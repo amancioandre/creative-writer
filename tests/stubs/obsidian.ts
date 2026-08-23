@@ -76,3 +76,26 @@ export class TextComponent {
   setValue(v: string) { this.value = v; return this; }
   onChange(cb: TextCb) { this.onChangeCb = cb; return this; }
 }
+export class WorkspaceLeaf {}
+function withEl(el: HTMLElement): HTMLElement & { empty(): void; createEl: (tag: string, o?: { text?: string; cls?: string }) => HTMLElement; createDiv: (o?: { text?: string; cls?: string }) => HTMLElement } {
+  const e = el as HTMLElement & { empty(): void; createEl: (tag: string, o?: { text?: string; cls?: string }) => HTMLElement; createDiv: (o?: { text?: string; cls?: string }) => HTMLElement };
+  e.empty = () => e.replaceChildren();
+  e.createEl = (tag, o) => { const c = withEl(document.createElement(tag)); if (o?.text) c.textContent = o.text; if (o?.cls) c.className = o.cls; e.appendChild(c); return c; };
+  e.createDiv = (o) => e.createEl("div", o);
+  return e;
+}
+export class ItemView {
+  contentEl = withEl(document.createElement("div"));
+  constructor(public leaf: WorkspaceLeaf) {}
+  getViewType(): string { return ""; }
+  getDisplayText(): string { return ""; }
+  getIcon(): string { return ""; }
+}
+
+declare global {
+  interface HTMLElement {
+    empty(): void;
+    createEl(tag: string, o?: { text?: string; cls?: string }): HTMLElement;
+    createDiv(o?: { text?: string; cls?: string }): HTMLElement;
+  }
+}

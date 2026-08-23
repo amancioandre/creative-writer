@@ -95,3 +95,8 @@ function locate(hay: Normalised, needle: string, hint: number | undefined): [num
   const to = hay.map[best + n.length - 1]! + 1;
   return [from, to];
 }
+
+/** Does `quote` occur in `text`, ignoring case, curly quotes and whitespace runs? */
+export function quoteAppears(text: string, quote: string): boolean {
+  return locate(normalise(text), normalise(quote).text, undefined) !== null;
+}

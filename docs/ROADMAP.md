@@ -56,7 +56,14 @@ Goal: upgrade precision on existing checks and add a metaphor *candidate* detect
 
 ---
 
-## Tier 3 — language models
+## Tier 3 — language models ✅ (3.0, 3.1 code-only, 3.2, 3.3 done)
+
+**As built:** Ollama adapter verified live; Claude adapter written and unit-tested against fixtures but **not run against the API** (no key on the build machine; skipped at the user's request). Eval harness shipped before myth, as planned, and changed the design: the model is asked only about judgement kinds (`cliche`, `metaphor`, `passive`), stays on-command by default, and its findings dedupe against rule findings. Myth analysis runs on the local model (deepseek-r1:14b recommended) instead of Claude-only. Numbers in `eval/RESULTS.md`.
+
+### Open items
+- Run `tests/eval/model.eval.test.ts` and `tests/integration/claude.live.test.ts` once an `ANTHROPIC_API_KEY` is available; Opus/Haiku are the models expected to actually clear the precision bar.
+- Hover note for model findings should say which model wrote it (currently only the status bar does).
+- Myth report could persist per note (frontmatter or sidecar) — currently session-cached only.
 
 Goal: judgement calls — is this metaphor fresh, is this cliché *in context*, what myth or archetype is this scene echoing. Two adapters behind one port; local first.
 

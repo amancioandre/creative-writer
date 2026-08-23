@@ -1,4 +1,4 @@
-import { MarkdownView, Notice, Plugin } from "obsidian";
+import { MarkdownView, Notice, Plugin, type WorkspaceLeaf } from "obsidian";
 import { Compartment } from "@codemirror/state";
 
 import type { PluginSettings } from "./domain/settings/Settings";
@@ -20,6 +20,9 @@ import { styleExtension } from "./infrastructure/codemirror/styleExtension";
 import { findingsTooltip } from "./infrastructure/codemirror/findingsTooltip";
 import { asyncFindingsExtension, analyseNow } from "./infrastructure/codemirror/asyncFindingsExtension";
 import { ConfiguredLlmAnalyser } from "./infrastructure/llm/ConfiguredLlmAnalyser";
+import { OllamaMythAnalyser } from "./infrastructure/llm/OllamaMythAnalyser";
+import { AnalyzeMyth } from "./application/use-cases/AnalyzeMyth";
+import { MythView, MYTH_VIEW_TYPE } from "./infrastructure/obsidian/views/MythView";
 import { RequestUrlHttpClient } from "./infrastructure/obsidian/RequestUrlHttpClient";
 import { enabledStyleKinds } from "./domain/settings/Settings";
 
@@ -33,6 +36,7 @@ export default class CreativeZenModePlugin extends Plugin {
   private readonly settingsCompartment = new Compartment();
   private settingsRepo!: PluginDataSettingsRepository;
   private zen!: ToggleZenMode;
+  private myth: AnalyzeMyth | null = null;
 
   async onload(): Promise<void> {
     this.settingsRepo = new PluginDataSettingsRepository(this);
@@ -68,6 +72,13 @@ export default class CreativeZenModePlugin extends Plugin {
       },
     });
 
+    this.registerView(MYTH_VIEW_TYPE, (leaf: WorkspaceLeaf) => new MythView(leaf));
+    this.addCommand({
+      id: "analyse-myth",
+      name: "Analyse selection for myth and archetype",
+      editorCallback: (editor) => void this.analyseMyth(editor.getSelection() || editor.getValue()),
+    });
+
     this.registerEditorExtension([
       this.settingsCompartment.of(settingsFacet.of(this.current)),
       typewriterExtension(),
@@ -95,6 +106,27 @@ export default class CreativeZenModePlugin extends Plugin {
         update: (next) => this.updateSettings(next),
       }),
     );
+  }
+
+  private async analyseMyth(text: string): Promise<void> {
+    const cfg = this.current.llm;
+    if (cfg.provider !== "ollama") {
+      new Notice("Creative Zen Mode: myth analysis needs a local model — set Model to Local (Ollama) in settings.");
+      return;
+    }
+    const leaf = this.app.workspace.getLeavesOfType(MYTH_VIEW_TYPE)[0] ?? this.app.workspace.getRightLeaf(false);
+    if (!leaf) return;
+    await leaf.setViewState({ type: MYTH_VIEW_TYPE, active: true });
+    this.app.workspace.revealLeaf(leaf);
+    const view = leaf.view as MythView;
+    const analyser = new OllamaMythAnalyser(new RequestUrlHttpClient(), { baseUrl: cfg.ollamaUrl, model: cfg.ollamaModel });
+    const useCase = (this.myth ??= new AnalyzeMyth(analyser));
+    view.showBusy(analyser.name);
+    try {
+      view.showReport(await useCase.execute(text, new AbortController().signal), analyser.name);
+    } catch (e) {
+      view.showError(e instanceof Error ? e.message : String(e));
+    }
   }
 
   async onunload(): Promise<void> {

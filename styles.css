@@ -92,3 +92,14 @@ body.czm-zen .workspace-split.mod-root {
 .czm-style-nominalization { background-color: var(--czm-style-nominalization); }
 .czm-style-weakverb       { background-color: var(--czm-style-weakverb); }
 .czm-style-metaphor       { background-color: var(--czm-style-metaphor); border-bottom: 1px dashed rgba(220, 120, 200, 0.7); }
+
+/* --- Myth & archetype view ------------------------------------------------ */
+.czm-myth { padding: 4px 8px; line-height: 1.45; }
+.czm-myth h4 { margin: 14px 0 6px; font-size: var(--font-ui-small); text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.7; }
+.czm-myth-summary { font-style: italic; }
+.czm-myth-item { margin-bottom: 10px; }
+.czm-myth-name { font-weight: 600; }
+.czm-myth blockquote { margin: 4px 0; padding-left: 10px; border-left: 2px solid var(--interactive-accent); opacity: 0.85; font-size: var(--font-ui-small); }
+.czm-myth-hint { opacity: 0.7; }
+.czm-myth-error { color: var(--text-error); }
+.czm-myth-meta { margin-top: 16px; font-size: var(--font-ui-smaller); opacity: 0.5; }

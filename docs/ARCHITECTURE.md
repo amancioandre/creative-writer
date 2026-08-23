@@ -108,3 +108,20 @@ Two more domain-defined ports, both optional — every rule works without them, 
 | Nominalization | light verb + noun with a verb inside (map of ~60, suffix fallback) | "take a look" is flagged; sometimes it's the right idiom. |
 | WeakVerb | sentence ≥ 10 words whose only verbs are copulas | Deliberate descriptive stasis. |
 | MetaphorCandidate | concrete verb (≥3.0) / modifier (≥4.0) with an abstract noun (≤3.4), gap ≥ 0.7; copula + concrete predicate; dead-metaphor list | Verbs the norms rate as abstract ("devour" 3.1) are invisible. Proper nouns skipped. |
+
+## Tier 3: models
+
+Two more ports, both async, both implemented for Ollama (and Claude, unverified):
+
+```
+asyncFindingsExtension ──► ScheduleAnalysis ──► AnalyzeParagraphWithLlm ──► LlmAnalyser (Ollama | Claude)
+                                                      │
+                                                      └── validateFindings: quote-anchored, never offset-anchored
+MythView ◄── AnalyzeMyth ◄── MythAnalyser (Ollama) ──► validateMythReport: evidence must be quoted from the passage
+```
+
+Invariants worth knowing:
+- **The model never places a mark.** Every finding passes `validateFindings`, which locates the model's quote in the text (case/quote/whitespace-insensitive) and drops anything it cannot find. Same for myth evidence.
+- **Rules own the mechanical checks.** `MODEL_KINDS` restricts what the model is asked about; `asyncFindingsExtension` drops model findings that overlap a rule finding of the same kind.
+- **Money is counted in one place.** `ConfiguredLlmAnalyser` prices Claude usage with `CostLedger` and enforces the daily cap before the request; spend persists in settings.
+- **Nothing runs on idle unless you opt in.** `llm.onIdle` defaults to false; the command always works.
