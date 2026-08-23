@@ -9,7 +9,7 @@ const COPULAS = new Set(["is", "are", "was", "were", "am", "be", "been", "being"
  * Short copula sentences ("The sky was red.") are fine and left alone.
  */
 export class WeakVerbRule implements StyleRule {
-  constructor(private readonly tagger: PosTagger, private readonly minWords = 10) {}
+  constructor(private readonly tagger: PosTagger, private readonly minWords = 14) {}
 
   analyse(text: string, ctx = new AnalysisContext(text, this.tagger)): Finding[] {
     const bySentence = new Map<number, TaggedToken[]>();

@@ -3,6 +3,10 @@ import { AnalysisContext, type StyleRule } from "../StyleRule";
 import { tokenize } from "../Tokenizer";
 import { LY_NOT_ADVERB, DIALOGUE_TAGS, STRUCTURAL_ADVERBS } from "../lexicon/adverbExceptions";
 import { indexByOffset, type PosTagger } from "../PosTagger";
+import { WEAK_WORDS } from "../lexicon/weakWords";
+
+/** Words the weak-word rule already owns ("basically", "suddenly"); flagging them twice helps nobody. */
+const OWNED_BY_WEAK = new Set(WEAK_WORDS.filter((w) => !w.phrase.includes(" ")).map((w) => w.phrase));
 
 /**
  * -ly manner adverbs. Each one is a place where a stronger verb might do
@@ -23,7 +27,7 @@ export class AdverbRule implements StyleRule {
     tokens.forEach((tok, i) => {
       const w = tok.text;
       if (w.length < 5 || !w.endsWith("ly") || /[^a-z]/.test(w)) return;
-      if (STRUCTURAL_ADVERBS.has(w)) return;
+      if (STRUCTURAL_ADVERBS.has(w) || OWNED_BY_WEAK.has(w)) return;
       const isAdverb = tagged ? (tagged.get(tok.from)?.tags.has("Adverb") ?? false) : !LY_NOT_ADVERB.has(w);
       if (!isAdverb) return;
       const prev = tokens[i - 1]?.text ?? "";

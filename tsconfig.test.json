@@ -9,7 +9,8 @@
   },
   "include": [
     "src/**/*.ts",
-    "tests/**/*.ts"
+    "tests/**/*.ts",
+    "eval/**/*.ts"
   ],
   "exclude": [
     "src/main.ts"

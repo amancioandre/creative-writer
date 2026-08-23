@@ -102,7 +102,6 @@ export const WEAK_WORDS: readonly WeakEntry[] = [
   f("saw", "Filter verb. Render what was seen, not the seeing: \"she saw the door open\" → \"the door opened\"."),
   f("see", "Filter verb. Render what is seen directly."),
   f("watched", "Filter verb. Render what was watched directly."),
-  f("looked", "Filter verb when followed by what was seen. Render it directly."),
   f("noticed", "Filter verb. Render what was noticed directly."),
   f("observed", "Filter verb. Render what was observed directly."),
   f("spotted", "Filter verb. Render what was spotted directly."),

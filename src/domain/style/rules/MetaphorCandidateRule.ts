@@ -17,9 +17,11 @@ export interface MetaphorThresholds {
   readonly minGap: number;
 }
 
-export const DEFAULT_METAPHOR_THRESHOLDS: MetaphorThresholds = { verbMin: 3.0, modifierMin: 4.0, abstractMax: 3.4, minGap: 0.7 };
+export const DEFAULT_METAPHOR_THRESHOLDS: MetaphorThresholds = { verbMin: 3.5, modifierMin: 4.0, abstractMax: 3.4, minGap: 0.7 };
 
 const NOT_A_HEAD_VERB = ["Copula", "Auxiliary", "Modal"];
+/** Light verbs carry nominalisations ("reached an agreement"); that is a different finding, not a metaphor. */
+const LIGHT_VERBS = new Set(["make", "take", "give", "have", "do", "reach", "come", "get", "put", "hold", "keep", "bring", "go", "set", "let"]);
 const WINDOW = 3;
 
 /**
@@ -60,7 +62,7 @@ export class MetaphorCandidateRule implements StyleRule {
       const t = toks[i]!;
       const isNoun = t.tags.has("Noun") && !t.tags.has("Pronoun");
 
-      if (t.tags.has("Verb") && !NOT_A_HEAD_VERB.some((s) => t.tags.has(s))) {
+      if (t.tags.has("Verb") && !NOT_A_HEAD_VERB.some((s) => t.tags.has(s)) && !LIGHT_VERBS.has(t.lemma)) {
         const vs = this.score(t);
         if (vs === null || vs < this.t.verbMin) continue;
         const partner = this.abstractNoun(toks, i, +1, vs) ?? this.abstractNoun(toks, i, -1, vs);
@@ -93,6 +95,7 @@ export class MetaphorCandidateRule implements StyleRule {
       const n = toks[i + dir * step];
       if (!n || n.sentence !== v.sentence) return null;
       if (n.tags.has("Verb") || n.tags.has("Preposition") || n.tags.has("Conjunction")) return null;
+      if (n.tags.has("Possessive") || n.tags.has("Determiner")) continue;
       if (!n.tags.has("Noun") || n.tags.has("Pronoun") || n.tags.has("Person") || n.tags.has("Place")) continue;
       const ns = this.score(n);
       if (ns === null) return null;

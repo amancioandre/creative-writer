@@ -62,7 +62,7 @@ export const CLICHES: readonly string[] = [
   "like a bull in a china shop", "like a moth to a flame", "like a hot knife through butter",
   "like a ton of bricks", "like a house on fire", "like a chicken with its head cut off", "like there's no tomorrow",
   "like there was no tomorrow", "like clockwork", "like a dream", "like a charm", "like water off a duck's back",
-  "like two peas in a pod", "like taking candy from a baby", "like a broken record", "like night and day",
+  "like two peas in a pod", "two peas in a pod", "like taking candy from a baby", "like a broken record", "like night and day",
   "like a glove", "fit like a glove", "like the back of my hand", "like the back of his hand",
   "like the back of her hand", "like a sore thumb", "stuck out like a sore thumb", "stick out like a sore thumb",
 

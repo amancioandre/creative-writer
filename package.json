@@ -12,7 +12,9 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc -noEmit -skipLibCheck && tsc -noEmit -skipLibCheck -p tsconfig.test.json",
     "install:vault": "node scripts/install-to-vault.mjs",
-    "build:concreteness": "node scripts/build-concreteness.mjs"
+    "build:concreteness": "node scripts/build-concreteness.mjs",
+    "eval": "vitest run tests/eval",
+    "eval:ollama": "OLLAMA_LIVE=1 vitest run tests/eval/model"
   },
   "keywords": [
     "obsidian",

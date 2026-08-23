@@ -1,6 +1,6 @@
 import type { FindingKind } from "../../../domain/style/Finding";
 
-export const RULEBOOK_VERSION = "2026-08-23.1";
+export const RULEBOOK_VERSION = "2026-08-23.2";
 
 /**
  * The system prompt shared by every model adapter. Long on purpose: a
@@ -44,6 +44,7 @@ weakverb — A long sentence whose only verb is 'to be', describing a state wher
   Example: quote "was", note "Twenty-two words hung on 'was'. What did the room DO to her?"
 
 Rules:
+0. Most sentences are fine. A competent paragraph usually has zero or one finding. Returning {"findings": []} is the normal outcome, not a failure — an editor who marks every line is ignored. Only report what you would defend to the author's face.
 1. Quote exactly. If you cannot quote the span verbatim, do not report it.
 2. Report each problem once. Do not report the same span under two kinds unless both are real.
 3. Prefer fewer, sharper findings. Three good notes beat ten vague ones.

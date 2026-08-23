@@ -37,4 +37,11 @@ describe("AnalyzeParagraphWithLlm", () => {
     const uc = new AnalyzeParagraphWithLlm(llm, () => new Set(["cliche"]));
     expect(await uc.analyse("It was very cold in the hall that night.", 0, new AbortController().signal)).toEqual([]);
   });
+
+  it("only asks the model about judgement kinds, even if more are enabled", async () => {
+    const llm = fake([]);
+    const uc = new AnalyzeParagraphWithLlm(llm, () => new Set(["cliche", "weak", "adverb", "metaphor"]));
+    await uc.analyse("A paragraph with enough words in it.", 0, new AbortController().signal);
+    expect(llm.requests[0]!.checks).toEqual(["cliche", "metaphor"]);
+  });
 });
