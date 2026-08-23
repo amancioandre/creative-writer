@@ -11,30 +11,24 @@ What Obsidian requires, and where this repo stands.
 - Build: `npm run build` → `main.js` (gitignored; attached to releases, not committed).
 - Guidelines compliance checked: no `innerHTML` with untrusted content (model text goes in as text nodes), no default hotkeys, commands named without the plugin name, sentence-case settings, `onunload` restores the body class, no `console.log`, no Node/Electron APIs (the only network call goes through `requestUrl`).
 
-## Before the first release
+## Submitting (current process — https://docs.obsidian.md/plugins/releasing/submit-plugin)
 
-1. **Fill in `author`/`authorUrl`** in `manifest.json` if you want a link (`authorUrl` is optional; `fundingUrl` too).
-2. **Create a public GitHub repository** and push `main`. Any name is fine; the plugin `id` is what matters.
-3. **Tag a release whose tag is exactly the version** — `0.1.0`, no `v` prefix:
-   ```bash
-   npm run release:check
-   git tag 0.1.0 && git push --tags
-   ```
-   `.github/workflows/release.yml` then builds from source with the committed lockfile, runs the tests, attests provenance for the assets, and creates the GitHub release with **`main.js`, `manifest.json`, `styles.css`**. Never upload a locally built `main.js` — the review bot compares the asset with its own build.
-4. **Submit**: fork `obsidianmd/obsidian-releases`, add an entry to the end of `community-plugins.json`:
-   ```json
-   { "id": "creative-writer", "name": "creative-writer", "author": "André Amnc", "description": "…same as manifest…", "repo": "amancioandre/creative-writer" }
-   ```
-   and open a PR titled `Add plugin: creative-writer`. A bot validates the manifest and release assets; a reviewer then reads the code. Expect a few weeks.
+Submission is through the **community directory**, not a pull request:
 
-## Each later release
+1. Repository has `README.md`, `LICENSE` and `manifest.json` at the root, and the plugin `id` is unique and does not contain "obsidian". ✅
+2. A GitHub release exists whose tag equals `manifest.version`, with `main.js`, `manifest.json`, `styles.css` attached. CI does this on every version tag.
+3. Sign in at https://community.obsidian.md with your Obsidian account, link your GitHub profile, and add the plugin by repository.
+4. The automated review reads `manifest.json` at the HEAD of the default branch and checks the matching release. Errors block installation; warnings don't.
+5. **To get re-reviewed after fixes, publish a new release with an incremented version** — the directory does not re-check an existing version.
+
+## Each later release (and every review round)
 
 ```bash
-npm version 0.2.0        # bumps package.json, manifest.json, versions.json; commits
+npm version patch        # or minor/major — bumps package.json, manifest.json, versions.json; commits + tags
 npm run release:check
-git push && git push --tags
+git push --follow-tags
 ```
-CI creates the release. Users on the community list get the update automatically.
+CI builds, attests and creates the release; the directory picks up the new version and re-runs its review. Users on the community list get the update automatically.
 
 ## Things a reviewer may ask about
 
