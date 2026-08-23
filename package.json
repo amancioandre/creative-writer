@@ -1,0 +1,37 @@
+{
+  "name": "creative-zen-mode",
+  "version": "0.1.0",
+  "description": "Zen Mode, typewriter centering, focus fade and paragraph rhythm for creative writing in Obsidian.",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "npm run typecheck && node esbuild.config.mjs production",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc -noEmit -skipLibCheck && tsc -noEmit -skipLibCheck -p tsconfig.test.json",
+    "install:vault": "node scripts/install-to-vault.mjs"
+  },
+  "keywords": [
+    "obsidian",
+    "plugin",
+    "writing",
+    "zen"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@codemirror/language": "^6.10.0",
+    "@codemirror/state": "6.5.0",
+    "@codemirror/view": "^6.26.0",
+    "@types/node": "^20.11.0",
+    "@vitest/coverage-v8": "^2.1.0",
+    "builtin-modules": "^4.0.0",
+    "esbuild": "^0.23.0",
+    "jsdom": "^25.0.0",
+    "obsidian": "latest",
+    "tslib": "^2.6.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.1.0"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "id": "creative-zen-mode",
+  "name": "Creative Zen Mode",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Zen Mode, typewriter centering, focus fade and paragraph rhythm colouring for creative writing.",
+  "author": "André Amancio",
+  "isDesktopOnly": true
+}

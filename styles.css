@@ -1,0 +1,58 @@
+/* ==========================================================================
+   Creative Zen Mode — all visuals live here. The plugin only toggles classes.
+   ========================================================================== */
+
+/* --- Zen Mode: hide workspace chrome ------------------------------------ */
+body.czm-zen .workspace-ribbon,
+body.czm-zen .workspace-tab-header-container,
+body.czm-zen .status-bar,
+body.czm-zen .workspace-split.mod-left-split,
+body.czm-zen .workspace-split.mod-right-split,
+body.czm-zen .titlebar,
+body.czm-zen .view-header {
+  display: none !important;
+}
+
+body.czm-zen .workspace-split.mod-root {
+  width: 100%;
+}
+
+/* --- Typewriter: room for the first/last lines to reach the centre ------ */
+.czm-typewriter .cm-content {
+  padding-top: 45vh !important;
+  padding-bottom: 45vh !important;
+}
+
+/* --- Focus fade ----------------------------------------------------------- */
+.czm-focus-fade .cm-line {
+  transition: opacity 120ms ease-out;
+}
+.czm-focus-fade .cm-line.czm-focus-0 { opacity: 1; }
+.czm-focus-fade .cm-line.czm-focus-1 { opacity: 0.72; }
+.czm-focus-fade .cm-line.czm-focus-2 { opacity: 0.45; }
+.czm-focus-fade .cm-line.czm-focus-3 { opacity: 0.25; }
+
+/* --- Paragraph rhythm ------------------------------------------------------
+   Tier 1 = shortest/lightest sentence, tier 6 = longest/heaviest.
+   Colours are subtle underlines so they coexist with theme text colours. */
+:root {
+  --czm-rhythm-1: rgba(99, 179, 237, 0.85);
+  --czm-rhythm-2: rgba(72, 187, 170, 0.85);
+  --czm-rhythm-3: rgba(154, 205, 50, 0.85);
+  --czm-rhythm-4: rgba(236, 201, 75, 0.85);
+  --czm-rhythm-5: rgba(237, 137, 54, 0.85);
+  --czm-rhythm-6: rgba(229, 83, 83, 0.85);
+}
+
+.cm-line [class*="czm-rhythm-"] {
+  text-decoration-line: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+  text-decoration-skip-ink: none;
+}
+.czm-rhythm-1 { text-decoration-color: var(--czm-rhythm-1); }
+.czm-rhythm-2 { text-decoration-color: var(--czm-rhythm-2); }
+.czm-rhythm-3 { text-decoration-color: var(--czm-rhythm-3); }
+.czm-rhythm-4 { text-decoration-color: var(--czm-rhythm-4); }
+.czm-rhythm-5 { text-decoration-color: var(--czm-rhythm-5); }
+.czm-rhythm-6 { text-decoration-color: var(--czm-rhythm-6); }
