@@ -1,7 +1,8 @@
 import { RhythmScale } from "../rhythm/RhythmScale";
 import { FINDING_KINDS, type FindingKind } from "../style/Finding";
 
-export type LlmProvider = "off" | "ollama";
+export type LlmProvider = "off" | "ollama" | "claude";
+export type ClaudeModelId = "claude-opus-5" | "claude-haiku-4-5";
 
 export interface LlmSettings {
   readonly provider: LlmProvider;
@@ -10,6 +11,12 @@ export interface LlmSettings {
   readonly idleMs: number;
   readonly ollamaUrl: string;
   readonly ollamaModel: string;
+  readonly claudeModel: ClaudeModelId;
+  /** Stored in plaintext in data.json inside the vault. The settings tab says so. */
+  readonly claudeApiKey: string;
+  /** USD per local day; 0 = unlimited. */
+  readonly dailyCapUsd: number;
+  readonly spend: { readonly day: string; readonly usd: number };
 }
 
 export const DEFAULT_LLM_SETTINGS: LlmSettings = {
@@ -18,6 +25,10 @@ export const DEFAULT_LLM_SETTINGS: LlmSettings = {
   idleMs: 1500,
   ollamaUrl: "http://localhost:11434",
   ollamaModel: "qwen2.5:7b",
+  claudeModel: "claude-opus-5",
+  claudeApiKey: "",
+  dailyCapUsd: 1,
+  spend: { day: "", usd: 0 },
 };
 
 export interface PluginSettings {
@@ -89,7 +100,8 @@ export function enabledStyleKinds(s: PluginSettings): Set<FindingKind> {
   return new Set(FINDING_KINDS.filter((k) => s.styleEnabled && s.styleChecks[k]));
 }
 
-const PROVIDERS: readonly LlmProvider[] = ["off", "ollama"];
+const PROVIDERS: readonly LlmProvider[] = ["off", "ollama", "claude"];
+const CLAUDE_MODELS: readonly ClaudeModelId[] = ["claude-opus-5", "claude-haiku-4-5"];
 
 function normalizeLlm(raw: unknown): LlmSettings {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
@@ -100,10 +112,19 @@ function normalizeLlm(raw: unknown): LlmSettings {
     idleMs: typeof r.idleMs === "number" && Number.isFinite(r.idleMs) ? clampInt(r.idleMs, 500, 10000) : DEFAULT_LLM_SETTINGS.idleMs,
     ollamaUrl: str("ollamaUrl"),
     ollamaModel: str("ollamaModel"),
+    claudeModel: CLAUDE_MODELS.includes(r.claudeModel as ClaudeModelId) ? (r.claudeModel as ClaudeModelId) : DEFAULT_LLM_SETTINGS.claudeModel,
+    claudeApiKey: typeof r.claudeApiKey === "string" ? r.claudeApiKey.trim() : "",
+    dailyCapUsd: typeof r.dailyCapUsd === "number" && Number.isFinite(r.dailyCapUsd) ? Math.min(100, Math.max(0, r.dailyCapUsd)) : DEFAULT_LLM_SETTINGS.dailyCapUsd,
+    spend: normalizeSpend(r.spend),
   };
+}
+
+function normalizeSpend(raw: unknown): { day: string; usd: number } {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  return { day: typeof r.day === "string" ? r.day : "", usd: typeof r.usd === "number" && Number.isFinite(r.usd) && r.usd >= 0 ? r.usd : 0 };
 }
 
 /** True when the two configurations would talk to a different model. */
 export function llmConfigEquals(a: LlmSettings, b: LlmSettings): boolean {
-  return a.provider === b.provider && a.ollamaUrl === b.ollamaUrl && a.ollamaModel === b.ollamaModel;
+  return a.provider === b.provider && a.ollamaUrl === b.ollamaUrl && a.ollamaModel === b.ollamaModel && a.claudeModel === b.claudeModel && a.claudeApiKey === b.claudeApiKey;
 }

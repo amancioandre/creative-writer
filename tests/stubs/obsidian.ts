@@ -42,7 +42,8 @@ export class Setting {
   slider?: SliderComponent;
   constructor(public containerEl: HTMLElement) { Setting.created.push(this); }
   setName(n: string) { this.name = n; return this; }
-  setDesc(_d: string) { return this; }
+  desc = "";
+  setDesc(d: string) { this.desc = d; return this; }
   setHeading() { return this; }
   addToggle(cb: (t: ToggleComponent) => unknown) { this.toggle = new ToggleComponent(); cb(this.toggle); return this; }
   addSlider(cb: (s: SliderComponent) => unknown) { this.slider = new SliderComponent(); cb(this.slider); return this; }

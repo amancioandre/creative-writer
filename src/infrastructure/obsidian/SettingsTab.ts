@@ -1,6 +1,6 @@
 import { type App, type Plugin, PluginSettingTab, Setting } from "obsidian";
 import { RhythmScale } from "../../domain/rhythm/RhythmScale";
-import type { LlmProvider, PluginSettings } from "../../domain/settings/Settings";
+import type { ClaudeModelId, LlmProvider, PluginSettings } from "../../domain/settings/Settings";
 import type { FindingKind } from "../../domain/style/Finding";
 
 /** What the tab needs from the outside world — not the whole plugin. */
@@ -84,7 +84,7 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
       .setName("Model")
       .setDesc("A language model reads the current paragraph and adds findings the rules cannot see: clichés in context, tired metaphors, passives that hide an agent. Local Ollama keeps everything on this machine.")
       .addDropdown((d) =>
-        d.addOptions({ off: "Off", ollama: "Local (Ollama)" }).setValue(s.llm.provider).onChange((v) => set({ llm: { ...this.port.current().llm, provider: v as LlmProvider } })),
+        d.addOptions({ off: "Off", ollama: "Local (Ollama)", claude: "Claude (Anthropic API)" }).setValue(s.llm.provider).onChange((v) => set({ llm: { ...this.port.current().llm, provider: v as LlmProvider } })),
       );
 
     new Setting(containerEl)
@@ -105,5 +105,24 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
       .setName("Ollama model")
       .setDesc("Any chat model you have pulled. qwen2.5:7b and llama3.1:8b follow the JSON format well; reasoning models (deepseek-r1) are slower and less reliable here.")
       .addText((t) => t.setPlaceholder("qwen2.5:7b").setValue(s.llm.ollamaModel).onChange((v) => set({ llm: { ...this.port.current().llm, ollamaModel: v } })));
+
+    new Setting(containerEl)
+      .setName("Claude model")
+      .setDesc("Opus 5 ($5 / $25 per million tokens) reads prose far more carefully; Haiku 4.5 ($1 / $5) is the budget option. A paragraph costs roughly a cent on Opus with the rulebook cached.")
+      .addDropdown((d) =>
+        d.addOptions({ "claude-opus-5": "Claude Opus 5", "claude-haiku-4-5": "Claude Haiku 4.5" })
+          .setValue(s.llm.claudeModel)
+          .onChange((v) => set({ llm: { ...this.port.current().llm, claudeModel: v as ClaudeModelId } })),
+      );
+
+    new Setting(containerEl)
+      .setName("Anthropic API key")
+      .setDesc("Stored in PLAINTEXT in this vault's .obsidian/plugins/creative-zen-mode/data.json. If the vault syncs, the key syncs with it. Use a key you can revoke.")
+      .addText((t) => t.setPlaceholder("sk-ant-…").setValue(s.llm.claudeApiKey).onChange((v) => set({ llm: { ...this.port.current().llm, claudeApiKey: v } })));
+
+    new Setting(containerEl)
+      .setName("Daily spending cap (USD)")
+      .setDesc(`Claude calls stop when today's spend reaches this. 0 = no cap. Spent today: $${s.llm.spend.usd.toFixed(3)}.`)
+      .addSlider((sl) => sl.setLimits(0, 20, 0.5).setValue(s.llm.dailyCapUsd).setDynamicTooltip().onChange((v) => set({ llm: { ...this.port.current().llm, dailyCapUsd: v } })));
   }
 }

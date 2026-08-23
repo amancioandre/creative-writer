@@ -46,7 +46,11 @@ export default class CreativeZenModePlugin extends Plugin {
       callback: () => void this.zen.execute(),
     });
 
-    const llm = new ConfiguredLlmAnalyser(new RequestUrlHttpClient(), () => this.current.llm);
+    const llm = new ConfiguredLlmAnalyser(
+      new RequestUrlHttpClient(),
+      () => this.current.llm,
+      (spend) => void this.updateSettings({ ...this.current, llm: { ...this.current.llm, spend } }),
+    );
     const llmAnalyser = new AnalyzeParagraphWithLlm(llm, () => enabledStyleKinds(this.current));
     const status = this.addStatusBarItem();
     let lastErrorAt = 0;
@@ -72,7 +76,10 @@ export default class CreativeZenModePlugin extends Plugin {
       styleExtension(AnalyzeParagraphStyle.withDefaultRules(new CompromiseTagger(), new BrysbaertConcreteness())),
       findingsTooltip(),
       asyncFindingsExtension(llmAnalyser, {
-        onBusy: (busy) => status.setText(busy ? `✦ ${llm.name}…` : ""),
+        onBusy: (busy) => {
+          const cost = this.current.llm.provider === "claude" ? ` $${llm.ledger.sessionUsd.toFixed(3)}` : "";
+          status.setText(busy ? `✦ ${llm.name}…` : cost.trim());
+        },
         onError: (e) => {
           // One notice a minute is plenty; a dead Ollama would otherwise spam on every pause.
           if (Date.now() - lastErrorAt < 60_000) return;

@@ -42,7 +42,7 @@ describe("style settings", () => {
 describe("llm settings", () => {
   it("defaults to off with sensible Ollama values", () => {
     const s = normalizeSettings(undefined);
-    expect(s.llm).toEqual({ provider: "off", onIdle: false, idleMs: 1500, ollamaUrl: "http://localhost:11434", ollamaModel: "qwen2.5:7b" });
+    expect(s.llm).toEqual({ provider: "off", onIdle: false, idleMs: 1500, ollamaUrl: "http://localhost:11434", ollamaModel: "qwen2.5:7b", claudeModel: "claude-opus-5", claudeApiKey: "", dailyCapUsd: 1, spend: { day: "", usd: 0 } });
   });
   it("accepts valid providers and rejects junk", () => {
     expect(normalizeSettings({ llm: { provider: "ollama" } }).llm.provider).toBe("ollama");
@@ -53,5 +53,14 @@ describe("llm settings", () => {
     expect(s.llm.idleMs).toBe(500);
     expect(s.llm.ollamaUrl).toBe("http://h:1");
     expect(s.llm.ollamaModel).toBe("m");
+  });
+  it("validates claude fields", () => {
+    const s = normalizeSettings({ llm: { provider: "claude", claudeModel: "claude-haiku-4-5", claudeApiKey: " sk ", dailyCapUsd: 500, spend: { day: "2026-08-23", usd: -1 } } });
+    expect(s.llm.provider).toBe("claude");
+    expect(s.llm.claudeModel).toBe("claude-haiku-4-5");
+    expect(s.llm.claudeApiKey).toBe("sk");
+    expect(s.llm.dailyCapUsd).toBe(100);
+    expect(s.llm.spend).toEqual({ day: "2026-08-23", usd: 0 });
+    expect(normalizeSettings({ llm: { claudeModel: "claude-3" } }).llm.claudeModel).toBe("claude-opus-5");
   });
 });

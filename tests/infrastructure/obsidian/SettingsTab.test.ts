@@ -20,7 +20,7 @@ describe("CreativeZenSettingsTab", () => {
   it("renders a control for every setting", () => {
     const names = Setting.created.map((s) => s.name).filter(Boolean);
     expect(names).toEqual(
-      expect.arrayContaining(["Typewriter scrolling", "Focus fade", "Paragraph rhythm", "Rhythm tiers", "Fullscreen in Zen Mode", "Style checks", "Clichés", "Passive voice", "Weak words", "Filter verbs", "Adverbs", "Repetition", "Nominalisations", "Weak verbs", "Metaphor candidates", "Model", "Analyse automatically", "Ollama URL", "Ollama model"]),
+      expect.arrayContaining(["Typewriter scrolling", "Focus fade", "Paragraph rhythm", "Rhythm tiers", "Fullscreen in Zen Mode", "Style checks", "Clichés", "Passive voice", "Weak words", "Filter verbs", "Adverbs", "Repetition", "Nominalisations", "Weak verbs", "Metaphor candidates", "Model", "Analyse automatically", "Ollama URL", "Ollama model", "Claude model", "Anthropic API key", "Daily spending cap (USD)"]),
     );
   });
 
@@ -54,5 +54,12 @@ describe("CreativeZenSettingsTab", () => {
     await Setting.created.find((s) => s.name === "Ollama model")!.text!.onChangeCb("llama3.1:8b");
     expect(saved[0]!.llm.provider).toBe("ollama");
     expect(saved[1]!.llm.ollamaModel).toBe("llama3.1:8b");
+  });
+
+  it("persists the Claude key and warns about plaintext", async () => {
+    const key = Setting.created.find((s) => s.name === "Anthropic API key")!;
+    await key.text!.onChangeCb("sk-ant-x");
+    expect(saved[0]!.llm.claudeApiKey).toBe("sk-ant-x");
+    expect(key.desc).toMatch(/plaintext/i);
   });
 });
