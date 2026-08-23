@@ -90,3 +90,21 @@ Each rule's precision/recall trade-off, in one line:
 | WeakWord | 100+ entries with notes; context guards for `so`, `just`, `felt`, `pretty` | "There was" is flagged even when it's the right choice. |
 | Adverb | `-ly`, ≥5 letters, minus a non-adverb list; sharper note after a dialogue tag | Rare adjectives not in the list ("ghastly" is). |
 | Repetition | Stemmed content word within 30 words; ≥3 sentence openers alike | Deliberate anaphora gets flagged at three. |
+
+## Tier 2: tagger and concreteness
+
+Two more domain-defined ports, both optional — every rule works without them, they only sharpen:
+
+- `PosTagger` (`domain/style/PosTagger.ts`) ← `CompromiseTagger`. Tokens carry tags, offsets, sentence index and a lemma.
+- `Concreteness` (`domain/style/Concreteness.ts`) ← `BrysbaertConcreteness`. 1–5 score, lemma fallback for inflections.
+
+`AnalysisContext` is passed to every rule in one `execute()` so the paragraph is tagged once. `AnalyzeParagraphStyle.withDefaultRules(tagger?, concreteness?)` adds `NominalizationRule`, `WeakVerbRule` and `MetaphorCandidateRule` only when their ports are supplied.
+
+`ScheduleAnalysis` + `asyncFindingsExtension` (debounce, abort, LRU keyed by text hash, stale-result hiding) exist for analysers that are too slow to run per keystroke. Nothing in Tier 2 needed them; Tier 3 will.
+
+| Rule | Signal | Known misses |
+|---|---|---|
+| PassiveVoice (+tagger) | Participle/Passive tag; stative word accepted only with a `by`-agent or `being` | "was closed" with no agent and no context stays unflagged — by design. |
+| Nominalization | light verb + noun with a verb inside (map of ~60, suffix fallback) | "take a look" is flagged; sometimes it's the right idiom. |
+| WeakVerb | sentence ≥ 10 words whose only verbs are copulas | Deliberate descriptive stasis. |
+| MetaphorCandidate | concrete verb (≥3.0) / modifier (≥4.0) with an abstract noun (≤3.4), gap ≥ 0.7; copula + concrete predicate; dead-metaphor list | Verbs the norms rate as abstract ("devour" 3.1) are invisible. Proper nouns skipped. |

@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc -noEmit -skipLibCheck && tsc -noEmit -skipLibCheck -p tsconfig.test.json",
-    "install:vault": "node scripts/install-to-vault.mjs"
+    "install:vault": "node scripts/install-to-vault.mjs",
+    "build:concreteness": "node scripts/build-concreteness.mjs"
   },
   "keywords": [
     "obsidian",

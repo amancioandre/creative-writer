@@ -10,6 +10,8 @@ export interface TaggedToken {
   readonly to: number;
   /** Lowercased, punctuation-stripped form. */
   readonly normal: string;
+  /** Dictionary form when the tagger can derive one ("bled" → "bleed"); otherwise `normal`. */
+  readonly lemma: string;
   /** Penn-ish tag names as the tagger reports them: Noun, Verb, Participle, Adverb, Adjective, Copula, Auxiliary… */
   readonly tags: ReadonlySet<string>;
   /** 0-based sentence index. */

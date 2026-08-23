@@ -22,6 +22,12 @@ describe("CompromiseTagger", () => {
     expect(toks.map((t) => t.sentence)).toEqual([0, 0, 1, 1]);
   });
 
+  it("derives lemmas for irregular forms", () => {
+    const by = Object.fromEntries(tagger.tag("The idea bled. Knives fell.").map((t) => [t.normal, t.lemma]));
+    expect(by.bled).toBe("bleed");
+    expect(by.knives).toBe("knife");
+  });
+
   it("handles empty input", () => {
     expect(tagger.tag("")).toEqual([]);
   });

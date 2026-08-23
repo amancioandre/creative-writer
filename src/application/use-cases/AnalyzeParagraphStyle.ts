@@ -1,6 +1,8 @@
 import type { Finding, FindingKind } from "../../domain/style/Finding";
 import { AnalysisContext, type StyleRule } from "../../domain/style/StyleRule";
 import type { PosTagger } from "../../domain/style/PosTagger";
+import type { Concreteness } from "../../domain/style/Concreteness";
+import { MetaphorCandidateRule } from "../../domain/style/rules/MetaphorCandidateRule";
 import { NominalizationRule } from "../../domain/style/rules/NominalizationRule";
 import { WeakVerbRule } from "../../domain/style/rules/WeakVerbRule";
 import { ClicheRule } from "../../domain/style/rules/ClicheRule";
@@ -29,9 +31,10 @@ export class AnalyzeParagraphStyle {
   /**
    * Without a tagger: the six Tier 1 rules on word shape alone.
    * With one: passive and adverb use real tags, and nominalisation and
-   * weak-verb checks become possible. The tagger runs once per paragraph.
+   * weak-verb checks become possible. With concreteness norms as well,
+   * metaphor candidates are detected. The tagger runs once per paragraph.
    */
-  static withDefaultRules(tagger?: PosTagger): AnalyzeParagraphStyle {
+  static withDefaultRules(tagger?: PosTagger, concreteness?: Concreteness): AnalyzeParagraphStyle {
     const weak = new WeakWordRule();
     const rules: RuleRegistry = {
       cliche: new ClicheRule(),
@@ -44,6 +47,7 @@ export class AnalyzeParagraphStyle {
     if (tagger) {
       rules.nominalization = new NominalizationRule(tagger);
       rules.weakverb = new WeakVerbRule(tagger);
+      if (concreteness) rules.metaphor = new MetaphorCandidateRule(tagger, concreteness);
     }
     return new AnalyzeParagraphStyle(rules, tagger ?? null);
   }

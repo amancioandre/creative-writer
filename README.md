@@ -8,7 +8,7 @@ An Obsidian plugin for creative writing. Four features, all inside the editor:
 | **Typewriter scrolling** | Keeps the line you're writing vertically centred. | Settings → Typewriter scrolling |
 | **Focus fade** | Fades lines progressively by distance from the cursor (3 rings). | Settings → Focus fade |
 | **Paragraph rhythm** | Underlines each sentence of the current paragraph, cool → warm by "effective length". | Settings → Paragraph rhythm / Rhythm tiers |
-| **Style checks** | Tints clichés, passive voice, weak words, filter verbs, adverbs and repetition in the current paragraph; hover for the note. Offline, rule-based. | Settings → Style checks (per-kind toggles) |
+| **Style checks** | Tints clichés, passive voice, weak words, filter verbs, adverbs, repetition, nominalisations, weak verbs and metaphor candidates in the current paragraph; hover for the note. Offline: rules + a POS tagger + concreteness norms. | Settings → Style checks (per-kind toggles) |
 
 Editing mode only (Source + Live Preview); Reading view has no CodeMirror and is untouched.
 
@@ -26,7 +26,7 @@ Then in Obsidian: Settings → Community plugins → enable **Creative Zen Mode*
 For development: `npm run dev` (esbuild watch) plus the **Hot Reload** community plugin.
 
 ```bash
-npm test              # 163 tests, ~1s
+npm test              # 214 tests, ~1s
 npm run test:watch
 npm run test:coverage # thresholds: 90% lines/functions/statements, 85% branches
 npm run typecheck
@@ -42,16 +42,19 @@ src/
 │   ├── rhythm/       Sentence, SentenceMetrics, SyllableEstimator, RhythmScale,
 │   │                 RhythmClassifier, AbbreviationMerger
 │   ├── text/         LineSource (port), Paragraph (locateParagraph)
-│   ├── style/        Finding, Tokenizer, StyleRule, rules/ (Cliche, PassiveVoice,
-│   │                 WeakWord, Adverb, Repetition, PhraseMatcher), lexicon/ (curated lists)
+│   ├── style/        Finding, Tokenizer, StyleRule (+AnalysisContext), PosTagger & Concreteness
+│   │                 (ports), rules/ (Cliche, PassiveVoice, WeakWord, Adverb, Repetition,
+│   │                 Nominalization, WeakVerb, MetaphorCandidate, PhraseMatcher), lexicon/
 │   ├── focus/        FocusTier
 │   ├── zen/          ZenMode
 │   └── settings/     PluginSettings, normalizeSettings
 ├── application/      use cases + the ports they need
 │   ├── ports/        SentenceSegmenter, WorkspaceChrome, SettingsRepository
-│   └── use-cases/    AnalyzeParagraphRhythm, AnalyzeParagraphStyle, ComputeFocusFade, ToggleZenMode
+│   └── use-cases/    AnalyzeParagraphRhythm, AnalyzeParagraphStyle, ScheduleAnalysis,
+│                     ComputeFocusFade, ToggleZenMode
 ├── infrastructure/   adapters — the only place CodeMirror and Obsidian appear
 │   ├── segmentation/ IntlSentenceSegmenter
+│   ├── nlp/          CompromiseTagger, BrysbaertConcreteness (+ generated data)
 │   ├── codemirror/   settingsFacet, typewriter/focusFade/rhythm/style extensions
 │   └── obsidian/     DomWorkspaceChrome, PluginDataSettingsRepository, SettingsTab
 └── main.ts           composition root — wiring only
@@ -60,6 +63,11 @@ src/
 `styles.css` owns every visual. The code only toggles classes:
 `body.czm-zen`, `.czm-typewriter`, `.czm-focus-fade` + `.czm-focus-{0..3}`, `.czm-rhythm-{1..6}`, `.czm-style-{kind}`.
 
+## Data and dependencies
+
+- [`compromise`](https://github.com/spencermountain/compromise) (MIT) — part-of-speech tagging, the plugin's only runtime dependency.
+- Concreteness norms: Brysbaert, Warriner & Kuperman (2014), *Concreteness ratings for 40 thousand generally known English word lemmas*, Behavior Research Methods — CC-BY 4.0. `data/` holds the source; `npm run build:concreteness` regenerates the bundled subset (16k lemmas, SUBTLEX ≥ 20).
+
 ## Out of scope (by design)
 
-The LLM-backed assistant from the original brief is not implemented yet. Everything here is offline and deterministic. See [docs/ROADMAP.md](docs/ROADMAP.md) for Tiers 2 and 3.
+The LLM-backed assistant from the original brief (Tier 3) is not implemented yet. Everything here is offline and deterministic. See [docs/ROADMAP.md](docs/ROADMAP.md).

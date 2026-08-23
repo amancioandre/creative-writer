@@ -1,12 +1,14 @@
 # Roadmap: Tiers 2 and 3
 
-Tier 1 (rule-based style checks) shipped 2026-08-23. This document breaks down the next two tiers into increments that each end in a working, tested, installable plugin. Estimates assume the same cadence as Tier 0/1: one focused session per increment.
+Tier 1 (rule-based style checks) and Tier 2 (2.0–2.2) shipped 2026-08-23. 2.3 (stats panel) was optional and is not built. This document breaks down the next two tiers into increments that each end in a working, tested, installable plugin. Estimates assume the same cadence as Tier 0/1: one focused session per increment.
 
 The architectural seam for everything below already exists: findings are `Finding { kind, from, to, note }` and render through `styleExtension`. New detectors only need to produce findings; nothing in rendering changes. The one new abstraction is an **async analyser port** — Tier 1 rules are synchronous, Tier 2/3 sources are not.
 
 ---
 
-## Tier 2 — local NLP, no LLM
+## Tier 2 — local NLP, no LLM ✅ (2.0, 2.1, 2.2 done)
+
+**As built:** tagger-backed rules run synchronously (tag once per paragraph via `AnalysisContext`, ~3 ms typical, 15 ms for a 500-word paragraph), so the async path from 2.0 is wired and tested but reserved for Tier 3. Metaphor candidates use a concreteness *gap* with separate verb/modifier thresholds rather than fixed extremes, plus a copula-predicate pattern ("sorrow was a stone"); 0.87 recall / 0.93 precision on the 30-sentence corpus. Bundle: 593 KB.
 
 Goal: upgrade precision on existing checks and add a metaphor *candidate* detector, all offline, all fast enough to run on idle.
 

@@ -4,6 +4,7 @@ import type { PosTagger, TaggedToken } from "../../domain/style/PosTagger";
 interface CompromiseTerm {
   text: string;
   normal: string;
+  root?: string;
   tags: string[];
   offset: { start: number; length: number };
 }
@@ -12,7 +13,11 @@ interface CompromiseTerm {
 export class CompromiseTagger implements PosTagger {
   tag(text: string): TaggedToken[] {
     if (text.trim().length === 0) return [];
-    const sentences = nlp(text).json({ offset: true, terms: { offset: true, tags: true, normal: true } }) as Array<{ terms: CompromiseTerm[] }>;
+    const doc = nlp(text);
+    doc.compute("root");
+    // `root` is produced by compute("root") but missing from compromise's json option typings.
+    const jsonOptions = { offset: true, terms: { offset: true, tags: true, normal: true, root: true } } as Parameters<typeof doc.json>[0];
+    const sentences = doc.json(jsonOptions) as Array<{ terms: CompromiseTerm[] }>;
     const out: TaggedToken[] = [];
     sentences.forEach((s, sentence) => {
       for (const term of s.terms) {
@@ -24,6 +29,7 @@ export class CompromiseTagger implements PosTagger {
           from,
           to,
           normal: term.normal.toLowerCase(),
+          lemma: (term.root || term.normal).toLowerCase(),
           tags: new Set(term.tags),
           sentence,
         });

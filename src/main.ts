@@ -7,6 +7,7 @@ import { AnalyzeParagraphRhythm } from "./application/use-cases/AnalyzeParagraph
 import { AnalyzeParagraphStyle } from "./application/use-cases/AnalyzeParagraphStyle";
 import { IntlSentenceSegmenter } from "./infrastructure/segmentation/IntlSentenceSegmenter";
 import { CompromiseTagger } from "./infrastructure/nlp/CompromiseTagger";
+import { BrysbaertConcreteness } from "./infrastructure/nlp/BrysbaertConcreteness";
 import { DomWorkspaceChrome } from "./infrastructure/obsidian/DomWorkspaceChrome";
 import { PluginDataSettingsRepository } from "./infrastructure/obsidian/PluginDataSettingsRepository";
 import { CreativeZenSettingsTab } from "./infrastructure/obsidian/SettingsTab";
@@ -45,7 +46,7 @@ export default class CreativeZenModePlugin extends Plugin {
       typewriterExtension(),
       focusFadeExtension(),
       rhythmExtension(new AnalyzeParagraphRhythm(new IntlSentenceSegmenter())),
-      styleExtension(AnalyzeParagraphStyle.withDefaultRules(new CompromiseTagger())),
+      styleExtension(AnalyzeParagraphStyle.withDefaultRules(new CompromiseTagger(), new BrysbaertConcreteness())),
       findingsTooltip(),
     ]);
 

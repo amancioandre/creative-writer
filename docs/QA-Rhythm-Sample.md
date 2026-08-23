@@ -18,3 +18,7 @@ Last line to scroll to.
 ## Style checks
 
 At the end of the day, the letter was written very slowly by a man who had started to realise that he was really quite tired. She saw the garden. She heard the wind. She felt the cold seep in, and the garden, which was basically a diamond in the rough, seemed to shiver. "Leave," he said quietly. The garden waited.
+
+## Tier 2: tagger and metaphor candidates
+
+The silence bruised him, and a velvet grief settled over the house. She made a decision to stay. The road was closed by the council. The room at the end of the long corridor on the second floor of the old house was very cold. A flood of memories hit her. His sorrow was a stone in his chest. The knife cut the bread.
