@@ -117,7 +117,7 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Anthropic API key")
-      .setDesc("Stored in PLAINTEXT in this vault's .obsidian/plugins/creative-zen-mode/data.json. If the vault syncs, the key syncs with it. Use a key you can revoke.")
+      .setDesc("Stored in PLAINTEXT in this vault's .obsidian/plugins/creative-writer/data.json. If the vault syncs, the key syncs with it. Use a key you can revoke.")
       .addText((t) => t.setPlaceholder("sk-ant-…").setValue(s.llm.claudeApiKey).onChange((v) => set({ llm: { ...this.port.current().llm, claudeApiKey: v } })));
 
     new Setting(containerEl)

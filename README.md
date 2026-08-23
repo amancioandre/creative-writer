@@ -6,7 +6,7 @@ An Obsidian plugin for creative writing. Four features, all inside the editor:
 
 | Feature | What it does | Command / setting |
 |---|---|---|
-| **Zen Mode** | Hides ribbon, tabs, sidebars, status bar. Optional fullscreen. | `Creative Zen Mode: Toggle Zen Mode` |
+| **Zen Mode** | Hides ribbon, tabs, sidebars, status bar. Optional fullscreen. | `creative-writer: Toggle Zen Mode` |
 | **Typewriter scrolling** | Keeps the line you're writing vertically centred. | Settings → Typewriter scrolling |
 | **Focus fade** | Fades lines progressively by distance from the cursor (3 rings). | Settings → Focus fade |
 | **Paragraph rhythm** | Underlines each sentence of the current paragraph, cool → warm by "effective length". | Settings → Paragraph rhythm / Rhythm tiers |
