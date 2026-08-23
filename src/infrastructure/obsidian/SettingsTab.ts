@@ -65,6 +65,9 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
       ["filter", "Filter verbs", "saw, heard, felt, realised — narrating perception instead of rendering it."],
       ["adverb", "Adverbs", "-ly adverbs, especially on dialogue tags."],
       ["repetition", "Repetition", "A word echoed within thirty words, or three sentences opening alike."],
+      ["nominalization", "Nominalisations", "\"made a decision\" → \"decided\"; the action hiding inside a noun."],
+      ["weakverb", "Weak verbs", "A long sentence carried only by \"was\" or \"is\"."],
+      ["metaphor", "Metaphor candidates", "A concrete word applied to an abstract one — possibly figurative. Fresh or tired is your call."],
     ];
     for (const [kind, name, desc] of checks) {
       new Setting(containerEl)

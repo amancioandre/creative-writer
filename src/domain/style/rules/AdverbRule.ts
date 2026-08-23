@@ -1,21 +1,31 @@
 import { Finding } from "../Finding";
-import type { StyleRule } from "../StyleRule";
+import { AnalysisContext, type StyleRule } from "../StyleRule";
 import { tokenize } from "../Tokenizer";
-import { LY_NOT_ADVERB, DIALOGUE_TAGS } from "../lexicon/adverbExceptions";
+import { LY_NOT_ADVERB, DIALOGUE_TAGS, STRUCTURAL_ADVERBS } from "../lexicon/adverbExceptions";
+import { indexByOffset, type PosTagger } from "../PosTagger";
 
 /**
- * -ly manner adverbs. Not every adverb is a sin, but each one is a place
- * where a stronger verb might do the work. An adverb glued to a dialogue
- * tag ("she said softly") is flagged with a sharper note.
+ * -ly manner adverbs. Each one is a place where a stronger verb might do
+ * the work. An adverb glued to a dialogue tag ("she said softly") gets a
+ * sharper note.
+ *
+ * With a tagger, "is this an adverb?" comes from the tag and only the
+ * structural-adverb allowlist remains; without one, a non-adverb list
+ * stands in for the tag.
  */
 export class AdverbRule implements StyleRule {
-  analyse(text: string): Finding[] {
+  constructor(private readonly tagger?: PosTagger) {}
+
+  analyse(text: string, ctx = new AnalysisContext(text, this.tagger ?? null)): Finding[] {
     const tokens = tokenize(text);
+    const tagged = ctx.hasTagger ? indexByOffset(ctx.tagged()) : null;
     const out: Finding[] = [];
     tokens.forEach((tok, i) => {
       const w = tok.text;
-      if (w.length < 5 || !w.endsWith("ly") || LY_NOT_ADVERB.has(w)) return;
-      if (/[^a-z]/.test(w)) return;
+      if (w.length < 5 || !w.endsWith("ly") || /[^a-z]/.test(w)) return;
+      if (STRUCTURAL_ADVERBS.has(w)) return;
+      const isAdverb = tagged ? (tagged.get(tok.from)?.tags.has("Adverb") ?? false) : !LY_NOT_ADVERB.has(w);
+      if (!isAdverb) return;
       const prev = tokens[i - 1]?.text ?? "";
       const note = DIALOGUE_TAGS.has(prev)
         ? `Adverb on a dialogue tag. Let the line itself carry the "${w}".`

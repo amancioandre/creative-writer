@@ -84,3 +84,11 @@ body.czm-zen .workspace-split.mod-root {
 }
 .czm-style-tooltip { padding: 6px 10px; font-size: var(--font-ui-small); line-height: 1.4; }
 .czm-style-tooltip-kind { text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.75em; opacity: 0.7; margin-bottom: 2px; }
+:root {
+  --czm-style-nominalization: rgba(200, 160, 90, 0.25);
+  --czm-style-weakverb:       rgba(120, 140, 200, 0.28);
+  --czm-style-metaphor:       rgba(220, 120, 200, 0.22);
+}
+.czm-style-nominalization { background-color: var(--czm-style-nominalization); }
+.czm-style-weakverb       { background-color: var(--czm-style-weakverb); }
+.czm-style-metaphor       { background-color: var(--czm-style-metaphor); border-bottom: 1px dashed rgba(220, 120, 200, 0.7); }

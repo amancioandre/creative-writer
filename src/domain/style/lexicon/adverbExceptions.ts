@@ -12,7 +12,10 @@ export const LY_NOT_ADVERB: ReadonlySet<string> = new Set([
   "bubbly", "cuddly", "giggly", "wobbly", "woolly", "chilly", "hilly", "frilly", "smelly", "shapely", "stately",
   "likely", "unlikely", "only", "lowly", "measly", "grisly", "gnarly", "pearly", "portly", "steely", "unruly",
   "fly", "sly", "ply", "gully", "sully", "dolly", "molly", "polly", "sally", "dally", "rely",
-  // adverbs that are not style problems (structural rather than manner)
+]);
+
+/** Adverbs that are structural (degree, frequency, stance) rather than manner — not style problems. */
+export const STRUCTURAL_ADVERBS: ReadonlySet<string> = new Set([
   "only", "really", "early", "likely", "unlikely", "namely", "merely", "barely", "hardly", "nearly", "mostly",
   "partly", "mainly", "largely", "usually", "finally", "especially", "particularly", "generally", "possibly",
   "probably", "exactly", "recently", "currently", "previously", "eventually", "immediately", "originally",

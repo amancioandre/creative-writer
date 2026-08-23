@@ -1,0 +1,30 @@
+/** Labelled sentences: the passive spans a careful editor would flag. Empty = none. */
+export const PASSIVE_CORPUS: ReadonlyArray<[sentence: string, expected: string[]]> = [
+  ["The letter was written by her.", ["was written"]],
+  ["Mistakes were made.", ["were made"]],
+  ["The door is being closed.", ["is being closed"]],
+  ["He has been forgotten.", ["has been forgotten"]],
+  ["It was quickly taken.", ["was quickly taken"]],
+  ["The city got destroyed.", ["got destroyed"]],
+  ["They will be seen.", ["will be seen"]],
+  ["The bread was eaten and the song was sung.", ["was eaten", "was sung"]],
+  ["The house was built in 1900.", ["was built"]],
+  ["She was given a second chance.", ["was given"]],
+  ["The results were published yesterday.", ["were published"]],
+  ["A decision was reached.", ["was reached"]],
+  // negatives: state adjectives, progressives, plain past, copula + adjective
+  ["She was tired and he was running.", []],
+  ["They walked home.", []],
+  ["I am interested in this.", []],
+  ["We were excited.", []],
+  ["He is gone.", []],
+  ["The sky was red.", []],
+  ["The window was open.", []],
+  ["She was determined to win.", []],
+  ["The shop was closed on Sundays.", []],
+  ["He was bored and she was worried.", []],
+  ["The old man was wise.", []],
+  ["I was surprised by the news.", ["was surprised"]], // agent present → "The news surprised me"
+  ["The garden was overgrown.", []],
+  ["They were married in June.", []],
+];

@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import { AnalyzeParagraphStyle } from "../../src/application/use-cases/AnalyzeParagraphStyle";
 import { Finding, type FindingKind } from "../../src/domain/style/Finding";
 import type { StyleRule } from "../../src/domain/style/StyleRule";
+import { CompromiseTagger } from "../../src/infrastructure/nlp/CompromiseTagger";
+import { FINDING_KINDS } from "../../src/domain/style/Finding";
 
 const ruleOf = (kind: FindingKind, from: number, to: number): StyleRule => ({
   analyse: () => [Finding.create(kind, from, to, `${kind} note`)],
@@ -31,5 +33,17 @@ describe("AnalyzeParagraphStyle", () => {
     const text = "At the end of the day the letter was written very slowly. She saw the garden. The garden wept.";
     const kinds = new Set(useCase.execute({ text, paragraphFrom: 0, enabled: new Set(["cliche", "passive", "weak", "filter", "adverb", "repetition"]) }).map((f) => f.kind));
     expect([...kinds].sort()).toEqual(["adverb", "cliche", "filter", "passive", "repetition", "weak"]);
+  });
+});
+
+describe("AnalyzeParagraphStyle with a tagger", () => {
+  it("tags the paragraph exactly once however many rules need it", () => {
+    let calls = 0;
+    const tagger = { tag: (t: string) => { calls++; return new CompromiseTagger().tag(t); } };
+    const useCase = AnalyzeParagraphStyle.withDefaultRules(tagger);
+    const text = "The letter was written slowly. She made a decision. The house on the hill above the quiet village by the river was old and grey.";
+    const kinds = new Set(useCase.execute({ text, paragraphFrom: 0, enabled: new Set(FINDING_KINDS) }).map((f) => f.kind));
+    expect(calls).toBe(1);
+    expect(kinds).toEqual(new Set(["passive", "adverb", "nominalization", "weakverb"]));
   });
 });
