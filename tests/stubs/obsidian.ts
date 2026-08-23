@@ -46,4 +46,32 @@ export class Setting {
   setHeading() { return this; }
   addToggle(cb: (t: ToggleComponent) => unknown) { this.toggle = new ToggleComponent(); cb(this.toggle); return this; }
   addSlider(cb: (s: SliderComponent) => unknown) { this.slider = new SliderComponent(); cb(this.slider); return this; }
+  dropdown?: DropdownComponent;
+  text?: TextComponent;
+  addDropdown(cb: (d: DropdownComponent) => unknown) { this.dropdown = new DropdownComponent(); cb(this.dropdown); return this; }
+  addText(cb: (t: TextComponent) => unknown) { this.text = new TextComponent(); cb(this.text); return this; }
+}
+export async function requestUrl(_req: unknown): Promise<{ status: number; json: unknown }> {
+  return { status: 200, json: {} };
+}
+export class Notice {
+  static shown: string[] = [];
+  constructor(message: string) { Notice.shown.push(message); }
+}
+type DropdownCb = (v: string) => unknown;
+type TextCb = (v: string) => unknown;
+export class DropdownComponent {
+  value = "";
+  options: Record<string, string> = {};
+  onChangeCb: DropdownCb = () => undefined;
+  addOptions(o: Record<string, string>) { this.options = o; return this; }
+  setValue(v: string) { this.value = v; return this; }
+  onChange(cb: DropdownCb) { this.onChangeCb = cb; return this; }
+}
+export class TextComponent {
+  value = "";
+  onChangeCb: TextCb = () => undefined;
+  setPlaceholder(_p: string) { return this; }
+  setValue(v: string) { this.value = v; return this; }
+  onChange(cb: TextCb) { this.onChangeCb = cb; return this; }
 }

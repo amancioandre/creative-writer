@@ -1,10 +1,11 @@
-import { Plugin } from "obsidian";
+import { MarkdownView, Notice, Plugin } from "obsidian";
 import { Compartment } from "@codemirror/state";
 
 import type { PluginSettings } from "./domain/settings/Settings";
 import { ToggleZenMode } from "./application/use-cases/ToggleZenMode";
 import { AnalyzeParagraphRhythm } from "./application/use-cases/AnalyzeParagraphRhythm";
 import { AnalyzeParagraphStyle } from "./application/use-cases/AnalyzeParagraphStyle";
+import { AnalyzeParagraphWithLlm } from "./application/use-cases/AnalyzeParagraphWithLlm";
 import { IntlSentenceSegmenter } from "./infrastructure/segmentation/IntlSentenceSegmenter";
 import { CompromiseTagger } from "./infrastructure/nlp/CompromiseTagger";
 import { BrysbaertConcreteness } from "./infrastructure/nlp/BrysbaertConcreteness";
@@ -17,6 +18,10 @@ import { focusFadeExtension } from "./infrastructure/codemirror/focusFadeExtensi
 import { rhythmExtension } from "./infrastructure/codemirror/rhythmExtension";
 import { styleExtension } from "./infrastructure/codemirror/styleExtension";
 import { findingsTooltip } from "./infrastructure/codemirror/findingsTooltip";
+import { asyncFindingsExtension, analyseNow } from "./infrastructure/codemirror/asyncFindingsExtension";
+import { ConfiguredLlmAnalyser } from "./infrastructure/llm/ConfiguredLlmAnalyser";
+import { RequestUrlHttpClient } from "./infrastructure/obsidian/RequestUrlHttpClient";
+import { enabledStyleKinds } from "./domain/settings/Settings";
 
 /**
  * Composition root. The only file that knows about every layer: it builds
@@ -41,6 +46,24 @@ export default class CreativeZenModePlugin extends Plugin {
       callback: () => void this.zen.execute(),
     });
 
+    const llm = new ConfiguredLlmAnalyser(new RequestUrlHttpClient(), () => this.current.llm);
+    const llmAnalyser = new AnalyzeParagraphWithLlm(llm, () => enabledStyleKinds(this.current));
+    const status = this.addStatusBarItem();
+    let lastErrorAt = 0;
+
+    this.addCommand({
+      id: "analyse-paragraph-with-model",
+      name: "Analyse paragraph with model",
+      editorCallback: (_editor, view) => {
+        if (this.current.llm.provider === "off") {
+          new Notice("Creative Zen Mode: choose a model in settings first.");
+          return;
+        }
+        const cm = (view as MarkdownView & { editor: { cm?: { dispatch: (spec: unknown) => void } } }).editor.cm;
+        cm?.dispatch({ effects: analyseNow.of(null) });
+      },
+    });
+
     this.registerEditorExtension([
       this.settingsCompartment.of(settingsFacet.of(this.current)),
       typewriterExtension(),
@@ -48,6 +71,15 @@ export default class CreativeZenModePlugin extends Plugin {
       rhythmExtension(new AnalyzeParagraphRhythm(new IntlSentenceSegmenter())),
       styleExtension(AnalyzeParagraphStyle.withDefaultRules(new CompromiseTagger(), new BrysbaertConcreteness())),
       findingsTooltip(),
+      asyncFindingsExtension(llmAnalyser, {
+        onBusy: (busy) => status.setText(busy ? `✦ ${llm.name}…` : ""),
+        onError: (e) => {
+          // One notice a minute is plenty; a dead Ollama would otherwise spam on every pause.
+          if (Date.now() - lastErrorAt < 60_000) return;
+          lastErrorAt = Date.now();
+          new Notice(`Creative Zen Mode: ${e instanceof Error ? e.message : String(e)}`, 8000);
+        },
+      }),
     ]);
 
     this.addSettingTab(

@@ -7,6 +7,8 @@ export interface ScheduleOptions {
   /** Paragraph results kept in the LRU. */
   readonly cacheSize?: number;
   readonly onError?: (error: unknown) => void;
+  /** Called with true when a model call starts and false when it settles. */
+  readonly onBusy?: (busy: boolean) => void;
 }
 
 export type Deliver = (key: string, findings: Finding[]) => void;
@@ -23,9 +25,10 @@ export type Deliver = (key: string, findings: Finding[]) => void;
  * a paragraph that has since changed.
  */
 export class ScheduleAnalysis {
-  private readonly idleMs: number;
+  private idleMs: number;
   private readonly cacheSize: number;
   private readonly onError: (e: unknown) => void;
+  private readonly onBusy: (busy: boolean) => void;
   private readonly cache = new Map<string, Finding[]>(); // insertion order = LRU order
   private timer: ReturnType<typeof setTimeout> | null = null;
   private inflight: AbortController | null = null;
@@ -40,6 +43,7 @@ export class ScheduleAnalysis {
     this.idleMs = options.idleMs ?? 600;
     this.cacheSize = options.cacheSize ?? 200;
     this.onError = options.onError ?? (() => undefined);
+    this.onBusy = options.onBusy ?? (() => undefined);
   }
 
   /** Stable, cheap content hash (FNV-1a). Not cryptographic; collisions only cost a wrong cache hit. */
@@ -52,13 +56,23 @@ export class ScheduleAnalysis {
     return `${text.length}:${(h >>> 0).toString(16)}`;
   }
 
-  request(text: string, paragraphFrom: number): void {
+  /** Queue an analysis after the idle delay — or immediately. */
+  request(text: string, paragraphFrom: number, immediate = false): void {
     if (this.disposed) return;
     this.pending = { text, from: paragraphFrom };
     this.inflight?.abort();
     this.inflight = null;
     if (this.timer !== null) clearTimeout(this.timer);
-    this.timer = setTimeout(() => void this.run(), this.idleMs);
+    this.timer = setTimeout(() => void this.run(), immediate ? 0 : this.idleMs);
+  }
+
+  setIdleMs(ms: number): void {
+    this.idleMs = ms;
+  }
+
+  /** Forget cached results (e.g. the model changed). */
+  invalidate(): void {
+    this.cache.clear();
   }
 
   dispose(): void {
@@ -85,6 +99,7 @@ export class ScheduleAnalysis {
 
     const controller = new AbortController();
     this.inflight = controller;
+    this.onBusy(true);
     try {
       const findings = await this.analyser.analyse(job.text, job.from, controller.signal);
       if (controller.signal.aborted || this.disposed) return;
@@ -94,6 +109,7 @@ export class ScheduleAnalysis {
       if (!isAbort(e) && !this.disposed) this.onError(e);
     } finally {
       if (this.inflight === controller) this.inflight = null;
+      if (this.inflight === null) this.onBusy(false);
     }
   }
 

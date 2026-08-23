@@ -112,4 +112,15 @@ describe("ScheduleAnalysis", () => {
     expect(delivered).toEqual([]);
     expect(analyser.aborted).toBe(1);
   });
+
+  it("reports busy while a call is in flight", async () => {
+    const states: boolean[] = [];
+    scheduler.dispose();
+    scheduler = new ScheduleAnalysis(analyser, () => undefined, { idleMs: 10, onBusy: (b) => states.push(b) });
+    scheduler.request("q", 0);
+    await vi.advanceTimersByTimeAsync(15);
+    expect(states).toEqual([true]);
+    await vi.advanceTimersByTimeAsync(20);
+    expect(states).toEqual([true, false]);
+  });
 });

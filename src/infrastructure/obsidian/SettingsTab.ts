@@ -1,6 +1,6 @@
 import { type App, type Plugin, PluginSettingTab, Setting } from "obsidian";
 import { RhythmScale } from "../../domain/rhythm/RhythmScale";
-import type { PluginSettings } from "../../domain/settings/Settings";
+import type { LlmProvider, PluginSettings } from "../../domain/settings/Settings";
 import type { FindingKind } from "../../domain/style/Finding";
 
 /** What the tab needs from the outside world — not the whole plugin. */
@@ -77,5 +77,33 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
           t.setValue(s.styleChecks[kind]).onChange((v) => set({ styleChecks: { ...this.port.current().styleChecks, [kind]: v } })),
         );
     }
+
+    new Setting(containerEl).setName("Model assistant").setHeading();
+
+    new Setting(containerEl)
+      .setName("Model")
+      .setDesc("A language model reads the current paragraph and adds findings the rules cannot see: clichés in context, tired metaphors, passives that hide an agent. Local Ollama keeps everything on this machine.")
+      .addDropdown((d) =>
+        d.addOptions({ off: "Off", ollama: "Local (Ollama)" }).setValue(s.llm.provider).onChange((v) => set({ llm: { ...this.port.current().llm, provider: v as LlmProvider } })),
+      );
+
+    new Setting(containerEl)
+      .setName("Analyse automatically")
+      .setDesc("Run the model after a pause in typing. Off: only when you run the \"Analyse paragraph with model\" command.")
+      .addToggle((t) => t.setValue(s.llm.onIdle).onChange((v) => set({ llm: { ...this.port.current().llm, onIdle: v } })));
+
+    new Setting(containerEl)
+      .setName("Pause before analysing")
+      .setDesc("Milliseconds of quiet before the model is called.")
+      .addSlider((sl) => sl.setLimits(500, 10000, 250).setValue(s.llm.idleMs).setDynamicTooltip().onChange((v) => set({ llm: { ...this.port.current().llm, idleMs: v } })));
+
+    new Setting(containerEl)
+      .setName("Ollama URL")
+      .addText((t) => t.setPlaceholder("http://localhost:11434").setValue(s.llm.ollamaUrl).onChange((v) => set({ llm: { ...this.port.current().llm, ollamaUrl: v } })));
+
+    new Setting(containerEl)
+      .setName("Ollama model")
+      .setDesc("Any chat model you have pulled. qwen2.5:7b and llama3.1:8b follow the JSON format well; reasoning models (deepseek-r1) are slower and less reliable here.")
+      .addText((t) => t.setPlaceholder("qwen2.5:7b").setValue(s.llm.ollamaModel).onChange((v) => set({ llm: { ...this.port.current().llm, ollamaModel: v } })));
   }
 }

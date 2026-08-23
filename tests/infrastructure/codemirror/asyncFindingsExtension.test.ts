@@ -6,6 +6,9 @@ import { AnalyzeParagraphStyle } from "../../../src/application/use-cases/Analyz
 import type { ParagraphAnalyser } from "../../../src/application/ports/ParagraphAnalyser";
 import { Finding } from "../../../src/domain/style/Finding";
 import { mount, type Harness } from "./helpers";
+import { DEFAULT_SETTINGS } from "../../../src/domain/settings/Settings";
+
+const llmOn = { llm: { ...DEFAULT_SETTINGS.llm, provider: "ollama" as const, onIdle: true } };
 
 const DOC = "The silence bruised him.\n\nVery plain words here.";
 
@@ -24,7 +27,7 @@ describe("asyncFindingsExtension", () => {
   afterEach(() => { h?.destroy(); vi.useRealTimers(); });
 
   it("renders async findings for the cursor paragraph after idle", async () => {
-    h = mount(DOC, asyncFindingsExtension(firstWordAnalyser, { idleMs: 50 }));
+    h = mount(DOC, asyncFindingsExtension(firstWordAnalyser, { idleMs: 50 }), llmOn);
     h.moveCursor(1);
     expect(marks(h)).toHaveLength(0);
     await vi.advanceTimersByTimeAsync(100);
@@ -33,7 +36,7 @@ describe("asyncFindingsExtension", () => {
   });
 
   it("drops results once the paragraph text changes, then re-analyses", async () => {
-    h = mount(DOC, asyncFindingsExtension(firstWordAnalyser, { idleMs: 50 }));
+    h = mount(DOC, asyncFindingsExtension(firstWordAnalyser, { idleMs: 50 }), llmOn);
     h.moveCursor(1);
     await vi.advanceTimersByTimeAsync(100);
     expect(marks(h)).toHaveLength(1);
@@ -44,7 +47,7 @@ describe("asyncFindingsExtension", () => {
   });
 
   it("follows the cursor to another paragraph", async () => {
-    h = mount(DOC, asyncFindingsExtension(firstWordAnalyser, { idleMs: 50 }));
+    h = mount(DOC, asyncFindingsExtension(firstWordAnalyser, { idleMs: 50 }), llmOn);
     h.moveCursor(1);
     await vi.advanceTimersByTimeAsync(100);
     h.moveCursor(DOC.length - 1);
@@ -53,14 +56,14 @@ describe("asyncFindingsExtension", () => {
   });
 
   it("does nothing when the feature is disabled", async () => {
-    h = mount(DOC, asyncFindingsExtension(firstWordAnalyser, { idleMs: 50 }), { styleEnabled: false });
+    h = mount(DOC, asyncFindingsExtension(firstWordAnalyser, { idleMs: 50 }), { ...llmOn, styleEnabled: false });
     h.moveCursor(1);
     await vi.advanceTimersByTimeAsync(100);
     expect(marks(h)).toHaveLength(0);
   });
 
   it("filters findings by the per-kind toggle", async () => {
-    h = mount(DOC, asyncFindingsExtension(firstWordAnalyser, { idleMs: 50 }));
+    h = mount(DOC, asyncFindingsExtension(firstWordAnalyser, { idleMs: 50 }), llmOn);
     h.moveCursor(1);
     await vi.advanceTimersByTimeAsync(100);
     h.setSettings({ styleChecks: { cliche: true, passive: true, weak: true, filter: true, adverb: true, repetition: true, metaphor: false, nominalization: true, weakverb: true } });
@@ -68,7 +71,7 @@ describe("asyncFindingsExtension", () => {
   });
 
   it("cleans up its scheduler on destroy (no late dispatch on a dead view)", async () => {
-    h = mount(DOC, asyncFindingsExtension(firstWordAnalyser, { idleMs: 50 }));
+    h = mount(DOC, asyncFindingsExtension(firstWordAnalyser, { idleMs: 50 }), llmOn);
     h.moveCursor(1);
     h.destroy();
     await vi.advanceTimersByTimeAsync(100); // must not throw on a destroyed view
@@ -81,7 +84,7 @@ describe("findingsTooltip merges sync and async sources", () => {
   afterEach(() => { h?.destroy(); vi.useRealTimers(); });
 
   it("allFindings returns both rule findings and async findings", async () => {
-    h = mount(DOC, [styleExtension(AnalyzeParagraphStyle.withDefaultRules()), asyncFindingsExtension(firstWordAnalyser, { idleMs: 50 }), findingsTooltip()]);
+    h = mount(DOC, [styleExtension(AnalyzeParagraphStyle.withDefaultRules()), asyncFindingsExtension(firstWordAnalyser, { idleMs: 50 }), findingsTooltip()], llmOn);
     h.moveCursor(DOC.length - 1);
     await vi.advanceTimersByTimeAsync(100);
     const kinds = allFindings(h.view).map((f) => f.kind).sort();

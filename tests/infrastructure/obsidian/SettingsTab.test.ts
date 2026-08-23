@@ -20,7 +20,7 @@ describe("CreativeZenSettingsTab", () => {
   it("renders a control for every setting", () => {
     const names = Setting.created.map((s) => s.name).filter(Boolean);
     expect(names).toEqual(
-      expect.arrayContaining(["Typewriter scrolling", "Focus fade", "Paragraph rhythm", "Rhythm tiers", "Fullscreen in Zen Mode", "Style checks", "Clichés", "Passive voice", "Weak words", "Filter verbs", "Adverbs", "Repetition", "Nominalisations", "Weak verbs", "Metaphor candidates"]),
+      expect.arrayContaining(["Typewriter scrolling", "Focus fade", "Paragraph rhythm", "Rhythm tiers", "Fullscreen in Zen Mode", "Style checks", "Clichés", "Passive voice", "Weak words", "Filter verbs", "Adverbs", "Repetition", "Nominalisations", "Weak verbs", "Metaphor candidates", "Model", "Analyse automatically", "Ollama URL", "Ollama model"]),
     );
   });
 
@@ -47,5 +47,12 @@ describe("CreativeZenSettingsTab", () => {
     await toggle.onChangeCb(false);
     expect(saved[0]!.styleChecks.passive).toBe(false);
     expect(saved[0]!.styleChecks.cliche).toBe(true);
+  });
+
+  it("persists the model provider and text fields", async () => {
+    await Setting.created.find((s) => s.name === "Model")!.dropdown!.onChangeCb("ollama");
+    await Setting.created.find((s) => s.name === "Ollama model")!.text!.onChangeCb("llama3.1:8b");
+    expect(saved[0]!.llm.provider).toBe("ollama");
+    expect(saved[1]!.llm.ollamaModel).toBe("llama3.1:8b");
   });
 });

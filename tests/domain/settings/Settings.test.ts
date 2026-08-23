@@ -38,3 +38,20 @@ describe("style settings", () => {
     expect((s.styleChecks as Record<string, unknown>).bogus).toBeUndefined();
   });
 });
+
+describe("llm settings", () => {
+  it("defaults to off with sensible Ollama values", () => {
+    const s = normalizeSettings(undefined);
+    expect(s.llm).toEqual({ provider: "off", onIdle: false, idleMs: 1500, ollamaUrl: "http://localhost:11434", ollamaModel: "qwen2.5:7b" });
+  });
+  it("accepts valid providers and rejects junk", () => {
+    expect(normalizeSettings({ llm: { provider: "ollama" } }).llm.provider).toBe("ollama");
+    expect(normalizeSettings({ llm: { provider: "gpt" } }).llm.provider).toBe("off");
+  });
+  it("clamps idleMs and keeps strings", () => {
+    const s = normalizeSettings({ llm: { idleMs: 10, ollamaUrl: "http://h:1", ollamaModel: "m" } });
+    expect(s.llm.idleMs).toBe(500);
+    expect(s.llm.ollamaUrl).toBe("http://h:1");
+    expect(s.llm.ollamaModel).toBe("m");
+  });
+});
