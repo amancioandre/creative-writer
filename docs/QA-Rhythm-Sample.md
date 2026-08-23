@@ -14,3 +14,7 @@ This is a separate paragraph. It should only light up when the cursor is inside 
 > A blockquote line. Still just text to CodeMirror.
 
 Last line to scroll to.
+
+## Style checks
+
+At the end of the day, the letter was written very slowly by a man who had started to realise that he was really quite tired. She saw the garden. She heard the wind. She felt the cold seep in, and the garden, which was basically a diamond in the rough, seemed to shiver. "Leave," he said quietly. The garden waited.

@@ -4,6 +4,7 @@ import { Compartment } from "@codemirror/state";
 import type { PluginSettings } from "./domain/settings/Settings";
 import { ToggleZenMode } from "./application/use-cases/ToggleZenMode";
 import { AnalyzeParagraphRhythm } from "./application/use-cases/AnalyzeParagraphRhythm";
+import { AnalyzeParagraphStyle } from "./application/use-cases/AnalyzeParagraphStyle";
 import { IntlSentenceSegmenter } from "./infrastructure/segmentation/IntlSentenceSegmenter";
 import { DomWorkspaceChrome } from "./infrastructure/obsidian/DomWorkspaceChrome";
 import { PluginDataSettingsRepository } from "./infrastructure/obsidian/PluginDataSettingsRepository";
@@ -12,6 +13,7 @@ import { settingsFacet } from "./infrastructure/codemirror/settingsFacet";
 import { typewriterExtension } from "./infrastructure/codemirror/typewriterExtension";
 import { focusFadeExtension } from "./infrastructure/codemirror/focusFadeExtension";
 import { rhythmExtension } from "./infrastructure/codemirror/rhythmExtension";
+import { styleExtension } from "./infrastructure/codemirror/styleExtension";
 
 /**
  * Composition root. The only file that knows about every layer: it builds
@@ -41,6 +43,7 @@ export default class CreativeZenModePlugin extends Plugin {
       typewriterExtension(),
       focusFadeExtension(),
       rhythmExtension(new AnalyzeParagraphRhythm(new IntlSentenceSegmenter())),
+      styleExtension(AnalyzeParagraphStyle.withDefaultRules()),
     ]);
 
     this.addSettingTab(

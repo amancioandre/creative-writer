@@ -1,6 +1,7 @@
 import { type App, type Plugin, PluginSettingTab, Setting } from "obsidian";
 import { RhythmScale } from "../../domain/rhythm/RhythmScale";
 import type { PluginSettings } from "../../domain/settings/Settings";
+import type { FindingKind } from "../../domain/style/Finding";
 
 /** What the tab needs from the outside world — not the whole plugin. */
 export interface SettingsPort {
@@ -49,5 +50,29 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
       .setName("Fullscreen in Zen Mode")
       .setDesc("Also request window fullscreen when Zen Mode is toggled on.")
       .addToggle((t) => t.setValue(s.zenFullscreen).onChange((v) => set({ zenFullscreen: v })));
+
+    new Setting(containerEl).setName("Style checks").setHeading();
+
+    new Setting(containerEl)
+      .setName("Style checks")
+      .setDesc("Highlight clichés, passive voice, weak words, filter verbs, adverbs and repetition in the current paragraph. Hover a highlight for the note.")
+      .addToggle((t) => t.setValue(s.styleEnabled).onChange((v) => set({ styleEnabled: v })));
+
+    const checks: ReadonlyArray<[FindingKind, string, string]> = [
+      ["cliche", "Clichés", "Phrases worn smooth by overuse."],
+      ["passive", "Passive voice", "\"The letter was written\" — by whom?"],
+      ["weak", "Weak words", "Intensifiers, hedges and filler: very, quite, just, started to…"],
+      ["filter", "Filter verbs", "saw, heard, felt, realised — narrating perception instead of rendering it."],
+      ["adverb", "Adverbs", "-ly adverbs, especially on dialogue tags."],
+      ["repetition", "Repetition", "A word echoed within thirty words, or three sentences opening alike."],
+    ];
+    for (const [kind, name, desc] of checks) {
+      new Setting(containerEl)
+        .setName(name)
+        .setDesc(desc)
+        .addToggle((t) =>
+          t.setValue(s.styleChecks[kind]).onChange((v) => set({ styleChecks: { ...this.port.current().styleChecks, [kind]: v } })),
+        );
+    }
   }
 }

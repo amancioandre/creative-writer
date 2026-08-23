@@ -24,3 +24,17 @@ describe("normalizeSettings", () => {
     expect(s.typewriterEnabled).toBe(DEFAULT_SETTINGS.typewriterEnabled);
   });
 });
+
+describe("style settings", () => {
+  it("defaults every style check on and the feature on", () => {
+    const s = normalizeSettings(undefined);
+    expect(s.styleEnabled).toBe(true);
+    expect(s.styleChecks).toEqual({ cliche: true, passive: true, weak: true, filter: true, adverb: true, repetition: true });
+  });
+  it("merges partial styleChecks with defaults and drops junk", () => {
+    const s = normalizeSettings({ styleChecks: { passive: false, bogus: true, adverb: "no" } });
+    expect(s.styleChecks.passive).toBe(false);
+    expect(s.styleChecks.adverb).toBe(true);
+    expect((s.styleChecks as Record<string, unknown>).bogus).toBeUndefined();
+  });
+});

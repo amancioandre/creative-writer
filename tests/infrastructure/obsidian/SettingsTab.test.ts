@@ -20,7 +20,7 @@ describe("CreativeZenSettingsTab", () => {
   it("renders a control for every setting", () => {
     const names = Setting.created.map((s) => s.name).filter(Boolean);
     expect(names).toEqual(
-      expect.arrayContaining(["Typewriter scrolling", "Focus fade", "Paragraph rhythm", "Rhythm tiers", "Fullscreen in Zen Mode"]),
+      expect.arrayContaining(["Typewriter scrolling", "Focus fade", "Paragraph rhythm", "Rhythm tiers", "Fullscreen in Zen Mode", "Style checks", "Clichés", "Passive voice", "Weak words", "Filter verbs", "Adverbs", "Repetition"]),
     );
   });
 
@@ -40,5 +40,12 @@ describe("CreativeZenSettingsTab", () => {
     const slider = Setting.created.find((s) => s.name === "Rhythm tiers")!.slider!;
     await slider.onChangeCb(4);
     expect(saved[0]!.rhythmTiers).toBe(4);
+  });
+
+  it("persists a per-kind style toggle", async () => {
+    const toggle = Setting.created.find((s) => s.name === "Passive voice")!.toggle!;
+    await toggle.onChangeCb(false);
+    expect(saved[0]!.styleChecks.passive).toBe(false);
+    expect(saved[0]!.styleChecks.cliche).toBe(true);
   });
 });

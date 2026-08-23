@@ -56,3 +56,31 @@ body.czm-zen .workspace-split.mod-root {
 .czm-rhythm-4 { text-decoration-color: var(--czm-rhythm-4); }
 .czm-rhythm-5 { text-decoration-color: var(--czm-rhythm-5); }
 .czm-rhythm-6 { text-decoration-color: var(--czm-rhythm-6); }
+
+/* --- Style checks ----------------------------------------------------------
+   Tinted backgrounds (not underlines) so they coexist with rhythm underlines. */
+:root {
+  --czm-style-cliche:     rgba(229, 83, 83, 0.22);
+  --czm-style-passive:    rgba(236, 201, 75, 0.22);
+  --czm-style-weak:       rgba(160, 160, 160, 0.25);
+  --czm-style-filter:     rgba(154, 116, 237, 0.22);
+  --czm-style-adverb:     rgba(237, 137, 54, 0.22);
+  --czm-style-repetition: rgba(72, 187, 170, 0.22);
+}
+.cm-line [class*="czm-style-"] { border-radius: 2px; }
+.czm-style-cliche     { background-color: var(--czm-style-cliche); }
+.czm-style-passive    { background-color: var(--czm-style-passive); }
+.czm-style-weak       { background-color: var(--czm-style-weak); }
+.czm-style-filter     { background-color: var(--czm-style-filter); }
+.czm-style-adverb     { background-color: var(--czm-style-adverb); }
+.czm-style-repetition { background-color: var(--czm-style-repetition); }
+
+.cm-tooltip.cm-tooltip-hover:has(.czm-style-tooltip) {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  box-shadow: var(--shadow-s);
+  max-width: 28em;
+}
+.czm-style-tooltip { padding: 6px 10px; font-size: var(--font-ui-small); line-height: 1.4; }
+.czm-style-tooltip-kind { text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.75em; opacity: 0.7; margin-bottom: 2px; }

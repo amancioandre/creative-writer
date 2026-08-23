@@ -66,7 +66,7 @@ Every file under `src/` (except `main.ts`, which is wiring) was written test-fir
 | infrastructure/codemirror | Real `EditorView` mounted in jsdom; assert on rendered `.cm-line` classes and mark spans | `tests/infrastructure/codemirror/helpers.ts` |
 | infrastructure/obsidian | Real DOM for chrome; `tests/stubs/obsidian.ts` stands in for the types-only `obsidian` package | stub |
 
-jsdom has no layout, so scroll *position* cannot be asserted — the typewriter test checks the **policy** (`shouldRecenter`) exhaustively and the **wiring** (a scroll effect is dispatched). Scroll smoothness was verified manually in Obsidian 1.6.5.
+jsdom has no layout, so scroll *position* cannot be asserted — the typewriter test checks the **policy** (`shouldRecenter`) exhaustively and the **wiring** (a scroll effect is dispatched). Scroll smoothness was verified manually in Obsidian 1.13.4.
 
 ## Known limits
 
@@ -74,3 +74,19 @@ jsdom has no layout, so scroll *position* cannot be asserted — the typewriter 
 - `AbbreviationMerger` has a fixed list. ICU already handles "e.g.", "i.e.", "etc."; the list covers honorifics and common short forms in English and Portuguese.
 - Headings, list bullets and blockquote markers are part of the sentence text CM sees. The rhythm of "# Title" includes the hash; harmless, but a Markdown-aware tokenizer would be the next step.
 - Rhythm scale boundaries are tuned for English prose. They live in one table in `RhythmScale.withTiers`.
+
+## Style checks (Tier 1)
+
+Each check is a `StyleRule` — `analyse(text) → Finding[]` — in `domain/style/rules/`. They share one `Tokenizer` (lowercased words with exact offsets and a sentence-start flag) and one `PhraseMatcher` (a word-trie; longest match, never across a sentence boundary). Lexicons in `domain/style/lexicon/` are plain data with a hygiene test each (no duplicates, normalised form).
+
+`AnalyzeParagraphStyle` runs the enabled rules over the cursor's paragraph, shifts findings to absolute offsets, and sorts. `styleExtension` renders them as `Decoration.mark` with a `data-czm-note` attribute and a `hoverTooltip` that reads from the same plugin instance.
+
+Each rule's precision/recall trade-off, in one line:
+
+| Rule | Approach | Where it's wrong |
+|---|---|---|
+| Cliche | 888 curated phrases, token-trie | Only what's in the list. Add freely; the hygiene test guards the format. |
+| PassiveVoice | be/get (+modal, +been/being) + adverbs + participle; stative list excluded | "was closed" (state) vs "was closed by" (passive) — we skip it unless "being" is present. |
+| WeakWord | 100+ entries with notes; context guards for `so`, `just`, `felt`, `pretty` | "There was" is flagged even when it's the right choice. |
+| Adverb | `-ly`, ≥5 letters, minus a non-adverb list; sharper note after a dialogue tag | Rare adjectives not in the list ("ghastly" is). |
+| Repetition | Stemmed content word within 30 words; ≥3 sentence openers alike | Deliberate anaphora gets flagged at three. |
