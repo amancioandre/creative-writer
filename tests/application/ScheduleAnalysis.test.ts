@@ -3,6 +3,8 @@ import { ScheduleAnalysis } from "../../src/application/use-cases/ScheduleAnalys
 import type { ParagraphAnalyser } from "../../src/application/ports/ParagraphAnalyser";
 import { Finding } from "../../src/domain/style/Finding";
 
+const timers = { set: (fn: () => void, ms: number) => window.setTimeout(fn, ms), clear: (id: number) => window.clearTimeout(id) };
+
 class FakeAnalyser implements ParagraphAnalyser {
   calls: string[] = [];
   aborted = 0;
@@ -26,7 +28,7 @@ describe("ScheduleAnalysis", () => {
     vi.useFakeTimers();
     analyser = new FakeAnalyser();
     delivered = [];
-    scheduler = new ScheduleAnalysis(analyser, (key, findings) => delivered.push({ key, findings }), { idleMs: 100, cacheSize: 3 });
+    scheduler = new ScheduleAnalysis(analyser, (key, findings) => delivered.push({ key, findings }), { timers, idleMs: 100, cacheSize: 3 });
   });
   afterEach(() => { scheduler.dispose(); vi.useRealTimers(); });
 
@@ -97,7 +99,7 @@ describe("ScheduleAnalysis", () => {
   it("swallows analyser errors other than abort, reporting them via onError", async () => {
     const errors: unknown[] = [];
     scheduler.dispose();
-    scheduler = new ScheduleAnalysis({ analyse: async () => { throw new Error("boom"); } }, () => undefined, { idleMs: 10, onError: (e) => errors.push(e) });
+    scheduler = new ScheduleAnalysis({ analyse: async () => { throw new Error("boom"); } }, () => undefined, { timers, idleMs: 10, onError: (e) => errors.push(e) });
     scheduler.request("z", 0);
     await vi.advanceTimersByTimeAsync(50);
     expect(errors).toHaveLength(1);
@@ -116,7 +118,7 @@ describe("ScheduleAnalysis", () => {
   it("reports busy while a call is in flight", async () => {
     const states: boolean[] = [];
     scheduler.dispose();
-    scheduler = new ScheduleAnalysis(analyser, () => undefined, { idleMs: 10, onBusy: (b) => states.push(b) });
+    scheduler = new ScheduleAnalysis(analyser, () => undefined, { timers, idleMs: 10, onBusy: (b) => states.push(b) });
     scheduler.request("q", 0);
     await vi.advanceTimersByTimeAsync(15);
     expect(states).toEqual([true]);

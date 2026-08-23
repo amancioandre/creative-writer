@@ -104,6 +104,7 @@ export default class CreativeZenModePlugin extends Plugin {
       new CreativeZenSettingsTab(this.app, this, {
         current: () => this.current,
         update: (next) => this.updateSettings(next),
+        configDir: () => this.app.vault.configDir,
       }),
     );
   }
@@ -117,7 +118,7 @@ export default class CreativeZenModePlugin extends Plugin {
     const leaf = this.app.workspace.getLeavesOfType(MYTH_VIEW_TYPE)[0] ?? this.app.workspace.getRightLeaf(false);
     if (!leaf) return;
     await leaf.setViewState({ type: MYTH_VIEW_TYPE, active: true });
-    this.app.workspace.revealLeaf(leaf);
+    await this.app.workspace.revealLeaf(leaf);
     const view = leaf.view as MythView;
     const analyser = new OllamaMythAnalyser(new RequestUrlHttpClient(), { baseUrl: cfg.ollamaUrl, model: cfg.ollamaModel });
     const useCase = (this.myth ??= new AnalyzeMyth(analyser));
@@ -129,9 +130,9 @@ export default class CreativeZenModePlugin extends Plugin {
     }
   }
 
-  async onunload(): Promise<void> {
+  onunload(): void {
     // Editor extensions are torn down by Obsidian; Zen Mode's body class is ours to remove.
-    await this.zen.deactivate();
+    void this.zen.deactivate();
   }
 
   private async updateSettings(next: PluginSettings): Promise<void> {

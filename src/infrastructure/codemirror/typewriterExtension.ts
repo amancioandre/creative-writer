@@ -46,7 +46,8 @@ export function typewriterExtension() {
 
       private schedule() {
         if (this.frame !== null) return;
-        this.frame = requestAnimationFrame(() => {
+        const win = this.view.dom.ownerDocument.defaultView ?? window;
+        this.frame = win.requestAnimationFrame(() => {
           this.frame = null;
           const head = this.view.state.selection.main.head;
           this.view.dispatch({ effects: EditorView.scrollIntoView(head, { y: "center" }) });
@@ -54,7 +55,7 @@ export function typewriterExtension() {
       }
 
       destroy() {
-        if (this.frame !== null) cancelAnimationFrame(this.frame);
+        if (this.frame !== null) (this.view.dom.ownerDocument.defaultView ?? window).cancelAnimationFrame(this.frame);
       }
     },
   );

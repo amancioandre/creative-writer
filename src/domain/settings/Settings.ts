@@ -69,7 +69,7 @@ const clampInt = (v: number, min: number, max: number) => Math.min(max, Math.max
 export function normalizeSettings(raw: unknown): PluginSettings {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const bool = (key: keyof PluginSettings) =>
-    typeof r[key] === "boolean" ? (r[key] as boolean) : (DEFAULT_SETTINGS[key] as boolean);
+    typeof r[key] === "boolean" ? r[key] : (DEFAULT_SETTINGS[key] as boolean);
 
   return {
     typewriterEnabled: bool("typewriterEnabled"),
@@ -90,7 +90,7 @@ function normalizeChecks(raw: unknown): Record<FindingKind, boolean> {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const out = { ...DEFAULT_STYLE_CHECKS };
   for (const kind of FINDING_KINDS) {
-    if (typeof r[kind] === "boolean") out[kind] = r[kind] as boolean;
+    if (typeof r[kind] === "boolean") out[kind] = r[kind];
   }
   return out;
 }
@@ -105,7 +105,10 @@ const CLAUDE_MODELS: readonly ClaudeModelId[] = ["claude-opus-5", "claude-haiku-
 
 function normalizeLlm(raw: unknown): LlmSettings {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  const str = (key: keyof LlmSettings) => (typeof r[key] === "string" && (r[key] as string).trim() ? (r[key] as string).trim() : (DEFAULT_LLM_SETTINGS[key] as string));
+  const str = (key: keyof LlmSettings): string => {
+    const v = r[key];
+    return typeof v === "string" && v.trim() ? v.trim() : (DEFAULT_LLM_SETTINGS[key] as string);
+  };
   return {
     provider: PROVIDERS.includes(r.provider as LlmProvider) ? (r.provider as LlmProvider) : DEFAULT_LLM_SETTINGS.provider,
     onIdle: typeof r.onIdle === "boolean" ? r.onIdle : DEFAULT_LLM_SETTINGS.onIdle,

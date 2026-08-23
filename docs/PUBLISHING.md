@@ -20,7 +20,7 @@ What Obsidian requires, and where this repo stands.
    npm run release:check
    git tag 0.1.0 && git push --tags
    ```
-   Then on GitHub create a release from that tag and attach **`main.js`, `manifest.json`, `styles.css`** as individual assets (not a zip).
+   `.github/workflows/release.yml` then builds from source with the committed lockfile, runs the tests, attests provenance for the assets, and creates the GitHub release with **`main.js`, `manifest.json`, `styles.css`**. Never upload a locally built `main.js` — the review bot compares the asset with its own build.
 4. **Submit**: fork `obsidianmd/obsidian-releases`, add an entry to the end of `community-plugins.json`:
    ```json
    { "id": "creative-writer", "name": "creative-writer", "author": "André Amnc", "description": "…same as manifest…", "repo": "amancioandre/creative-writer" }
@@ -34,7 +34,7 @@ npm version 0.2.0        # bumps package.json, manifest.json, versions.json; com
 npm run release:check
 git push && git push --tags
 ```
-Attach the three files to the GitHub release as before. Users on the community list get the update automatically.
+CI creates the release. Users on the community list get the update automatically.
 
 ## Things a reviewer may ask about
 

@@ -20,7 +20,7 @@ export function tokenize(text: string): Token[] {
   let lastEnd = 0;
   let first = true;
   for (const m of text.matchAll(WORD)) {
-    const from = m.index!;
+    const from = m.index;
     const between = text.slice(lastEnd, from);
     tokens.push({
       text: m[0].toLowerCase().replace(/’/g, "'"),

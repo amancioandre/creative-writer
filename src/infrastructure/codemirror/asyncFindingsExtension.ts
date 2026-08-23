@@ -9,6 +9,7 @@ import { enabledStyleKinds, llmConfigEquals } from "../../domain/settings/Settin
 import { Finding } from "../../domain/style/Finding";
 import type { ParagraphAnalyser } from "../../application/ports/ParagraphAnalyser";
 import { ScheduleAnalysis, type ScheduleOptions } from "../../application/use-cases/ScheduleAnalysis";
+import { windowTimers } from "./windowTimers";
 
 interface AsyncResult {
   readonly key: string;
@@ -29,7 +30,7 @@ const EMPTY: AsyncResult = { key: "", findings: [] };
  *
  * Runs on idle only if `settings.llm.onIdle`; always on `analyseNow`.
  */
-export function asyncFindingsExtension(analyser: ParagraphAnalyser, options: ScheduleOptions = {}) {
+export function asyncFindingsExtension(analyser: ParagraphAnalyser, options: Partial<ScheduleOptions> = {}) {
   const results = StateField.define<AsyncResult>({
     create: () => EMPTY,
     update(value, tr) {
@@ -70,7 +71,7 @@ export function asyncFindingsExtension(analyser: ParagraphAnalyser, options: Sch
         this.scheduler = new ScheduleAnalysis(
           analyser,
           (key, findings) => view.dispatch({ effects: setResult.of({ key, findings }) }),
-          { ...options, idleMs: options.idleMs ?? view.state.facet(settingsFacet).llm.idleMs },
+          { ...options, timers: options.timers ?? windowTimers(view.dom.ownerDocument.defaultView ?? window), idleMs: options.idleMs ?? view.state.facet(settingsFacet).llm.idleMs },
         );
         this.maybeRequest(view, false);
       }

@@ -71,8 +71,8 @@ export class ClaudeAnalyser implements LlmAnalyser {
     if (r?.stop_reason === "refusal") return [];
 
     const text = r?.content?.find((c) => c.type === "text")?.text ?? "";
-    const findings = (extractJson(text) as { findings?: unknown } | null)?.findings;
+    const findings: unknown = (extractJson(text) as { findings?: unknown } | null)?.findings;
     if (!Array.isArray(findings)) throw new Error("Claude: response was not the expected JSON ({findings: [...]})");
-    return findings;
+    return findings as unknown[];
   }
 }

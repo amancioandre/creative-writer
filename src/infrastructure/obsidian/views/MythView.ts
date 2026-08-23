@@ -53,7 +53,7 @@ export class MythView extends ItemView {
         root.createEl("h4", { text: "Patterns" });
         for (const p of report.patterns) {
           const item = root.createDiv({ cls: "czm-myth-item" });
-          item.createEl("div", { text: p.name, cls: "czm-myth-name" });
+          item.createDiv({ text: p.name, cls: "czm-myth-name" });
           item.createEl("blockquote", { text: p.evidence });
           if (p.note) item.createEl("p", { text: p.note });
         }
@@ -62,7 +62,7 @@ export class MythView extends ItemView {
         root.createEl("h4", { text: "Archetypes" });
         for (const a of report.archetypes) {
           const item = root.createDiv({ cls: "czm-myth-item" });
-          item.createEl("div", { text: a.character ? `${a.name} — ${a.character}` : a.name, cls: "czm-myth-name" });
+          item.createDiv({ text: a.character ? `${a.name} — ${a.character}` : a.name, cls: "czm-myth-name" });
           item.createEl("blockquote", { text: a.evidence });
         }
       }

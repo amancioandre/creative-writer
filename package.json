@@ -31,7 +31,6 @@
     "@codemirror/view": "^6.26.0",
     "@types/node": "^20.11.0",
     "@vitest/coverage-v8": "^2.1.0",
-    "builtin-modules": "^4.0.0",
     "esbuild": "^0.23.0",
     "jsdom": "^25.0.0",
     "obsidian": "latest",
@@ -41,5 +40,8 @@
   },
   "dependencies": {
     "compromise": "^14.16.0"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

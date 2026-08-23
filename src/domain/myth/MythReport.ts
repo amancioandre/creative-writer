@@ -41,7 +41,7 @@ export class MythReport {
 export function validateMythReport(raw: unknown, text: string): MythReport {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const str = (v: unknown) => (typeof v === "string" ? v.trim().slice(0, MAX_TEXT) : "");
-  const list = (v: unknown) => (Array.isArray(v) ? v : []);
+  const list = (v: unknown): unknown[] => (Array.isArray(v) ? (v as unknown[]) : []);
 
   const patterns: MythPattern[] = [];
   for (const p of list(r.patterns)) {

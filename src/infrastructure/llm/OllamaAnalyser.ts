@@ -48,8 +48,8 @@ export class OllamaAnalyser implements LlmAnalyser {
       this.lastUsage = { input: r.prompt_eval_count, output: r.eval_count };
     }
     const parsed = extractJson(r.message?.content ?? "");
-    const findings = (parsed as { findings?: unknown } | null)?.findings;
+    const findings: unknown = (parsed as { findings?: unknown } | null)?.findings;
     if (!Array.isArray(findings)) throw new Error("Ollama: response was not the expected JSON ({findings: [...]})");
-    return findings;
+    return findings as unknown[];
   }
 }

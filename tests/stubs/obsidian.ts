@@ -10,13 +10,8 @@ export class Plugin {
   async saveData(d: unknown): Promise<void> { this.data = d; }
 }
 export class PluginSettingTab {
-  containerEl: HTMLElement & { empty(): void };
-  constructor(public app: App, public plugin: Plugin) {
-    const el = document.createElement("div") as unknown as HTMLElement & { empty(): void };
-    el.empty = () => el.replaceChildren();
-    this.containerEl = el;
-  }
-  display(): void {}
+  containerEl: HTMLElement = document.createElement("div");
+  constructor(public app: App, public plugin: Plugin) {}
   hide(): void {}
 }
 type ToggleCb = (v: boolean) => unknown;
@@ -77,15 +72,8 @@ export class TextComponent {
   onChange(cb: TextCb) { this.onChangeCb = cb; return this; }
 }
 export class WorkspaceLeaf {}
-function withEl(el: HTMLElement): HTMLElement & { empty(): void; createEl: (tag: string, o?: { text?: string; cls?: string }) => HTMLElement; createDiv: (o?: { text?: string; cls?: string }) => HTMLElement } {
-  const e = el as HTMLElement & { empty(): void; createEl: (tag: string, o?: { text?: string; cls?: string }) => HTMLElement; createDiv: (o?: { text?: string; cls?: string }) => HTMLElement };
-  e.empty = () => e.replaceChildren();
-  e.createEl = (tag, o) => { const c = withEl(document.createElement(tag)); if (o?.text) c.textContent = o.text; if (o?.cls) c.className = o.cls; e.appendChild(c); return c; };
-  e.createDiv = (o) => e.createEl("div", o);
-  return e;
-}
 export class ItemView {
-  contentEl = withEl(document.createElement("div"));
+  contentEl: HTMLElement = document.createElement("div");
   constructor(public leaf: WorkspaceLeaf) {}
   getViewType(): string { return ""; }
   getDisplayText(): string { return ""; }
@@ -98,4 +86,9 @@ declare global {
     createEl(tag: string, o?: { text?: string; cls?: string }): HTMLElement;
     createDiv(o?: { text?: string; cls?: string }): HTMLElement;
   }
+  function createEl(tag: string, o?: { text?: string; cls?: string }): HTMLElement;
+  function createDiv(o?: { text?: string; cls?: string }): HTMLElement;
+  function createSpan(o?: { text?: string; cls?: string }): HTMLElement;
 }
+
+export type SettingDefinitionItem = unknown;

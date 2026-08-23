@@ -17,20 +17,16 @@ export function findingAt(findings: readonly Finding[], pos: number): Finding | 
   return null;
 }
 
-/** Builds the hover card for one finding. Exported for tests; no CM state involved. */
+/** Builds the hover card for one finding. The returned element becomes the `.cm-tooltip` itself. */
 export function tooltipFor(f: Finding): Tooltip {
   return {
     pos: f.from,
     end: f.to,
     above: true,
     create() {
-      const dom = document.createElement("div");
-      dom.className = `czm-style-tooltip czm-style-tooltip-${f.kind}`;
-      const kind = dom.appendChild(document.createElement("div"));
-      kind.className = "czm-style-tooltip-kind";
-      kind.textContent = f.kind;
-      const note = dom.appendChild(document.createElement("div"));
-      note.textContent = f.note;
+      const dom = createDiv({ cls: `czm-style-tooltip czm-style-tooltip-${f.kind}` });
+      dom.createDiv({ cls: "czm-style-tooltip-kind", text: f.kind });
+      dom.createDiv({ text: f.note });
       return { dom };
     },
   };

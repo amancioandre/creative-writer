@@ -1,7 +1,9 @@
 import type { Finding } from "../../domain/style/Finding";
 import type { ParagraphAnalyser } from "../ports/ParagraphAnalyser";
+import type { Timers } from "../ports/Timers";
 
 export interface ScheduleOptions {
+  readonly timers: Timers;
   /** Quiet time after the last request before analysing. */
   readonly idleMs?: number;
   /** Paragraph results kept in the LRU. */
@@ -30,7 +32,8 @@ export class ScheduleAnalysis {
   private readonly onError: (e: unknown) => void;
   private readonly onBusy: (busy: boolean) => void;
   private readonly cache = new Map<string, Finding[]>(); // insertion order = LRU order
-  private timer: ReturnType<typeof setTimeout> | null = null;
+  private readonly timers: Timers;
+  private timer: number | null = null;
   private inflight: AbortController | null = null;
   private pending: { text: string; from: number } | null = null;
   private disposed = false;
@@ -38,8 +41,9 @@ export class ScheduleAnalysis {
   constructor(
     private readonly analyser: ParagraphAnalyser,
     private readonly deliver: Deliver,
-    options: ScheduleOptions = {},
+    options: ScheduleOptions,
   ) {
+    this.timers = options.timers;
     this.idleMs = options.idleMs ?? 600;
     this.cacheSize = options.cacheSize ?? 200;
     this.onError = options.onError ?? (() => undefined);
@@ -62,8 +66,8 @@ export class ScheduleAnalysis {
     this.pending = { text, from: paragraphFrom };
     this.inflight?.abort();
     this.inflight = null;
-    if (this.timer !== null) clearTimeout(this.timer);
-    this.timer = setTimeout(() => void this.run(), immediate ? 0 : this.idleMs);
+    if (this.timer !== null) this.timers.clear(this.timer);
+    this.timer = this.timers.set(() => void this.run(), immediate ? 0 : this.idleMs);
   }
 
   setIdleMs(ms: number): void {
@@ -77,7 +81,7 @@ export class ScheduleAnalysis {
 
   dispose(): void {
     this.disposed = true;
-    if (this.timer !== null) clearTimeout(this.timer);
+    if (this.timer !== null) this.timers.clear(this.timer);
     this.timer = null;
     this.inflight?.abort();
     this.inflight = null;
