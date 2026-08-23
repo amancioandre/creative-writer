@@ -25,7 +25,7 @@ Then in Obsidian: Settings → Community plugins → enable **Creative Zen Mode*
 For development: `npm run dev` (esbuild watch) plus the **Hot Reload** community plugin.
 
 ```bash
-npm test              # 105 tests, ~1s
+npm test              # 104 tests, ~1s
 npm run test:watch
 npm run test:coverage # thresholds: 90% lines/functions/statements, 85% branches
 npm run typecheck
