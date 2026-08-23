@@ -23,7 +23,7 @@ What Obsidian requires, and where this repo stands.
    Then on GitHub create a release from that tag and attach **`main.js`, `manifest.json`, `styles.css`** as individual assets (not a zip).
 4. **Submit**: fork `obsidianmd/obsidian-releases`, add an entry to the end of `community-plugins.json`:
    ```json
-   { "id": "creative-zen-mode", "name": "Creative Zen Mode", "author": "André Amancio", "description": "…same as manifest…", "repo": "<github-user>/<repo>" }
+   { "id": "creative-zen-mode", "name": "Creative Zen Mode", "author": "André Amancio", "description": "…same as manifest…", "repo": "amancioandre/creative-writer" }
    ```
    and open a PR titled `Add plugin: Creative Zen Mode`. A bot validates the manifest and release assets; a reviewer then reads the code. Expect a few weeks.
 

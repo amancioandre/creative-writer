@@ -1,5 +1,7 @@
 # Creative Zen Mode
 
+Repository: [github.com/amancioandre/creative-writer](https://github.com/amancioandre/creative-writer)
+
 An Obsidian plugin for creative writing. Four features, all inside the editor:
 
 | Feature | What it does | Command / setting |
