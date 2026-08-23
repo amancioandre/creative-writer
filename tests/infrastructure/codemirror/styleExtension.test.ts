@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { styleExtension, findingAt, tooltipFor } from "../../../src/infrastructure/codemirror/styleExtension";
+import { styleExtension } from "../../../src/infrastructure/codemirror/styleExtension";
+import { findingAt, tooltipFor, tooltipSource } from "../../../src/infrastructure/codemirror/findingsTooltip";
 import { AnalyzeParagraphStyle } from "../../../src/application/use-cases/AnalyzeParagraphStyle";
 import { Finding } from "../../../src/domain/style/Finding";
 import { mount, type Harness } from "./helpers";
@@ -29,7 +30,7 @@ describe("styleExtension", () => {
   });
 
   it("honours per-kind toggles", () => {
-    h = mount(DOC, ext(), { styleChecks: { cliche: false, passive: true, weak: true, filter: true, adverb: true, repetition: true } });
+    h = mount(DOC, ext(), { styleChecks: { cliche: false, passive: true, weak: true, filter: true, adverb: true, repetition: true, metaphor: true, nominalization: true, weakverb: true } });
     h.moveCursor(1);
     expect(marks(h).map((m) => m.textContent)).toEqual(["was seen"]);
   });
@@ -66,10 +67,9 @@ describe("hover tooltip", () => {
   });
 
   it("source resolves a finding from the live plugin, and null elsewhere", () => {
-    const e = ext();
-    h = mount(DOC, e);
+    h = mount(DOC, ext());
     h.moveCursor(1);
-    expect(e.source(h.view, 2)?.pos).toBe(0);
-    expect(e.source(h.view, DOC.length - 2)).toBeNull();
+    expect(tooltipSource(h.view, 2)?.pos).toBe(0);
+    expect(tooltipSource(h.view, DOC.length - 2)).toBeNull();
   });
 });

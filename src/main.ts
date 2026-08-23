@@ -14,6 +14,7 @@ import { typewriterExtension } from "./infrastructure/codemirror/typewriterExten
 import { focusFadeExtension } from "./infrastructure/codemirror/focusFadeExtension";
 import { rhythmExtension } from "./infrastructure/codemirror/rhythmExtension";
 import { styleExtension } from "./infrastructure/codemirror/styleExtension";
+import { findingsTooltip } from "./infrastructure/codemirror/findingsTooltip";
 
 /**
  * Composition root. The only file that knows about every layer: it builds
@@ -44,6 +45,7 @@ export default class CreativeZenModePlugin extends Plugin {
       focusFadeExtension(),
       rhythmExtension(new AnalyzeParagraphRhythm(new IntlSentenceSegmenter())),
       styleExtension(AnalyzeParagraphStyle.withDefaultRules()),
+      findingsTooltip(),
     ]);
 
     this.addSettingTab(

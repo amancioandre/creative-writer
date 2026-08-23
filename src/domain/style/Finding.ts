@@ -1,6 +1,6 @@
-export type FindingKind = "cliche" | "passive" | "weak" | "filter" | "adverb" | "repetition";
+export type FindingKind = "cliche" | "passive" | "weak" | "filter" | "adverb" | "repetition" | "metaphor" | "nominalization" | "weakverb";
 
-export const FINDING_KINDS: readonly FindingKind[] = ["cliche", "passive", "weak", "filter", "adverb", "repetition"];
+export const FINDING_KINDS: readonly FindingKind[] = ["cliche", "passive", "weak", "filter", "adverb", "repetition", "metaphor", "nominalization", "weakverb"];
 
 /**
  * One thing a style rule wants the writer to look at: a range and a note.

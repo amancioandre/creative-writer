@@ -14,6 +14,7 @@ export interface PluginSettings {
 
 export const DEFAULT_STYLE_CHECKS: Readonly<Record<FindingKind, boolean>> = {
   cliche: true, passive: true, weak: true, filter: true, adverb: true, repetition: true,
+  metaphor: true, nominalization: true, weakverb: true,
 };
 
 export const DEFAULT_SETTINGS: PluginSettings = {
