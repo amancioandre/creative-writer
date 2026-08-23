@@ -4,7 +4,7 @@ What Obsidian requires, and where this repo stands.
 
 ## Already in place
 
-- `manifest.json` — `id` (`creative-zen-mode`, must never change), `name`, `version`, `minAppVersion`, `description`, `author`, `isDesktopOnly: true`.
+- `manifest.json` — `id` (`creative-writer`, must never change), `name`, `version`, `minAppVersion`, `description`, `author`, `isDesktopOnly: true`.
 - `versions.json` — maps plugin version → minimum app version. Updated by `npm version`.
 - `LICENSE` — MIT, plus CC-BY attribution for the bundled concreteness norms.
 - `README.md` — what it does, how to install, settings, data/licensing, model caveats.
@@ -23,9 +23,9 @@ What Obsidian requires, and where this repo stands.
    Then on GitHub create a release from that tag and attach **`main.js`, `manifest.json`, `styles.css`** as individual assets (not a zip).
 4. **Submit**: fork `obsidianmd/obsidian-releases`, add an entry to the end of `community-plugins.json`:
    ```json
-   { "id": "creative-zen-mode", "name": "Creative Zen Mode", "author": "André Amancio", "description": "…same as manifest…", "repo": "amancioandre/creative-writer" }
+   { "id": "creative-writer", "name": "creative-writer", "author": "André Amnc", "description": "…same as manifest…", "repo": "amancioandre/creative-writer" }
    ```
-   and open a PR titled `Add plugin: Creative Zen Mode`. A bot validates the manifest and release assets; a reviewer then reads the code. Expect a few weeks.
+   and open a PR titled `Add plugin: creative-writer`. A bot validates the manifest and release assets; a reviewer then reads the code. Expect a few weeks.
 
 ## Each later release
 

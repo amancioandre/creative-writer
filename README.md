@@ -1,4 +1,4 @@
-# Creative Zen Mode
+# creative-writer
 
 Repository: [github.com/amancioandre/creative-writer](https://github.com/amancioandre/creative-writer)
 
@@ -24,7 +24,7 @@ npm run build                                  # typecheck + bundle → main.js
 npm run install:vault -- /path/to/test-vault   # copies main.js, manifest.json, styles.css
 ```
 
-Then in Obsidian: Settings → Community plugins → enable **Creative Zen Mode**, and reload (Ctrl/Cmd+R).
+Then in Obsidian: Settings → Community plugins → enable **creative-writer**, and reload (Ctrl/Cmd+R).
 `docs/QA-Rhythm-Sample.md` is a note written to exercise every feature — drop it in the vault.
 
 For development: `npm run dev` (esbuild watch) plus the **Hot Reload** community plugin.

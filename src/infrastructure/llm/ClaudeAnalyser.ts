@@ -38,7 +38,7 @@ export class ClaudeAnalyser implements LlmAnalyser {
   }
 
   async analyse(request: LlmRequest, signal: AbortSignal): Promise<unknown[]> {
-    if (!this.config.apiKey.trim()) throw new Error("Claude: no API key configured (Settings → Creative Zen Mode → Model assistant).");
+    if (!this.config.apiKey.trim()) throw new Error("Claude: no API key configured (Settings → creative-writer → Model assistant).");
     const opus = this.config.model === "claude-opus-5";
     const body: Record<string, unknown> = {
       model: this.config.model,

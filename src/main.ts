@@ -64,7 +64,7 @@ export default class CreativeZenModePlugin extends Plugin {
       name: "Analyse paragraph with model",
       editorCallback: (_editor, view) => {
         if (this.current.llm.provider === "off") {
-          new Notice("Creative Zen Mode: choose a model in settings first.");
+          new Notice("creative-writer: choose a model in settings first.");
           return;
         }
         const cm = (view as MarkdownView & { editor: { cm?: { dispatch: (spec: unknown) => void } } }).editor.cm;
@@ -95,7 +95,7 @@ export default class CreativeZenModePlugin extends Plugin {
           // One notice a minute is plenty; a dead Ollama would otherwise spam on every pause.
           if (Date.now() - lastErrorAt < 60_000) return;
           lastErrorAt = Date.now();
-          new Notice(`Creative Zen Mode: ${e instanceof Error ? e.message : String(e)}`, 8000);
+          new Notice(`creative-writer: ${e instanceof Error ? e.message : String(e)}`, 8000);
         },
       }),
     ]);
@@ -111,7 +111,7 @@ export default class CreativeZenModePlugin extends Plugin {
   private async analyseMyth(text: string): Promise<void> {
     const cfg = this.current.llm;
     if (cfg.provider !== "ollama") {
-      new Notice("Creative Zen Mode: myth analysis needs a local model — set Model to Local (Ollama) in settings.");
+      new Notice("creative-writer: myth analysis needs a local model — set Model to Local (Ollama) in settings.");
       return;
     }
     const leaf = this.app.workspace.getLeavesOfType(MYTH_VIEW_TYPE)[0] ?? this.app.workspace.getRightLeaf(false);
