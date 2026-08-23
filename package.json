@@ -14,7 +14,9 @@
     "install:vault": "node scripts/install-to-vault.mjs",
     "build:concreteness": "node scripts/build-concreteness.mjs",
     "eval": "vitest run tests/eval",
-    "eval:ollama": "OLLAMA_LIVE=1 vitest run tests/eval/model"
+    "eval:ollama": "OLLAMA_LIVE=1 vitest run tests/eval/model",
+    "version": "node scripts/version-bump.mjs && git add manifest.json versions.json",
+    "release:check": "npm run build && npm test && node -e \"const m=require('./manifest.json'),p=require('./package.json');if(m.version!==p.version)throw new Error('manifest/package version mismatch')\""
   },
   "keywords": [
     "obsidian",
