@@ -47,8 +47,7 @@ body.czm-zen .workspace-split.mod-root {
 
 /* A 2px rule drawn with a gradient background: works everywhere, sits below descenders, and stacks with style tints. */
 .cm-line [class*="czm-rhythm-"] {
-  --czm-rhythm-color: transparent;
-  background-image: linear-gradient(var(--czm-rhythm-color), var(--czm-rhythm-color));
+  background-image: linear-gradient(var(--czm-rhythm-color, transparent), var(--czm-rhythm-color, transparent));
   background-repeat: no-repeat;
   background-size: 100% 2px;
   background-position: 0 calc(100% - 1px);
@@ -79,8 +78,10 @@ body.czm-zen .workspace-split.mod-root {
 .czm-style-adverb     { background-color: var(--czm-style-adverb); }
 .czm-style-repetition { background-color: var(--czm-style-repetition); }
 
-.cm-tooltip.czm-style-tooltip {
-  background: var(--background-secondary);
+/* Three classes outrank CodeMirror's own `.cm-tooltip` light-grey defaults, which ignore Obsidian's theme. */
+.cm-tooltip.cm-tooltip-hover.czm-style-tooltip {
+  background-color: var(--background-secondary);
+  color: var(--text-normal);
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
   box-shadow: var(--shadow-s);
