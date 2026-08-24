@@ -1,7 +1,7 @@
 {
   "id": "creative-writer",
   "name": "Creative Writer",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "minAppVersion": "1.7.2",
   "description": "Zen Mode, typewriter scrolling, focus fade, paragraph rhythm and offline style checks for creative writing. Optional local-model assistant.",
   "author": "André Amnc",
