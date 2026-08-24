@@ -1,5 +1,6 @@
 import { RhythmScale } from "../rhythm/RhythmScale";
 import { FINDING_KINDS, type FindingKind } from "../style/Finding";
+import type { ScopeMode, ScopeSettings } from "../scope/NoteScope";
 
 export type LlmProvider = "off" | "ollama" | "claude";
 export type ClaudeModelId = "claude-opus-5" | "claude-haiku-4-5";
@@ -32,8 +33,18 @@ export const DEFAULT_LLM_SETTINGS: LlmSettings = {
 };
 
 export interface PluginSettings {
+  /** Master switch; the "Toggle Creative Writer" command flips it. */
+  readonly enabled: boolean;
+  /** Which notes the plugin runs in; front matter `creative-writer:` overrides. */
+  readonly scope: ScopeSettings;
   readonly typewriterEnabled: boolean;
+  /** Faint full-width band behind the cursor's visual line. */
+  readonly currentLineEnabled: boolean;
   readonly focusFadeEnabled: boolean;
+  /** Opacity of the cursor paragraph's other rows (the cursor row is always 1). */
+  readonly focusParagraphOpacity: number;
+  /** Opacity of the paragraphs furthest from the cursor; nearer rings sit between this and the paragraph value. */
+  readonly focusFarOpacity: number;
   readonly rhythmEnabled: boolean;
   readonly rhythmTiers: number;
   /** Request browser fullscreen when entering Zen Mode. */
@@ -54,13 +65,20 @@ export interface GoalSettings {
 export const DEFAULT_GOALS: GoalSettings = { dailyWords: 500 };
 
 export const DEFAULT_STYLE_CHECKS: Readonly<Record<FindingKind, boolean>> = {
-  cliche: true, passive: true, weak: true, filter: true, adverb: true, repetition: true,
+  cliche: true, passive: true, filter: true, adverb: true, repetition: true,
   metaphor: true, nominalization: true, weakverb: true,
 };
 
+export const DEFAULT_SCOPE: ScopeSettings = { mode: "all", folders: [] };
+
 export const DEFAULT_SETTINGS: PluginSettings = {
+  enabled: true,
+  scope: DEFAULT_SCOPE,
   typewriterEnabled: true,
+  currentLineEnabled: true,
   focusFadeEnabled: true,
+  focusParagraphOpacity: 0.7,
+  focusFarOpacity: 0.25,
   rhythmEnabled: true,
   rhythmTiers: 6,
   zenFullscreen: false,
@@ -83,9 +101,17 @@ export function normalizeSettings(raw: unknown): PluginSettings {
   const bool = (key: keyof PluginSettings) =>
     typeof r[key] === "boolean" ? r[key] : (DEFAULT_SETTINGS[key] as boolean);
 
+  const unit = (key: "focusParagraphOpacity" | "focusFarOpacity") =>
+    typeof r[key] === "number" && Number.isFinite(r[key]) ? Math.min(1, Math.max(0.05, r[key] as number)) : DEFAULT_SETTINGS[key];
+
   return {
+    enabled: bool("enabled"),
+    scope: normalizeScope(r.scope),
     typewriterEnabled: bool("typewriterEnabled"),
+    currentLineEnabled: bool("currentLineEnabled"),
     focusFadeEnabled: bool("focusFadeEnabled"),
+    focusParagraphOpacity: unit("focusParagraphOpacity"),
+    focusFarOpacity: unit("focusFarOpacity"),
     rhythmEnabled: bool("rhythmEnabled"),
     rhythmTiers:
       typeof r.rhythmTiers === "number" && Number.isFinite(r.rhythmTiers)
@@ -98,6 +124,23 @@ export function normalizeSettings(raw: unknown): PluginSettings {
     goals: normalizeGoals(r.goals),
     llm: normalizeLlm(r.llm),
   };
+}
+
+const SCOPE_MODES: readonly ScopeMode[] = ["all", "marked", "folders"];
+
+function normalizeScope(raw: unknown): ScopeSettings {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const mode = SCOPE_MODES.includes(r.mode as ScopeMode) ? (r.mode as ScopeMode) : DEFAULT_SCOPE.mode;
+  const folders = Array.isArray(r.folders) ? r.folders.filter((f): f is string => typeof f === "string").map((f) => f.trim()).filter(Boolean) : [];
+  return { mode, folders };
+}
+
+/** Folder list as the settings text box shows it: one per line. */
+export function foldersToText(folders: readonly string[]): string {
+  return folders.join("\n");
+}
+export function textToFolders(text: string): string[] {
+  return text.split(/[\n,]/).map((f) => f.trim()).filter(Boolean);
 }
 
 function normalizeChecks(raw: unknown): Record<FindingKind, boolean> {

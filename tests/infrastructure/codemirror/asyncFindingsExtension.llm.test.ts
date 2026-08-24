@@ -7,12 +7,12 @@ import { Finding } from "../../../src/domain/style/Finding";
 import { DEFAULT_SETTINGS } from "../../../src/domain/settings/Settings";
 import { mount, type Harness } from "./helpers";
 
-const DOC = "It was very cold and the silence bruised him.";
+const DOC = "She saw the cold and the silence bruised him.";
 const analyser = (calls: string[]): ParagraphAnalyser => ({
   async analyse(text, from) {
     calls.push(text);
     return [
-      Finding.create("weak", from + 7, from + 11, "model: very"),          // duplicates the sync rule
+      Finding.create("filter", from + 4, from + 7, "model: saw") ,          // duplicates the sync rule
       Finding.create("metaphor", from + 25, from + 40, "model: silence"),  // new
     ];
   },
@@ -40,7 +40,7 @@ describe("asyncFindingsExtension + llm settings", () => {
     h.moveCursor(1);
     await vi.advanceTimersByTimeAsync(200);
     expect(calls).toEqual([DOC]);
-    expect(marks(h, "weak")).toHaveLength(1);      // the sync one only
+    expect(marks(h, "filter")).toHaveLength(1);      // the sync one only
     expect(marks(h, "metaphor")).toHaveLength(1);  // the model's
   });
 

@@ -25,7 +25,7 @@ const PARAGRAPH =
 describe.skipIf(!live)(`Ollama live (${model})`, () => {
   it("returns validated findings for a cliché-heavy paragraph within a sane time", async () => {
     const adapter = new OllamaAnalyser(fetchHttp, { baseUrl: "http://localhost:11434", model });
-    const uc = new AnalyzeParagraphWithLlm(adapter, () => new Set(["cliche", "metaphor", "passive", "weak", "filter", "adverb"]));
+    const uc = new AnalyzeParagraphWithLlm(adapter, () => new Set(["cliche", "metaphor", "passive", "filter", "adverb"]));
     const t0 = performance.now();
     const out = await uc.analyse(PARAGRAPH, 0, new AbortController().signal);
     const ms = performance.now() - t0;

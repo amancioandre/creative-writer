@@ -17,6 +17,9 @@ describe("MetaphorCandidateRule", () => {
   it("flags a concrete adjective on an abstract noun", () => {
     expect(spans("A velvet silence settled.")).toEqual(["velvet silence"]);
   });
+  it("never pairs a modifier with a determiner across an ellipsis boundary", () => {
+    expect(spans("and the office… The office grew stranger for the past few years.")).toEqual([]);
+  });
   it("leaves literal pairings alone", () => {
     expect(spans("The knife cut the bread.")).toEqual([]);
     expect(spans("The cat crawled under the bed.")).toEqual([]);

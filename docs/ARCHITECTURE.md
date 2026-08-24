@@ -85,11 +85,11 @@ Each rule's precision/recall trade-off, in one line:
 
 | Rule | Approach | Where it's wrong |
 |---|---|---|
-| Cliche | 888 curated phrases, token-trie | Only what's in the list. Add freely; the hygiene test guards the format. |
-| PassiveVoice | be/get (+modal, +been/being) + adverbs + participle; stative list excluded | "was closed" (state) vs "was closed by" (passive) — we skip it unless "being" is present. |
-| WeakWord | 100+ entries with notes; context guards for `so`, `just`, `felt`, `pretty` | "There was" is flagged even when it's the right choice. |
-| Adverb | `-ly`, ≥5 letters, minus a non-adverb list; sharper note after a dialogue tag | Rare adjectives not in the list ("ghastly" is). |
-| Repetition | Stemmed content word within 30 words; ≥3 sentence openers alike | Deliberate anaphora gets flagged at three. |
+| Cliche | ~860 curated phrases, token-trie; literal-prone bare idioms ("cats and dogs", "a dead end", "a crescent moon") and preposition stubs ("orbs of", "nestled in") removed in the 2026-08-24 audit | Only what's in the list. Add freely; the hygiene test guards the format. |
+| PassiveVoice | modal chain + be/get (+been/being/getting) + adverbs/negation + participle; questions ("Was it sent?"); stative and not-a-participle lists; names skipped; agent scan to sentence end, "by then" excluded | "was painted red" without an agent reads as a state (tagger calls it an adjective) and is skipped. |
+| FilterVerb | ~70 perception/cognition forms incl. multi-word ("could see", "found herself", "was aware of"); not inside quotes, not in a noun/passive slot ("a thought", "was decided"), not before a linking preposition ("smelled of"); with a tagger the head must be a verb | "saw" in "I saw him yesterday" (report, not filter) is flagged. Intensifiers, hedges and filler are deliberately left to [Harper](https://writewithharper.com). |
+| Adverb | `-ly`, ≥5 letters, minus a non-adverb list (applied even with a tagger) and a structural/stance list ("suddenly", "obviously"); nothing inside quotes; names skipped; dialogue-tag note only when a quote closed in the sentence | "sadly"/"clearly" are ambiguous between stance and manner; the stance reading wins and the manner use is missed. |
+| Repetition | Stemmed content word within 30 words (names skipped, stems handle -ies/-ing/doubled consonants); ≥3 sentence openers alike, ≥5 for "the/a/I/it/there" | Deliberate anaphora gets flagged at three. |
 
 ## Tier 2: tagger and concreteness
 
@@ -104,10 +104,10 @@ Two more domain-defined ports, both optional — every rule works without them, 
 
 | Rule | Signal | Known misses |
 |---|---|---|
-| PassiveVoice (+tagger) | Participle/Passive tag; stative word accepted only with a `by`-agent or `being` | "was closed" with no agent and no context stays unflagged — by design. |
-| Nominalization | light verb + noun with a verb inside (map of ~60, suffix fallback) | "take a look" is flagged; sometimes it's the right idiom. |
-| WeakVerb | sentence ≥ 10 words whose only verbs are copulas | Deliberate descriptive stasis. |
-| MetaphorCandidate | concrete verb (≥3.0) / modifier (≥4.0) with an abstract noun (≤3.4), gap ≥ 0.7; copula + concrete predicate; dead-metaphor list | Verbs the norms rate as abstract ("devour" 3.1) are invisible. Proper nouns skipped. |
+| PassiveVoice (+tagger) | Participle/Passive/PastTense tag, or participle shape (compromise misses "got hit", "was told"); a plain-adjective tag is accepted only with a `by`-agent; stative word only with an agent or `being` | "was closed" with no agent and no context stays unflagged — by design. |
+| Nominalization | light verb + noun with a verb inside (map of ~80, plural via lemma; suffix fallback only after make/take/give/do/conduct/perform/carry/provide/offer/put, never for "have"/"reach"; phrasal "carried out", indirect objects and adverbs skipped) | "take a look" is flagged; sometimes it's the right idiom. |
+| WeakVerb | sentence ≥ 14 words whose only verbs are copulas (incl. "wasn't", "'s"); finding sits on the main-clause copula, not one after "which/that" | Deliberate descriptive stasis. |
+| MetaphorCandidate | concrete verb (≥3.5) / adjective or material noun (≥3.8) with an abstract noun (≤3.4), gap ≥ 0.7, looking through auxiliaries/negation/adverbs; copula + concrete predicate (shell nouns like "the problem was…" excluded); dead-metaphor list, with open figures ("a flood of …") only when the complement is abstract | Verbs the norms rate as abstract ("creep" 3.4, "gnaw" absent) are invisible. Proper nouns, possessives, noun compounds ("office hours") and inscription/transaction verbs ("cut the budget", "signed the treaty") skipped. |
 
 ## Tier 3: models
 

@@ -23,7 +23,7 @@ const PARAGRAPH =
 describe.skipIf(!key)(`Claude live (${model})`, () => {
   it("returns validated findings; second call hits the prompt cache", async () => {
     const adapter = new ClaudeAnalyser(fetchHttp, { apiKey: key, model });
-    const uc = new AnalyzeParagraphWithLlm(adapter, () => new Set(["cliche", "metaphor", "passive", "weak", "filter", "adverb"]));
+    const uc = new AnalyzeParagraphWithLlm(adapter, () => new Set(["cliche", "metaphor", "passive", "filter", "adverb"]));
     const out = await uc.analyse(PARAGRAPH, 0, new AbortController().signal);
     const first = adapter.lastUsage!;
     await uc.analyse(PARAGRAPH + " And then he left.", 0, new AbortController().signal);

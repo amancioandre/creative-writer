@@ -1,3 +1,4 @@
+import { effectiveSettings } from "./activeNote";
 import { StateField } from "@codemirror/state";
 import { Decoration, EditorView } from "@codemirror/view";
 import { settingsFacet } from "./settingsFacet";
@@ -17,7 +18,7 @@ export { STYLE_MARK_CLASS_PREFIX, STYLE_NOTE_ATTR } from "./findingDecorations";
  */
 export function styleExtension(analyze: AnalyzeParagraphStyle) {
   const compute = (state: Parameters<typeof cursorParagraph>[0] & { facet: EditorView["state"]["facet"] }): Finding[] => {
-    const enabled = enabledStyleKinds(state.facet(settingsFacet));
+    const enabled = enabledStyleKinds(effectiveSettings(state));
     if (enabled.size === 0) return [];
     const p = cursorParagraph(state);
     if (!p) return [];
@@ -27,7 +28,7 @@ export function styleExtension(analyze: AnalyzeParagraphStyle) {
   const field = StateField.define<Finding[]>({
     create: (state) => compute(state),
     update(value, tr) {
-      const settingsChanged = tr.startState.facet(settingsFacet) !== tr.state.facet(settingsFacet);
+      const settingsChanged = effectiveSettings(tr.startState) !== effectiveSettings(tr.state);
       return tr.docChanged || tr.selection || settingsChanged ? compute(tr.state) : value;
     },
   });

@@ -24,7 +24,7 @@ Goal: upgrade precision on existing checks and add a metaphor *candidate* detect
 
 ### 2.1 — POS tagging via `compromise`
 
-**Why:** PassiveVoice, Adverb and WeakWord are currently guessing from word shape. A tagger removes the guesswork.
+**Why:** PassiveVoice and Adverb are currently guessing from word shape. A tagger removes the guesswork.
 
 - Add `compromise` (~250 KB, pure JS, no WASM, MIT). It runs in the domain's *infrastructure* adapter, not the domain.
 - `infrastructure/nlp/CompromiseTagger.ts` implementing `application/ports/PosTagger.ts` (`tag(text) → TaggedToken[]` with offsets)

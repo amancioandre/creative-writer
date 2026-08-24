@@ -1,6 +1,6 @@
 # Eval results — 2026-08-23
 
-Corpus: `eval/corpus.ts`, 111 labelled sentences (75 with at least one expected kind, 36 clean). Scoring is sentence-level per kind. Run: `npm run eval` (rules), `npm run eval:ollama` (local model).
+Corpus: `eval/corpus.ts`, 100 labelled sentences (64 with at least one expected kind, 36 clean). The former `weak` kind (intensifiers, hedges, filler) was dropped on 2026-08-24 — that is Harper's job — and its 10 sentences with it; the figures below predate that and are unchanged for the remaining kinds (verified by re-running `npm run eval`). The same day, a rule audit (~300 adversarial sentences per rule, pinned in `tests/domain/style/audit.test.ts`) rewrote the passive, adverb, filter, repetition, nominalisation and metaphor rules; the corpus score is unchanged, the corpus simply never contained the failure modes (negated passives, names as echoes, noun compounds as metaphors, literal "a flood of water"). Scoring is sentence-level per kind. Run: `npm run eval` (rules), `npm run eval:ollama` (local model).
 
 ## Rules (Tier 1 + 2)
 

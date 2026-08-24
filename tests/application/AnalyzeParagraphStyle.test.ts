@@ -19,9 +19,9 @@ describe("AnalyzeParagraphStyle", () => {
   });
 
   it("sorts findings by position", () => {
-    const useCase = new AnalyzeParagraphStyle({ cliche: ruleOf("cliche", 5, 8), weak: ruleOf("weak", 0, 2) });
-    const out = useCase.execute({ text: "ab   cde", paragraphFrom: 0, enabled: new Set(["cliche", "weak"]) });
-    expect(out.map((f) => f.kind)).toEqual(["weak", "cliche"]);
+    const useCase = new AnalyzeParagraphStyle({ cliche: ruleOf("cliche", 5, 8), filter: ruleOf("filter", 0, 2) });
+    const out = useCase.execute({ text: "ab   cde", paragraphFrom: 0, enabled: new Set(["cliche", "filter"]) });
+    expect(out.map((f) => f.kind)).toEqual(["filter", "cliche"]);
   });
 
   it("returns nothing when no rules are enabled", () => {
@@ -32,8 +32,8 @@ describe("AnalyzeParagraphStyle", () => {
   it("default wiring produces real findings across kinds", () => {
     const useCase = AnalyzeParagraphStyle.withDefaultRules();
     const text = "At the end of the day the letter was written very slowly. She saw the garden. The garden wept.";
-    const kinds = new Set(useCase.execute({ text, paragraphFrom: 0, enabled: new Set(["cliche", "passive", "weak", "filter", "adverb", "repetition"]) }).map((f) => f.kind));
-    expect([...kinds].sort()).toEqual(["adverb", "cliche", "filter", "passive", "repetition", "weak"]);
+    const kinds = new Set(useCase.execute({ text, paragraphFrom: 0, enabled: new Set(["cliche", "passive", "filter", "adverb", "repetition"]) }).map((f) => f.kind));
+    expect([...kinds].sort()).toEqual(["adverb", "cliche", "filter", "passive", "repetition"]);
   });
 });
 

@@ -1,6 +1,6 @@
 import type { FindingKind } from "../../../domain/style/Finding";
 
-export const RULEBOOK_VERSION = "2026-08-23.2";
+export const RULEBOOK_VERSION = "2026-08-24.1";
 
 /**
  * The system prompt shared by every model adapter. Long on purpose: a
@@ -24,9 +24,6 @@ metaphor — Judge figurative language. Flag a metaphor or simile that is DEAD (
 
 passive — Passive voice that HIDES an agent the reader should see, or that sags a sentence that wants energy. Do not flag passives that are correct because the agent is unknown, unimportant, or deliberately concealed ("The body was found at dawn").
   Example: quote "the decision was made", note "By whom? If it's Marcus, say so — the evasion reads as the author's, not the character's."
-
-weak — Hedges, intensifiers and filler that dilute: very, really, quite, rather, somewhat, just, actually, basically, literally, kind of, sort of, seemed to, started to, began to. Flag only when the word adds nothing; "just" in "just as she left" is temporal and fine.
-  Example: quote "very tired", note "'Exhausted', 'spent', 'hollowed out' — pick the one that fits her."
 
 filter — Perception verbs that put the narrator between the reader and the experience in close third or first person: saw, heard, felt, noticed, watched, realised, knew, wondered. Flag when removing the verb and rendering the thing directly would be stronger.
   Example: quote "She heard the door slam", note "Filtered. 'The door slammed.' — we are already in her head."

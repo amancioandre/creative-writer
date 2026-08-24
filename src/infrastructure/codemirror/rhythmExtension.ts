@@ -1,3 +1,4 @@
+import { effectiveSettings } from "./activeNote";
 import { Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 import { RangeSetBuilder } from "@codemirror/state";
 import { settingsFacet, settingsChanged } from "./settingsFacet";
@@ -42,7 +43,7 @@ export function rhythmExtension(analyze: AnalyzeParagraphRhythm) {
   );
 
   function build(view: EditorView): DecorationSet {
-    const settings = view.state.facet(settingsFacet);
+    const settings = effectiveSettings(view.state);
     if (!settings.rhythmEnabled) return Decoration.none;
 
     const doc = view.state.doc;

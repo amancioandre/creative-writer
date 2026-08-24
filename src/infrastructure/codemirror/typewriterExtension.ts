@@ -1,3 +1,4 @@
+import { effectiveSettings } from "./activeNote";
 import { EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 import { settingsFacet } from "./settingsFacet";
 import { editorClassWhen } from "./editorClassToggle";
@@ -39,7 +40,7 @@ export function typewriterExtension() {
           docChanged: u.docChanged,
           selectionSet: u.selectionSet,
           hasFocus: u.view.hasFocus,
-          enabled: u.state.facet(settingsFacet).typewriterEnabled,
+          enabled: effectiveSettings(u.state).typewriterEnabled,
         };
         if (shouldRecenter(signal)) this.schedule();
       }

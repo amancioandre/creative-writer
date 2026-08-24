@@ -1,4 +1,4 @@
-import { MarkdownView, Notice, Plugin, type WorkspaceLeaf } from "obsidian";
+import { MarkdownView, Notice, Plugin, editorInfoField, type WorkspaceLeaf } from "obsidian";
 import { Compartment } from "@codemirror/state";
 
 import type { PluginSettings } from "./domain/settings/Settings";
@@ -13,7 +13,10 @@ import { DomWorkspaceChrome } from "./infrastructure/obsidian/DomWorkspaceChrome
 import { PluginDataSettingsRepository } from "./infrastructure/obsidian/PluginDataSettingsRepository";
 import { CreativeZenSettingsTab } from "./infrastructure/obsidian/SettingsTab";
 import { settingsFacet } from "./infrastructure/codemirror/settingsFacet";
+import { activeNoteExtension } from "./infrastructure/codemirror/activeNote";
+import { FRONTMATTER_KEY, frontmatterFlag, isNoteActive } from "./domain/scope/NoteScope";
 import { typewriterExtension } from "./infrastructure/codemirror/typewriterExtension";
+import { currentLineExtension } from "./infrastructure/codemirror/currentLineExtension";
 import { focusFadeExtension } from "./infrastructure/codemirror/focusFadeExtension";
 import { rhythmExtension } from "./infrastructure/codemirror/rhythmExtension";
 import { styleExtension } from "./infrastructure/codemirror/styleExtension";
@@ -58,6 +61,25 @@ export default class CreativeZenModePlugin extends Plugin {
       id: "toggle-zen-mode",
       name: "Toggle Zen Mode",
       callback: () => void this.zen.execute(),
+    });
+    this.addCommand({
+      id: "toggle-enabled",
+      name: "Toggle Creative Writer (everywhere)",
+      callback: () => {
+        void this.updateSettings({ ...this.current, enabled: !this.current.enabled });
+        new Notice(`creative-writer: ${this.current.enabled ? "on" : "off"}`);
+      },
+    });
+    this.addCommand({
+      id: "toggle-note",
+      name: "Toggle Creative Writer for this note",
+      editorCallback: (editor, view) => {
+        const file = (view as MarkdownView).file;
+        if (!file) return;
+        const active = isNoteActive({ enabled: this.current.enabled, scope: this.current.scope, path: file.path, flag: frontmatterFlag(editor.getValue()) });
+        void this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => { fm[FRONTMATTER_KEY] = !active; });
+        new Notice(`creative-writer: ${!active ? "on" : "off"} for this note`);
+      },
     });
 
     const llm = new ConfiguredLlmAnalyser(
@@ -139,11 +161,13 @@ export default class CreativeZenModePlugin extends Plugin {
 
     this.registerEditorExtension([
       this.settingsCompartment.of(settingsFacet.of(this.current)),
+      activeNoteExtension((state) => state.field(editorInfoField, false)?.file?.path ?? null),
       readabilityStatusExtension(profile, (p) => {
         readability.setText(statusLabel(p));
         readability.title = p?.readingEase ? `${p.readingEase.band.hint}${p.variety ? `\n${p.variety.band.hint}` : ""}` : "";
       }),
       typewriterExtension(),
+      currentLineExtension(),
       focusFadeExtension(),
       rhythmExtension(new AnalyzeParagraphRhythm(new IntlSentenceSegmenter())),
       styleExtension(AnalyzeParagraphStyle.withDefaultRules(new CompromiseTagger(), new BrysbaertConcreteness())),

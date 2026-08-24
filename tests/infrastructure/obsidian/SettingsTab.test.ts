@@ -29,8 +29,8 @@ describe("CreativeZenSettingsTab", () => {
     it("declares every setting with a searchable name", () => {
       const all = names(tab.getSettingDefinitions());
       expect(all).toEqual(expect.arrayContaining([
-        "Typewriter scrolling", "Focus fade", "Paragraph rhythm", "Rhythm tiers", "Fullscreen in Zen Mode",
-        "Style checks", "Clichés", "Passive voice", "Weak words", "Filter verbs", "Adverbs", "Repetition", "Nominalisations", "Weak verbs", "Metaphor candidates",
+        "Enabled", "Notes", "Folders", "Typewriter scrolling", "Current line", "Focus fade", "Paragraph strength", "Far text strength", "Paragraph rhythm", "Rhythm tiers", "Fullscreen in Zen Mode",
+        "Style checks", "Clichés", "Passive voice", "Filter verbs", "Adverbs", "Repetition", "Nominalisations", "Weak verbs", "Metaphor candidates",
         "Model", "Analyse automatically", "Ollama URL", "Ollama model", "Claude model", "Anthropic API key", "Daily spending cap (USD)",
       ]));
     });

@@ -54,7 +54,7 @@ describe("cliché lexicon hygiene", () => {
     for (const c of CLICHES) {
       expect(c).toBe(c.toLowerCase().trim());
       expect(c.split(" ").length >= 2 || c.includes("-")).toBe(true);
-      expect(/^[a-z' -]+$/.test(c)).toBe(true);
+      expect(/^[a-z0-9' -]+$/.test(c)).toBe(true);
     }
   });
   it("is substantial", () => {

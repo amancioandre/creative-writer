@@ -10,7 +10,7 @@ import { DEFAULT_SETTINGS } from "../../../src/domain/settings/Settings";
 
 const llmOn = { llm: { ...DEFAULT_SETTINGS.llm, provider: "ollama" as const, onIdle: true } };
 
-const DOC = "The silence bruised him.\n\nVery plain words here.";
+const DOC = "The silence bruised him.\n\nSaw plain words here.";
 
 /** Flags the first word of whatever paragraph it is given. */
 const firstWordAnalyser: ParagraphAnalyser = {
@@ -52,7 +52,7 @@ describe("asyncFindingsExtension", () => {
     await vi.advanceTimersByTimeAsync(100);
     h.moveCursor(DOC.length - 1);
     await vi.advanceTimersByTimeAsync(100);
-    expect(marks(h).map((m) => m.textContent)).toEqual(["Very"]);
+    expect(marks(h).map((m) => m.textContent)).toEqual(["Saw"]);
   });
 
   it("does nothing when the feature is disabled", async () => {
@@ -66,7 +66,7 @@ describe("asyncFindingsExtension", () => {
     h = mount(DOC, asyncFindingsExtension(firstWordAnalyser, { idleMs: 50 }), llmOn);
     h.moveCursor(1);
     await vi.advanceTimersByTimeAsync(100);
-    h.setSettings({ styleChecks: { cliche: true, passive: true, weak: true, filter: true, adverb: true, repetition: true, metaphor: false, nominalization: true, weakverb: true } });
+    h.setSettings({ styleChecks: { cliche: true, passive: true, filter: true, adverb: true, repetition: true, metaphor: false, nominalization: true, weakverb: true } });
     expect(marks(h)).toHaveLength(0);
   });
 
@@ -88,6 +88,6 @@ describe("findingsTooltip merges sync and async sources", () => {
     h.moveCursor(DOC.length - 1);
     await vi.advanceTimersByTimeAsync(100);
     const kinds = allFindings(h.view).map((f) => f.kind).sort();
-    expect(kinds).toEqual(["metaphor", "weak"]); // "Very" from both
+    expect(kinds).toEqual(["filter", "metaphor"]); // "Saw" from both
   });
 });

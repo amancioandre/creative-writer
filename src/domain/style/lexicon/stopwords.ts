@@ -1,7 +1,8 @@
-/** Function words excluded from repetition checks. */
+/** Function words excluded from repetition checks. Content words ("man", "day", "looked") are not: a writer wants those caught. */
 export const STOPWORDS: ReadonlySet<string> = new Set([
   "the", "a", "an", "and", "or", "but", "nor", "so", "yet", "for", "of", "in", "on", "at", "to", "from", "by", "with",
   "about", "into", "onto", "over", "under", "through", "between", "among", "against", "without", "within", "upon",
+  "after", "before", "while", "until", "because", "since", "though", "although", "during",
   "is", "am", "are", "was", "were", "be", "been", "being", "have", "has", "had", "having", "do", "does", "did",
   "doing", "will", "would", "shall", "should", "can", "could", "may", "might", "must", "ought",
   "i", "me", "my", "mine", "myself", "you", "your", "yours", "yourself", "he", "him", "his", "himself", "she", "her",
@@ -10,8 +11,14 @@ export const STOPWORDS: ReadonlySet<string> = new Set([
   "how", "there", "here", "then", "than", "as", "if", "not", "no", "yes", "all", "any", "some", "each", "every",
   "both", "few", "more", "most", "other", "such", "only", "own", "same", "too", "very", "just", "also", "now",
   "again", "once", "still", "even", "ever", "never", "always", "often", "back", "up", "down", "out", "off", "away",
-  "said", "says", "one", "two", "like", "get", "got", "go", "went", "come", "came", "made", "make", "thing", "things",
-  "well", "much", "many", "little", "long", "way", "time", "day", "man", "woman", "look", "looked", "know", "knew",
+  "nothing", "something", "anything", "everything", "someone", "anyone", "everyone", "nobody", "somebody", "anybody",
+  "said", "says", "asked", "ask", "asks", "replied", "reply", "answered", "told", "tell", "tells",
+  "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "first", "second", "last", "next", "another",
+  "like", "get", "got", "go", "went", "come", "came", "made", "make", "thing", "things",
+  "well", "much", "many", "okay", "maybe", "yeah", "hello",
+  "later", "ago", "soon", "today", "tonight", "tomorrow", "yesterday",
   "don't", "didn't", "doesn't", "isn't", "wasn't", "weren't", "can't", "couldn't", "won't", "wouldn't", "shouldn't",
+  "hadn't", "hasn't", "haven't", "aren't", "mustn't",
   "i'm", "i've", "i'd", "i'll", "he's", "she's", "it's", "we're", "they're", "you're", "that's", "there's", "what's",
+  "you've", "you'll", "we've", "we'll", "they've", "they'll", "he'd", "she'd", "he'll", "she'll", "who's", "let's",
 ]);

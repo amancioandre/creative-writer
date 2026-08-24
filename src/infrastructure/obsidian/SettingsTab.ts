@@ -1,6 +1,7 @@
 import { type App, type Plugin, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
 import { RhythmScale } from "../../domain/rhythm/RhythmScale";
-import type { ClaudeModelId, LlmProvider, PluginSettings } from "../../domain/settings/Settings";
+import { foldersToText, textToFolders, type ClaudeModelId, type LlmProvider, type PluginSettings } from "../../domain/settings/Settings";
+import type { ScopeMode } from "../../domain/scope/NoteScope";
 import type { FindingKind } from "../../domain/style/Finding";
 
 /** What the tab needs from the outside world — not the whole plugin. */
@@ -14,7 +15,6 @@ export interface SettingsPort {
 const STYLE_CHECKS: ReadonlyArray<[FindingKind, string, string]> = [
   ["cliche", "Clichés", "Phrases worn smooth by overuse."],
   ["passive", "Passive voice", "\"The letter was written\" — by whom?"],
-  ["weak", "Weak words", "Intensifiers, hedges and filler: very, quite, just, started to…"],
   ["filter", "Filter verbs", "saw, heard, felt, realised — narrating perception instead of rendering it."],
   ["adverb", "Adverbs", "-ly adverbs, especially on dialogue tags."],
   ["repetition", "Repetition", "A word echoed within thirty words, or three sentences opening alike."],
@@ -36,8 +36,20 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
   getSettingDefinitions(): SettingDefinitionItem[] {
     const s = this.port.current();
     return [
+      {
+        type: "group",
+        heading: "Where it runs",
+        items: [
+          { name: "Enabled", desc: "Master switch. The \"Toggle Creative Writer (everywhere)\" command flips it.", control: { type: "toggle", key: "enabled" } },
+          { name: "Notes", desc: "Which notes get the writing tools. A note's own front matter always wins: creative-writer: true or false (the \"Toggle Creative Writer for this note\" command writes it).", control: { type: "dropdown", key: "scope.mode", options: { all: "Every note", marked: "Only notes marked creative-writer: true", folders: "Only notes in these folders" } } },
+          { name: "Folders", desc: "One vault-relative folder per line, e.g. storytelling/novel.", control: { type: "text", key: "scope.foldersText", placeholder: "storytelling" } },
+        ],
+      },
       { name: "Typewriter scrolling", desc: "Keep the line you are writing vertically centred.", control: { type: "toggle", key: "typewriterEnabled" } },
+      { name: "Current line", desc: "A faint band across the editor behind the line you are writing, so it stands out inside its paragraph.", control: { type: "toggle", key: "currentLineEnabled" } },
       { name: "Focus fade", desc: "Fade lines progressively the further they are from the cursor.", control: { type: "toggle", key: "focusFadeEnabled" } },
+      { name: "Paragraph strength", desc: "How visible the rest of the cursor paragraph is, next to the line you are on (1 = no difference).", control: { type: "slider", key: "focusParagraphOpacity", min: 0.1, max: 1, step: 0.05 } },
+      { name: "Far text strength", desc: "How visible the paragraphs furthest from the cursor are. Nearer ones sit between this and the paragraph strength.", control: { type: "slider", key: "focusFarOpacity", min: 0.05, max: 1, step: 0.05 } },
       { name: "Paragraph rhythm", desc: "Colour each sentence of the current paragraph by its length and weight.", control: { type: "toggle", key: "rhythmEnabled" } },
       { name: "Rhythm tiers", desc: "How many colour steps the rhythm gradient uses.", control: { type: "slider", key: "rhythmTiers", min: RhythmScale.MIN_TIERS, max: RhythmScale.MAX_TIERS, step: 1 } },
       { name: "Fullscreen in Zen Mode", desc: "Also request window fullscreen when Zen Mode is toggled on.", control: { type: "toggle", key: "zenFullscreen" } },
@@ -53,7 +65,7 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
         type: "group",
         heading: "Style checks",
         items: [
-          { name: "Style checks", desc: "Highlight clichés, passive voice, weak words, filter verbs, adverbs and repetition in the current paragraph. Hover a highlight for the note.", control: { type: "toggle", key: "styleEnabled" } },
+          { name: "Style checks", desc: "Highlight clichés, passive voice, filter verbs, adverbs, repetition and more in the current paragraph. Hover a highlight for the note.", control: { type: "toggle", key: "styleEnabled" } },
           ...STYLE_CHECKS.map(([kind, name, desc]) => ({ name, desc, control: { type: "toggle" as const, key: `styleChecks.${kind}` } })),
         ],
       },
@@ -75,10 +87,16 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
   }
 
   getControlValue(key: string): unknown {
+    if (key === "scope.foldersText") return foldersToText(this.port.current().scope.folders);
     return key.split(".").reduce<unknown>((o, k) => (o && typeof o === "object" ? (o as Record<string, unknown>)[k] : undefined), this.port.current());
   }
 
   async setControlValue(key: string, value: unknown): Promise<void> {
+    if (key === "scope.foldersText") {
+      const c = this.port.current();
+      await this.port.update({ ...c, scope: { ...c.scope, folders: textToFolders(String(value ?? "")) } });
+      return;
+    }
     await this.port.update(setPath(this.port.current(), key.split("."), value));
   }
 
@@ -97,10 +115,22 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
     const set = (patch: Partial<PluginSettings>) => this.port.update({ ...this.port.current(), ...patch });
     const llm = (patch: Partial<PluginSettings["llm"]>) => set({ llm: { ...this.port.current().llm, ...patch } });
 
+    new Setting(containerEl).setName("Enabled").setDesc("Master switch.")
+      .addToggle((t) => t.setValue(s.enabled).onChange((v) => set({ enabled: v })));
+    new Setting(containerEl).setName("Notes").setDesc("Which notes get the writing tools; a note's front matter creative-writer: true/false always wins.")
+      .addDropdown((d) => d.addOptions({ all: "Every note", marked: "Only notes marked creative-writer: true", folders: "Only notes in these folders" }).setValue(s.scope.mode).onChange((v) => set({ scope: { ...this.port.current().scope, mode: v as ScopeMode } })));
+    new Setting(containerEl).setName("Folders").setDesc("One vault-relative folder per line.")
+      .addText((t) => t.setPlaceholder("storytelling").setValue(foldersToText(s.scope.folders)).onChange((v) => set({ scope: { ...this.port.current().scope, folders: textToFolders(v) } })));
     new Setting(containerEl).setName("Typewriter scrolling").setDesc("Keep the line you are writing vertically centred.")
       .addToggle((t) => t.setValue(s.typewriterEnabled).onChange((v) => set({ typewriterEnabled: v })));
+    new Setting(containerEl).setName("Current line").setDesc("A faint band across the editor behind the line you are writing, so it stands out inside its paragraph.")
+      .addToggle((t) => t.setValue(s.currentLineEnabled).onChange((v) => set({ currentLineEnabled: v })));
     new Setting(containerEl).setName("Focus fade").setDesc("Fade lines progressively the further they are from the cursor.")
       .addToggle((t) => t.setValue(s.focusFadeEnabled).onChange((v) => set({ focusFadeEnabled: v })));
+    new Setting(containerEl).setName("Paragraph strength").setDesc("How visible the rest of the cursor paragraph is next to the current line.")
+      .addSlider((sl) => sl.setLimits(0.1, 1, 0.05).setValue(s.focusParagraphOpacity).setDynamicTooltip().onChange((v) => set({ focusParagraphOpacity: v })));
+    new Setting(containerEl).setName("Far text strength").setDesc("How visible the paragraphs furthest from the cursor are.")
+      .addSlider((sl) => sl.setLimits(0.05, 1, 0.05).setValue(s.focusFarOpacity).setDynamicTooltip().onChange((v) => set({ focusFarOpacity: v })));
     new Setting(containerEl).setName("Paragraph rhythm").setDesc("Colour each sentence of the current paragraph by its length and weight.")
       .addToggle((t) => t.setValue(s.rhythmEnabled).onChange((v) => set({ rhythmEnabled: v })));
     new Setting(containerEl).setName("Rhythm tiers").setDesc("How many colour steps the rhythm gradient uses.")
@@ -115,7 +145,7 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
       .addSlider((sl) => sl.setLimits(0, 5000, 50).setValue(s.goals.dailyWords).onChange((v) => set({ goals: { ...this.port.current().goals, dailyWords: v } })));
 
     new Setting(containerEl).setName("Style checks").setHeading();
-    new Setting(containerEl).setName("Style checks").setDesc("Highlight clichés, passive voice, weak words, filter verbs, adverbs and repetition in the current paragraph. Hover a highlight for the note.")
+    new Setting(containerEl).setName("Style checks").setDesc("Highlight clichés, passive voice, filter verbs, adverbs, repetition and more in the current paragraph. Hover a highlight for the note.")
       .addToggle((t) => t.setValue(s.styleEnabled).onChange((v) => set({ styleEnabled: v })));
     for (const [kind, name, desc] of STYLE_CHECKS) {
       new Setting(containerEl).setName(name).setDesc(desc)

@@ -28,6 +28,21 @@ describe("CompromiseTagger", () => {
     expect(by.knives).toBe("knife");
   });
 
+  it("ends a sentence at an ellipsis followed by a capital, with offsets intact", () => {
+    for (const text of ["and the office… The office grew.", "He waited... \"The door,\" she said."]) {
+      const toks = tagger.tag(text);
+      for (const t of toks) expect(text.slice(t.from, t.to)).toBe(t.text);
+      expect(new Set(toks.map((t) => t.sentence)).size).toBe(2);
+      const the = toks.find((t) => t.text === "The")!;
+      expect(the.tags.has("Determiner")).toBe(true);
+      expect(the.tags.has("ProperNoun")).toBe(false);
+    }
+  });
+
+  it("does not split at a mid-sentence ellipsis followed by lowercase", () => {
+    expect(new Set(tagger.tag("She waited… and then she left.").map((t) => t.sentence)).size).toBe(1);
+  });
+
   it("handles empty input", () => {
     expect(tagger.tag("")).toEqual([]);
   });

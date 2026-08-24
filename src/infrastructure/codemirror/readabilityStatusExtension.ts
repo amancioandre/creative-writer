@@ -1,3 +1,4 @@
+import { effectiveSettings } from "./activeNote";
 import { ViewPlugin, type EditorView, type ViewUpdate } from "@codemirror/view";
 import { settingsFacet, settingsChanged } from "./settingsFacet";
 import { cursorParagraph } from "./cursorParagraph";
@@ -26,7 +27,7 @@ export function readabilityStatusExtension(profile: ProfileProse, report: (p: Pr
       }
 
       private emit(view: EditorView) {
-        if (!view.state.facet(settingsFacet).readabilityEnabled) {
+        if (!effectiveSettings(view.state).readabilityEnabled) {
           this.lastText = null;
           report(null);
           return;

@@ -30,7 +30,7 @@ describe("styleExtension", () => {
   });
 
   it("honours per-kind toggles", () => {
-    h = mount(DOC, ext(), { styleChecks: { cliche: false, passive: true, weak: true, filter: true, adverb: true, repetition: true, metaphor: true, nominalization: true, weakverb: true } });
+    h = mount(DOC, ext(), { styleChecks: { cliche: false, passive: true, filter: true, adverb: true, repetition: true, metaphor: true, nominalization: true, weakverb: true } });
     h.moveCursor(1);
     expect(marks(h).map((m) => m.textContent)).toEqual(["was seen"]);
   });
@@ -43,7 +43,7 @@ describe("styleExtension", () => {
 });
 
 describe("findingAt", () => {
-  const fs = [Finding.create("weak", 5, 9, "a"), Finding.create("adverb", 20, 26, "b")];
+  const fs = [Finding.create("filter", 5, 9, "a"), Finding.create("adverb", 20, 26, "b")];
   it("returns the finding covering a position (inclusive of the end, for hover)", () => {
     expect(findingAt(fs, 5)?.note).toBe("a");
     expect(findingAt(fs, 9)?.note).toBe("a");

@@ -1,3 +1,4 @@
+import { effectiveSettings, activeField } from "./activeNote";
 import { type EditorState, StateEffect, StateField } from "@codemirror/state";
 import { EditorView, ViewPlugin, type ViewUpdate, Decoration } from "@codemirror/view";
 import { settingsFacet, settingsChanged } from "./settingsFacet";
@@ -47,7 +48,7 @@ export function asyncFindingsExtension(analyser: ParagraphAnalyser, options: Par
   });
 
   function visible(state: EditorState): Finding[] {
-    const enabled = enabledStyleKinds(state.facet(settingsFacet));
+    const enabled = enabledStyleKinds(effectiveSettings(state));
     if (enabled.size === 0) return [];
     const p = cursorParagraph(state);
     if (!p) return [];
@@ -57,7 +58,7 @@ export function asyncFindingsExtension(analyser: ParagraphAnalyser, options: Par
     return r.findings.filter((f) => enabled.has(f.kind) && !sync.some((s) => s.kind === f.kind && f.from < s.to && f.to > s.from));
   }
 
-  const decorations = EditorView.decorations.compute([results, settingsFacet, "selection", "doc"], (state) => {
+  const decorations = EditorView.decorations.compute([results, settingsFacet, activeField, "selection", "doc"], (state) => {
     const fs = visible(state);
     return fs.length ? decorateFindings(fs) : Decoration.none;
   });
@@ -71,15 +72,15 @@ export function asyncFindingsExtension(analyser: ParagraphAnalyser, options: Par
         this.scheduler = new ScheduleAnalysis(
           analyser,
           (key, findings) => view.dispatch({ effects: setResult.of({ key, findings }) }),
-          { ...options, timers: options.timers ?? windowTimers(view.dom.ownerDocument.defaultView ?? window), idleMs: options.idleMs ?? view.state.facet(settingsFacet).llm.idleMs },
+          { ...options, timers: options.timers ?? windowTimers(view.dom.ownerDocument.defaultView ?? window), idleMs: options.idleMs ?? effectiveSettings(view.state).llm.idleMs },
         );
         this.maybeRequest(view, false);
       }
 
       update(u: ViewUpdate) {
         const now = u.transactions.some((tr) => tr.effects.some((e) => e.is(analyseNow)));
-        if (settingsChanged(u) && options.idleMs === undefined) this.scheduler.setIdleMs(u.state.facet(settingsFacet).llm.idleMs);
-        const modelChanged = settingsChanged(u) && !llmConfigEquals(u.startState.facet(settingsFacet).llm, u.state.facet(settingsFacet).llm);
+        if (settingsChanged(u) && options.idleMs === undefined) this.scheduler.setIdleMs(effectiveSettings(u.state).llm.idleMs);
+        const modelChanged = settingsChanged(u) && !llmConfigEquals(effectiveSettings(u.startState).llm, effectiveSettings(u.state).llm);
         if (modelChanged) {
           this.scheduler.invalidate();
           // Cannot dispatch inside update(); clear the old model's results on the next tick.
@@ -94,7 +95,7 @@ export function asyncFindingsExtension(analyser: ParagraphAnalyser, options: Par
       }
 
       private maybeRequest(view: EditorView, immediate: boolean, force = false) {
-        const settings = view.state.facet(settingsFacet);
+        const settings = effectiveSettings(view.state);
         if (settings.llm.provider === "off") return;
         if (!immediate && !settings.llm.onIdle) return;
         if (enabledStyleKinds(settings).size === 0) return;

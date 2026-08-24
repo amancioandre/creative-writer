@@ -24,14 +24,33 @@ body.czm-zen .workspace-split.mod-root {
   padding-bottom: 45vh;
 }
 
+/* --- Current line ----------------------------------------------------------
+   A CodeMirror layer drawn below the text: one faint band behind the cursor's
+   visual line, full editor width. Being a separate layer, it is unaffected by
+   focus fade's opacity and sits under rhythm/style decorations. */
+.cm-layer.czm-current-line-layer .czm-current-line {
+  background-color: color-mix(in srgb, var(--text-normal) 7%, transparent);
+  pointer-events: none;
+}
+
 /* --- Focus fade ----------------------------------------------------------- */
 .czm-focus-fade .cm-line {
   transition: opacity 120ms ease-out;
 }
+/* Hierarchy: cursor row (veil-free) > rest of its paragraph (veiled, --czm-focus-paragraph)
+   > nearer paragraphs > far paragraphs (--czm-focus-far). Both strengths are settings. */
+.cm-editor { --czm-focus-paragraph: 0.7; --czm-focus-far: 0.25; }
 .czm-focus-fade .cm-line.czm-focus-0 { opacity: 1; }
-.czm-focus-fade .cm-line.czm-focus-1 { opacity: 0.72; }
-.czm-focus-fade .cm-line.czm-focus-2 { opacity: 0.45; }
-.czm-focus-fade .cm-line.czm-focus-3 { opacity: 0.25; }
+.czm-focus-fade .cm-line.czm-focus-1 { opacity: calc(var(--czm-focus-far) + (var(--czm-focus-paragraph) - var(--czm-focus-far)) * 0.66); }
+.czm-focus-fade .cm-line.czm-focus-2 { opacity: calc(var(--czm-focus-far) + (var(--czm-focus-paragraph) - var(--czm-focus-far)) * 0.33); }
+.czm-focus-fade .cm-line.czm-focus-3 { opacity: var(--czm-focus-far); }
+
+/* The veil: editor background at (1 - paragraph strength), over every row of the cursor paragraph except the cursor's. */
+.cm-layer.czm-paragraph-veil-layer .czm-paragraph-veil {
+  background-color: var(--background-primary);
+  opacity: calc(1 - var(--czm-focus-paragraph));
+  pointer-events: none;
+}
 
 /* --- Paragraph rhythm ------------------------------------------------------
    Tier 1 = shortest/lightest sentence, tier 6 = longest/heaviest.
@@ -65,7 +84,6 @@ body.czm-zen .workspace-split.mod-root {
 :root {
   --czm-style-cliche:     rgba(229, 83, 83, 0.22);
   --czm-style-passive:    rgba(236, 201, 75, 0.22);
-  --czm-style-weak:       rgba(160, 160, 160, 0.25);
   --czm-style-filter:     rgba(154, 116, 237, 0.22);
   --czm-style-adverb:     rgba(237, 137, 54, 0.22);
   --czm-style-repetition: rgba(72, 187, 170, 0.22);
@@ -73,13 +91,15 @@ body.czm-zen .workspace-split.mod-root {
 .cm-line [class*="czm-style-"] { border-radius: 2px; }
 .czm-style-cliche     { background-color: var(--czm-style-cliche); }
 .czm-style-passive    { background-color: var(--czm-style-passive); }
-.czm-style-weak       { background-color: var(--czm-style-weak); }
 .czm-style-filter     { background-color: var(--czm-style-filter); }
 .czm-style-adverb     { background-color: var(--czm-style-adverb); }
 .czm-style-repetition { background-color: var(--czm-style-repetition); }
 
-/* Three classes outrank CodeMirror's own `.cm-tooltip` light-grey defaults, which ignore Obsidian's theme. */
-.cm-tooltip.cm-tooltip-hover.czm-style-tooltip {
+/* hoverTooltip wraps our element as `.cm-tooltip-section` inside a host
+   `.cm-tooltip.cm-tooltip-hover`; the host is what carries CodeMirror's
+   light-grey `&light` defaults, which ignore Obsidian's theme. Style the host
+   through :has() and the section directly, with enough specificity to win. */
+.cm-editor .cm-tooltip.cm-tooltip-hover:has(> .czm-style-tooltip) {
   background-color: var(--background-secondary);
   color: var(--text-normal);
   border: 1px solid var(--background-modifier-border);
@@ -87,7 +107,14 @@ body.czm-zen .workspace-split.mod-root {
   box-shadow: var(--shadow-s);
   max-width: 28em;
 }
-.czm-style-tooltip { padding: 6px 10px; font-size: var(--font-ui-small); line-height: 1.4; }
+.cm-editor .cm-tooltip-section.czm-style-tooltip {
+  background-color: var(--background-secondary);
+  color: var(--text-normal);
+  border-top: none;
+  padding: 6px 10px;
+  font-size: var(--font-ui-small);
+  line-height: 1.4;
+}
 .czm-style-tooltip-kind { text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.75em; opacity: 0.7; margin-bottom: 2px; }
 :root {
   --czm-style-nominalization: rgba(200, 160, 90, 0.25);

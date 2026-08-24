@@ -1,3 +1,4 @@
+import { effectiveSettings } from "./activeNote";
 import { Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 import { RangeSetBuilder } from "@codemirror/state";
 import { settingsFacet, settingsChanged } from "./settingsFacet";
@@ -37,7 +38,7 @@ export function focusFadeExtension() {
   );
 
   function build(view: EditorView): DecorationSet {
-    if (!view.state.facet(settingsFacet).focusFadeEnabled) return Decoration.none;
+    if (!effectiveSettings(view.state).focusFadeEnabled) return Decoration.none;
 
     const doc = view.state.doc;
     const cursorLine = doc.lineAt(view.state.selection.main.head).number - 1;
@@ -54,5 +55,10 @@ export function focusFadeExtension() {
     return builder.finish();
   }
 
-  return [plugin, editorClassWhen(FOCUS_EDITOR_CLASS, (s) => s.focusFadeEnabled)];
+  // The strengths are CSS custom properties on the editor root; styles.css turns them into opacities.
+  const strengths = EditorView.editorAttributes.of((view) => {
+    const s = effectiveSettings(view.state);
+    return { style: `--czm-focus-paragraph:${s.focusParagraphOpacity};--czm-focus-far:${s.focusFarOpacity}` };
+  });
+  return [plugin, strengths, editorClassWhen(FOCUS_EDITOR_CLASS, (s) => s.focusFadeEnabled)];
 }

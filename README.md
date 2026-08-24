@@ -6,9 +6,11 @@ An Obsidian plugin for creative writing. Everything that touches the page lives 
 
 | Feature | What it does | Command / setting |
 |---|---|---|
+| **Where it runs** | Every note, only notes marked `creative-writer: true`, or only listed folders. A note's front matter (`creative-writer: true` / `false`) always wins. Two commands: toggle everywhere, toggle for this note (writes the property). | Settings → Where it runs; `Toggle Creative Writer (everywhere)`, `Toggle Creative Writer for this note` |
 | **Zen Mode** | Hides ribbon, tabs, sidebars, status bar. Optional fullscreen. | `creative-writer: Toggle Zen Mode` |
 | **Typewriter scrolling** | Keeps the line you're writing vertically centred. | Settings → Typewriter scrolling |
-| **Focus fade** | Fades lines progressively by distance from the cursor (3 rings). | Settings → Focus fade |
+| **Current line** | A faint band across the editor behind the line you are writing — the visual line, not the paragraph — so it stands out even inside a focused paragraph. | Settings → Current line |
+| **Focus fade** | Three-level hierarchy: the line you are on at full strength; the rest of its paragraph slightly veiled; other paragraphs faded progressively by distance. Both strengths are sliders. | Settings → Focus fade / Paragraph strength / Far text strength |
 | **Paragraph rhythm** | Underlines each sentence of the current paragraph, cool → warm by "effective length". | Settings → Paragraph rhythm / Rhythm tiers |
 | **Model assistant** | Optional. A local model (Ollama) adds contextual findings — clichés in context, tired metaphors, passives hiding an agent — on command, or after a pause if you opt in. | `Analyse paragraph with model`; Settings → Model assistant |
 | **Myth & archetype** | Select a scene, get a sidebar report: mythic patterns, archetypes, what the pattern asks next. Local model, on command. | `Analyse selection for myth and archetype` |
@@ -16,9 +18,15 @@ An Obsidian plugin for creative writing. Everything that touches the page lives 
 | **Writing desk** | Words added and cut today against a daily goal, streak, this week's total, and a 12-week calendar heatmap. Deletions are tracked separately, so a revision day still shows as work. History lives in `progress.json` beside the plugin's settings. | `Open writing desk`; Settings → Goals |
 | **Project targets** | Add `writing-target: 50000` (and optionally `writing-deadline: 2026-10-31`) to any note's front matter and its folder becomes a project: total words, words per day needed vs. your last-7-day pace, and the projected finish date. `writing-daily: 500` adds a per-project daily goal with its own streak; `writing-scope: note` limits it to that note; `writing-name` overrides the title. | Writing desk → Projects |
 | **Scene outline** | The desk lists the active note's headings with words, reading-ease band and dialogue share per scene, bar-scaled to the longest; click to jump. Heatmap days where cutting outweighed adding are shown as revision days. | Writing desk → Scenes |
-| **Style checks** | Tints clichés, passive voice, weak words, filter verbs, adverbs, repetition, nominalisations, weak verbs and metaphor candidates in the current paragraph; hover for the note. Offline: rules + a POS tagger + concreteness norms. | Settings → Style checks (per-kind toggles) |
+| **Style checks** | Tints clichés, passive voice, filter verbs, adverbs, repetition, nominalisations, weak verbs and metaphor candidates in the current paragraph; hover for the note. Offline: rules + a POS tagger + concreteness norms. | Settings → Style checks (per-kind toggles) |
 
 Editing mode only (Source + Live Preview); Reading view has no CodeMirror and is untouched.
+
+## Pair it with Harper
+
+Install [Harper](https://writewithharper.com) alongside this plugin — it is the intended companion, not an alternative. Harper is a free, offline grammar and spelling checker with its own Obsidian plugin; Creative Writer deliberately does **not** check spelling, grammar, punctuation, agreement, homophones, or intensifiers/hedges/filler words ("very", "quite", "just") because Harper already does those well (`boring_words`, `filler_words`, `hedging`, `long_sentences`, and ~350 more rules).
+
+The split: **Harper edits the sentence, Creative Writer edits the prose.** Passive voice, filter verbs, nominalisations, clichés, metaphor, rhythm and readability are craft judgements no grammar checker makes; they stay here. Both plugins decorate the editor, so their marks can overlap on the same span — Harper underlines, Creative Writer tints, and the two are readable together.
 
 ## Quick start
 
@@ -34,7 +42,7 @@ Then in Obsidian: Settings → Community plugins → enable **Creative Writer**,
 For development: `npm run dev` (esbuild watch) plus the **Hot Reload** community plugin.
 
 ```bash
-npm test              # 390 tests
+npm test              # 465 tests
 npm run eval          # rule scorecard on eval/corpus.ts (see eval/RESULTS.md)
 npm run eval:ollama   # the same corpus through the local model, ~1s
 npm run test:watch
@@ -55,7 +63,7 @@ src/
 │   ├── readability/  Flesch reading ease / grade, variety and dialogue bands
 │   ├── progress/     Dates, WritingLog, ProgressSummary (streak, heatmap, session kind), Project
 │   ├── style/        Finding, Tokenizer, StyleRule (+AnalysisContext), PosTagger & Concreteness
-│   │                 (ports), rules/ (Cliche, PassiveVoice, WeakWord, Adverb, Repetition,
+│   │                 (ports), rules/ (Cliche, PassiveVoice, FilterVerb, Adverb, Repetition,
 │   │                 Nominalization, WeakVerb, MetaphorCandidate, PhraseMatcher), lexicon/
 │   ├── focus/        FocusTier
 │   ├── zen/          ZenMode
@@ -70,14 +78,14 @@ src/
 │   ├── nlp/          CompromiseTagger, BrysbaertConcreteness (+ generated data)
 │   ├── llm/          OllamaAnalyser, OllamaMythAnalyser, ClaudeAnalyser (untested live),
 │   │                 ConfiguredLlmAnalyser, prompts/ (style + myth rulebooks)
-│   ├── codemirror/   settingsFacet, typewriter/focusFade/rhythm/style/readabilityStatus extensions
+│   ├── codemirror/   settingsFacet, typewriter/currentLine/focusFade/rhythm/style/readabilityStatus extensions
 │   └── obsidian/     DomWorkspaceChrome, PluginDataSettingsRepository, AdapterProgressRepository,
 │                     SettingsTab, RequestUrlHttpClient, views/MythView, views/DeskView
 └── main.ts           composition root — wiring only
 ```
 
 `styles.css` owns every visual. The code only toggles classes:
-`body.czm-zen`, `.czm-typewriter`, `.czm-focus-fade` + `.czm-focus-{0..3}`, `.czm-rhythm-{1..6}`, `.czm-style-{kind}`.
+`body.czm-zen`, `.czm-typewriter`, `.czm-current-line` (a CM layer below the text), `.czm-paragraph-veil` (a layer above it), `.czm-focus-fade` + `.czm-focus-{0..3}`, `.czm-rhythm-{1..6}`, `.czm-style-{kind}`.
 
 ## Data and dependencies
 

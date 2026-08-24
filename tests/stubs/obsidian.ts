@@ -2,6 +2,15 @@
  * Minimal stand-in for the `obsidian` package, which ships types only and
  * cannot be imported at test time. Only what the adapters touch is modelled.
  */
+import { StateField } from "@codemirror/state";
+
+/** Obsidian's per-editor info; tests set a file path through `withFile`. */
+export const editorInfoField = StateField.define<{ file: { path: string } | null }>({
+  create: () => ({ file: null }),
+  update: (v) => v,
+});
+export const withFile = (path: string | null) => editorInfoField.init(() => ({ file: path ? { path } : null }));
+
 export class App {}
 export class Plugin {
   app = new App();

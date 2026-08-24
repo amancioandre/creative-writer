@@ -41,5 +41,12 @@ export function lemmaCandidates(w: string): string[] {
   if (/(.)\1(ed|ing)$/.test(w)) out.push(w.replace(/(.)\1(ed|ing)$/, "$1")); // stopped → stop
   if (w.endsWith("er") && w.length > 4) out.push(w.slice(0, -2));
   if (w.endsWith("ly") && w.length > 4) out.push(w.slice(0, -2));
+  // British spellings: the norms are American.
+  if (/our$/.test(w)) out.push(w.replace(/our$/, "or"));
+  if (/ours?$/.test(w)) out.push(w.replace(/ours$/, "ors"));
+  if (/re$/.test(w) && w.length > 4) out.push(w.replace(/re$/, "er"));
+  if (/is(e|ed|es|ing)$/.test(w)) out.push(w.replace(/is(e|ed|es|ing)$/, "iz$1"));
+  if (/ll(ed|ing)$/.test(w)) out.push(w.replace(/ll(ed|ing)$/, "l"), w.replace(/ll(ed|ing)$/, "l$1"));
+  if (/t$/.test(w) && /(learn|spel|smel|spil|spoil|dream|leap|burn)t$/.test(w)) out.push(w.slice(0, -1), w.slice(0, -1) + "ed");
   return out;
 }

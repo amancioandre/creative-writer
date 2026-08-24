@@ -42,18 +42,6 @@ export const CORPUS: readonly Labelled[] = [
   s("The results will be announced tomorrow.", "passive"),
   s("A decision had been taken without him.", "passive"),
 
-  // --- weak ---
-  s("It was very cold in the hall.", "weak"),
-  s("She was really quite tired by then.", "weak"),
-  s("He just wanted to go home.", "weak"),
-  s("They started to run toward the gate.", "weak"),
-  s("The room seemed to shrink around her.", "weak"),
-  s("It was basically a disaster.", "weak"),
-  s("She began to cry.", "weak"),
-  s("There was a man standing at the door.", "weak"),
-  s("He was somewhat relieved.", "weak"),
-  s("Suddenly, the lights went out.", "weak"),
-
   // --- filter ---
   s("She saw the door swing open.", "filter"),
   s("He heard a car pull into the drive.", "filter"),
@@ -89,8 +77,8 @@ export const CORPUS: readonly Labelled[] = [
   s("They had a discussion about the will.", "nominalization"),
 
   // --- weakverb ---
-  s("The room at the end of the long corridor on the second floor of the old house was very cold and dark.", "weakverb", "weak"),
-  s("The garden behind the house at the bottom of the lane past the church was a tangle of nettles and broken glass.", "weakverb", "metaphor"),
+  s("The room at the end of the long corridor on the second floor of the old house was very cold and dark.", "weakverb"),
+  s("The garden behind the house at the bottom of the lane past the church was a tangle of nettles and broken glass.", "weakverb"), // "a tangle of nettles" is literal
   s("The house on the hill above the quiet village by the river was old and grey and tired.", "weakverb"),
   s("The man in the grey coat by the far window of the station café was a stranger to all of them.", "weakverb"),
 

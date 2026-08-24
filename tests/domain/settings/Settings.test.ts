@@ -29,7 +29,7 @@ describe("style settings", () => {
   it("defaults every style check on and the feature on", () => {
     const s = normalizeSettings(undefined);
     expect(s.styleEnabled).toBe(true);
-    expect(s.styleChecks).toEqual({ cliche: true, passive: true, weak: true, filter: true, adverb: true, repetition: true, metaphor: true, nominalization: true, weakverb: true });
+    expect(s.styleChecks).toEqual({ cliche: true, passive: true, filter: true, adverb: true, repetition: true, metaphor: true, nominalization: true, weakverb: true });
   });
   it("merges partial styleChecks with defaults and drops junk", () => {
     const s = normalizeSettings({ styleChecks: { passive: false, bogus: true, adverb: "no" } });

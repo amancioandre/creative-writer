@@ -1,3 +1,4 @@
+import { effectiveSettings } from "./activeNote";
 import { EditorView } from "@codemirror/view";
 import { settingsFacet } from "./settingsFacet";
 import type { PluginSettings } from "../../domain/settings/Settings";
@@ -8,6 +9,6 @@ import type { PluginSettings } from "../../domain/settings/Settings";
  */
 export function editorClassWhen(className: string, isOn: (s: PluginSettings) => boolean) {
   return EditorView.editorAttributes.of((view) =>
-    isOn(view.state.facet(settingsFacet)) ? { class: className } : null,
+    isOn(effectiveSettings(view.state)) ? { class: className } : null,
   );
 }

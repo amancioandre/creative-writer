@@ -7,7 +7,7 @@ import { NominalizationRule } from "../../domain/style/rules/NominalizationRule"
 import { WeakVerbRule } from "../../domain/style/rules/WeakVerbRule";
 import { ClicheRule } from "../../domain/style/rules/ClicheRule";
 import { PassiveVoiceRule } from "../../domain/style/rules/PassiveVoiceRule";
-import { WeakWordRule } from "../../domain/style/rules/WeakWordRule";
+import { FilterVerbRule } from "../../domain/style/rules/FilterVerbRule";
 import { AdverbRule } from "../../domain/style/rules/AdverbRule";
 import { RepetitionRule } from "../../domain/style/rules/RepetitionRule";
 
@@ -17,7 +17,7 @@ export interface AnalyzeParagraphStyleInput {
   readonly enabled: ReadonlySet<FindingKind>;
 }
 
-/** Rules keyed by the kind(s) they produce. One rule may serve several kinds (WeakWordRule → weak + filter). */
+/** Rules keyed by the kind(s) they produce. One rule may serve several kinds. */
 export type RuleRegistry = Partial<Record<FindingKind, StyleRule>>;
 
 /**
@@ -29,18 +29,16 @@ export class AnalyzeParagraphStyle {
   constructor(private readonly rules: RuleRegistry, private readonly tagger: PosTagger | null = null) {}
 
   /**
-   * Without a tagger: the six Tier 1 rules on word shape alone.
+   * Without a tagger: the five Tier 1 rules on word shape alone.
    * With one: passive and adverb use real tags, and nominalisation and
    * weak-verb checks become possible. With concreteness norms as well,
    * metaphor candidates are detected. The tagger runs once per paragraph.
    */
   static withDefaultRules(tagger?: PosTagger, concreteness?: Concreteness): AnalyzeParagraphStyle {
-    const weak = new WeakWordRule();
     const rules: RuleRegistry = {
       cliche: new ClicheRule(),
       passive: new PassiveVoiceRule(tagger),
-      weak,
-      filter: weak,
+      filter: new FilterVerbRule(tagger),
       adverb: new AdverbRule(tagger),
       repetition: new RepetitionRule(),
     };
