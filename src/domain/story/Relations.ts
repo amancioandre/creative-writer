@@ -118,7 +118,7 @@ function safeDecode(s: string): string {
 }
 
 /** "Characters/Ilse" and "Ilse" name the same note when the shorter is the other's basename. */
-function sameTarget(a: string, b: string): boolean {
+export function sameTarget(a: string, b: string): boolean {
   const base = (s: string) => s.slice(s.lastIndexOf("/") + 1).replace(/\.md$/i, "").toLowerCase();
   return base(a) === base(b);
 }

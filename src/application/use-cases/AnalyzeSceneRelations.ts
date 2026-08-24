@@ -1,14 +1,16 @@
 import type { ProjectSpec } from "../../domain/progress/Project";
 import { EntityIndex } from "../../domain/story/EntityIndex";
-import { findMentions } from "../../domain/story/Mentions";
 import { validateReading } from "../../domain/story/SceneReading";
 import { sceneKey, textHash, type SceneRef, type StoryGraph } from "../../domain/story/StoryGraph";
 import { putReading, type SceneReading } from "../../domain/story/StoryMapFile";
 import type { ProjectNotes } from "../ports/ProjectNotes";
 import type { RelationAnalyser } from "../ports/RelationAnalyser";
 import type { StoryMapRepository } from "../ports/StoryMapRepository";
+import { presentNames } from "./presentNames";
 
-const MIN_WORDS = 40;
+/** Shorter than this and a scene is a heading with a line under it — not worth a model call. */
+export const MIN_SCENE_WORDS = 40;
+const MIN_WORDS = MIN_SCENE_WORDS;
 
 export interface AnalyzeProgress {
   readonly done: number;
@@ -38,9 +40,6 @@ export class AnalyzeSceneRelations {
     const targets = notes.filter((n) => (notePath ? n.path === notePath : sceneNotes.has(n.path)));
     if (targets.length === 0) return 0;
     const index = new EntityIndex(notes);
-    // Names the model may use: everything the graph knows, so candidates and aliases count.
-    const known = graph.entities.filter((e) => e.kind !== "note" && e.kind !== "reference");
-    const byId = new Map(known.map((e) => [e.id, e.name]));
     let file = await this.repo.load(project);
     const scenes = targets.flatMap((note) => note.scenes.filter((s) => s.prose.split(/\s+/).filter(Boolean).length >= MIN_WORDS).map((scene) => ({ note, scene })));
     let analysed = 0;
@@ -53,11 +52,8 @@ export class AnalyzeSceneRelations {
         onProgress?.({ done: i + 1, total: scenes.length, scene: ref, skipped: true });
         continue;
       }
-      const row = graph.timeline.find((t) => sceneKey(t.scene) === sceneKey(ref));
-      const present = row ? row.present.map((id) => byId.get(id)).filter((n): n is string => !!n) : [];
-      if (present.length === 0) for (const m of findMentions(scene.prose, index)) if (m.entityId && byId.has(m.entityId)) present.push(byId.get(m.entityId)!);
       if (signal.aborted) break;
-      const names = [...new Set(present)].sort((a, b) => a.localeCompare(b));
+      const names = presentNames(graph, ref, scene.prose, index);
       const raw = await this.analyser.analyse(scene.prose, names, signal);
       const valid = validateReading(raw, scene.prose, names);
       const reading: SceneReading = { scene: ref, hash, model: this.analyser.name, ...valid };

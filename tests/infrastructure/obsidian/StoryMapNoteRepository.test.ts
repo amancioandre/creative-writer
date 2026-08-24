@@ -21,7 +21,7 @@ describe("StoryMapNoteRepository", () => {
     expect(await repo.load(folderProject)).toEqual(EMPTY_STORY_MAP_FILE);
     const file = putReading(EMPTY_STORY_MAP_FILE, { scene: { path: "Novel/One.md", title: "A", line: 0 }, hash: "h", model: "m", relations: [], references: [], events: [] });
     await repo.save(folderProject, file);
-    expect(vault.files["Novel/Story map.md"]).toContain("creative-writer-storymap: 1");
+    expect(vault.files["Novel/Story map.md"]).toContain("creative-writer-storymap: 2");
     expect(await repo.load(folderProject)).toEqual(file);
   });
   it("serialises updates so a layout save and a reading save both land", async () => {

@@ -9,6 +9,11 @@ export interface NoteVaultLike {
   write(path: string, content: string): Promise<void>;
 }
 
+/** The folder a project's data notes go in: its scope, or, for a single-note project, the note's own folder. */
+export function projectFolder(project: ProjectSpec): string {
+  return project.scope.endsWith("/") || project.scope === "" ? project.scope : project.scope.slice(0, project.scope.lastIndexOf("/") + 1);
+}
+
 /**
  * `Story map.md` in the project folder. A markdown note, not a JSON file,
  * because that is what every sync method — Obsidian Sync, git, Syncthing,
@@ -19,8 +24,7 @@ export class StoryMapNoteRepository implements StoryMapRepository {
   constructor(private readonly vault: NoteVaultLike) {}
 
   static pathFor(project: ProjectSpec): string {
-    const folder = project.scope.endsWith("/") || project.scope === "" ? project.scope : project.scope.slice(0, project.scope.lastIndexOf("/") + 1);
-    return `${folder}${STORY_MAP_NOTE}`;
+    return `${projectFolder(project)}${STORY_MAP_NOTE}`;
   }
 
   async load(project: ProjectSpec): Promise<StoryMapFile> {

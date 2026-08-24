@@ -1,7 +1,8 @@
 import type { ProjectSpec } from "../../domain/progress/Project";
-import { buildStoryGraph, type BuildOptions, DEFAULT_BUILD_OPTIONS } from "../../domain/story/BuildGraph";
+import { buildStoryGraph, type BuildOptions, DEFAULT_BUILD_OPTIONS, type ProjectNote } from "../../domain/story/BuildGraph";
 import { normalise } from "../../domain/story/EntityIndex";
 import type { StoryGraph } from "../../domain/story/StoryGraph";
+import type { StoryMapFile } from "../../domain/story/StoryMapFile";
 import type { ProjectNotes } from "../ports/ProjectNotes";
 import type { StoryMapRepository } from "../ports/StoryMapRepository";
 
@@ -21,6 +22,11 @@ export class BuildStoryMap {
 
   async execute(project: ProjectSpec): Promise<StoryGraph> {
     const [notes, file] = await Promise.all([this.notes.notes(project), this.repo.load(project)]);
+    return this.graphFrom(project, notes, file);
+  }
+
+  /** The graph from notes and a file already in hand — for callers that need the notes for something else as well. */
+  graphFrom(project: ProjectSpec, notes: readonly ProjectNote[], file: StoryMapFile): StoryGraph {
     return buildStoryGraph(project.name, notes, file, { ...this.options, ignore: new Set(project.ignoredNames.map(normalise)) });
   }
 }

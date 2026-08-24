@@ -102,6 +102,28 @@ export const DEFAULT_STORY_MAP: StoryMapSettings = {
   panelOpen: true,
 };
 
+export type ThreadKind = "entity" | "fact" | "writer";
+export const THREAD_KINDS: readonly ThreadKind[] = ["entity", "fact", "writer"];
+
+/** The story threads view's own preferences — filters and strips, edited from its panel. */
+export interface ThreadsSettings {
+  readonly kinds: Readonly<Record<ThreadKind, boolean>>;
+  /** Strip id → shown; strips not listed are shown. */
+  readonly strips: Readonly<Record<string, boolean>>;
+  readonly showDismissed: boolean;
+  readonly contradictionsOnly: boolean;
+  readonly panelOpen: boolean;
+}
+
+/** Entity threads are the densest and the least surprising, so they start off; a picked entity turns its own on. */
+export const DEFAULT_THREADS: ThreadsSettings = {
+  kinds: { entity: false, fact: true, writer: true },
+  strips: {},
+  showDismissed: false,
+  contradictionsOnly: false,
+  panelOpen: true,
+};
+
 export interface PluginSettings {
   /** Master switch; the "Toggle Creative Writer" command flips it. */
   readonly enabled: boolean;
@@ -126,6 +148,7 @@ export interface PluginSettings {
   readonly goals: GoalSettings;
   readonly llm: LlmSettings;
   readonly storyMap: StoryMapSettings;
+  readonly threads: ThreadsSettings;
 }
 
 export interface GoalSettings {
@@ -161,6 +184,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   goals: DEFAULT_GOALS,
   llm: DEFAULT_LLM_SETTINGS,
   storyMap: DEFAULT_STORY_MAP,
+  threads: DEFAULT_THREADS,
 };
 
 const clampInt = (v: number, min: number, max: number) => Math.min(max, Math.max(min, Math.floor(v)));
@@ -198,19 +222,36 @@ export function normalizeSettings(raw: unknown): PluginSettings {
     goals: normalizeGoals(r.goals),
     llm: normalizeLlm(r.llm),
     storyMap: normalizeStoryMap(r.storyMap),
+    threads: normalizeThreads(r.threads),
   };
 }
 
 const HEX = /^#[0-9a-f]{6}$/i;
 
+/** Known boolean keys from a persisted object, defaults for the rest. */
+const flags = <K extends string>(v: unknown, keys: readonly K[], defaults: Readonly<Record<K, boolean>>): Record<K, boolean> => {
+  const o = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
+  const out: Record<K, boolean> = { ...defaults };
+  for (const k of keys) if (typeof o[k] === "boolean") out[k] = o[k] as boolean;
+  return out;
+};
+
+export function normalizeThreads(raw: unknown): ThreadsSettings {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const strips: Record<string, boolean> = {};
+  const s = (r.strips && typeof r.strips === "object" ? r.strips : {}) as Record<string, unknown>;
+  for (const [id, v] of Object.entries(s)) if (typeof v === "boolean" && id) strips[id] = v;
+  return {
+    kinds: flags(r.kinds, THREAD_KINDS, DEFAULT_THREADS.kinds),
+    strips,
+    showDismissed: typeof r.showDismissed === "boolean" ? r.showDismissed : DEFAULT_THREADS.showDismissed,
+    contradictionsOnly: typeof r.contradictionsOnly === "boolean" ? r.contradictionsOnly : DEFAULT_THREADS.contradictionsOnly,
+    panelOpen: typeof r.panelOpen === "boolean" ? r.panelOpen : DEFAULT_THREADS.panelOpen,
+  };
+}
+
 export function normalizeStoryMap(raw: unknown): StoryMapSettings {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  const flags = <K extends string>(v: unknown, keys: readonly K[], defaults: Readonly<Record<K, boolean>>): Record<K, boolean> => {
-    const o = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
-    const out: Record<K, boolean> = { ...defaults };
-    for (const k of keys) if (typeof o[k] === "boolean") out[k] = o[k] as boolean;
-    return out;
-  };
   const f = (r.forces && typeof r.forces === "object" ? r.forces : {}) as Record<string, unknown>;
   const force = (key: keyof ForceSettings) => {
     const [min, max] = FORCE_RANGES[key];

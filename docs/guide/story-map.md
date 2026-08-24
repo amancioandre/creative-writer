@@ -56,7 +56,7 @@ The icon top-right toggles a floating panel; its state is remembered.
 | Section | What |
 |---|---|
 | *Head* | Project dropdown; a search box — matching names stay, with their direct neighbours for context. |
-| *Actions* | **Read project with model** (see [Reading a project](/guide/model-reading)); **Timeline** opens the [story timeline](/guide/story-timeline); **Add** a node; **Fit**; **Shake**; **Show all** when a focus is active. |
+| *Actions* | **Read project with model** (see [Reading a project](/guide/model-reading)); **Timeline** opens the [story timeline](/guide/story-timeline); **Threads** opens the [story threads](/guide/story-threads); **Add** a node; **Fit**; **Shake**; **Show all** when a focus is active. |
 | **Filters** | Toggle each layer; *Hide loners* removes nodes with no visible edge. |
 | **Kinds & colours** | A colour swatch and a toggle per kind, with counts; *Reset colours*. |
 | **Display** | Node size, edge thickness, edge opacity, label size (0 hides labels). |
@@ -133,9 +133,9 @@ Every Markdown note in the project folder except:
 
 - notes with `creative-writer: false` in their front matter (memos, research, reviews — they talk *about* the cast in ways that are not scenes);
 - typed entity notes, whose prose describes rather than stages (they are nodes, never scenes);
-- `Story map.md`, the plugin's own data note.
+- `Story map.md` and `Story threads.md`, the plugin's own data notes.
 
-Prose-less headings (outlines, checklists) are skipped. The map refreshes about two seconds after you stop editing.
+Prose-less headings (outlines, checklists) are skipped. Notes are read in path order unless they carry `story-order` (see [Front matter](/reference/front-matter)). The map refreshes about two seconds after you stop editing.
 
 ## Sync
 

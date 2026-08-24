@@ -61,3 +61,16 @@ The story map's own settings live in its floating panel rather than the settings
 | Panel | Open or closed |
 
 Hand-edited or out-of-range values are clamped to these ranges on load; unknown keys are dropped.
+
+## Story threads
+
+Likewise in the view's own panel, persisted under `threads`:
+
+| Group | Settings | Default |
+|---|---|---|
+| Threads | Names / Facts / Yours | off / on / on |
+| Contradictions | Only contradictions; Show dismissed | off; off |
+| Strips | One toggle per strip | all on |
+| Panel | Open or closed | open |
+
+Which entity is being followed and the zoom are not persisted — they are for the session.

@@ -111,6 +111,15 @@ describe("buildStoryGraph", () => {
     expect(g2.entities.some((e) => e.name === "Story map")).toBe(false);
   });
 
+  it("lets story-order front matter override path order, and skips a hand-made threads note", () => {
+    const reordered = notes.map((n) => (n.path === "Novel/Chapters/Two.md" ? { ...n, frontmatter: { "story-order": 1 } } : n));
+    const g2 = buildStoryGraph("Novel", [...reordered, note("Novel/Story threads.md", "## Clue\n- [[One#Camp]]")], EMPTY_STORY_MAP_FILE);
+    expect(g2.timeline.map((r) => r.scene.title)).toEqual(["Return", "Camp", "Creek"]);
+    expect(byName("Marta Kovács").appearances.map((s) => s.title)).toEqual(["Camp", "Return"]);
+    expect(g2.entities.find((e) => e.name === "Marta Kovács")!.appearances.map((s) => s.title)).toEqual(["Return", "Camp"]);
+    expect(g2.entities.some((e) => e.name === "Story threads")).toBe(false);
+  });
+
   it("is deterministic regardless of note order", () => {
     const g2 = buildStoryGraph("Novel", [...notes].reverse(), EMPTY_STORY_MAP_FILE);
     expect(g2).toEqual(g);

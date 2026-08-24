@@ -46,6 +46,12 @@ import { StoryMapNoteRepository } from "./infrastructure/obsidian/StoryMapNoteRe
 import { OllamaRelationAnalyser } from "./infrastructure/llm/OllamaRelationAnalyser";
 import { STORY_MAP_VIEW_TYPE, StoryMapView } from "./infrastructure/obsidian/views/StoryMapView";
 import { STORY_TIMELINE_VIEW_TYPE, StoryTimelineView } from "./infrastructure/obsidian/views/StoryTimelineView";
+import { STORY_THREADS_VIEW_TYPE, StoryThreadsView } from "./infrastructure/obsidian/views/StoryThreadsView";
+import { StoryThreadsNoteRepository } from "./infrastructure/obsidian/StoryThreadsNoteRepository";
+import { BuildStoryThreads } from "./application/use-cases/BuildStoryThreads";
+import { EditStoryThread } from "./application/use-cases/EditStoryThread";
+import { AnalyzeSceneFacts } from "./application/use-cases/AnalyzeSceneFacts";
+import { OllamaFactAnalyser } from "./infrastructure/llm/OllamaFactAnalyser";
 import type { EntityKind, SceneRef } from "./domain/story/StoryGraph";
 import { removeRelation, upsertRelation } from "./domain/story/Relations";
 import { setLayout } from "./domain/story/StoryMapFile";
@@ -189,6 +195,7 @@ export default class CreativeZenModePlugin extends Plugin {
       saveLayout: (project, layout) => storyRepo.update(project, (f) => setLayout(f, layout)).then(() => undefined),
       updateSettings: (next) => void this.updateSettings({ ...this.current, storyMap: next }),
       openTimeline: (project) => void this.openStoryTimeline(project),
+      openThreads: (project) => void this.openStoryThreads(project),
       // Checked at click time, not load time, so switching the model on in settings takes effect without a reload.
       analyse: (project, notePath, graph, signal, onProgress) => {
         const cfg = this.current.llm;
@@ -204,6 +211,41 @@ export default class CreativeZenModePlugin extends Plugin {
       id: "read-note-for-story-map",
       name: "Read this note with model (story map)",
       editorCallback: () => void this.openStoryMap().then(() => (this.app.workspace.getLeavesOfType(STORY_MAP_VIEW_TYPE)[0]?.view as StoryMapView | undefined)?.readActiveNote()),
+    });
+    // Story threads: the same graph laid out as one line, with facts read per scene and hand-drawn threads from `Story threads.md`.
+    const threadsRepo = new StoryThreadsNoteRepository(notes);
+    const buildThreads = new BuildStoryThreads(buildStoryMap, projectNotes, storyRepo, threadsRepo);
+    const editThread = new EditStoryThread(threadsRepo);
+    this.registerView(STORY_THREADS_VIEW_TYPE, (leaf: WorkspaceLeaf) => new StoryThreadsView(leaf, {
+      projects: storySource.projects,
+      activeProject: storySource.activeProject,
+      activeNotePath: () => this.app.workspace.getActiveViewOfType(MarkdownView)?.file?.path ?? null,
+      build: (project) => buildThreads.execute(project),
+      openNote: storySource.openNote,
+      reveal: storySource.reveal,
+      readFacts: async (project, notePath, signal, onProgress) => {
+        const cfg = this.current.llm;
+        if (cfg.provider !== "ollama") throw new Error("Reading for facts needs a local model — set Model to Local (Ollama) in Creative Writer settings.");
+        const analyser = new OllamaFactAnalyser(new RequestUrlHttpClient(), { baseUrl: cfg.ollamaUrl, model: cfg.ollamaModel });
+        const graph = await buildStoryMap.execute(project);
+        return new AnalyzeSceneFacts(projectNotes, storyRepo, analyser).execute(project, notePath, graph, signal, onProgress);
+      },
+      dismiss: (project, key) => buildThreads.dismiss(project, key),
+      undismiss: (project, key) => buildThreads.undismiss(project, key),
+      addToThread: (project, thread, link, note) => editThread.addRef(project, thread, link, note),
+      removeFromThread: (project, thread, link) => editThread.removeRef(project, thread, link),
+      threadsNotePath: (project) => StoryThreadsNoteRepository.pathFor(project),
+      storyColors: () => this.current.storyMap.colors,
+      settings: () => this.current.threads,
+      updateSettings: (next) => void this.updateSettings({ ...this.current, threads: next }),
+      openMap: () => void this.openStoryMap(),
+    }));
+    this.addCommand({ id: "open-story-threads", name: "Open story threads", callback: () => void this.openStoryThreads(null) });
+    this.addRibbonIcon("spline", "Open story threads", () => void this.openStoryThreads(null));
+    this.addCommand({
+      id: "read-note-for-story-threads",
+      name: "Read this note for facts (story threads)",
+      editorCallback: () => void this.openStoryThreads(null).then(() => (this.app.workspace.getLeavesOfType(STORY_THREADS_VIEW_TYPE)[0]?.view as StoryThreadsView | undefined)?.readActiveNote()),
     });
     this.registerEvent(this.app.metadataCache.on("resolved", () => this.refreshStoryMap()));
     this.registerEvent(this.app.vault.on("rename", () => this.refreshStoryMap()));
@@ -310,16 +352,27 @@ export default class CreativeZenModePlugin extends Plugin {
     if (project) await view.show(project); else await view.onOpen();
   }
 
+  private async openStoryThreads(project: ProjectSpec | null): Promise<void> {
+    const existing = this.app.workspace.getLeavesOfType(STORY_THREADS_VIEW_TYPE)[0];
+    const leaf = existing ?? this.app.workspace.getLeaf("tab");
+    if (!existing) await leaf.setViewState({ type: STORY_THREADS_VIEW_TYPE, active: true });
+    await this.app.workspace.revealLeaf(leaf);
+    const view = leaf.view as StoryThreadsView;
+    if (project) await view.show(project); else await view.onOpen();
+  }
+
   private storyMapRefreshTimer: number | null = null;
   /** The metadata cache fires `resolved` on every edit; a rebuild every couple of seconds is plenty for a map. */
   private refreshStoryMap(): void {
-    const leaf = this.app.workspace.getLeavesOfType(STORY_MAP_VIEW_TYPE)[0] ?? this.app.workspace.getLeavesOfType(STORY_TIMELINE_VIEW_TYPE)[0];
-    if (!leaf) return;
+    const ws = this.app.workspace;
+    const open = ws.getLeavesOfType(STORY_MAP_VIEW_TYPE).length + ws.getLeavesOfType(STORY_TIMELINE_VIEW_TYPE).length + ws.getLeavesOfType(STORY_THREADS_VIEW_TYPE).length;
+    if (open === 0) return;
     if (this.storyMapRefreshTimer !== null) window.clearTimeout(this.storyMapRefreshTimer);
     this.storyMapRefreshTimer = window.setTimeout(() => {
       this.storyMapRefreshTimer = null;
-      if (leaf.view instanceof StoryMapView) void leaf.view.refresh();
-      for (const tl of this.app.workspace.getLeavesOfType(STORY_TIMELINE_VIEW_TYPE)) void (tl.view as StoryTimelineView).refresh();
+      for (const l of ws.getLeavesOfType(STORY_MAP_VIEW_TYPE)) void (l.view as StoryMapView).refresh();
+      for (const l of ws.getLeavesOfType(STORY_TIMELINE_VIEW_TYPE)) void (l.view as StoryTimelineView).refresh();
+      for (const l of ws.getLeavesOfType(STORY_THREADS_VIEW_TYPE)) void (l.view as StoryThreadsView).refresh();
     }, 2000);
   }
 

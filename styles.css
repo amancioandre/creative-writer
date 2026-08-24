@@ -279,6 +279,55 @@ body.czm-zen .workspace-split.mod-root {
 .czm-map-status { position: absolute; left: 10px; bottom: 8px; z-index: 2; display: none; padding: 3px 8px; border-radius: 6px; background: var(--background-secondary); border: 1px solid var(--background-modifier-border); font-size: var(--font-ui-smaller); opacity: 0.85; max-width: 60%; }
 .czm-map-status.is-open { display: block; }
 
+/* --- Story threads ----------------------------------------------------------
+   The manuscript as one line; arcs over it for everything that recurs;
+   strips under it on the same axis. Red is reserved for contradictions. */
+.czm-th-scroll { position: absolute; inset: 0; overflow: auto; }
+.czm-th-svg { display: block; }
+.czm-th-baseline { stroke: var(--background-modifier-border); stroke-width: 1; }
+.czm-th-bar { fill: var(--text-faint); opacity: 0.55; cursor: pointer; }
+.czm-th-bar.czm-th-shade-1 { fill: var(--text-muted); }
+.czm-th-bar:hover { opacity: 1; }
+.czm-th-bar.is-selected { fill: var(--interactive-accent); opacity: 1; }
+.czm-th-bar.is-bookmarked { stroke: var(--color-yellow); stroke-width: 1.5; }
+.czm-arc { fill: none; stroke: var(--text-muted); stroke-width: 1.2; opacity: 0.55; cursor: pointer; transition: opacity 120ms; }
+.czm-arc-entity { stroke: var(--czm-kind, var(--text-muted)); opacity: 0.35; }
+.czm-arc-fact { stroke: var(--interactive-accent); }
+.czm-arc-writer { stroke: var(--color-orange); stroke-width: 1.8; opacity: 0.85; }
+.czm-arc.is-contradiction { stroke: var(--color-red); stroke-width: 2.2; opacity: 0.9; }
+.czm-arc.is-contradiction.is-dismissed { opacity: 0.25; stroke-dasharray: 2 4; }
+.czm-arc.is-stale { stroke-dasharray: 4 3; }
+.czm-th-arcs.has-hover .czm-arc:not(.is-lifted):not(.is-kin):not(.is-selected) { opacity: 0.07; }
+.czm-th-arcs.has-selection .czm-arc:not(.is-selected):not(.is-lifted):not(.is-kin) { opacity: 0.12; }
+.czm-arc.is-kin { opacity: 0.9; }
+.czm-arc.is-lifted, .czm-arc.is-selected { opacity: 1; stroke-width: 2.6; }
+.czm-arc.is-touching { opacity: 1; }
+.czm-th-strip-label { fill: var(--text-muted); font-size: 10px; pointer-events: none; }
+.czm-th-strip-rule { stroke: var(--background-modifier-border); stroke-width: 1; }
+.czm-th-strip-bar { fill: var(--interactive-accent); opacity: 0.55; }
+.czm-th-strip-bar.is-bad { fill: var(--color-red); }
+.czm-th-strip-bar:hover { opacity: 1; }
+.czm-th-badge { position: absolute; left: 10px; top: 8px; z-index: 2; display: none; padding: 3px 10px; border-radius: 12px; cursor: pointer;
+  background: var(--background-secondary); border: 1px solid var(--background-modifier-border); font-size: var(--font-ui-smaller); color: var(--text-muted); }
+.czm-th-badge.is-open { display: block; }
+.czm-th-badge.is-alert { color: var(--color-red); border-color: var(--color-red); font-weight: 600; }
+.czm-th-kind-writer { color: var(--color-orange); }
+.czm-th-kind-fact { color: var(--interactive-accent); }
+.czm-map-row.czm-th-row-writer { border-left-color: var(--color-orange); }
+.czm-map-row.czm-th-row-fact { border-left-color: var(--interactive-accent); }
+.czm-map-row.is-broken { color: var(--color-red); cursor: default; }
+.czm-th-quote { margin: 4px 0; padding-left: 8px; border-left: 2px solid var(--color-red); font-size: var(--font-ui-smaller); opacity: 0.9; }
+.czm-map-conflict.is-dismissed { border-left-color: var(--text-faint); background: none; }
+.czm-map-conflict.is-dismissed .czm-map-conflict-text { color: var(--text-muted); }
+.czm-map-conflict.is-dismissed .czm-th-quote { border-left-color: var(--text-faint); }
+.czm-th-entity-row { padding: 4px 8px; }
+.czm-th-entity-row .dropdown { width: 100%; font-size: var(--font-ui-smaller); }
+.czm-th-broken { padding: 2px 8px; }
+.czm-th-add { display: flex; flex-direction: column; gap: 4px; }
+.czm-th-add .dropdown, .czm-th-add input { width: 100%; box-sizing: border-box; font-size: var(--font-ui-smaller); }
+.czm-th-add button { align-self: flex-start; font-size: var(--font-ui-smaller); padding: 3px 8px; height: auto; }
+.czm-map-panel-actions .czm-th-read { grid-column: 1 / -1; }
+
 /* --- Story timeline -------------------------------------------------------- */
 .czm-tl { padding: 6px 8px; height: 100%; display: flex; flex-direction: column; gap: 6px; }
 .czm-tl-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }

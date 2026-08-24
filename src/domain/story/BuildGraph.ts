@@ -2,6 +2,7 @@ import { countWords } from "../text/Dialogue";
 import type { Scene } from "../text/Scenes";
 import { EntityIndex, NameLookup, basenameOf, normalise } from "./EntityIndex";
 import { NOT_A_NAME, findMentions, unresolvedCounts } from "./Mentions";
+import { compareNotes } from "./Order";
 import type { PosTagger } from "../style/PosTagger";
 import { type Edge, type EdgeKind, type Entity, type SceneRef, type StoryGraph, type TimelineRow, layerOf, pairKey, sceneKey, textHash } from "./StoryGraph";
 import type { StoryMapFile } from "./StoryMapFile";
@@ -76,7 +77,7 @@ export function looksLikeName(surface: string, tagger?: PosTagger): boolean {
  * on top and marked stale where the scene has moved on since.
  */
 export function buildStoryGraph(project: string, notes: readonly ProjectNote[], file: StoryMapFile, options: BuildOptions = DEFAULT_BUILD_OPTIONS): StoryGraph {
-  const sorted = [...notes].sort((a, b) => a.path.localeCompare(b.path));
+  const sorted = [...notes].sort(compareNotes);
   const index = new EntityIndex(sorted);
   const isSceneNote = (note: ProjectNote) => !index.entities.some((e) => e.path === note.path); // an entity's own note is not a scene
 
@@ -139,7 +140,7 @@ export function buildStoryGraph(project: string, notes: readonly ProjectNote[], 
   }
   for (const note of sorted) {
     if (!isSceneNote(note)) continue;
-    if (basenameOf(note.path) === "Story map") continue;
+    if (basenameOf(note.path) === "Story map" || basenameOf(note.path) === "Story threads") continue;
     entities.push({ id: note.path, name: basenameOf(note.path), kind: "note", path: note.path, aliases: [], bookmarked: note.bookmarked, appearances: [], mentions: 0 });
   }
 

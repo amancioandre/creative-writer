@@ -7,6 +7,7 @@ Every property the plugin reads or writes. All are optional.
 | Key | Values | Effect |
 |---|---|---|
 | `creative-writer` | `true` / `false` | Force the editor features on or off for this note, whatever the *Notes* mode says. `false` also keeps the note out of the [story map](/guide/story-map#what-is-read) and timeline — the right line for memos, research and reviews. Written by *Toggle Creative Writer for this note*. |
+| `story-order` | number, e.g. `3` | Where this note falls in the manuscript. Notes with it come first, by number; the rest follow in path order. Used by the story map, timeline and [threads](/guide/story-threads#the-axis). |
 
 ## Project note
 
@@ -52,8 +53,21 @@ aliases: []
 ```yaml
 ---
 creative-writer: false
-creative-writer-storymap: 1
+creative-writer-storymap: 2
 ---
 ```
 
-followed by a short explanation and one ```` ```json ```` block of model readings. The flag keeps the plugin from reading its own note as a chapter. Safe to delete — you would re-run the reading.
+followed by a short explanation and one ```` ```json ```` block: relation readings and fact readings per scene, contradictions you dismissed, and pinned node positions. The flag keeps the plugin from reading its own note as a chapter; a version-1 note (before facts existed) loads as is. Safe to delete — you would re-run the readings.
+
+## Story threads note
+
+`Story threads.md` in the project folder is yours: the [threads you draw by hand](/guide/story-threads#drawing-threads-yourself). The plugin creates it on the first *Add to a thread* with
+
+```yaml
+---
+creative-writer: false
+creative-writer-threads: 1
+---
+```
+
+and adds one `## heading` per thread and one `- [[Note#Heading]] — note` line per scene. Edit it freely, or write it from scratch without the front matter — a note named `Story threads` is never read as a chapter either way.

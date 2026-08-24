@@ -40,6 +40,8 @@ export interface StoryMapSource {
   updateSettings(next: StoryMapSettings): void;
   /** Opens the timeline view for the same project. */
   openTimeline(project: ProjectSpec): void;
+  /** Opens the story threads view for the same project. */
+  openThreads(project: ProjectSpec): void;
 }
 
 const SVG = "http://www.w3.org/2000/svg";
@@ -623,6 +625,7 @@ export class StoryMapView extends ItemView {
     if (this.project) {
       btn(this.running ? "Stop" : "Read project with model", "czm-map-analyse", () => void this.toggleAnalyse(null), "Asks the local model (Ollama) for relationships, outside references and events in every scene. Unchanged scenes are skipped.");
       btn("Timeline", "czm-map-timeline-btn", () => this.source.openTimeline(this.project!), "Open the Who-is-where timeline for this project.");
+      btn("Threads", "czm-map-threads-btn", () => this.source.openThreads(this.project!), "Open the story threads view: the manuscript as one line, with facts, contradictions and hand-drawn threads arcing over it.");
     }
     if (this.project) btn("Add", "czm-map-add", () => { const r = this.svg.getBoundingClientRect(); this.openComposer(this.toWorld(r.left + (r.width || 800) / 2, r.top + (r.height || 600) / 2)); }, "Add a character, place, item, faction or event as a new note. Or double-click the background.");
     btn("Fit", "czm-map-fit", () => this.fit());

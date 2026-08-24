@@ -10,6 +10,9 @@ import type { WritingLog } from "./WritingLog";
  *   story-ignore: [LOW, POV]     (optional; capitalised words the story map must not take for names)
  * The folder — or that one note — is what gets counted.
  *
+ * Any note inside the project may carry `story-order: 3` to fix its place
+ * in the manuscript; notes without it follow in path order (see Order.ts).
+ *
  * A folder can also be a project with no goal at all:
  *   story: true
  * — a novel being read and mapped rather than written, or a map sketched

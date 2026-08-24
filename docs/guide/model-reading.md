@@ -31,3 +31,7 @@ A model that invents a cousin does not get a node. This is deliberate and makes 
 Each reading is stored with a hash of the scene's prose. Next time, unchanged scenes are skipped ("Unchanged 2/7"), so re-reading a novel after editing one scene costs one scene. An edited scene's old edges turn **dashed** on the map until it is re-read. Renaming a heading counts as a new scene.
 
 Readings are stored in `Story map.md` inside the project folder — see [Files & sync](/reference/data-and-sync).
+
+## Reading for facts
+
+The [story threads](/guide/story-threads) view runs a second, separate reading with the same rules: **Read project for facts** asks the model, scene by scene, for the concrete facts the scene states about the names in it — *Ilse · eye colour · green*, with a verbatim quote. It is validated the same way (a fact about a name not in the scene is dropped, so is one whose quote is not there), cached by the same hash, and stored beside the relation readings with its own hash, so re-reading one kind never disturbs the other. Contradictions between scenes are then found by code, not by the model; see [Contradictions](/guide/story-threads#contradictions).

@@ -26,7 +26,7 @@ const file = putReading(EMPTY_STORY_MAP_FILE, {
 });
 
 function source(overrides: Partial<StoryMapSource> = {}) {
-  const calls = { opened: [] as string[], revealed: [] as string[], promoted: [] as string[], ignored: [] as string[], aliased: [] as string[], relations: [] as string[], renamed: [] as string[], removed: [] as string[], layouts: [] as Layout[], timeline: 0 };
+  const calls = { opened: [] as string[], revealed: [] as string[], promoted: [] as string[], ignored: [] as string[], aliased: [] as string[], relations: [] as string[], renamed: [] as string[], removed: [] as string[], layouts: [] as Layout[], timeline: 0, threads: 0 };
   let settings: StoryMapSettings = DEFAULT_STORY_MAP;
   // Relations written through the source show up in the next build, as they would from the vault.
   const authored: ProjectRelation[] = [];
@@ -56,6 +56,7 @@ function source(overrides: Partial<StoryMapSource> = {}) {
     settings: () => settings,
     updateSettings: (next) => { settings = next; },
     openTimeline: () => { calls.timeline++; },
+    openThreads: () => { calls.threads++; },
     ...overrides,
   };
   return { src, calls, settings: () => settings };
@@ -248,6 +249,8 @@ describe("StoryMapView", () => {
     expect(el.querySelector(".czm-map-status")!.textContent).toContain("Read 1 scene");
     (el.querySelector(".czm-map-timeline-btn") as HTMLElement).click();
     expect(calls.timeline).toBe(1);
+    (el.querySelector(".czm-map-threads-btn") as HTMLElement).click();
+    expect(calls.threads).toBe(1);
   });
 
   it("shows the model's own message when no model is configured", async () => {

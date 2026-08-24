@@ -3,6 +3,7 @@ import { inScope, parseProjectFrontmatter, type ProjectSpec } from "../../domain
 import type { ProjectNote } from "../../domain/story/BuildGraph";
 import { parseRelations } from "../../domain/story/Relations";
 import { STORY_MAP_FLAG } from "../../domain/story/StoryMapFile";
+import { STORY_THREADS_FLAG } from "../../domain/threads/StoryThreadsNote";
 import { splitScenes } from "../../domain/text/Scenes";
 
 /** The slice of Obsidian's `App` this adapter touches, typed structurally so tests can fake it. */
@@ -41,7 +42,7 @@ export class VaultProjectNotes implements ProjectNotes {
       if (!inScope(project, f.path)) continue;
       const cache = this.app.metadataCache.getFileCache(f);
       const fm = cache?.frontmatter;
-      if (fm && fm[STORY_MAP_FLAG] !== undefined) continue; // our own data note
+      if (fm && (fm[STORY_MAP_FLAG] !== undefined || fm[STORY_THREADS_FLAG] !== undefined)) continue; // our own data notes
       if (fm && fm["creative-writer"] === false) continue; // memos, research, reviews: the writer opted the note out
       const links = new Set<string>();
       for (const l of [...(cache?.links ?? []), ...(cache?.embeds ?? []), ...(cache?.frontmatterLinks ?? [])]) {

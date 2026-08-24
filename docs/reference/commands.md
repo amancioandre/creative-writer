@@ -13,10 +13,12 @@ All commands appear in the palette under **Creative Writer:**. None has a defaul
 | **Open story map** | Open the project graph in a tab. |
 | **Open story timeline** | Open *Who is where* beside the current tab. |
 | **Read this note with model (story map)** | Read the active note's scenes for relationships, references and events (or the whole project if no note is active). Local model only. |
+| **Open story threads** | Open the [story threads](/guide/story-threads) view in a tab: the manuscript as one line, threads and contradictions as arcs over it. |
+| **Read this note for facts (story threads)** | Read the active note's scenes for concrete facts — eye colours, ages, places, who knows what — so scenes can be checked against each other. Local model only. |
 
 ## Ribbon
 
-Two ribbon icons: the fork opens the story map, the chart opens the story timeline. Obsidian lets you reorder or hide ribbon items from the ribbon's own menu.
+Three ribbon icons: the fork opens the story map, the chart opens the story timeline, the curve opens the story threads. Obsidian lets you reorder or hide ribbon items from the ribbon's own menu.
 
 ## Status bar
 

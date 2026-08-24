@@ -89,5 +89,8 @@ describe("normalizeSettings — story map", () => {
     expect(s.storyMap.panelOpen).toBe(false);
     expect(normalizeSettings({ storyMap: { display: { nodeSize: 9, labelSize: -2, edgeOpacity: "x" } } }).storyMap.display).toEqual({ nodeSize: 2.5, edgeWidth: 1, edgeOpacity: 0.55, labelSize: 0 });
     expect(normalizeSettings({}).storyMap).toEqual(DEFAULT_SETTINGS.storyMap);
+    expect(normalizeSettings({}).threads).toEqual(DEFAULT_SETTINGS.threads);
+    const t = normalizeSettings({ threads: { kinds: { entity: true, bogus: 1 }, strips: { cast: false, "": true, x: "no" }, showDismissed: true, contradictionsOnly: "yes", panelOpen: false } }).threads;
+    expect(t).toEqual({ kinds: { entity: true, fact: true, writer: true }, strips: { cast: false }, showDismissed: true, contradictionsOnly: false, panelOpen: false });
   });
 });
