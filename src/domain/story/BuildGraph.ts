@@ -1,7 +1,8 @@
 import { countWords } from "../text/Dialogue";
 import type { Scene } from "../text/Scenes";
 import { EntityIndex, NameLookup, basenameOf, normalise } from "./EntityIndex";
-import { findMentions, unresolvedCounts } from "./Mentions";
+import { NOT_A_NAME, findMentions, unresolvedCounts } from "./Mentions";
+import type { PosTagger } from "../style/PosTagger";
 import { type Edge, type EdgeKind, type Entity, type SceneRef, type StoryGraph, type TimelineRow, layerOf, pairKey, sceneKey, textHash } from "./StoryGraph";
 import type { StoryMapFile } from "./StoryMapFile";
 
@@ -20,9 +21,43 @@ export interface ProjectNote {
 export interface BuildOptions {
   /** Unknown names mentioned at least this often become candidate entities. */
   readonly candidateMinMentions: number;
+  /** Optional: vetoes candidates whose words are pronouns, verbs, adjectives, numbers… rather than names. */
+  readonly tagger?: PosTagger;
+  /** Normalised surface forms the writer said are not names. */
+  readonly ignore?: ReadonlySet<string>;
 }
 
 export const DEFAULT_BUILD_OPTIONS: BuildOptions = { candidateMinMentions: 3 };
+
+/** Tags that mean "this capitalised word is not somebody's name". */
+const NOT_NAME_TAGS = ["Pronoun", "Conjunction", "Preposition", "Determiner", "Modal", "Auxiliary", "QuestionWord", "Expression", "Value", "Cardinal", "Ordinal", "Copula", "Negative", "Adverb", "Gerund", "Comparative", "Superlative"];
+const PARTICLES = new Set(["of", "the", "de", "da", "do", "di", "van", "von", "der", "den", "la", "le", "del", "y", "e"]);
+
+/**
+ * Could this surface form be a name? Every word is checked: none may be
+ * a stop word, and with a tagger none may be a function word, a bare
+ * verb or a bare adjective. "Bear" (noun) passes; "Waiting" (gerund),
+ * "Better" (comparative) and "Twelve" (value) do not.
+ */
+export function looksLikeName(surface: string, tagger?: PosTagger): boolean {
+  const words = surface.split(/\s+/).filter((w) => !PARTICLES.has(w.toLowerCase()));
+  if (words.length === 0) return false;
+  if (words.some((w) => NOT_A_NAME.has(normalise(w)))) return false;
+  if (!tagger) return true;
+  const isNoun = (tags: ReadonlySet<string>) => tags.has("Noun") || tags.has("ProperNoun") || tags.has("Singular") || tags.has("Plural");
+  for (const w of words) {
+    for (const tok of tagger.tag(w)) {
+      if (NOT_NAME_TAGS.some((t) => tok.tags.has(t))) return false;
+      if (isNoun(tok.tags)) continue;
+      if (tok.tags.has("Adjective")) return false; // "Disgusting", "Silent" — an exclamation, not a person
+      if (!tok.tags.has("Verb")) continue;
+      // "Bear" alone reads as a verb; "the Bear" reads as a noun. A word that can be a thing may be a name.
+      const framed = tagger.tag(`the ${w}`).find((t) => t.normal !== "the");
+      if (!framed || !isNoun(framed.tags) || framed.tags.has("Gerund")) return false;
+    }
+  }
+  return true;
+}
 
 /**
  * Builds the whole graph from the project's notes. Deterministic: same
@@ -66,6 +101,8 @@ export function buildStoryGraph(project: string, notes: readonly ProjectNote[], 
   const candidateSurface = new Map<string, string>();
   for (const [key, { surface, count }] of unresolvedCounts(allUnresolved)) {
     if (count < options.candidateMinMentions) break;
+    if (options.ignore?.has(key)) continue;
+    if (!looksLikeName(surface, options.tagger)) continue;
     candidateIds.add(`name:${key}`);
     candidateSurface.set(`name:${key}`, surface);
   }

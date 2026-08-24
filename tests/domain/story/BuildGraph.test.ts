@@ -3,6 +3,8 @@ import { buildStoryGraph, type ProjectNote } from "../../../src/domain/story/Bui
 import { splitScenes } from "../../../src/domain/text/Scenes";
 import { EMPTY_STORY_MAP_FILE, putReading } from "../../../src/domain/story/StoryMapFile";
 import { textHash } from "../../../src/domain/story/StoryGraph";
+import { looksLikeName } from "../../../src/domain/story/BuildGraph";
+import type { PosTagger, TaggedToken } from "../../../src/domain/style/PosTagger";
 
 const chapterOne = `# Camp
 Marta woke before Ilse and walked to the gate of Lisbon. Zsófi was there, as Zsófi always was.
@@ -112,5 +114,40 @@ describe("buildStoryGraph", () => {
   it("is deterministic regardless of note order", () => {
     const g2 = buildStoryGraph("Novel", [...notes].reverse(), EMPTY_STORY_MAP_FILE);
     expect(g2).toEqual(g);
+  });
+});
+
+describe("looksLikeName", () => {
+  const tags: Record<string, string[]> = { bear: ["Noun", "Singular"], waiting: ["Verb", "Gerund"], better: ["Adjective", "Comparative"], twelve: ["Value", "Cardinal"], vitaliy: ["ProperNoun"], stand: ["Verb", "Infinitive"], disgusting: ["Adjective"], night: ["Noun", "Date"], vancouver: ["ProperNoun"], island: ["Noun"] };
+  const tags2: Record<string, string[]> = { ...tags, stand: ["Noun"], disgusting: ["Adjective"] }; // after "the …"
+  const tagger: PosTagger = { tag: (t) => {
+    const framed = t.startsWith("the ");
+    return t.split(/\s+/).map((w, i): TaggedToken => ({ text: w, from: i, to: i + w.length, normal: w.toLowerCase(), lemma: w.toLowerCase(), tags: new Set(w === "the" ? ["Determiner"] : (framed ? tags2 : tags)[w.toLowerCase()] ?? ["Noun"]), sentence: 0 }));
+  } };
+  it("rejects stop words with or without a tagger", () => {
+    expect(looksLikeName("He")).toBe(false);
+    expect(looksLikeName("Can")).toBe(false);
+    expect(looksLikeName("Bear Hunt Publishing Team")).toBe(true);
+    expect(looksLikeName("the")).toBe(false);
+  });
+  it("uses the tagger to veto verbs, adjectives, gerunds and numbers but keeps nouns and proper nouns", () => {
+    expect(looksLikeName("Bear", tagger)).toBe(true);
+    expect(looksLikeName("Night", tagger)).toBe(true);
+    expect(looksLikeName("Vitaliy", tagger)).toBe(true);
+    expect(looksLikeName("Vancouver Island", tagger)).toBe(true);
+    expect(looksLikeName("Waiting", tagger)).toBe(false);
+    expect(looksLikeName("Better", tagger)).toBe(false);
+    expect(looksLikeName("Twelve", tagger)).toBe(false);
+    expect(looksLikeName("Stand", tagger)).toBe(false); // stop word
+    expect(looksLikeName("Disgusting", tagger)).toBe(false); // adjective even after "the"
+  });
+  it("honours the writer's ignore list", () => {
+    const g = buildStoryGraph("Novel", notes, EMPTY_STORY_MAP_FILE, { candidateMinMentions: 3, ignore: new Set(["zsofi"]) });
+    expect(g.entities.some((e) => e.kind === "candidate")).toBe(false);
+  });
+  it("applies the veto when building candidates", () => {
+    const body = "# A\nThen Waiting came, and Waiting stayed, and Waiting left; Bear was near, Bear was here, Bear was there.";
+    const g = buildStoryGraph("N", [note("N/One.md", body)], EMPTY_STORY_MAP_FILE, { candidateMinMentions: 3, tagger });
+    expect(g.entities.filter((e) => e.kind === "candidate").map((e) => e.name)).toEqual(["Bear"]);
   });
 });

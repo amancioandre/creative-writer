@@ -29,6 +29,16 @@ describe("findMentions", () => {
       ["Porto", null],
     ]);
   });
+  it("treats a capital after an opening quote, dash, bracket or colon as a clause start, not a name", () => {
+    const text = 'Out of the box came bread, "This is good bread." He nodded - He always did (undecided If he stays): Can one tell? Zak said, "Yeah." Then Zak laughed — Zak always laughed.';
+    // Unknown names at a sentence or clause start are skipped until familiar; the mid-sentence one counts.
+    expect(findMentions(text, index).map((m) => m.surface)).toEqual(["Zak"]);
+    expect(findMentions(text, index, new Set(["zak"])).map((m) => m.surface)).toEqual(["Zak", "Zak", "Zak"]);
+  });
+  it("never takes pronouns, modals, question words or dialogue openers for names", () => {
+    const text = "and then He said If You go There, All of Them will Ask Why; Thank you, Better now, Twelve of Us.";
+    expect(findMentions(text, index)).toEqual([]);
+  });
   it("ignores I, honorifics, months and weekdays", () => {
     const m = findMentions("On Monday I met Dr Ilse in June.", index);
     expect(m.map((x) => x.surface)).toEqual(["Ilse"]);

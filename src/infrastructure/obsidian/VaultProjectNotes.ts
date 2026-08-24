@@ -41,6 +41,7 @@ export class VaultProjectNotes implements ProjectNotes {
       const cache = this.app.metadataCache.getFileCache(f);
       const fm = cache?.frontmatter;
       if (fm && fm[STORY_MAP_FLAG] !== undefined) continue; // our own data note
+      if (fm && fm["creative-writer"] === false) continue; // memos, research, reviews: the writer opted the note out
       const links = new Set<string>();
       for (const l of [...(cache?.links ?? []), ...(cache?.embeds ?? []), ...(cache?.frontmatterLinks ?? [])]) {
         const target = this.app.metadataCache.getFirstLinkpathDest(l.link.split("#")[0]!.split("|")[0]!, f.path);

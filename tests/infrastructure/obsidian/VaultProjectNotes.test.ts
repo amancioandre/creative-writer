@@ -7,6 +7,7 @@ const files: Record<string, { fm?: Record<string, unknown>; links?: string[]; bo
   "Novel/Characters/Ilse.md": { body: "" },
   "Novel/One.md": { links: ["Marta#Childhood", "Missing", "One"], body: "# Camp\nMarta and Ilse.\n" },
   "Novel/Story map.md": { fm: { "creative-writer-storymap": 1 }, body: "```json\n{}\n```" },
+  "Novel/memos/review.md": { fm: { "creative-writer": false }, body: "He said This. Analysis." },
   "Other/Note.md": { body: "Not in scope." },
 };
 
@@ -32,7 +33,7 @@ describe("VaultProjectNotes", () => {
   it("lists projects from front matter", () => {
     expect(source.projects().map((p) => [p.name, p.scope])).toEqual([["Novel", "Novel/"]]);
   });
-  it("reads in-scope notes with resolved links, bookmarks and scenes, skipping the story map note", async () => {
+  it("reads in-scope notes with resolved links, bookmarks and scenes, skipping the story map note and opted-out notes", async () => {
     const notes = await source.notes(source.projects()[0]!);
     expect(notes.map((n) => n.path)).toEqual(["Novel/Novel.md", "Novel/Characters/Marta.md", "Novel/Characters/Ilse.md", "Novel/One.md"]);
     const one = notes.find((n) => n.path === "Novel/One.md")!;
