@@ -31,6 +31,7 @@ import { TrackWriting } from "./application/use-cases/TrackWriting";
 import { AdapterProgressRepository } from "./infrastructure/obsidian/AdapterProgressRepository";
 import { countWords } from "./domain/text/Dialogue";
 import { toDay } from "./domain/progress/Dates";
+import { inScope, parseProjectFrontmatter, projectStatus, recentAdded, type ProjectStatus } from "./domain/progress/Project";
 import { enabledStyleKinds } from "./domain/settings/Settings";
 
 /**
@@ -101,6 +102,7 @@ export default class CreativeZenModePlugin extends Plugin {
       log: () => this.tracker.current,
       today: () => toDay(new Date()),
       dailyGoal: () => this.current.goals.dailyWords,
+      projects: () => this.projectStatuses(),
     }));
     this.addCommand({ id: "open-writing-desk", name: "Open writing desk", callback: () => void this.openDesk() });
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.refreshDesk()));
@@ -155,6 +157,27 @@ export default class CreativeZenModePlugin extends Plugin {
         configDir: () => this.app.vault.configDir,
       }),
     );
+  }
+
+  /** Projects are declared in front matter; totals come from the vault, not the log, so untracked files count too. */
+  private async projectStatuses(): Promise<ProjectStatus[]> {
+    const files = this.app.vault.getMarkdownFiles();
+    const specs = files
+      .map((f) => parseProjectFrontmatter(this.app.metadataCache.getFileCache(f)?.frontmatter, f.path))
+      .filter((s): s is NonNullable<typeof s> => s !== null)
+      .sort((a, b) => a.name.localeCompare(b.name));
+    if (specs.length === 0) return [];
+    const counts = new Map<string, number>();
+    for (const f of files) {
+      if (!specs.some((s) => inScope(s, f.path))) continue;
+      counts.set(f.path, countWords(await this.app.vault.cachedRead(f)));
+    }
+    const today = toDay(new Date());
+    return specs.map((spec) => {
+      let total = 0;
+      for (const [path, words] of counts) if (inScope(spec, path)) total += words;
+      return projectStatus(spec, total, recentAdded(this.tracker.current, spec, today, 7), today);
+    });
   }
 
   private async openDesk(): Promise<void> {

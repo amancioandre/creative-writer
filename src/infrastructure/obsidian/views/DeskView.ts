@@ -3,6 +3,7 @@ import type { ProseProfile } from "../../../application/use-cases/ProfileProse";
 import type { WritingLog } from "../../../domain/progress/WritingLog";
 import { addDays, type Day, weekday } from "../../../domain/progress/Dates";
 import { heatmap, streak, summarizeDay, totals } from "../../../domain/progress/ProgressSummary";
+import type { ProjectStatus } from "../../../domain/progress/Project";
 
 export const DESK_VIEW_TYPE = "creative-writer-desk";
 const HEATMAP_WEEKS = 12;
@@ -13,6 +14,8 @@ export interface DeskSource {
   log(): WritingLog;
   today(): Day;
   dailyGoal(): number;
+  /** Every project declared in front matter, with current totals. Async: totals need file reads. */
+  projects(): Promise<ProjectStatus[]>;
 }
 
 /**
@@ -20,6 +23,8 @@ export interface DeskSource {
  * Lives in a side leaf so Zen Mode hides it with the rest of the chrome.
  */
 export class DeskView extends ItemView {
+  private generation = 0;
+
   constructor(leaf: WorkspaceLeaf, private readonly source: DeskSource) {
     super(leaf);
   }
@@ -46,6 +51,13 @@ export class DeskView extends ItemView {
 
     root.createEl("h4", { text: "Today" });
     renderProgress(root, this.source.log(), this.source.today(), this.source.dailyGoal());
+
+    const projects = root.createDiv();
+    const generation = ++this.generation;
+    void this.source.projects().then((list) => {
+      if (generation !== this.generation) return;
+      renderProjects(projects, list);
+    });
 
     root.createEl("h4", { text: "Readability" });
     const active = this.source.activeProfile();
@@ -99,6 +111,39 @@ export function renderHeatmap(root: HTMLElement, log: WritingLog, today: Day, go
     }
   }
   root.createDiv({ text: map.max > 0 ? `Darkest day: ${map.max.toLocaleString()} words. Outlined days met the goal.` : "Nothing logged yet — write and the calendar fills in.", cls: "czm-desk-legend" });
+}
+
+export function renderProjects(root: HTMLElement, projects: readonly ProjectStatus[]): void {
+  root.empty();
+  if (projects.length === 0) return;
+  root.createEl("h4", { text: "Projects" });
+  for (const p of projects) {
+    const item = root.createDiv({ cls: `czm-desk-project is-${p.verdict}` });
+    const head = item.createDiv({ cls: "czm-desk-band-head" });
+    head.createSpan({ text: p.spec.name, cls: "czm-desk-band-label" });
+    head.createSpan({ text: `${p.totalWords.toLocaleString()} / ${p.spec.targetWords.toLocaleString()} · ${Math.round(p.fraction * 100)}%`, cls: "czm-desk-band-name" });
+    const bar = item.createDiv({ cls: "czm-desk-bar" });
+    bar.createDiv({ cls: `czm-desk-bar-fill${p.verdict === "done" ? " is-met" : ""}` }).style.width = `${Math.round(p.fraction * 100)}%`;
+    item.createDiv({ text: paceLine(p), cls: "czm-desk-band-hint" });
+  }
+}
+
+export function paceLine(p: ProjectStatus): string {
+  const n = (v: number) => Math.round(v).toLocaleString();
+  switch (p.verdict) {
+    case "done":
+      return "Target reached.";
+    case "stalled":
+      return p.neededPerDay !== null ? `Nothing added this week. ${n(p.neededPerDay)} words a day would still make ${p.spec.deadline}.` : "Nothing added this week.";
+    case "no-deadline":
+      return `Writing ${n(p.recentPerDay)} a day; at this pace done around ${p.projectedDay}.`;
+    case "on-track":
+      return `${n(p.neededPerDay!)} a day needed, writing ${n(p.recentPerDay)}. On track: done around ${p.projectedDay}, deadline ${p.spec.deadline}.`;
+    case "behind":
+      return p.daysLeft! <= 0
+        ? `Deadline ${p.spec.deadline} has passed with ${n(p.remaining)} words to go; writing ${n(p.recentPerDay)} a day.`
+        : `${n(p.neededPerDay!)} a day needed, writing ${n(p.recentPerDay)}. At this pace done around ${p.projectedDay}, after the ${p.spec.deadline} deadline.`;
+  }
 }
 
 export function renderProfile(root: HTMLElement, p: ProseProfile): void {

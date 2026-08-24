@@ -140,3 +140,7 @@ body.czm-zen .workspace-split.mod-root {
 .czm-desk-cell.czm-level-4 { background: var(--interactive-accent); opacity: 1; }
 .czm-desk-cell.is-met { outline: 1px solid var(--color-green); outline-offset: -1px; }
 .czm-desk-legend { font-size: var(--font-ui-smaller); opacity: 0.55; }
+
+.czm-desk-project { margin-bottom: 12px; }
+.czm-desk-project.is-behind .czm-desk-bar-fill { background: var(--color-orange); }
+.czm-desk-project.is-stalled .czm-desk-bar-fill { background: var(--text-muted); }

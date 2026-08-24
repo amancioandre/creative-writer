@@ -6,7 +6,7 @@ import { IntlSentenceSegmenter } from "../../../src/infrastructure/segmentation/
 import { EMPTY_LOG } from "../../../src/domain/progress/WritingLog";
 
 const profile = new ProfileProse(new IntlSentenceSegmenter("en"));
-const progress = { log: () => EMPTY_LOG, today: () => "2026-08-24", dailyGoal: () => 500 };
+const progress = { log: () => EMPTY_LOG, today: () => "2026-08-24", dailyGoal: () => 500, projects: async () => [] };
 
 describe("DeskView", () => {
   it("has a stable view type and title", () => {
@@ -54,7 +54,7 @@ describe("DeskView progress", () => {
     log = recordWordCount(log, "a.md", 300, "2026-08-23");
     log = recordWordCount(log, "a.md", 250, "2026-08-24");
     log = recordWordCount(log, "a.md", 900, "2026-08-24");
-    const v = new DeskView(new WorkspaceLeaf(), { activeProfile: () => null, log: () => log, today: () => "2026-08-24", dailyGoal: () => 500 });
+    const v = new DeskView(new WorkspaceLeaf(), { activeProfile: () => null, log: () => log, today: () => "2026-08-24", dailyGoal: () => 500, projects: async () => [] });
     v.refresh();
     const t = v.contentEl.textContent!;
     expect(t).toContain("650 words");
@@ -68,10 +68,34 @@ describe("DeskView progress", () => {
   });
 
   it("omits the bar without a goal and explains an empty calendar", () => {
-    const v = new DeskView(new WorkspaceLeaf(), { activeProfile: () => null, log: () => EMPTY_LOG, today: () => "2026-08-24", dailyGoal: () => 0 });
+    const v = new DeskView(new WorkspaceLeaf(), { activeProfile: () => null, log: () => EMPTY_LOG, today: () => "2026-08-24", dailyGoal: () => 0, projects: async () => [] });
     v.refresh();
     expect(v.contentEl.querySelector(".czm-desk-bar")).toBeNull();
     expect(v.contentEl.textContent).toContain("no daily goal");
     expect(v.contentEl.textContent).toContain("Nothing logged yet");
+  });
+});
+
+describe("DeskView projects", () => {
+  it("renders each project with a bar and a pace line", async () => {
+    const { projectStatus } = await import("../../../src/domain/progress/Project");
+    const spec = { name: "Camp", scope: "Camp/", targetWords: 10000, deadline: "2026-09-03" };
+    const list = [projectStatus(spec, 7000, [500], "2026-08-24"), projectStatus({ ...spec, name: "Slow" }, 7000, [10], "2026-08-24")];
+    const v = new DeskView(new WorkspaceLeaf(), { ...progress, activeProfile: () => null, projects: async () => list });
+    v.refresh();
+    await Promise.resolve();
+    const t = v.contentEl.textContent!;
+    expect(t).toContain("Projects");
+    expect(t).toContain("7,000 / 10,000 · 70%");
+    expect(t).toContain("On track");
+    expect(t).toContain("after the 2026-09-03 deadline");
+    expect(v.contentEl.querySelectorAll(".czm-desk-project.is-behind")).toHaveLength(1);
+  });
+
+  it("shows no Projects heading when none are declared", async () => {
+    const v = new DeskView(new WorkspaceLeaf(), { ...progress, activeProfile: () => null });
+    v.refresh();
+    await Promise.resolve();
+    expect(v.contentEl.textContent).not.toContain("Projects");
   });
 });
