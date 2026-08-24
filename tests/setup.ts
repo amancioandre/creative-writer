@@ -12,6 +12,7 @@ function make(tag: string, o?: Opts): HTMLElement {
 const proto = HTMLElement.prototype as HTMLElement & { createEl?: unknown; createDiv?: unknown; empty?: unknown };
 proto.createEl = function (this: HTMLElement, tag: string, o?: Opts) { const c = make(tag, o); this.appendChild(c); return c; };
 proto.createDiv = function (this: HTMLElement, o?: Opts) { return this.createEl("div", o); };
+proto.createSpan = function (this: HTMLElement, o?: Opts) { return this.createEl("span", o); };
 proto.empty = function (this: HTMLElement) { this.replaceChildren(); };
 (globalThis as Record<string, unknown>).createEl = make;
 (globalThis as Record<string, unknown>).createDiv = (o?: Opts) => make("div", o);

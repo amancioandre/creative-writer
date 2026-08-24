@@ -85,6 +85,7 @@ declare global {
     empty(): void;
     createEl(tag: string, o?: { text?: string; cls?: string }): HTMLElement;
     createDiv(o?: { text?: string; cls?: string }): HTMLElement;
+    createSpan(o?: { text?: string; cls?: string }): HTMLElement;
   }
   function createEl(tag: string, o?: { text?: string; cls?: string }): HTMLElement;
   function createDiv(o?: { text?: string; cls?: string }): HTMLElement;

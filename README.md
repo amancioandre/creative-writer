@@ -12,6 +12,7 @@ An Obsidian plugin for creative writing. Four features, all inside the editor:
 | **Paragraph rhythm** | Underlines each sentence of the current paragraph, cool → warm by "effective length". | Settings → Paragraph rhythm / Rhythm tiers |
 | **Model assistant** | Optional. A local model (Ollama) adds contextual findings — clichés in context, tired metaphors, passives hiding an agent — on command, or after a pause if you opt in. | `Analyse paragraph with model`; Settings → Model assistant |
 | **Myth & archetype** | Select a scene, get a sidebar report: mythic patterns, archetypes, what the pattern asks next. Local model, on command. | `Analyse selection for myth and archetype` |
+| **Readability** | Status bar shows the current paragraph's reading-ease band (Flesch) and sentence-rhythm band (monotone → dynamic). Click it, or run the command, for the **Writing desk**: the whole note's reading ease, grade level, sentence rhythm and dialogue share, each as a named band with a hint. | `Open writing desk`; Settings → Readability in status bar |
 | **Style checks** | Tints clichés, passive voice, weak words, filter verbs, adverbs, repetition, nominalisations, weak verbs and metaphor candidates in the current paragraph; hover for the note. Offline: rules + a POS tagger + concreteness norms. | Settings → Style checks (per-kind toggles) |
 
 Editing mode only (Source + Live Preview); Reading view has no CodeMirror and is untouched.

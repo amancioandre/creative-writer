@@ -41,6 +41,7 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
       { name: "Paragraph rhythm", desc: "Colour each sentence of the current paragraph by its length and weight.", control: { type: "toggle", key: "rhythmEnabled" } },
       { name: "Rhythm tiers", desc: "How many colour steps the rhythm gradient uses.", control: { type: "slider", key: "rhythmTiers", min: RhythmScale.MIN_TIERS, max: RhythmScale.MAX_TIERS, step: 1 } },
       { name: "Fullscreen in Zen Mode", desc: "Also request window fullscreen when Zen Mode is toggled on.", control: { type: "toggle", key: "zenFullscreen" } },
+      { name: "Readability in status bar", desc: "Show the current paragraph's reading-ease and sentence-rhythm bands. Click it to open the writing desk with the whole note's profile.", control: { type: "toggle", key: "readabilityEnabled" } },
       {
         type: "group",
         heading: "Style checks",
@@ -99,6 +100,8 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
       .addSlider((sl) => sl.setLimits(RhythmScale.MIN_TIERS, RhythmScale.MAX_TIERS, 1).setValue(s.rhythmTiers).onChange((v) => set({ rhythmTiers: v })));
     new Setting(containerEl).setName("Fullscreen in Zen Mode").setDesc("Also request window fullscreen when Zen Mode is toggled on.")
       .addToggle((t) => t.setValue(s.zenFullscreen).onChange((v) => set({ zenFullscreen: v })));
+    new Setting(containerEl).setName("Readability in status bar").setDesc("Show the current paragraph's reading-ease and sentence-rhythm bands. Click it to open the writing desk.")
+      .addToggle((t) => t.setValue(s.readabilityEnabled).onChange((v) => set({ readabilityEnabled: v })));
 
     new Setting(containerEl).setName("Style checks").setHeading();
     new Setting(containerEl).setName("Style checks").setDesc("Highlight clichés, passive voice, weak words, filter verbs, adverbs and repetition in the current paragraph. Hover a highlight for the note.")

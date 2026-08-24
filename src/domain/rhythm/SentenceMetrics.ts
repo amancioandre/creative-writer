@@ -14,7 +14,7 @@ export interface SentenceMetrics {
  * A "word" is a run of unicode letters/digits, optionally joined by
  * apostrophes or hyphens ("don't", "over-think" count once each).
  */
-const WORD_PATTERN = /[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/gu;
+export const WORD_PATTERN = /[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/gu;
 
 export function measureSentence(sentence: Sentence): SentenceMetrics {
   const words = sentence.text.match(WORD_PATTERN) ?? [];

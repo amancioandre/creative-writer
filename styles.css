@@ -108,3 +108,17 @@ body.czm-zen .workspace-split.mod-root {
 .czm-myth-hint { opacity: 0.7; }
 .czm-myth-error { color: var(--text-error); }
 .czm-myth-meta { margin-top: 16px; font-size: var(--font-ui-smaller); opacity: 0.5; }
+
+/* --- Writing desk ----------------------------------------------------------- */
+.czm-desk { padding: 4px 8px; line-height: 1.45; }
+.czm-desk h4 { margin: 14px 0 6px; font-size: var(--font-ui-small); text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.7; }
+.czm-desk-title { font-weight: 600; margin: 0 0 6px; }
+.czm-desk-hint { opacity: 0.7; }
+.czm-desk-counts { display: flex; gap: 12px; flex-wrap: wrap; font-size: var(--font-ui-small); opacity: 0.8; margin-bottom: 10px; }
+.czm-desk-band { margin-bottom: 12px; }
+.czm-desk-band-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.czm-desk-band-name { font-size: var(--font-ui-small); opacity: 0.7; }
+.czm-desk-band-label { font-weight: 600; }
+.czm-desk-band-hint { font-size: var(--font-ui-small); }
+.czm-desk-band-detail { font-size: var(--font-ui-smaller); opacity: 0.55; }
+.czm-status-readability { cursor: pointer; }

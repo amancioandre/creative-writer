@@ -40,6 +40,8 @@ export interface PluginSettings {
   readonly zenFullscreen: boolean;
   readonly styleEnabled: boolean;
   readonly styleChecks: Readonly<Record<FindingKind, boolean>>;
+  /** Show the cursor paragraph's readability bands in the status bar. */
+  readonly readabilityEnabled: boolean;
   readonly llm: LlmSettings;
 }
 
@@ -56,6 +58,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   zenFullscreen: false,
   styleEnabled: true,
   styleChecks: DEFAULT_STYLE_CHECKS,
+  readabilityEnabled: true,
   llm: DEFAULT_LLM_SETTINGS,
 };
 
@@ -82,6 +85,7 @@ export function normalizeSettings(raw: unknown): PluginSettings {
     zenFullscreen: bool("zenFullscreen"),
     styleEnabled: bool("styleEnabled"),
     styleChecks: normalizeChecks(r.styleChecks),
+    readabilityEnabled: bool("readabilityEnabled"),
     llm: normalizeLlm(r.llm),
   };
 }

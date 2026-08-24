@@ -24,6 +24,9 @@ import { OllamaMythAnalyser } from "./infrastructure/llm/OllamaMythAnalyser";
 import { AnalyzeMyth } from "./application/use-cases/AnalyzeMyth";
 import { MythView, MYTH_VIEW_TYPE } from "./infrastructure/obsidian/views/MythView";
 import { RequestUrlHttpClient } from "./infrastructure/obsidian/RequestUrlHttpClient";
+import { ProfileProse } from "./application/use-cases/ProfileProse";
+import { readabilityStatusExtension, statusLabel } from "./infrastructure/codemirror/readabilityStatusExtension";
+import { DeskView, DESK_VIEW_TYPE } from "./infrastructure/obsidian/views/DeskView";
 import { enabledStyleKinds } from "./domain/settings/Settings";
 
 /**
@@ -79,8 +82,28 @@ export default class CreativeZenModePlugin extends Plugin {
       editorCallback: (editor) => void this.analyseMyth(editor.getSelection() || editor.getValue()),
     });
 
+    const profile = new ProfileProse(new IntlSentenceSegmenter());
+    this.registerView(DESK_VIEW_TYPE, (leaf: WorkspaceLeaf) => new DeskView(leaf, {
+      activeProfile: () => {
+        const md = this.app.workspace.getActiveViewOfType(MarkdownView);
+        return md?.file ? { name: md.file.basename, profile: profile.document(md.editor.getValue()) } : null;
+      },
+    }));
+    this.addCommand({ id: "open-writing-desk", name: "Open writing desk", callback: () => void this.openDesk() });
+    this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.refreshDesk()));
+    this.registerEvent(this.app.workspace.on("editor-change", () => this.refreshDesk()));
+
+    const readability = this.addStatusBarItem();
+    readability.addClass("czm-status-readability");
+    readability.setAttribute("aria-label", "Readability of the current paragraph. Click for the whole note.");
+    readability.addEventListener("click", () => void this.openDesk());
+
     this.registerEditorExtension([
       this.settingsCompartment.of(settingsFacet.of(this.current)),
+      readabilityStatusExtension(profile, (p) => {
+        readability.setText(statusLabel(p));
+        readability.title = p?.readingEase ? `${p.readingEase.band.hint}${p.variety ? `\n${p.variety.band.hint}` : ""}` : "";
+      }),
       typewriterExtension(),
       focusFadeExtension(),
       rhythmExtension(new AnalyzeParagraphRhythm(new IntlSentenceSegmenter())),
@@ -107,6 +130,26 @@ export default class CreativeZenModePlugin extends Plugin {
         configDir: () => this.app.vault.configDir,
       }),
     );
+  }
+
+  private async openDesk(): Promise<void> {
+    const leaf = this.app.workspace.getLeavesOfType(DESK_VIEW_TYPE)[0] ?? this.app.workspace.getRightLeaf(false);
+    if (!leaf) return;
+    await leaf.setViewState({ type: DESK_VIEW_TYPE, active: true });
+    await this.app.workspace.revealLeaf(leaf);
+    (leaf.view as DeskView).refresh();
+  }
+
+  private deskRefreshTimer: number | null = null;
+  /** Re-profiling a whole note on every keystroke is wasteful; once a second is plenty for a side panel. */
+  private refreshDesk(): void {
+    const leaf = this.app.workspace.getLeavesOfType(DESK_VIEW_TYPE)[0];
+    if (!leaf) return;
+    if (this.deskRefreshTimer !== null) window.clearTimeout(this.deskRefreshTimer);
+    this.deskRefreshTimer = window.setTimeout(() => {
+      this.deskRefreshTimer = null;
+      (leaf.view as DeskView).refresh();
+    }, 1000);
   }
 
   private async analyseMyth(text: string): Promise<void> {
