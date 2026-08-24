@@ -44,6 +44,13 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
       { name: "Readability in status bar", desc: "Show the current paragraph's reading-ease and sentence-rhythm bands. Click it to open the writing desk with the whole note's profile.", control: { type: "toggle", key: "readabilityEnabled" } },
       {
         type: "group",
+        heading: "Goals",
+        items: [
+          { name: "Daily word goal", desc: "Words added per day for the streak and the progress bar in the writing desk. 0 = any day you write counts.", control: { type: "slider", key: "goals.dailyWords", min: 0, max: 5000, step: 50 } },
+        ],
+      },
+      {
+        type: "group",
         heading: "Style checks",
         items: [
           { name: "Style checks", desc: "Highlight clichés, passive voice, weak words, filter verbs, adverbs and repetition in the current paragraph. Hover a highlight for the note.", control: { type: "toggle", key: "styleEnabled" } },
@@ -102,6 +109,10 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
       .addToggle((t) => t.setValue(s.zenFullscreen).onChange((v) => set({ zenFullscreen: v })));
     new Setting(containerEl).setName("Readability in status bar").setDesc("Show the current paragraph's reading-ease and sentence-rhythm bands. Click it to open the writing desk.")
       .addToggle((t) => t.setValue(s.readabilityEnabled).onChange((v) => set({ readabilityEnabled: v })));
+
+    new Setting(containerEl).setName("Goals").setHeading();
+    new Setting(containerEl).setName("Daily word goal").setDesc("Words added per day for the streak and the progress bar in the writing desk. 0 = any day you write counts.")
+      .addSlider((sl) => sl.setLimits(0, 5000, 50).setValue(s.goals.dailyWords).onChange((v) => set({ goals: { ...this.port.current().goals, dailyWords: v } })));
 
     new Setting(containerEl).setName("Style checks").setHeading();
     new Setting(containerEl).setName("Style checks").setDesc("Highlight clichés, passive voice, weak words, filter verbs, adverbs and repetition in the current paragraph. Hover a highlight for the note.")

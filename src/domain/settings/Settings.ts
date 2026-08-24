@@ -42,8 +42,16 @@ export interface PluginSettings {
   readonly styleChecks: Readonly<Record<FindingKind, boolean>>;
   /** Show the cursor paragraph's readability bands in the status bar. */
   readonly readabilityEnabled: boolean;
+  readonly goals: GoalSettings;
   readonly llm: LlmSettings;
 }
+
+export interface GoalSettings {
+  /** Words added per day; 0 = no daily goal (any writing day counts for streaks). */
+  readonly dailyWords: number;
+}
+
+export const DEFAULT_GOALS: GoalSettings = { dailyWords: 500 };
 
 export const DEFAULT_STYLE_CHECKS: Readonly<Record<FindingKind, boolean>> = {
   cliche: true, passive: true, weak: true, filter: true, adverb: true, repetition: true,
@@ -59,6 +67,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   styleEnabled: true,
   styleChecks: DEFAULT_STYLE_CHECKS,
   readabilityEnabled: true,
+  goals: DEFAULT_GOALS,
   llm: DEFAULT_LLM_SETTINGS,
 };
 
@@ -86,6 +95,7 @@ export function normalizeSettings(raw: unknown): PluginSettings {
     styleEnabled: bool("styleEnabled"),
     styleChecks: normalizeChecks(r.styleChecks),
     readabilityEnabled: bool("readabilityEnabled"),
+    goals: normalizeGoals(r.goals),
     llm: normalizeLlm(r.llm),
   };
 }
@@ -134,4 +144,10 @@ function normalizeSpend(raw: unknown): { day: string; usd: number } {
 /** True when the two configurations would talk to a different model. */
 export function llmConfigEquals(a: LlmSettings, b: LlmSettings): boolean {
   return a.provider === b.provider && a.ollamaUrl === b.ollamaUrl && a.ollamaModel === b.ollamaModel && a.claudeModel === b.claudeModel && a.claudeApiKey === b.claudeApiKey;
+}
+
+function normalizeGoals(raw: unknown): GoalSettings {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const dailyWords = typeof r.dailyWords === "number" && Number.isFinite(r.dailyWords) ? clampInt(r.dailyWords, 0, 50_000) : DEFAULT_GOALS.dailyWords;
+  return { dailyWords };
 }

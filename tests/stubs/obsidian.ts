@@ -72,6 +72,7 @@ export class TextComponent {
   onChange(cb: TextCb) { this.onChangeCb = cb; return this; }
 }
 export class WorkspaceLeaf {}
+export interface DataAdapter { exists(p: string): Promise<boolean>; read(p: string): Promise<string>; write(p: string, d: string): Promise<void>; }
 export class ItemView {
   contentEl: HTMLElement = document.createElement("div");
   constructor(public leaf: WorkspaceLeaf) {}
@@ -82,6 +83,7 @@ export class ItemView {
 
 declare global {
   interface HTMLElement {
+    addClass(cls: string): void;
     empty(): void;
     createEl(tag: string, o?: { text?: string; cls?: string }): HTMLElement;
     createDiv(o?: { text?: string; cls?: string }): HTMLElement;

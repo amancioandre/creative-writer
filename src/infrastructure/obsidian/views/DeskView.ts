@@ -1,11 +1,18 @@
 import { ItemView, type WorkspaceLeaf } from "obsidian";
 import type { ProseProfile } from "../../../application/use-cases/ProfileProse";
+import type { WritingLog } from "../../../domain/progress/WritingLog";
+import { addDays, type Day, weekday } from "../../../domain/progress/Dates";
+import { heatmap, streak, summarizeDay, totals } from "../../../domain/progress/ProgressSummary";
 
 export const DESK_VIEW_TYPE = "creative-writer-desk";
+const HEATMAP_WEEKS = 12;
 
 export interface DeskSource {
   /** Profile of the active note, or null when no markdown note is active. */
   activeProfile(): { name: string; profile: ProseProfile } | null;
+  log(): WritingLog;
+  today(): Day;
+  dailyGoal(): number;
 }
 
 /**
@@ -36,8 +43,12 @@ export class DeskView extends ItemView {
   refresh(): void {
     this.contentEl.empty();
     const root = this.contentEl.createDiv({ cls: "czm-desk" });
-    const active = this.source.activeProfile();
+
+    root.createEl("h4", { text: "Today" });
+    renderProgress(root, this.source.log(), this.source.today(), this.source.dailyGoal());
+
     root.createEl("h4", { text: "Readability" });
+    const active = this.source.activeProfile();
     if (!active) {
       root.createEl("p", { text: "Open a note to see how it reads.", cls: "czm-desk-hint" });
       return;
@@ -45,6 +56,49 @@ export class DeskView extends ItemView {
     root.createEl("p", { text: active.name, cls: "czm-desk-title" });
     renderProfile(root, active.profile);
   }
+}
+
+export function renderProgress(root: HTMLElement, log: WritingLog, today: Day, goal: number): void {
+  const day = summarizeDay(log, today, goal);
+  const head = root.createDiv({ cls: "czm-desk-today" });
+  head.createSpan({ text: `${day.added.toLocaleString()} words`, cls: "czm-desk-today-words" });
+  head.createSpan({ text: goal > 0 ? `of ${goal.toLocaleString()}` : "no daily goal", cls: "czm-desk-today-goal" });
+  if (goal > 0) {
+    const bar = root.createDiv({ cls: "czm-desk-bar" });
+    const fill = bar.createDiv({ cls: `czm-desk-bar-fill${day.goalMet ? " is-met" : ""}` });
+    fill.style.width = `${Math.round(day.progress * 100)}%`;
+  }
+  if (day.removed > 0) root.createDiv({ text: `${day.removed.toLocaleString()} cut — revising counts.`, cls: "czm-desk-legend" });
+
+  const s = streak(log, today, goal);
+  const weekStart = addDays(today, -weekday(today));
+  const week = totals(log, weekStart, today, goal);
+  const row = root.createDiv({ cls: "czm-desk-streak" });
+  row.createSpan({ text: `Streak ${s.current} day${s.current === 1 ? "" : "s"}` });
+  row.createSpan({ text: `Best ${s.longest}` });
+  row.createSpan({ text: `This week ${week.added.toLocaleString()}` });
+
+  renderHeatmap(root, log, today, goal);
+}
+
+export function renderHeatmap(root: HTMLElement, log: WritingLog, today: Day, goal: number): void {
+  const map = heatmap(log, today, HEATMAP_WEEKS, goal);
+  const grid = root.createDiv({ cls: "czm-desk-heatmap" });
+  grid.setAttribute("aria-label", `Words added per day, last ${HEATMAP_WEEKS} weeks`);
+  for (const column of map.columns) {
+    for (const cell of column) {
+      const el = grid.createDiv({ cls: "czm-desk-cell" });
+      if (!cell) {
+        el.addClass("is-future");
+        continue;
+      }
+      if (cell.level > 0) el.addClass(`czm-level-${cell.level}`);
+      if (cell.goalMet) el.addClass("is-met");
+      el.setAttribute("aria-label", `${cell.day}: ${cell.added} added, ${cell.removed} cut`);
+      el.title = `${cell.day}: +${cell.added} −${cell.removed}`;
+    }
+  }
+  root.createDiv({ text: map.max > 0 ? `Darkest day: ${map.max.toLocaleString()} words. Outlined days met the goal.` : "Nothing logged yet — write and the calendar fills in.", cls: "czm-desk-legend" });
 }
 
 export function renderProfile(root: HTMLElement, p: ProseProfile): void {

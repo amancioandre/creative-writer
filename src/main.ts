@@ -27,6 +27,10 @@ import { RequestUrlHttpClient } from "./infrastructure/obsidian/RequestUrlHttpCl
 import { ProfileProse } from "./application/use-cases/ProfileProse";
 import { readabilityStatusExtension, statusLabel } from "./infrastructure/codemirror/readabilityStatusExtension";
 import { DeskView, DESK_VIEW_TYPE } from "./infrastructure/obsidian/views/DeskView";
+import { TrackWriting } from "./application/use-cases/TrackWriting";
+import { AdapterProgressRepository } from "./infrastructure/obsidian/AdapterProgressRepository";
+import { countWords } from "./domain/text/Dialogue";
+import { toDay } from "./domain/progress/Dates";
 import { enabledStyleKinds } from "./domain/settings/Settings";
 
 /**
@@ -40,6 +44,7 @@ export default class CreativeZenModePlugin extends Plugin {
   private settingsRepo!: PluginDataSettingsRepository;
   private zen!: ToggleZenMode;
   private myth: AnalyzeMyth | null = null;
+  private tracker!: TrackWriting;
 
   async onload(): Promise<void> {
     this.settingsRepo = new PluginDataSettingsRepository(this);
@@ -83,15 +88,35 @@ export default class CreativeZenModePlugin extends Plugin {
     });
 
     const profile = new ProfileProse(new IntlSentenceSegmenter());
+    this.tracker = new TrackWriting(
+      new AdapterProgressRepository(this.app.vault.adapter, `${this.app.vault.configDir}/plugins/${this.manifest.id}/progress.json`),
+      { timers: { set: (fn, ms) => window.setTimeout(fn, ms), clear: (id) => window.clearTimeout(id) }, today: () => toDay(new Date()), debounceMs: 800, saveMs: 10_000, onChange: () => this.refreshDesk() },
+    );
+    await this.tracker.start();
     this.registerView(DESK_VIEW_TYPE, (leaf: WorkspaceLeaf) => new DeskView(leaf, {
       activeProfile: () => {
         const md = this.app.workspace.getActiveViewOfType(MarkdownView);
         return md?.file ? { name: md.file.basename, profile: profile.document(md.editor.getValue()) } : null;
       },
+      log: () => this.tracker.current,
+      today: () => toDay(new Date()),
+      dailyGoal: () => this.current.goals.dailyWords,
     }));
     this.addCommand({ id: "open-writing-desk", name: "Open writing desk", callback: () => void this.openDesk() });
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.refreshDesk()));
-    this.registerEvent(this.app.workspace.on("editor-change", () => this.refreshDesk()));
+    this.registerEvent(this.app.workspace.on("file-open", (file) => {
+      const md = this.app.workspace.getActiveViewOfType(MarkdownView);
+      if (file && md?.file === file) this.tracker.opened(file.path, countWords(md.editor.getValue()));
+    }));
+    this.registerEvent(this.app.workspace.on("editor-change", (editor, info) => {
+      if (info.file) this.tracker.changed(info.file.path, countWords(editor.getValue()));
+    }));
+    this.registerEvent(this.app.vault.on("rename", (file, oldPath) => this.tracker.renamed(oldPath, file.path)));
+    this.registerEvent(this.app.vault.on("delete", (file) => this.tracker.deleted(file.path)));
+    this.app.workspace.onLayoutReady(() => {
+      const md = this.app.workspace.getActiveViewOfType(MarkdownView);
+      if (md?.file) this.tracker.opened(md.file.path, countWords(md.editor.getValue()));
+    });
 
     const readability = this.addStatusBarItem();
     readability.addClass("czm-status-readability");
@@ -176,6 +201,7 @@ export default class CreativeZenModePlugin extends Plugin {
   onunload(): void {
     // Editor extensions are torn down by Obsidian; Zen Mode's body class is ours to remove.
     void this.zen.deactivate();
+    void this.tracker.flush();
   }
 
   private async updateSettings(next: PluginSettings): Promise<void> {
