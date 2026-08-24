@@ -1,5 +1,6 @@
 import type { ProjectSpec } from "../../domain/progress/Project";
 import { buildStoryGraph, type BuildOptions, DEFAULT_BUILD_OPTIONS } from "../../domain/story/BuildGraph";
+import { normalise } from "../../domain/story/EntityIndex";
 import type { StoryGraph } from "../../domain/story/StoryGraph";
 import type { ProjectNotes } from "../ports/ProjectNotes";
 import type { StoryMapRepository } from "../ports/StoryMapRepository";
@@ -20,6 +21,6 @@ export class BuildStoryMap {
 
   async execute(project: ProjectSpec): Promise<StoryGraph> {
     const [notes, file] = await Promise.all([this.notes.notes(project), this.repo.load(project)]);
-    return buildStoryGraph(project.name, notes, file, this.options);
+    return buildStoryGraph(project.name, notes, file, { ...this.options, ignore: new Set(project.ignoredNames.map(normalise)) });
   }
 }

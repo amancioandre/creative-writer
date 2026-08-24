@@ -79,7 +79,7 @@ describe("DeskView progress", () => {
 describe("DeskView projects", () => {
   it("renders each project with a bar and a pace line", async () => {
     const { projectStatus } = await import("../../../src/domain/progress/Project");
-    const spec = { name: "Camp", scope: "Camp/", targetWords: 10000, deadline: "2026-09-03", dailyWords: 400 };
+    const spec = { name: "Camp", scope: "Camp/", targetWords: 10000, deadline: "2026-09-03", dailyWords: 400, notePath: "Camp/Project.md", ignoredNames: [] };
     const list = [projectStatus(spec, 7000, [500], "2026-08-24", 2), projectStatus({ ...spec, name: "Slow", dailyWords: 0 }, 7000, [10], "2026-08-24")];
     const v = new DeskView(new WorkspaceLeaf(), { ...progress, activeProfile: () => null, projects: async () => list });
     v.refresh();

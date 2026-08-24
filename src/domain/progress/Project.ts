@@ -7,16 +7,21 @@ import type { WritingLog } from "./WritingLog";
  *   writing-deadline: 2026-10-31 (optional)
  *   writing-scope: note          (optional; default is the note's folder)
  *   writing-daily: 500           (optional; words per day on this project)
+ *   story-ignore: [LOW, POV]     (optional; capitalised words the story map must not take for names)
  * The folder — or that one note — is what gets counted.
  */
 export interface ProjectSpec {
   readonly name: string;
+  /** The note carrying the front matter — where project-level decisions are written back. */
+  readonly notePath: string;
   /** A folder prefix ending in "/" (or "" for the vault root), or a single note's path. */
   readonly scope: string;
   readonly targetWords: number;
   readonly deadline: Day | null;
   /** Words to add to this project per day; 0 = none. */
   readonly dailyWords: number;
+  /** Names the writer said are not names, as written. */
+  readonly ignoredNames: readonly string[];
 }
 
 export function parseProjectFrontmatter(frontmatter: unknown, notePath: string): ProjectSpec | null {
@@ -31,7 +36,9 @@ export function parseProjectFrontmatter(frontmatter: unknown, notePath: string):
   const base = notePath.slice(slash + 1).replace(/\.md$/i, "");
   const name = typeof fm["writing-name"] === "string" && fm["writing-name"].trim() ? fm["writing-name"].trim() : noteScope || !folder ? base : folder.slice(0, -1).split("/").pop()!;
   const daily = Number(fm["writing-daily"]);
-  return { name, scope: noteScope ? notePath : folder, targetWords: Math.floor(target), deadline, dailyWords: Number.isFinite(daily) && daily > 0 ? Math.floor(daily) : 0 };
+  const rawIgnore = fm["story-ignore"];
+  const ignoredNames = (Array.isArray(rawIgnore) ? rawIgnore : typeof rawIgnore === "string" ? rawIgnore.split(",") : []).filter((x): x is string => typeof x === "string").map((x) => x.trim()).filter(Boolean);
+  return { name, notePath, scope: noteScope ? notePath : folder, targetWords: Math.floor(target), deadline, dailyWords: Number.isFinite(daily) && daily > 0 ? Math.floor(daily) : 0, ignoredNames };
 }
 
 function toIso(d: Date): Day {

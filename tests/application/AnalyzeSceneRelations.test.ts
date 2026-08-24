@@ -5,7 +5,7 @@ import type { ProjectSpec } from "../../src/domain/progress/Project";
 import { splitScenes } from "../../src/domain/text/Scenes";
 import { EMPTY_STORY_MAP_FILE, type StoryMapFile } from "../../src/domain/story/StoryMapFile";
 
-const novel: ProjectSpec = { name: "Novel", scope: "Novel/", targetWords: 100, deadline: null, dailyWords: 0 };
+const novel: ProjectSpec = { name: "Novel", scope: "Novel/", targetWords: 100, deadline: null, dailyWords: 0, notePath: "Novel/Project.md", ignoredNames: [] };
 const long = "Marta took Ilse by the hand and they walked the whole length of the quay while the gulls argued overhead and the tide went out and nobody on the boats looked up at either of them, not once, not for a moment, though Marta looked at every face.";
 const body = `# Quay\n${long}\n\n# Short\nMarta sat.\n`;
 const notes = {

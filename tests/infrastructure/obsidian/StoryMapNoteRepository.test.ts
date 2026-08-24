@@ -6,8 +6,8 @@ import type { ProjectSpec } from "../../../src/domain/progress/Project";
 function fakeVault(files: Record<string, string> = {}) {
   return { files, async exists(p: string) { return p in files; }, async read(p: string) { return files[p]!; }, async write(p: string, d: string) { files[p] = d; } };
 }
-const folderProject: ProjectSpec = { name: "Novel", scope: "Novel/", targetWords: 1, deadline: null, dailyWords: 0 };
-const noteProject: ProjectSpec = { name: "Short", scope: "Shorts/Gull.md", targetWords: 1, deadline: null, dailyWords: 0 };
+const folderProject: ProjectSpec = { name: "Novel", scope: "Novel/", targetWords: 1, deadline: null, dailyWords: 0, notePath: "Novel/Project.md", ignoredNames: [] };
+const noteProject: ProjectSpec = { name: "Short", scope: "Shorts/Gull.md", targetWords: 1, deadline: null, dailyWords: 0, notePath: "Shorts/Gull.md", ignoredNames: [] };
 
 describe("StoryMapNoteRepository", () => {
   it("puts the note in the project folder, or beside a single-note project", () => {

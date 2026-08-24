@@ -4,8 +4,8 @@ import type { ProjectSpec } from "../../src/domain/progress/Project";
 import { splitScenes } from "../../src/domain/text/Scenes";
 import { EMPTY_STORY_MAP_FILE } from "../../src/domain/story/StoryMapFile";
 
-const novel: ProjectSpec = { name: "Novel", scope: "Novel/", targetWords: 100, deadline: null, dailyWords: 0 };
-const short: ProjectSpec = { name: "Short", scope: "Novel/Shorts/One.md", targetWords: 10, deadline: null, dailyWords: 0 };
+const novel: ProjectSpec = { name: "Novel", scope: "Novel/", targetWords: 100, deadline: null, dailyWords: 0, notePath: "Novel/Project.md", ignoredNames: [] };
+const short: ProjectSpec = { name: "Short", scope: "Novel/Shorts/One.md", targetWords: 10, deadline: null, dailyWords: 0, notePath: "Novel/Shorts/One.md", ignoredNames: [] };
 const notes = {
   projects: () => [novel, short],
   notes: async () => [
