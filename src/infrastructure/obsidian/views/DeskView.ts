@@ -2,7 +2,8 @@ import { ItemView, type WorkspaceLeaf } from "obsidian";
 import type { ProseProfile } from "../../../application/use-cases/ProfileProse";
 import type { WritingLog } from "../../../domain/progress/WritingLog";
 import { addDays, type Day, weekday } from "../../../domain/progress/Dates";
-import { heatmap, streak, summarizeDay, totals } from "../../../domain/progress/ProgressSummary";
+import { heatmap, sessionKind, streak, summarizeDay, totals } from "../../../domain/progress/ProgressSummary";
+import type { Scene } from "../../../domain/text/Scenes";
 import type { ProjectStatus } from "../../../domain/progress/Project";
 
 export const DESK_VIEW_TYPE = "creative-writer-desk";
@@ -16,6 +17,10 @@ export interface DeskSource {
   dailyGoal(): number;
   /** Every project declared in front matter, with current totals. Async: totals need file reads. */
   projects(): Promise<ProjectStatus[]>;
+  /** The active note split at its headings, each with its prose profile. */
+  scenes(): { scene: Scene; profile: ProseProfile }[];
+  /** Puts the cursor on a line of the active note. */
+  revealLine(line: number): void;
 }
 
 /**
@@ -67,6 +72,33 @@ export class DeskView extends ItemView {
     }
     root.createEl("p", { text: active.name, cls: "czm-desk-title" });
     renderProfile(root, active.profile);
+
+    const scenes = this.source.scenes();
+    if (scenes.length > 1 || (scenes.length === 1 && scenes[0]!.scene.level > 0)) {
+      root.createEl("h4", { text: "Scenes" });
+      renderScenes(root, scenes, (line) => this.source.revealLine(line));
+    }
+  }
+}
+
+export function renderScenes(root: HTMLElement, scenes: readonly { scene: Scene; profile: ProseProfile }[], reveal: (line: number) => void): void {
+  const list = root.createDiv({ cls: "czm-desk-scenes" });
+  const maxWords = Math.max(1, ...scenes.map((s) => s.profile.wordCount));
+  for (const { scene, profile } of scenes) {
+    const row = list.createDiv({ cls: `czm-desk-scene czm-desk-scene-l${Math.min(scene.level, 3)}` });
+    row.setAttribute("role", "button");
+    row.setAttribute("tabindex", "0");
+    row.addEventListener("click", () => reveal(scene.line));
+    row.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") reveal(scene.line); });
+    const head = row.createDiv({ cls: "czm-desk-band-head" });
+    head.createSpan({ text: scene.title || "(before first heading)", cls: "czm-desk-scene-title" });
+    head.createSpan({ text: `${profile.wordCount.toLocaleString()} w`, cls: "czm-desk-band-name" });
+    const bar = row.createDiv({ cls: "czm-desk-bar czm-desk-scene-bar" });
+    bar.createDiv({ cls: "czm-desk-bar-fill" }).style.width = `${Math.round((profile.wordCount / maxWords) * 100)}%`;
+    const meta: string[] = [];
+    if (profile.readingEase) meta.push(profile.readingEase.band.label);
+    if (profile.wordCount > 0) meta.push(`${Math.round(profile.dialogue.ratio * 100)}% dialogue`);
+    if (meta.length) row.createDiv({ text: meta.join(" · "), cls: "czm-desk-band-detail" });
   }
 }
 
@@ -80,7 +112,9 @@ export function renderProgress(root: HTMLElement, log: WritingLog, today: Day, g
     const fill = bar.createDiv({ cls: `czm-desk-bar-fill${day.goalMet ? " is-met" : ""}` });
     fill.style.width = `${Math.round(day.progress * 100)}%`;
   }
-  if (day.removed > 0) root.createDiv({ text: `${day.removed.toLocaleString()} cut — revising counts.`, cls: "czm-desk-legend" });
+  const kind = sessionKind(day.added, day.removed);
+  if (kind === "revising") root.createDiv({ text: `Revision day: ${day.removed.toLocaleString()} cut. Cutting is work; the streak counts it when the goal is 0.`, cls: "czm-desk-legend" });
+  else if (day.removed > 0) root.createDiv({ text: `${day.removed.toLocaleString()} cut along the way.`, cls: "czm-desk-legend" });
 
   const s = streak(log, today, goal);
   const weekStart = addDays(today, -weekday(today));
@@ -105,12 +139,13 @@ export function renderHeatmap(root: HTMLElement, log: WritingLog, today: Day, go
         continue;
       }
       if (cell.level > 0) el.addClass(`czm-level-${cell.level}`);
+      if (cell.kind === "revising") el.addClass("is-revising");
       if (cell.goalMet) el.addClass("is-met");
       el.setAttribute("aria-label", `${cell.day}: ${cell.added} added, ${cell.removed} cut`);
       el.title = `${cell.day}: +${cell.added} −${cell.removed}`;
     }
   }
-  root.createDiv({ text: map.max > 0 ? `Darkest day: ${map.max.toLocaleString()} words. Outlined days met the goal.` : "Nothing logged yet — write and the calendar fills in.", cls: "czm-desk-legend" });
+  root.createDiv({ text: map.max > 0 ? `Busiest day: ${map.max.toLocaleString()} words added or cut. Outlined days met the goal; purple days were mostly revision.` : "Nothing logged yet — write and the calendar fills in.", cls: "czm-desk-legend" });
 }
 
 export function renderProjects(root: HTMLElement, projects: readonly ProjectStatus[]): void {

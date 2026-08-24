@@ -70,3 +70,13 @@ describe("totals", () => {
     expect(totals(log, "2026-08-20", "2026-08-24", 200)).toEqual({ added: 600, removed: 0, daysWritten: 1 });
   });
 });
+
+describe("sessionKind", () => {
+  it("classifies days by whether deletion dominated", async () => {
+    const { sessionKind } = await import("../../../src/domain/progress/ProgressSummary");
+    expect(sessionKind(0, 0)).toBe("none");
+    expect(sessionKind(100, 20)).toBe("drafting");
+    expect(sessionKind(50, 50)).toBe("revising");
+    expect(sessionKind(0, 300)).toBe("revising");
+  });
+});

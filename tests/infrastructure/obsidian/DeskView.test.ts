@@ -6,7 +6,7 @@ import { IntlSentenceSegmenter } from "../../../src/infrastructure/segmentation/
 import { EMPTY_LOG } from "../../../src/domain/progress/WritingLog";
 
 const profile = new ProfileProse(new IntlSentenceSegmenter("en"));
-const progress = { log: () => EMPTY_LOG, today: () => "2026-08-24", dailyGoal: () => 500, projects: async () => [] };
+const progress = { log: () => EMPTY_LOG, today: () => "2026-08-24", dailyGoal: () => 500, projects: async () => [], scenes: () => [], revealLine: () => undefined };
 
 describe("DeskView", () => {
   it("has a stable view type and title", () => {
@@ -54,7 +54,7 @@ describe("DeskView progress", () => {
     log = recordWordCount(log, "a.md", 300, "2026-08-23");
     log = recordWordCount(log, "a.md", 250, "2026-08-24");
     log = recordWordCount(log, "a.md", 900, "2026-08-24");
-    const v = new DeskView(new WorkspaceLeaf(), { activeProfile: () => null, log: () => log, today: () => "2026-08-24", dailyGoal: () => 500, projects: async () => [] });
+    const v = new DeskView(new WorkspaceLeaf(), { activeProfile: () => null, ...progress, log: () => log });
     v.refresh();
     const t = v.contentEl.textContent!;
     expect(t).toContain("650 words");
@@ -68,7 +68,7 @@ describe("DeskView progress", () => {
   });
 
   it("omits the bar without a goal and explains an empty calendar", () => {
-    const v = new DeskView(new WorkspaceLeaf(), { activeProfile: () => null, log: () => EMPTY_LOG, today: () => "2026-08-24", dailyGoal: () => 0, projects: async () => [] });
+    const v = new DeskView(new WorkspaceLeaf(), { activeProfile: () => null, ...progress, dailyGoal: () => 0 });
     v.refresh();
     expect(v.contentEl.querySelector(".czm-desk-bar")).toBeNull();
     expect(v.contentEl.textContent).toContain("no daily goal");
@@ -97,5 +97,40 @@ describe("DeskView projects", () => {
     v.refresh();
     await Promise.resolve();
     expect(v.contentEl.textContent).not.toContain("Projects");
+  });
+});
+
+describe("DeskView scenes and revision days", () => {
+  it("lists scenes with per-scene metrics and jumps on click", async () => {
+    const { splitScenes } = await import("../../../src/domain/text/Scenes");
+    const md = '# One\nShort scene. "Hi," she said.\n\n## Two\nA much longer scene that goes on and on with several sentences. It keeps going. And going.';
+    const scenes = splitScenes(md).map((scene) => ({ scene, profile: profile.paragraph(scene.prose) }));
+    const revealed: number[] = [];
+    const v = new DeskView(new WorkspaceLeaf(), { ...progress, activeProfile: () => ({ name: "N", profile: profile.document(md) }), scenes: () => scenes, revealLine: (l) => revealed.push(l) });
+    v.refresh();
+    const rows = v.contentEl.querySelectorAll<HTMLElement>(".czm-desk-scene");
+    expect(rows).toHaveLength(2);
+    expect(rows[1]!.textContent).toContain("Two");
+    expect(rows[1]!.textContent).toMatch(/\d+% dialogue/);
+    expect(rows[1]!.className).toContain("czm-desk-scene-l2");
+    rows[1]!.click();
+    expect(revealed).toEqual([3]);
+  });
+
+  it("hides the Scenes section for a note without headings", () => {
+    const v = new DeskView(new WorkspaceLeaf(), { ...progress, activeProfile: () => ({ name: "N", profile: profile.document("plain") }), scenes: () => [{ scene: { title: "", level: 0, line: 0, prose: "plain" }, profile: profile.paragraph("plain") }] });
+    v.refresh();
+    expect(v.contentEl.textContent).not.toContain("Scenes");
+  });
+
+  it("marks a mostly-deleting day as revision", async () => {
+    const { baselineWordCount, recordWordCount } = await import("../../../src/domain/progress/WritingLog");
+    let log = baselineWordCount(EMPTY_LOG, "a.md", 1000);
+    log = recordWordCount(log, "a.md", 400, "2026-08-24");
+    const v = new DeskView(new WorkspaceLeaf(), { ...progress, activeProfile: () => null, log: () => log, dailyGoal: () => 0 });
+    v.refresh();
+    expect(v.contentEl.textContent).toContain("Revision day: 600 cut");
+    expect(v.contentEl.querySelectorAll(".czm-desk-cell.is-revising")).toHaveLength(1);
+    expect(v.contentEl.querySelectorAll(".czm-desk-cell.czm-level-4")).toHaveLength(1);
   });
 });

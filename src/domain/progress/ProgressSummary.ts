@@ -22,6 +22,14 @@ export function summarizeDay(log: WritingLog, day: Day, goal: number): DaySummar
   return { day, added, removed, net: added - removed, goal, progress, goalMet: goal > 0 ? added >= goal : added > 0 };
 }
 
+export type SessionKind = "none" | "drafting" | "revising";
+
+/** A day where at least half the churn was deletion is a revision day. Net-zero days were still work. */
+export function sessionKind(added: number, removed: number): SessionKind {
+  if (added + removed === 0) return "none";
+  return removed >= added ? "revising" : "drafting";
+}
+
 export interface Streak {
   /** Consecutive written days ending today or yesterday (today is still in play). */
   readonly current: number;
@@ -58,9 +66,10 @@ export interface HeatmapCell {
   readonly day: Day;
   readonly added: number;
   readonly removed: number;
-  /** 0 (nothing) to 4 (top quartile of the period). */
+  /** 0 (nothing) to 4 (top quartile of the period), by words added plus cut. */
   readonly level: number;
   readonly goalMet: boolean;
+  readonly kind: SessionKind;
 }
 
 export interface Heatmap {
@@ -79,10 +88,10 @@ export function heatmap(log: WritingLog, today: Day, weeks: number, goal: number
     const day = addDays(start, i);
     if (day > today) break;
     const s = summarizeDay(log, day, goal);
-    max = Math.max(max, s.added);
-    cells.push({ day, added: s.added, removed: s.removed, level: 0, goalMet: s.goalMet });
+    max = Math.max(max, s.added + s.removed);
+    cells.push({ day, added: s.added, removed: s.removed, level: 0, goalMet: s.goalMet, kind: sessionKind(s.added, s.removed) });
   }
-  const levelled = cells.map((c) => ({ ...c, level: level(c.added, max) }));
+  const levelled = cells.map((c) => ({ ...c, level: level(c.added + c.removed, max) }));
   const columns: (HeatmapCell | null)[][] = [];
   for (let w = 0; w < weeks; w++) {
     columns.push(Array.from({ length: 7 }, (_, d) => levelled[w * 7 + d] ?? null));

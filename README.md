@@ -2,7 +2,7 @@
 
 Repository: [github.com/amancioandre/creative-writer](https://github.com/amancioandre/creative-writer)
 
-An Obsidian plugin for creative writing. Four features, all inside the editor:
+An Obsidian plugin for creative writing. Everything that touches the page lives in the editor; everything about the work (progress, goals, readability) lives in a side panel that Zen Mode hides.
 
 | Feature | What it does | Command / setting |
 |---|---|---|
@@ -15,6 +15,7 @@ An Obsidian plugin for creative writing. Four features, all inside the editor:
 | **Readability** | Status bar shows the current paragraph's reading-ease band (Flesch) and sentence-rhythm band (monotone → dynamic). Click it, or run the command, for the **Writing desk**: the whole note's reading ease, grade level, sentence rhythm and dialogue share, each as a named band with a hint. | `Open writing desk`; Settings → Readability in status bar |
 | **Writing desk** | Words added and cut today against a daily goal, streak, this week's total, and a 12-week calendar heatmap. Deletions are tracked separately, so a revision day still shows as work. History lives in `progress.json` beside the plugin's settings. | `Open writing desk`; Settings → Goals |
 | **Project targets** | Add `writing-target: 50000` (and optionally `writing-deadline: 2026-10-31`) to any note's front matter and its folder becomes a project: total words, words per day needed vs. your last-7-day pace, and the projected finish date. `writing-scope: note` limits it to that note; `writing-name` overrides the title. | Writing desk → Projects |
+| **Scene outline** | The desk lists the active note's headings with words, reading-ease band and dialogue share per scene, bar-scaled to the longest; click to jump. Heatmap days where cutting outweighed adding are shown as revision days. | Writing desk → Scenes |
 | **Style checks** | Tints clichés, passive voice, weak words, filter verbs, adverbs, repetition, nominalisations, weak verbs and metaphor candidates in the current paragraph; hover for the note. Offline: rules + a POS tagger + concreteness norms. | Settings → Style checks (per-kind toggles) |
 
 Editing mode only (Source + Live Preview); Reading view has no CodeMirror and is untouched.
@@ -33,7 +34,7 @@ Then in Obsidian: Settings → Community plugins → enable **Creative Writer**,
 For development: `npm run dev` (esbuild watch) plus the **Hot Reload** community plugin.
 
 ```bash
-npm test              # 296 tests
+npm test              # 390 tests
 npm run eval          # rule scorecard on eval/corpus.ts (see eval/RESULTS.md)
 npm run eval:ollama   # the same corpus through the local model, ~1s
 npm run test:watch
@@ -50,7 +51,9 @@ src/
 ├── domain/           pure TypeScript, no imports from outside this folder
 │   ├── rhythm/       Sentence, SentenceMetrics, SyllableEstimator, RhythmScale,
 │   │                 RhythmClassifier, AbbreviationMerger
-│   ├── text/         LineSource (port), Paragraph (locateParagraph)
+│   ├── text/         LineSource (port), Paragraph, ProseParagraphs, Scenes, Dialogue
+│   ├── readability/  Flesch reading ease / grade, variety and dialogue bands
+│   ├── progress/     Dates, WritingLog, ProgressSummary (streak, heatmap, session kind), Project
 │   ├── style/        Finding, Tokenizer, StyleRule (+AnalysisContext), PosTagger & Concreteness
 │   │                 (ports), rules/ (Cliche, PassiveVoice, WeakWord, Adverb, Repetition,
 │   │                 Nominalization, WeakVerb, MetaphorCandidate, PhraseMatcher), lexicon/
@@ -58,18 +61,18 @@ src/
 │   ├── zen/          ZenMode
 │   └── settings/     PluginSettings, normalizeSettings
 ├── application/      use cases + the ports they need
-│   ├── ports/        SentenceSegmenter, WorkspaceChrome, SettingsRepository, ParagraphAnalyser,
-│   │                 LlmAnalyser, MythAnalyser, HttpClient
-│   └── use-cases/    AnalyzeParagraphRhythm, AnalyzeParagraphStyle, ScheduleAnalysis,
-│                     AnalyzeParagraphWithLlm, AnalyzeMyth, ComputeFocusFade, ToggleZenMode
+│   ├── ports/        SentenceSegmenter, WorkspaceChrome, SettingsRepository, ProgressRepository,
+│   │                 ParagraphAnalyser, LlmAnalyser, MythAnalyser, HttpClient, Timers
+│   └── use-cases/    AnalyzeParagraphRhythm, AnalyzeParagraphStyle, ScheduleAnalysis, ProfileProse,
+│                     TrackWriting, AnalyzeParagraphWithLlm, AnalyzeMyth, ComputeFocusFade, ToggleZenMode
 ├── infrastructure/   adapters — the only place CodeMirror and Obsidian appear
 │   ├── segmentation/ IntlSentenceSegmenter
 │   ├── nlp/          CompromiseTagger, BrysbaertConcreteness (+ generated data)
 │   ├── llm/          OllamaAnalyser, OllamaMythAnalyser, ClaudeAnalyser (untested live),
 │   │                 ConfiguredLlmAnalyser, prompts/ (style + myth rulebooks)
-│   ├── codemirror/   settingsFacet, typewriter/focusFade/rhythm/style extensions
-│   └── obsidian/     DomWorkspaceChrome, PluginDataSettingsRepository, SettingsTab,
-│                     RequestUrlHttpClient, views/MythView
+│   ├── codemirror/   settingsFacet, typewriter/focusFade/rhythm/style/readabilityStatus extensions
+│   └── obsidian/     DomWorkspaceChrome, PluginDataSettingsRepository, AdapterProgressRepository,
+│                     SettingsTab, RequestUrlHttpClient, views/MythView, views/DeskView
 └── main.ts           composition root — wiring only
 ```
 

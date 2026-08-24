@@ -144,3 +144,12 @@ body.czm-zen .workspace-split.mod-root {
 .czm-desk-project { margin-bottom: 12px; }
 .czm-desk-project.is-behind .czm-desk-bar-fill { background: var(--color-orange); }
 .czm-desk-project.is-stalled .czm-desk-bar-fill { background: var(--text-muted); }
+
+.czm-desk-cell.is-revising { background: var(--color-purple); }
+.czm-desk-scenes { display: flex; flex-direction: column; gap: 6px; }
+.czm-desk-scene { padding: 4px 6px; border-radius: 4px; cursor: pointer; }
+.czm-desk-scene:hover, .czm-desk-scene:focus-visible { background: var(--background-modifier-hover); outline: none; }
+.czm-desk-scene-l2 { margin-left: 10px; }
+.czm-desk-scene-l3 { margin-left: 20px; }
+.czm-desk-scene-title { font-weight: 500; }
+.czm-desk-scene-bar { margin: 3px 0 2px; height: 3px; opacity: 0.7; }

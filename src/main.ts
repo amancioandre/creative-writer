@@ -31,6 +31,7 @@ import { TrackWriting } from "./application/use-cases/TrackWriting";
 import { AdapterProgressRepository } from "./infrastructure/obsidian/AdapterProgressRepository";
 import { countWords } from "./domain/text/Dialogue";
 import { toDay } from "./domain/progress/Dates";
+import { splitScenes } from "./domain/text/Scenes";
 import { inScope, parseProjectFrontmatter, projectStatus, recentAdded, type ProjectStatus } from "./domain/progress/Project";
 import { enabledStyleKinds } from "./domain/settings/Settings";
 
@@ -103,6 +104,17 @@ export default class CreativeZenModePlugin extends Plugin {
       today: () => toDay(new Date()),
       dailyGoal: () => this.current.goals.dailyWords,
       projects: () => this.projectStatuses(),
+      scenes: () => {
+        const md = this.app.workspace.getActiveViewOfType(MarkdownView);
+        return md?.file ? splitScenes(md.editor.getValue()).map((scene) => ({ scene, profile: profile.paragraph(scene.prose) })) : [];
+      },
+      revealLine: (line) => {
+        const md = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (!md) return;
+        md.editor.setCursor({ line, ch: 0 });
+        md.editor.scrollIntoView({ from: { line, ch: 0 }, to: { line, ch: 0 } }, true);
+        md.editor.focus();
+      },
     }));
     this.addCommand({ id: "open-writing-desk", name: "Open writing desk", callback: () => void this.openDesk() });
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.refreshDesk()));
