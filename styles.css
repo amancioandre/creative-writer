@@ -219,19 +219,20 @@ body.czm-zen .workspace-split.mod-root {
   background: var(--background-secondary); border: 1px solid var(--background-modifier-border); border-radius: 10px; box-shadow: var(--shadow-s); padding: 10px 12px; font-size: var(--font-ui-small); line-height: 1.35; }
 .czm-map-panel.is-open { display: block; }
 .czm-map-panel-head { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
-.czm-map-panel-head .dropdown, .czm-map-search { width: 100%; }
+.czm-map-panel-head .dropdown, .czm-map-search { width: 100%; box-sizing: border-box; margin: 0; }
 .czm-map-panel-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
 .czm-map-panel-actions button { font-size: var(--font-ui-smaller); padding: 4px 8px; height: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .czm-map-panel-actions .czm-map-analyse { grid-column: 1 / -1; }
 .czm-map-section { border-top: 1px solid var(--background-modifier-border); padding: 6px 0 2px; margin-top: 6px; }
-.czm-map-section > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; font-size: var(--font-ui-smaller); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); padding: 4px 0; }
+.czm-map-section > summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; font-size: var(--font-ui-smaller); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); padding: 4px 0; margin: 0; }
 .czm-map-section > summary::-webkit-details-marker { display: none; }
-.czm-map-section > summary::before { content: "▸"; font-size: 0.8em; opacity: 0.6; transition: transform 120ms; }
-.czm-map-section[open] > summary::before { transform: rotate(90deg); }
+.czm-map-section > summary::after { content: "▸"; font-size: 0.8em; opacity: 0.6; transition: transform 120ms; margin-right: 4px; }
+.czm-map-section[open] > summary::after { transform: rotate(90deg); }
 /* Panel rows: one line each, label left, controls in a fixed-width column so they line up down the section. */
-.czm-map-panel .setting-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 0; border: none; min-height: 28px; }
-.czm-map-panel .setting-item-info { flex: 1 1 auto; min-width: 0; margin: 0; }
-.czm-map-panel .setting-item-name { font-size: var(--font-ui-small); color: var(--text-normal); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.czm-map-panel .setting-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 0; margin: 0; border: none; min-height: 28px; }
+.czm-map-panel .setting-item.mod-toggle, .czm-map-panel .setting-item:first-child, .czm-map-panel .setting-item:last-child { padding-left: 0; padding-right: 0; border: none; }
+.czm-map-panel .setting-item-info { flex: 1 1 auto; min-width: 0; margin: 0; padding: 0; text-align: left; }
+.czm-map-panel .setting-item-name { display: block; font-size: var(--font-ui-small); color: var(--text-normal); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0; margin: 0; }
 .czm-map-panel .setting-item-description { font-size: var(--font-ui-smaller); padding-top: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .czm-map-panel .setting-item-control { flex: 0 0 auto; display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin: 0; }
 .czm-map-section-filters .setting-item-control { width: 44px; }
