@@ -131,7 +131,8 @@ Invariants worth knowing:
 A project (a folder with a `writing-target` note) becomes one graph, built in the domain from parsed notes and rendered by a plain-SVG `ItemView`.
 
 ```
-VaultProjectNotes ──ProjectNote[]──► buildStoryGraph ──StoryGraph──► applyFilter ──► forceLayout ──► StoryMapView
+VaultProjectNotes ──ProjectNote[]──► buildStoryGraph ──StoryGraph──► applyFilter ──► Simulation ──► StoryMapView
+                                                                          └──────────────────────► StoryTimelineView
        │                                    ▲
  metadataCache (links, front matter),       │ StoryMapFile (model readings only)
  Bookmarks core plugin                      │
@@ -149,4 +150,4 @@ Entity resolution (`EntityIndex`, `Mentions`) is deliberately tagger-free: a cap
 
 **Persistence and sync.** The graph is a pure function of the vault, so nothing derived is stored — two machines with the same notes draw the same map (the layout is seeded deterministically for the same reason). Only model readings persist, and they live in `Story map.md` inside the project folder: front matter (`creative-writer-storymap: 1`, `creative-writer: false`) plus one ```json block. A markdown note is the one file type every sync path — Obsidian Sync, git, Syncthing, a shared drive — carries by default; a sidecar `.json` beside the notes is not. Readings are keyed by `path#heading` and hashed, so an edit re-reads one scene, not a chapter; saving after every scene means an abort loses nothing.
 
-Layout is Fruchterman–Reingold on a golden-angle spiral start (`domain/story/Layout.ts`), pinned positions honoured; ~200 iterations over a hundred nodes is a few milliseconds. `.canvas` files are not used.
+**Layout and the view.** `domain/story/Simulation.ts` is a live force model — pairwise repulsion, springs along edges, a centre pull, damping, and an alpha that cools to rest — with the four forces exposed as persisted settings (`storyMap.forces`). It starts on a deterministic golden-angle spiral, keeps surviving nodes in place across graph updates, and honours pins. `StoryMapView` builds the SVG once per filter change and only moves elements per frame (`requestAnimationFrame`, stopped at rest); pan/zoom is a single `<g transform>`; the floating panel is built from Obsidian `Setting` rows (real toggles, colour pickers, sliders) and the floating card is positioned from the selection's world coordinates each frame. `StoryTimelineView` renders the same graph's `timeline` as a scene × cast matrix. `.canvas` files are not used.

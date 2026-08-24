@@ -35,7 +35,7 @@ import { AdapterProgressRepository } from "./infrastructure/obsidian/AdapterProg
 import { countWords } from "./domain/text/Dialogue";
 import { toDay } from "./domain/progress/Dates";
 import { splitScenes } from "./domain/text/Scenes";
-import { inScope, parseProjectFrontmatter, projectStatus, projectStreak, recentAdded, type ProjectStatus } from "./domain/progress/Project";
+import { inScope, parseProjectFrontmatter, projectStatus, projectStreak, recentAdded, type ProjectSpec, type ProjectStatus } from "./domain/progress/Project";
 import { enabledStyleKinds } from "./domain/settings/Settings";
 import { BuildStoryMap } from "./application/use-cases/BuildStoryMap";
 import { AnalyzeSceneRelations } from "./application/use-cases/AnalyzeSceneRelations";
@@ -43,7 +43,8 @@ import { VaultProjectNotes, type VaultAppLike } from "./infrastructure/obsidian/
 import { StoryMapNoteRepository } from "./infrastructure/obsidian/StoryMapNoteRepository";
 import { OllamaRelationAnalyser } from "./infrastructure/llm/OllamaRelationAnalyser";
 import { STORY_MAP_VIEW_TYPE, StoryMapView } from "./infrastructure/obsidian/views/StoryMapView";
-import type { EntityKind } from "./domain/story/StoryGraph";
+import { STORY_TIMELINE_VIEW_TYPE, StoryTimelineView } from "./infrastructure/obsidian/views/StoryTimelineView";
+import type { EntityKind, SceneRef } from "./domain/story/StoryGraph";
 import { TFile, TFolder, normalizePath } from "obsidian";
 
 /**
@@ -159,18 +160,29 @@ export default class CreativeZenModePlugin extends Plugin {
         else await this.app.vault.create(p, content);
       },
     });
-    const buildStoryMap = new BuildStoryMap(projectNotes, storyRepo);
-    this.registerView(STORY_MAP_VIEW_TYPE, (leaf: WorkspaceLeaf) => new StoryMapView(leaf, {
+    const buildStoryMap = new BuildStoryMap(projectNotes, storyRepo, { candidateMinMentions: 3, tagger: new CompromiseTagger() });
+    const storySource = {
       projects: () => buildStoryMap.projects(),
       activeProject: () => {
         const path = this.app.workspace.getActiveViewOfType(MarkdownView)?.file?.path;
         return path ? buildStoryMap.projectFor(path) : null;
       },
+      build: (project: ProjectSpec) => buildStoryMap.execute(project),
+      openNote: (path: string) => void this.app.workspace.openLinkText(path, "", false),
+      reveal: (ref: SceneRef) => void this.revealScene(ref.path, ref.line),
+      settings: () => this.current.storyMap,
+    };
+    this.registerView(STORY_TIMELINE_VIEW_TYPE, (leaf: WorkspaceLeaf) => new StoryTimelineView(leaf, storySource));
+    this.addCommand({ id: "open-story-timeline", name: "Open story timeline", callback: () => void this.openStoryTimeline(null) });
+    this.registerView(STORY_MAP_VIEW_TYPE, (leaf: WorkspaceLeaf) => new StoryMapView(leaf, {
+      ...storySource,
       activeNotePath: () => this.app.workspace.getActiveViewOfType(MarkdownView)?.file?.path ?? null,
-      build: (project) => buildStoryMap.execute(project),
-      openNote: (path) => void this.app.workspace.openLinkText(path, "", false),
-      reveal: (ref) => void this.revealScene(ref.path, ref.line),
       promote: (project, name, kind) => this.createEntityNote(project.scope, name, kind),
+      ignore: (project, name) => this.editList(project.notePath, "story-ignore", (list) => [...list.filter((n) => n !== name), name]),
+      unignore: (project, name) => this.editList(project.notePath, "story-ignore", (list) => list.filter((n) => n !== name)),
+      alias: (_project, entityPath, name) => this.editList(entityPath, "aliases", (list) => [...list.filter((n) => n !== name), name]),
+      updateSettings: (next) => void this.updateSettings({ ...this.current, storyMap: next }),
+      openTimeline: (project) => void this.openStoryTimeline(project),
       // Checked at click time, not load time, so switching the model on in settings takes effect without a reload.
       analyse: (project, notePath, graph, signal, onProgress) => {
         const cfg = this.current.llm;
@@ -281,15 +293,25 @@ export default class CreativeZenModePlugin extends Plugin {
     await (leaf.view as StoryMapView).onOpen();
   }
 
+  private async openStoryTimeline(project: ProjectSpec | null): Promise<void> {
+    const existing = this.app.workspace.getLeavesOfType(STORY_TIMELINE_VIEW_TYPE)[0];
+    const leaf = existing ?? this.app.workspace.getLeaf("split", "vertical");
+    if (!existing) await leaf.setViewState({ type: STORY_TIMELINE_VIEW_TYPE, active: true });
+    await this.app.workspace.revealLeaf(leaf);
+    const view = leaf.view as StoryTimelineView;
+    if (project) await view.show(project); else await view.onOpen();
+  }
+
   private storyMapRefreshTimer: number | null = null;
   /** The metadata cache fires `resolved` on every edit; a rebuild every couple of seconds is plenty for a map. */
   private refreshStoryMap(): void {
-    const leaf = this.app.workspace.getLeavesOfType(STORY_MAP_VIEW_TYPE)[0];
+    const leaf = this.app.workspace.getLeavesOfType(STORY_MAP_VIEW_TYPE)[0] ?? this.app.workspace.getLeavesOfType(STORY_TIMELINE_VIEW_TYPE)[0];
     if (!leaf) return;
     if (this.storyMapRefreshTimer !== null) window.clearTimeout(this.storyMapRefreshTimer);
     this.storyMapRefreshTimer = window.setTimeout(() => {
       this.storyMapRefreshTimer = null;
-      void (leaf.view as StoryMapView).refresh();
+      if (leaf.view instanceof StoryMapView) void leaf.view.refresh();
+      for (const tl of this.app.workspace.getLeavesOfType(STORY_TIMELINE_VIEW_TYPE)) void (tl.view as StoryTimelineView).refresh();
     }, 2000);
   }
 
@@ -306,10 +328,22 @@ export default class CreativeZenModePlugin extends Plugin {
     md.editor.focus();
   }
 
-  /** A candidate becomes a real entity: a typed note in the project's Characters/ or Places/ folder (created if missing). */
+  /** Adds to or trims a list property in a note's front matter — `story-ignore` on the project note, `aliases` on an entity note. */
+  private async editList(path: string, key: string, edit: (list: string[]) => string[]): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) return;
+    await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
+      const raw = fm[key];
+      const list = Array.isArray(raw) ? raw.filter((x): x is string => typeof x === "string") : typeof raw === "string" ? [raw] : [];
+      const next = edit(list);
+      if (next.length) fm[key] = next; else delete fm[key];
+    });
+  }
+
+  /** A candidate becomes a real entity: a typed note in the project's Characters/, Places/, Items/… folder (created if missing). */
   private async createEntityNote(scope: string, name: string, kind: EntityKind): Promise<string> {
     const folder = scope.endsWith("/") || scope === "" ? scope : scope.slice(0, scope.lastIndexOf("/") + 1);
-    const sub = kind === "location" ? "Places" : "Characters";
+    const sub = { character: "Characters", location: "Places", item: "Items", faction: "Factions", event: "Events" }[kind as string] ?? "Characters";
     const dir = normalizePath(`${folder}${sub}`);
     if (!(this.app.vault.getAbstractFileByPath(dir) instanceof TFolder)) await this.app.vault.createFolder(dir);
     const safe = name.replace(/[\\/:*?"<>|#^[\]]/g, "").trim() || "Unnamed";

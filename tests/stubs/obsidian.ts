@@ -44,7 +44,7 @@ export class Setting {
   name = "";
   toggle?: ToggleComponent;
   slider?: SliderComponent;
-  constructor(public containerEl: HTMLElement) { Setting.created.push(this); }
+  constructor(public containerEl: HTMLElement) { this.settingEl = containerEl.createDiv({ cls: "setting-item" }); Setting.created.push(this); }
   setName(n: string) { this.name = n; return this; }
   desc = "";
   setDesc(d: string) { this.desc = d; return this; }
@@ -53,6 +53,13 @@ export class Setting {
   addSlider(cb: (s: SliderComponent) => unknown) { this.slider = new SliderComponent(); cb(this.slider); return this; }
   dropdown?: DropdownComponent;
   text?: TextComponent;
+  color?: ColorComponent;
+  button?: ButtonComponent;
+  settingEl!: HTMLElement;
+  setClass(c: string) { this.settingEl.classList.add(c); return this; }
+  addColorPicker(cb: (c: ColorComponent) => unknown) { this.color = new ColorComponent(); cb(this.color); return this; }
+  addButton(cb: (b: ButtonComponent) => unknown) { this.button = new ButtonComponent(this.settingEl); cb(this.button); return this; }
+  addExtraButton(cb: (b: ButtonComponent) => unknown) { cb(new ButtonComponent(this.settingEl)); return this; }
   addDropdown(cb: (d: DropdownComponent) => unknown) { this.dropdown = new DropdownComponent(); cb(this.dropdown); return this; }
   addText(cb: (t: TextComponent) => unknown) { this.text = new TextComponent(); cb(this.text); return this; }
 }
@@ -80,6 +87,23 @@ export class TextComponent {
   setValue(v: string) { this.value = v; return this; }
   onChange(cb: TextCb) { this.onChangeCb = cb; return this; }
 }
+export class ColorComponent {
+  value = "";
+  onChangeCb: TextCb = () => undefined;
+  setValue(v: string) { this.value = v; return this; }
+  onChange(cb: TextCb) { this.onChangeCb = cb; return this; }
+}
+export class ButtonComponent {
+  buttonEl: HTMLElement;
+  constructor(parent: HTMLElement) { this.buttonEl = parent.createEl("button"); }
+  setButtonText(t: string) { this.buttonEl.textContent = t; return this; }
+  setIcon(_i: string) { return this; }
+  setTooltip(t: string) { this.buttonEl.title = t; return this; }
+  setCta() { return this; }
+  setDisabled(d: boolean) { (this.buttonEl as HTMLButtonElement).disabled = d; return this; }
+  onClick(cb: () => unknown) { this.buttonEl.addEventListener("click", () => cb()); return this; }
+}
+export function setIcon(el: HTMLElement, icon: string): void { el.setAttribute("data-icon", icon); }
 export class WorkspaceLeaf {}
 export interface DataAdapter { exists(p: string): Promise<boolean>; read(p: string): Promise<string>; write(p: string, d: string): Promise<void>; }
 export class ItemView {
@@ -94,13 +118,15 @@ declare global {
   interface HTMLElement {
     addClass(cls: string): void;
     empty(): void;
-    createEl(tag: string, o?: { text?: string; cls?: string }): HTMLElement;
-    createDiv(o?: { text?: string; cls?: string }): HTMLElement;
-    createSpan(o?: { text?: string; cls?: string }): HTMLElement;
+    setText(text: string): void;
+    createEl(tag: string, o?: DomOpts): HTMLElement;
+    createDiv(o?: DomOpts): HTMLElement;
+    createSpan(o?: DomOpts): HTMLElement;
   }
-  function createEl(tag: string, o?: { text?: string; cls?: string }): HTMLElement;
-  function createDiv(o?: { text?: string; cls?: string }): HTMLElement;
-  function createSpan(o?: { text?: string; cls?: string }): HTMLElement;
+  type DomOpts = { text?: string; cls?: string; attr?: Record<string, string> };
+  function createEl(tag: string, o?: DomOpts): HTMLElement;
+  function createDiv(o?: DomOpts): HTMLElement;
+  function createSpan(o?: DomOpts): HTMLElement;
 }
 
 export type SettingDefinitionItem = unknown;

@@ -27,6 +27,12 @@ describe("applyFilter", () => {
     const g2 = applyFilter(graph, { ...DEFAULT_FILTER, kinds: new Set(ALL_KINDS), layers: new Set(ALL_LAYERS), query: "marta" });
     expect(g2.entities.map((e) => e.id).sort()).toEqual(["ch1", "ilse", "lisbon", "marta", "orpheus"]);
   });
+  it("focuses on one entity and its neighbours, ignoring kind filters", () => {
+    const g = applyFilter(graph, { ...DEFAULT_FILTER, focusId: "ilse" });
+    expect(g.entities.map((e) => e.id).sort()).toEqual(["ilse", "marta"]);
+    const g2 = applyFilter(graph, { ...DEFAULT_FILTER, focusId: "marta" });
+    expect(g2.entities.map((e) => e.id).sort()).toEqual(["ch1", "ilse", "lisbon", "marta", "orpheus"]);
+  });
   it("can hide isolated nodes", () => {
     const g = applyFilter(graph, { ...DEFAULT_FILTER, hideIsolated: true });
     expect(g.entities.map((e) => e.id)).not.toContain("nobody");

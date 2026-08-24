@@ -7,6 +7,8 @@ export interface GraphFilter {
   readonly query: string;
   /** Hide entities that end up with no edges under the current filter. */
   readonly hideIsolated: boolean;
+  /** Show only this entity and its direct neighbours. */
+  readonly focusId?: string | null;
 }
 
 export const ALL_LAYERS: readonly Layer[] = ["explicit", "internal", "external"];
@@ -32,6 +34,15 @@ export function applyFilter(graph: StoryGraph, filter: GraphFilter): StoryGraph 
       if (hits.has(edge.to)) keep.add(edge.from);
     }
     entities = entities.filter((e) => keep.has(e.id));
+  }
+  if (filter.focusId) {
+    const ring = new Set([filter.focusId]);
+    for (const edge of graph.edges) {
+      if (!filter.layers.has(edge.layer)) continue;
+      if (edge.from === filter.focusId) ring.add(edge.to);
+      if (edge.to === filter.focusId) ring.add(edge.from);
+    }
+    entities = graph.entities.filter((e) => ring.has(e.id));
   }
   let ids = new Set(entities.map((e) => e.id));
   const keep = (e: Edge) => filter.layers.has(e.layer) && ids.has(e.from) && ids.has(e.to);

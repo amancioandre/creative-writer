@@ -32,6 +32,55 @@ export const DEFAULT_LLM_SETTINGS: LlmSettings = {
   spend: { day: "", usd: 0 },
 };
 
+export type StoryEntityKind = "character" | "location" | "item" | "faction" | "event" | "note" | "candidate" | "reference";
+export type StoryLayer = "explicit" | "internal" | "external";
+
+export interface ForceSettings {
+  /** How hard nodes push each other apart. */
+  readonly repulsion: number;
+  /** Resting length of an edge, in graph units. */
+  readonly linkDistance: number;
+  /** How strongly edges pull toward that length. */
+  readonly linkStrength: number;
+  /** Pull toward the centre; keeps islands from drifting off. */
+  readonly gravity: number;
+}
+
+export interface StoryMapSettings {
+  readonly layers: Readonly<Record<StoryLayer, boolean>>;
+  readonly kinds: Readonly<Record<StoryEntityKind, boolean>>;
+  readonly hideIsolated: boolean;
+  readonly forces: ForceSettings;
+  /** Hex colour per node kind. */
+  readonly colors: Readonly<Record<StoryEntityKind, string>>;
+  readonly panelOpen: boolean;
+}
+
+export const STORY_KINDS: readonly StoryEntityKind[] = ["character", "location", "item", "faction", "event", "note", "candidate", "reference"];
+export const STORY_LAYERS: readonly StoryLayer[] = ["explicit", "internal", "external"];
+
+export const DEFAULT_FORCES: ForceSettings = { repulsion: 1, linkDistance: 90, linkStrength: 0.5, gravity: 0.1 };
+export const FORCE_RANGES: Readonly<Record<keyof ForceSettings, readonly [number, number, number]>> = {
+  repulsion: [0.1, 4, 0.1],
+  linkDistance: [30, 300, 5],
+  linkStrength: [0.05, 1, 0.05],
+  gravity: [0, 0.5, 0.01],
+};
+
+export const DEFAULT_STORY_COLORS: Readonly<Record<StoryEntityKind, string>> = {
+  character: "#4a8fe2", location: "#3fa66b", item: "#d9a621", faction: "#e07b39", event: "#d64545",
+  note: "#8a8a8a", candidate: "#9a9a9a", reference: "#8e5bd6",
+};
+
+export const DEFAULT_STORY_MAP: StoryMapSettings = {
+  layers: { explicit: true, internal: true, external: true },
+  kinds: { character: true, location: true, item: true, faction: true, event: true, note: false, candidate: true, reference: true },
+  hideIsolated: false,
+  forces: DEFAULT_FORCES,
+  colors: DEFAULT_STORY_COLORS,
+  panelOpen: true,
+};
+
 export interface PluginSettings {
   /** Master switch; the "Toggle Creative Writer" command flips it. */
   readonly enabled: boolean;
@@ -55,6 +104,7 @@ export interface PluginSettings {
   readonly readabilityEnabled: boolean;
   readonly goals: GoalSettings;
   readonly llm: LlmSettings;
+  readonly storyMap: StoryMapSettings;
 }
 
 export interface GoalSettings {
@@ -87,6 +137,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   readabilityEnabled: true,
   goals: DEFAULT_GOALS,
   llm: DEFAULT_LLM_SETTINGS,
+  storyMap: DEFAULT_STORY_MAP,
 };
 
 const clampInt = (v: number, min: number, max: number) => Math.min(max, Math.max(min, Math.floor(v)));
@@ -123,6 +174,36 @@ export function normalizeSettings(raw: unknown): PluginSettings {
     readabilityEnabled: bool("readabilityEnabled"),
     goals: normalizeGoals(r.goals),
     llm: normalizeLlm(r.llm),
+    storyMap: normalizeStoryMap(r.storyMap),
+  };
+}
+
+const HEX = /^#[0-9a-f]{6}$/i;
+
+export function normalizeStoryMap(raw: unknown): StoryMapSettings {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const flags = <K extends string>(v: unknown, keys: readonly K[], defaults: Readonly<Record<K, boolean>>): Record<K, boolean> => {
+    const o = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
+    const out: Record<K, boolean> = { ...defaults };
+    for (const k of keys) if (typeof o[k] === "boolean") out[k] = o[k] as boolean;
+    return out;
+  };
+  const f = (r.forces && typeof r.forces === "object" ? r.forces : {}) as Record<string, unknown>;
+  const force = (key: keyof ForceSettings) => {
+    const [min, max] = FORCE_RANGES[key];
+    const v = f[key];
+    return typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : DEFAULT_FORCES[key];
+  };
+  const c = (r.colors && typeof r.colors === "object" ? r.colors : {}) as Record<string, unknown>;
+  const colors = { ...DEFAULT_STORY_COLORS };
+  for (const k of STORY_KINDS) if (typeof c[k] === "string" && HEX.test(c[k] as string)) colors[k] = (c[k] as string).toLowerCase();
+  return {
+    layers: flags(r.layers, STORY_LAYERS, DEFAULT_STORY_MAP.layers),
+    kinds: flags(r.kinds, STORY_KINDS, DEFAULT_STORY_MAP.kinds),
+    hideIsolated: typeof r.hideIsolated === "boolean" ? r.hideIsolated : DEFAULT_STORY_MAP.hideIsolated,
+    forces: { repulsion: force("repulsion"), linkDistance: force("linkDistance"), linkStrength: force("linkStrength"), gravity: force("gravity") },
+    colors,
+    panelOpen: typeof r.panelOpen === "boolean" ? r.panelOpen : DEFAULT_STORY_MAP.panelOpen,
   };
 }
 

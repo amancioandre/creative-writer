@@ -64,3 +64,17 @@ describe("llm settings", () => {
     expect(normalizeSettings({ llm: { claudeModel: "claude-3" } }).llm.claudeModel).toBe("claude-opus-5");
   });
 });
+
+describe("normalizeSettings — story map", () => {
+  it("defaults, clamps forces, validates colours and keeps flags", () => {
+    const s = normalizeSettings({ storyMap: { layers: { external: false, bogus: true }, kinds: { note: true }, hideIsolated: true, forces: { repulsion: 99, linkDistance: "x", gravity: -1 }, colors: { character: "#ABCDEF", location: "red" }, panelOpen: false } });
+    expect(s.storyMap.layers).toEqual({ explicit: true, internal: true, external: false });
+    expect(s.storyMap.kinds.note).toBe(true);
+    expect(s.storyMap.hideIsolated).toBe(true);
+    expect(s.storyMap.forces).toEqual({ repulsion: 4, linkDistance: 90, linkStrength: 0.5, gravity: 0 });
+    expect(s.storyMap.colors.character).toBe("#abcdef");
+    expect(s.storyMap.colors.location).toBe(DEFAULT_SETTINGS.storyMap.colors.location);
+    expect(s.storyMap.panelOpen).toBe(false);
+    expect(normalizeSettings({}).storyMap).toEqual(DEFAULT_SETTINGS.storyMap);
+  });
+});
