@@ -200,12 +200,13 @@ body.czm-zen .workspace-split.mod-root {
 .czm-node.is-dim { opacity: 0.18; }
 .czm-node:focus-visible { outline: none; }
 .czm-node:focus-visible circle { stroke: var(--text-accent); stroke-width: 2.5; }
-.czm-node-label { fill: var(--text-normal); font-size: 11px; pointer-events: none; user-select: none; paint-order: stroke; stroke: var(--background-primary); stroke-width: 3px; stroke-linejoin: round; }
+.czm-no-labels .czm-node-label { display: none; }
+.czm-node-label { fill: var(--text-normal); font-size: var(--czm-label-size, 11px); pointer-events: none; user-select: none; paint-order: stroke; stroke: var(--background-primary); stroke-width: 3px; stroke-linejoin: round; }
 .czm-node-star { fill: var(--color-yellow); font-size: 10px; pointer-events: none; }
-.czm-edge { stroke: var(--text-faint); stroke-linecap: round; opacity: 0.55; cursor: pointer; }
+.czm-edge { stroke: var(--text-faint); stroke-linecap: round; opacity: var(--czm-edge-opacity, 0.55); cursor: pointer; }
 .czm-edge.czm-layer-internal { stroke: var(--interactive-accent); }
 .czm-edge.czm-layer-external { stroke: var(--color-purple); }
-.czm-edge-relationship { opacity: 0.9; }
+.czm-edge-relationship { opacity: min(1, calc(var(--czm-edge-opacity, 0.55) + 0.35)); }
 .czm-edge.is-stale { stroke-dasharray: 4 3; opacity: 0.4; }
 .czm-edge.is-selected { opacity: 1; stroke: var(--text-normal); }
 .czm-edge.is-dim { opacity: 0.06; }
@@ -227,14 +228,22 @@ body.czm-zen .workspace-split.mod-root {
 .czm-map-section > summary::-webkit-details-marker { display: none; }
 .czm-map-section > summary::before { content: "▸"; font-size: 0.8em; opacity: 0.6; transition: transform 120ms; }
 .czm-map-section[open] > summary::before { transform: rotate(90deg); }
-.czm-map-panel .setting-item { padding: 5px 0; border: none; align-items: center; }
-.czm-map-panel .setting-item-info { margin-right: 8px; }
-.czm-map-panel .setting-item-name { font-size: var(--font-ui-small); color: var(--text-normal); }
-.czm-map-panel .setting-item-description { font-size: var(--font-ui-smaller); padding-top: 0; }
-.czm-map-panel .setting-item-control { gap: 8px; flex-shrink: 0; }
-.czm-map-panel .setting-item-control .slider { width: 110px; }
-.czm-map-panel .setting-item-control button { font-size: var(--font-ui-smaller); padding: 2px 8px; height: auto; }
-.czm-map-panel input[type="color"] { width: 22px; height: 22px; padding: 0; border: none; background: none; }
+/* Panel rows: one line each, label left, controls in a fixed-width column so they line up down the section. */
+.czm-map-panel .setting-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 0; border: none; min-height: 28px; }
+.czm-map-panel .setting-item-info { flex: 1 1 auto; min-width: 0; margin: 0; }
+.czm-map-panel .setting-item-name { font-size: var(--font-ui-small); color: var(--text-normal); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.czm-map-panel .setting-item-description { font-size: var(--font-ui-smaller); padding-top: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.czm-map-panel .setting-item-control { flex: 0 0 auto; display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin: 0; }
+.czm-map-section-filters .setting-item-control { width: 44px; }
+.czm-map-section-kinds .setting-item-control { width: 84px; }
+.czm-map-section-forces .setting-item-control, .czm-map-section-display .setting-item-control { width: 140px; }
+.czm-map-section-ignored .setting-item-control { width: 70px; }
+.czm-map-panel .setting-item-control .slider { width: 100%; margin: 0; }
+.czm-map-panel .setting-item-control .checkbox-container { margin: 0; }
+.czm-map-panel .setting-item-control button { font-size: var(--font-ui-smaller); padding: 2px 8px; height: 24px; line-height: 1; margin: 0; }
+.czm-map-panel .setting-item-control input[type="color"] { width: 22px; height: 22px; padding: 0; border: 1px solid var(--background-modifier-border); border-radius: 4px; background: none; cursor: pointer; }
+.czm-map-panel .setting-item-control input[type="color"]::-webkit-color-swatch-wrapper { padding: 1px; }
+.czm-map-panel .setting-item-control input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
 
 .czm-map-card { position: absolute; z-index: 4; width: 260px; max-height: 60%; overflow: auto; display: none;
   background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: 8px; box-shadow: var(--shadow-l); padding: 8px 10px; font-size: var(--font-ui-small); }

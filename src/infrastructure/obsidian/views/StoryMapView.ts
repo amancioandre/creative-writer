@@ -1,6 +1,6 @@
 import { ItemView, Setting, setIcon, type WorkspaceLeaf } from "obsidian";
 import type { ProjectSpec } from "../../../domain/progress/Project";
-import { DEFAULT_FORCES, DEFAULT_STORY_COLORS, FORCE_RANGES, STORY_KINDS, STORY_LAYERS, type ForceSettings, type StoryEntityKind, type StoryLayer, type StoryMapSettings } from "../../../domain/settings/Settings";
+import { DEFAULT_DISPLAY, DEFAULT_FORCES, DEFAULT_STORY_COLORS, DISPLAY_RANGES, FORCE_RANGES, STORY_KINDS, STORY_LAYERS, type DisplaySettings, type ForceSettings, type StoryEntityKind, type StoryLayer, type StoryMapSettings } from "../../../domain/settings/Settings";
 import { applyFilter, neighbours, type GraphFilter } from "../../../domain/story/Filter";
 import { Simulation, type Point } from "../../../domain/story/Simulation";
 import { EMPTY_GRAPH, type Edge, type Entity, type EntityKind, type SceneRef, type StoryGraph } from "../../../domain/story/StoryGraph";
@@ -36,6 +36,7 @@ const SVG = "http://www.w3.org/2000/svg";
 export const LAYER_LABEL: Record<StoryLayer, string> = { explicit: "Links", internal: "Scenes", external: "References" };
 export const KIND_LABEL: Record<StoryEntityKind, string> = { character: "Characters", location: "Places", item: "Items", faction: "Factions", event: "Events", note: "Notes", candidate: "Unnamed", reference: "Outside" };
 const FORCE_LABEL: Record<keyof ForceSettings, string> = { repulsion: "Repulsion", linkDistance: "Link distance", linkStrength: "Link strength", gravity: "Centre pull" };
+const DISPLAY_LABEL: Record<keyof DisplaySettings, string> = { nodeSize: "Node size", edgeWidth: "Edge thickness", edgeOpacity: "Edge opacity", labelSize: "Label size" };
 const MIN_ZOOM = 0.15, MAX_ZOOM = 5;
 
 type Selection = { kind: "node"; id: string } | { kind: "edge"; edge: Edge } | null;
@@ -174,11 +175,15 @@ export class StoryMapView extends ItemView {
     const shown = this.shown;
     this.svg.setAttribute("aria-label", `Story map of ${shown.project}: ${shown.entities.length} nodes, ${shown.edges.length} edges`);
     const colors = this.settings.colors;
+    const display = this.settings.display;
+    this.viewport.style.setProperty("--czm-edge-opacity", String(display.edgeOpacity));
+    this.viewport.style.setProperty("--czm-label-size", `${display.labelSize}px`);
+    this.viewport.classList.toggle("czm-no-labels", display.labelSize === 0);
     const edgesG = document.createElementNS(SVG, "g");
     for (const edge of shown.edges) {
       const line = document.createElementNS(SVG, "line");
       line.setAttribute("class", `czm-edge czm-edge-${edge.kind} czm-layer-${edge.layer}${edge.stale ? " is-stale" : ""}`);
-      line.setAttribute("stroke-width", f(1 + Math.min(4, Math.sqrt(edge.weight))));
+      line.setAttribute("stroke-width", f((1 + Math.min(4, Math.sqrt(edge.weight))) * display.edgeWidth));
       line.setAttribute("data-from", edge.from); line.setAttribute("data-to", edge.to);
       const title = document.createElementNS(SVG, "title");
       title.textContent = edgeTitle(edge, shown);
@@ -198,7 +203,7 @@ export class StoryMapView extends ItemView {
       g.setAttribute("tabindex", "0");
       g.setAttribute("role", "button");
       g.style.setProperty("--czm-kind", colors[e.kind]);
-      const r = 5 + 9 * Math.sqrt(e.mentions / maxMentions);
+      const r = (5 + 9 * Math.sqrt(e.mentions / maxMentions)) * display.nodeSize;
       const circle = document.createElementNS(SVG, "circle");
       circle.setAttribute("r", f(r));
       g.appendChild(circle);
@@ -410,7 +415,7 @@ export class StoryMapView extends ItemView {
     if (this.focusId) btn("Show all", "czm-map-unfocus", () => { this.focusId = null; this.rebuild(); });
 
     const section = (title: string, open = true) => {
-      const d = this.panel.createEl("details", { cls: "czm-map-section" }) as HTMLDetailsElement;
+      const d = this.panel.createEl("details", { cls: `czm-map-section czm-map-section-${title.split(" ")[0]!.toLowerCase()}` }) as HTMLDetailsElement;
       d.open = open;
       d.createEl("summary", { text: title });
       return d;
@@ -437,6 +442,16 @@ export class StoryMapView extends ItemView {
         new Setting(ignored).setName(name).setClass("czm-set-ignored").addButton((b) => b.setButtonText("Restore").onClick(() => void this.source.unignore(this.project!, name).then(() => this.reloadProject())));
       }
     }
+
+    const displaySec = section("Display", false);
+    for (const key of Object.keys(DISPLAY_LABEL) as (keyof DisplaySettings)[]) {
+      const [min, max, step] = DISPLAY_RANGES[key];
+      new Setting(displaySec).setName(DISPLAY_LABEL[key]).setClass(`czm-set-display-${key}`).addSlider((sl) => sl.setLimits(min, max, step).setValue(s.display[key]).setDynamicTooltip().onChange((v) => {
+        this.saveSettings({ ...this.settings, display: { ...this.settings.display, [key]: v } });
+        this.renderGraph();
+      }));
+    }
+    new Setting(displaySec).setName("Reset display").setClass("czm-set-reset-display").addButton((b) => b.setButtonText("Reset").onClick(() => { this.saveSettings({ ...this.settings, display: DEFAULT_DISPLAY }); this.renderPanel(); this.renderGraph(); }));
 
     const forces = section("Forces", false);
     for (const key of Object.keys(FORCE_LABEL) as (keyof ForceSettings)[]) {

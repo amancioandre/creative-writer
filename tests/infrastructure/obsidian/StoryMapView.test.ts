@@ -147,6 +147,21 @@ describe("StoryMapView", () => {
     expect(settings().forces.repulsion).toBe(3);
   });
 
+  it("scales nodes, edges and labels from the Display section", async () => {
+    const { el, settings } = await open();
+    const r = () => Number(el.querySelector<SVGCircleElement>('.czm-node[data-id="Novel/Characters/Ilse.md"] circle')!.getAttribute("r"));
+    const w = () => Number(el.querySelector<SVGLineElement>(".czm-edge")!.getAttribute("stroke-width"));
+    const r0 = r(), w0 = w();
+    setting("czm-set-display-nodeSize").slider!.onChangeCb(2);
+    expect(r()).toBeCloseTo(r0 * 2, 0);
+    setting("czm-set-display-edgeWidth").slider!.onChangeCb(3);
+    expect(w()).toBeCloseTo(w0 * 3, 0);
+    setting("czm-set-display-labelSize").slider!.onChangeCb(0);
+    expect(el.querySelector("svg > g")!.classList.contains("czm-no-labels")).toBe(true);
+    await new Promise((r) => setTimeout(r, 450));
+    expect(settings().display).toEqual({ nodeSize: 2, edgeWidth: 3, edgeOpacity: 0.55, labelSize: 0 });
+  });
+
   it("searches, pans, zooms and fits", async () => {
     const { el, v } = await open();
     const search = el.querySelector(".czm-map-search") as HTMLInputElement;

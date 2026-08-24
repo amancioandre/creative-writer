@@ -46,7 +46,27 @@ export interface ForceSettings {
   readonly gravity: number;
 }
 
+export interface DisplaySettings {
+  /** Multiplier on node radius. */
+  readonly nodeSize: number;
+  /** Multiplier on edge stroke width. */
+  readonly edgeWidth: number;
+  /** Base opacity of edges, 0.1–1. */
+  readonly edgeOpacity: number;
+  /** Label font size in px; 0 hides labels. */
+  readonly labelSize: number;
+}
+
+export const DEFAULT_DISPLAY: DisplaySettings = { nodeSize: 1, edgeWidth: 1, edgeOpacity: 0.55, labelSize: 11 };
+export const DISPLAY_RANGES: Readonly<Record<keyof DisplaySettings, readonly [number, number, number]>> = {
+  nodeSize: [0.4, 2.5, 0.1],
+  edgeWidth: [0.3, 3, 0.1],
+  edgeOpacity: [0.1, 1, 0.05],
+  labelSize: [0, 18, 1],
+};
+
 export interface StoryMapSettings {
+  readonly display: DisplaySettings;
   readonly layers: Readonly<Record<StoryLayer, boolean>>;
   readonly kinds: Readonly<Record<StoryEntityKind, boolean>>;
   readonly hideIsolated: boolean;
@@ -73,6 +93,7 @@ export const DEFAULT_STORY_COLORS: Readonly<Record<StoryEntityKind, string>> = {
 };
 
 export const DEFAULT_STORY_MAP: StoryMapSettings = {
+  display: DEFAULT_DISPLAY,
   layers: { explicit: true, internal: true, external: true },
   kinds: { character: true, location: true, item: true, faction: true, event: true, note: false, candidate: true, reference: true },
   hideIsolated: false,
@@ -194,10 +215,17 @@ export function normalizeStoryMap(raw: unknown): StoryMapSettings {
     const v = f[key];
     return typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : DEFAULT_FORCES[key];
   };
+  const d = (r.display && typeof r.display === "object" ? r.display : {}) as Record<string, unknown>;
+  const display = (key: keyof DisplaySettings) => {
+    const [min, max] = DISPLAY_RANGES[key];
+    const v = d[key];
+    return typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : DEFAULT_DISPLAY[key];
+  };
   const c = (r.colors && typeof r.colors === "object" ? r.colors : {}) as Record<string, unknown>;
   const colors = { ...DEFAULT_STORY_COLORS };
   for (const k of STORY_KINDS) if (typeof c[k] === "string" && HEX.test(c[k] as string)) colors[k] = (c[k] as string).toLowerCase();
   return {
+    display: { nodeSize: display("nodeSize"), edgeWidth: display("edgeWidth"), edgeOpacity: display("edgeOpacity"), labelSize: display("labelSize") },
     layers: flags(r.layers, STORY_LAYERS, DEFAULT_STORY_MAP.layers),
     kinds: flags(r.kinds, STORY_KINDS, DEFAULT_STORY_MAP.kinds),
     hideIsolated: typeof r.hideIsolated === "boolean" ? r.hideIsolated : DEFAULT_STORY_MAP.hideIsolated,

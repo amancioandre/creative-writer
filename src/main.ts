@@ -192,6 +192,8 @@ export default class CreativeZenModePlugin extends Plugin {
       },
     }));
     this.addCommand({ id: "open-story-map", name: "Open story map", callback: () => void this.openStoryMap() });
+    this.addRibbonIcon("git-fork", "Open story map", () => void this.openStoryMap());
+    this.addRibbonIcon("gantt-chart", "Open story timeline", () => void this.openStoryTimeline(null));
     this.addCommand({
       id: "read-note-for-story-map",
       name: "Read this note with model (story map)",

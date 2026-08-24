@@ -75,6 +75,7 @@ describe("normalizeSettings — story map", () => {
     expect(s.storyMap.colors.character).toBe("#abcdef");
     expect(s.storyMap.colors.location).toBe(DEFAULT_SETTINGS.storyMap.colors.location);
     expect(s.storyMap.panelOpen).toBe(false);
+    expect(normalizeSettings({ storyMap: { display: { nodeSize: 9, labelSize: -2, edgeOpacity: "x" } } }).storyMap.display).toEqual({ nodeSize: 2.5, edgeWidth: 1, edgeOpacity: 0.55, labelSize: 0 });
     expect(normalizeSettings({}).storyMap).toEqual(DEFAULT_SETTINGS.storyMap);
   });
 });
