@@ -6,6 +6,7 @@ import type { WritingLog } from "./WritingLog";
  *   writing-target: 50000        (words)
  *   writing-deadline: 2026-10-31 (optional)
  *   writing-scope: note          (optional; default is the note's folder)
+ *   writing-daily: 500           (optional; words per day on this project)
  * The folder — or that one note — is what gets counted.
  */
 export interface ProjectSpec {
@@ -14,6 +15,8 @@ export interface ProjectSpec {
   readonly scope: string;
   readonly targetWords: number;
   readonly deadline: Day | null;
+  /** Words to add to this project per day; 0 = none. */
+  readonly dailyWords: number;
 }
 
 export function parseProjectFrontmatter(frontmatter: unknown, notePath: string): ProjectSpec | null {
@@ -27,7 +30,8 @@ export function parseProjectFrontmatter(frontmatter: unknown, notePath: string):
   const noteScope = fm["writing-scope"] === "note";
   const base = notePath.slice(slash + 1).replace(/\.md$/i, "");
   const name = typeof fm["writing-name"] === "string" && fm["writing-name"].trim() ? fm["writing-name"].trim() : noteScope || !folder ? base : folder.slice(0, -1).split("/").pop()!;
-  return { name, scope: noteScope ? notePath : folder, targetWords: Math.floor(target), deadline };
+  const daily = Number(fm["writing-daily"]);
+  return { name, scope: noteScope ? notePath : folder, targetWords: Math.floor(target), deadline, dailyWords: Number.isFinite(daily) && daily > 0 ? Math.floor(daily) : 0 };
 }
 
 function toIso(d: Date): Day {
@@ -64,9 +68,24 @@ export interface ProjectStatus {
   /** At the recent pace, the day the target is reached; null when done or pace is zero. */
   readonly projectedDay: Day | null;
   readonly verdict: "done" | "on-track" | "behind" | "no-deadline" | "stalled";
+  /** Today's words on this project against its own daily goal; null when the project has none. */
+  readonly today: { added: number; goal: number; progress: number; met: boolean; streak: number } | null;
 }
 
-export function projectStatus(spec: ProjectSpec, totalWords: number, recent: readonly number[], today: Day): ProjectStatus {
+/** Consecutive days (ending today or yesterday) on which the project's daily goal was met. */
+export function projectStreak(log: WritingLog, spec: ProjectSpec, today: Day): number {
+  if (spec.dailyWords <= 0) return 0;
+  const addedOn = (day: Day) => recentAdded(log, spec, day, 1)[0]!;
+  let streak = 0;
+  let day = addedOn(today) >= spec.dailyWords ? today : addDays(today, -1);
+  while (addedOn(day) >= spec.dailyWords) {
+    streak += 1;
+    day = addDays(day, -1);
+  }
+  return streak;
+}
+
+export function projectStatus(spec: ProjectSpec, totalWords: number, recent: readonly number[], today: Day, streak = 0): ProjectStatus {
   const remaining = Math.max(0, spec.targetWords - totalWords);
   const fraction = Math.min(1, totalWords / spec.targetWords);
   const recentPerDay = recent.length ? recent.reduce((a, b) => a + b, 0) / recent.length : 0;
@@ -80,5 +99,9 @@ export function projectStatus(spec: ProjectSpec, totalWords: number, recent: rea
   else if (daysLeft === null) verdict = "no-deadline";
   else verdict = projectedDay !== null && projectedDay <= spec.deadline! ? "on-track" : "behind";
 
-  return { spec, totalWords, fraction, remaining, daysLeft, neededPerDay, recentPerDay, projectedDay, verdict };
+  const addedToday = recent[recent.length - 1] ?? 0;
+  const todayStatus = spec.dailyWords > 0
+    ? { added: addedToday, goal: spec.dailyWords, progress: Math.min(1, addedToday / spec.dailyWords), met: addedToday >= spec.dailyWords, streak }
+    : null;
+  return { spec, totalWords, fraction, remaining, daysLeft, neededPerDay, recentPerDay, projectedDay, verdict, today: todayStatus };
 }

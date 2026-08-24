@@ -79,8 +79,8 @@ describe("DeskView progress", () => {
 describe("DeskView projects", () => {
   it("renders each project with a bar and a pace line", async () => {
     const { projectStatus } = await import("../../../src/domain/progress/Project");
-    const spec = { name: "Camp", scope: "Camp/", targetWords: 10000, deadline: "2026-09-03" };
-    const list = [projectStatus(spec, 7000, [500], "2026-08-24"), projectStatus({ ...spec, name: "Slow" }, 7000, [10], "2026-08-24")];
+    const spec = { name: "Camp", scope: "Camp/", targetWords: 10000, deadline: "2026-09-03", dailyWords: 400 };
+    const list = [projectStatus(spec, 7000, [500], "2026-08-24", 2), projectStatus({ ...spec, name: "Slow", dailyWords: 0 }, 7000, [10], "2026-08-24")];
     const v = new DeskView(new WorkspaceLeaf(), { ...progress, activeProfile: () => null, projects: async () => list });
     v.refresh();
     await Promise.resolve();
@@ -90,6 +90,9 @@ describe("DeskView projects", () => {
     expect(t).toContain("On track");
     expect(t).toContain("after the 2026-09-03 deadline");
     expect(v.contentEl.querySelectorAll(".czm-desk-project.is-behind")).toHaveLength(1);
+    expect(v.contentEl.querySelectorAll(".czm-desk-project-daily")).toHaveLength(1);
+    expect(t).toContain("Today 500 of 400");
+    expect(t).toContain("Streak 2 days");
   });
 
   it("shows no Projects heading when none are declared", async () => {

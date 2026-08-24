@@ -160,6 +160,14 @@ export function renderProjects(root: HTMLElement, projects: readonly ProjectStat
     const bar = item.createDiv({ cls: "czm-desk-bar" });
     bar.createDiv({ cls: `czm-desk-bar-fill${p.verdict === "done" ? " is-met" : ""}` }).style.width = `${Math.round(p.fraction * 100)}%`;
     item.createDiv({ text: paceLine(p), cls: "czm-desk-band-hint" });
+    if (p.today) {
+      const daily = item.createDiv({ cls: "czm-desk-project-daily" });
+      const row = daily.createDiv({ cls: "czm-desk-band-head" });
+      row.createSpan({ text: `Today ${p.today.added.toLocaleString()} of ${p.today.goal.toLocaleString()}`, cls: "czm-desk-band-name" });
+      row.createSpan({ text: `Streak ${p.today.streak} day${p.today.streak === 1 ? "" : "s"}`, cls: "czm-desk-band-name" });
+      const bar = daily.createDiv({ cls: "czm-desk-bar czm-desk-scene-bar" });
+      bar.createDiv({ cls: `czm-desk-bar-fill${p.today.met ? " is-met" : ""}` }).style.width = `${Math.round(p.today.progress * 100)}%`;
+    }
   }
 }
 

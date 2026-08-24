@@ -5,11 +5,11 @@ import { EMPTY_LOG, baselineWordCount, recordWordCount } from "../../../src/doma
 describe("parseProjectFrontmatter", () => {
   it("scopes to the note's folder by default and names it after the folder", () => {
     const spec = parseProjectFrontmatter({ "writing-target": 50000, "writing-deadline": "2026-10-31" }, "Novels/Camp/notes.md");
-    expect(spec).toEqual({ name: "Camp", scope: "Novels/Camp/", targetWords: 50000, deadline: "2026-10-31" });
+    expect(spec).toEqual({ name: "Camp", scope: "Novels/Camp/", targetWords: 50000, deadline: "2026-10-31", dailyWords: 0 });
   });
   it("can scope to the note alone, accepts string numbers and a custom name", () => {
     const spec = parseProjectFrontmatter({ "writing-target": "8000", "writing-scope": "note", "writing-name": "The Creek" }, "Stories/creek.md");
-    expect(spec).toEqual({ name: "The Creek", scope: "Stories/creek.md", targetWords: 8000, deadline: null });
+    expect(spec).toEqual({ name: "The Creek", scope: "Stories/creek.md", targetWords: 8000, deadline: null, dailyWords: 0 });
   });
   it("handles vault-root notes and Date deadlines", () => {
     const spec = parseProjectFrontmatter({ "writing-target": 100, "writing-deadline": new Date(Date.UTC(2026, 11, 1)) }, "root.md");
@@ -22,11 +22,15 @@ describe("parseProjectFrontmatter", () => {
     expect(parseProjectFrontmatter({ "writing-target": 10, "writing-deadline": "soon" }, "a.md")!.deadline).toBeNull();
     expect(parseProjectFrontmatter(null, "a.md")).toBeNull();
   });
+  it("reads a per-project daily goal, ignoring junk", () => {
+    expect(parseProjectFrontmatter({ "writing-target": 10, "writing-daily": "250" }, "a.md")!.dailyWords).toBe(250);
+    expect(parseProjectFrontmatter({ "writing-target": 10, "writing-daily": -5 }, "a.md")!.dailyWords).toBe(0);
+  });
 });
 
 describe("inScope", () => {
   it("matches folder prefixes and exact notes", () => {
-    const folder = { name: "", scope: "Novels/Camp/", targetWords: 1, deadline: null };
+    const folder = { name: "", scope: "Novels/Camp/", targetWords: 1, deadline: null, dailyWords: 0 };
     expect(inScope(folder, "Novels/Camp/ch1.md")).toBe(true);
     expect(inScope(folder, "Novels/Camping/ch1.md")).toBe(false);
     expect(inScope({ ...folder, scope: "" }, "anything.md")).toBe(true);
@@ -41,13 +45,19 @@ describe("recentAdded", () => {
     log = recordWordCount(log, "P/a.md", 100, "2026-08-22");
     log = recordWordCount(log, "other.md", 999, "2026-08-23");
     log = recordWordCount(log, "P/a.md", 150, "2026-08-24");
-    expect(recentAdded(log, { name: "P", scope: "P/", targetWords: 1, deadline: null }, "2026-08-24", 3)).toEqual([100, 0, 50]);
+    expect(recentAdded(log, { name: "P", scope: "P/", targetWords: 1, deadline: null, dailyWords: 0 }, "2026-08-24", 3)).toEqual([100, 0, 50]);
   });
 });
 
 describe("projectStatus", () => {
-  const spec = { name: "Camp", scope: "Camp/", targetWords: 10000, deadline: "2026-09-03" };
+  const spec = { name: "Camp", scope: "Camp/", targetWords: 10000, deadline: "2026-09-03", dailyWords: 0 };
   const today = "2026-08-24";
+
+  it("has no today block without a daily goal, and one with it", () => {
+    expect(projectStatus(spec, 0, [100], today).today).toBeNull();
+    const s = projectStatus({ ...spec, dailyWords: 200 }, 0, [0, 150], today, 3);
+    expect(s.today).toEqual({ added: 150, goal: 200, progress: 0.75, met: false, streak: 3 });
+  });
 
   it("is on track when the recent pace reaches the target before the deadline", () => {
     const s = projectStatus(spec, 7000, [500, 500, 500], today);
@@ -63,5 +73,19 @@ describe("projectStatus", () => {
   });
   it("asks for everything today once the deadline has passed", () => {
     expect(projectStatus(spec, 7000, [100], "2026-09-05")).toMatchObject({ daysLeft: -2, neededPerDay: 3000 });
+  });
+});
+
+describe("projectStreak", () => {
+  it("counts consecutive days meeting the project's own goal, in scope only", async () => {
+    const { projectStreak } = await import("../../../src/domain/progress/Project");
+    let log = baselineWordCount(baselineWordCount(EMPTY_LOG, "P/a.md", 0), "other.md", 0);
+    log = recordWordCount(log, "P/a.md", 200, "2026-08-22");
+    log = recordWordCount(log, "P/a.md", 400, "2026-08-23");
+    log = recordWordCount(log, "other.md", 900, "2026-08-24");
+    const spec = { name: "P", scope: "P/", targetWords: 1, deadline: null, dailyWords: 200 };
+    expect(projectStreak(log, spec, "2026-08-24")).toBe(2);
+    expect(projectStreak(log, spec, "2026-08-25")).toBe(0);
+    expect(projectStreak(log, { ...spec, dailyWords: 0 }, "2026-08-24")).toBe(0);
   });
 });

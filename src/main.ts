@@ -32,7 +32,7 @@ import { AdapterProgressRepository } from "./infrastructure/obsidian/AdapterProg
 import { countWords } from "./domain/text/Dialogue";
 import { toDay } from "./domain/progress/Dates";
 import { splitScenes } from "./domain/text/Scenes";
-import { inScope, parseProjectFrontmatter, projectStatus, recentAdded, type ProjectStatus } from "./domain/progress/Project";
+import { inScope, parseProjectFrontmatter, projectStatus, projectStreak, recentAdded, type ProjectStatus } from "./domain/progress/Project";
 import { enabledStyleKinds } from "./domain/settings/Settings";
 
 /**
@@ -188,7 +188,7 @@ export default class CreativeZenModePlugin extends Plugin {
     return specs.map((spec) => {
       let total = 0;
       for (const [path, words] of counts) if (inScope(spec, path)) total += words;
-      return projectStatus(spec, total, recentAdded(this.tracker.current, spec, today, 7), today);
+      return projectStatus(spec, total, recentAdded(this.tracker.current, spec, today, 7), today, projectStreak(this.tracker.current, spec, today));
     });
   }
 
