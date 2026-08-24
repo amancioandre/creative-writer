@@ -208,9 +208,18 @@ body.czm-zen .workspace-split.mod-root {
 .czm-edge.czm-layer-external { stroke: var(--color-purple); }
 .czm-edge-relationship { opacity: min(1, calc(var(--czm-edge-opacity, 0.55) + 0.35)); }
 .czm-edge.is-stale { stroke-dasharray: 4 3; opacity: 0.4; }
+/* Hand-drawn relationships: solid, warm, a touch heavier, always on top. */
+.czm-edge-authored { stroke: var(--color-orange); opacity: min(1, calc(var(--czm-edge-opacity, 0.55) + 0.4)); }
+/* A pair the writer and the model describe differently: the model's line dashed red underneath, the writer's on top, also red. */
+.czm-edge.is-conflict { stroke: var(--color-red); }
+.czm-edge-relationship.is-conflict { stroke-dasharray: 6 4; opacity: 0.9; }
 .czm-edge.is-selected { opacity: 1; stroke: var(--text-normal); }
 .czm-edge.is-dim { opacity: 0.06; }
 .czm-edge:hover { opacity: 1; }
+.czm-map-rubber { display: none; stroke: var(--color-orange); stroke-width: 2; stroke-dasharray: 5 4; pointer-events: none; }
+.czm-map-rubber.is-open { display: block; }
+.czm-map.is-linking .czm-node { cursor: crosshair; }
+.czm-map.is-linking .czm-node.is-selected circle { stroke: var(--color-orange); stroke-width: 3; }
 
 /* floating chrome */
 .czm-map-corner { position: absolute; top: 8px; right: 8px; z-index: 3; }
@@ -298,3 +307,18 @@ body.czm-zen .workspace-split.mod-root {
 .czm-map-alias .dropdown { flex: 1; min-width: 0; font-size: var(--font-ui-smaller); }
 .czm-map-alias button, .czm-act-ignore { font-size: var(--font-ui-smaller); padding: 3px 8px; height: auto; }
 .czm-act-ignore { margin-top: 4px; opacity: 0.8; }
+.czm-map-kind.czm-authored { color: var(--color-orange); }
+.czm-map-row.czm-edge-authored { border-left-color: var(--color-orange); }
+.czm-map-label { display: flex; gap: 4px; margin: 6px 0; }
+.czm-map-label-input { flex: 1; min-width: 0; font-size: var(--font-ui-smaller); }
+.czm-map-label button { font-size: var(--font-ui-smaller); padding: 3px 8px; height: auto; }
+.czm-map-rename { font-size: var(--font-ui-small); font-weight: 600; width: 100%; }
+.czm-act-delete.is-armed { color: var(--text-on-accent); background: var(--color-red); }
+.czm-map-linking { color: var(--color-orange); }
+.czm-map-conflict { margin: 6px 0; padding: 6px 8px; border-left: 3px solid var(--color-red); background: color-mix(in srgb, var(--color-red) 10%, transparent); border-radius: 4px; }
+.czm-map-conflict-text { color: var(--color-red); font-size: var(--font-ui-small); font-weight: 600; }
+.czm-map-conflict button, .czm-act-adopt { font-size: var(--font-ui-smaller); padding: 3px 8px; height: auto; margin: 4px 4px 0 0; }
+.czm-map-new { position: absolute; z-index: 5; width: 240px; display: none; padding: 8px; border-radius: 8px; background: var(--background-secondary); border: 1px solid var(--background-modifier-border); box-shadow: var(--shadow-s); }
+.czm-map-new.is-open { display: block; }
+.czm-map-new-name { width: 100%; margin-bottom: 4px; }
+.czm-map-new-cancel { font-size: var(--font-ui-smaller); padding: 3px 8px; height: auto; margin-top: 4px; opacity: 0.8; }

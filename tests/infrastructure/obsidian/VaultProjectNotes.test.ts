@@ -3,7 +3,7 @@ import { VaultProjectNotes, type VaultAppLike } from "../../../src/infrastructur
 
 const files: Record<string, { fm?: Record<string, unknown>; links?: string[]; body: string }> = {
   "Novel/Novel.md": { fm: { "writing-target": 1000 }, body: "# Plan" },
-  "Novel/Characters/Marta.md": { fm: { type: "character" }, links: ["Ilse"], body: "" },
+  "Novel/Characters/Marta.md": { fm: { type: "character" }, links: ["Ilse"], body: "Elder.\n\n## Relationships\n- [[Ilse]] — sister\n- [[Nobody]] — ?\n" },
   "Novel/Characters/Ilse.md": { body: "" },
   "Novel/One.md": { links: ["Marta#Childhood", "Missing", "One"], body: "# Camp\nMarta and Ilse.\n" },
   "Novel/Story map.md": { fm: { "creative-writer-storymap": 1 }, body: "```json\n{}\n```" },
@@ -42,6 +42,14 @@ describe("VaultProjectNotes", () => {
     expect(one.scenes[0]!.title).toBe("Camp");
     expect(notes.find((n) => n.path === "Novel/Characters/Ilse.md")!.bookmarked).toBe(true);
     expect(notes.find((n) => n.path === "Novel/Characters/Marta.md")!.frontmatter).toEqual({ type: "character" });
+  });
+  it("reads hand-written relationships and resolves their links where it can", async () => {
+    const notes = await source.notes(source.projects()[0]!);
+    expect(notes.find((n) => n.path === "Novel/Characters/Marta.md")!.relations).toEqual([
+      { target: "Ilse", targetPath: "Novel/Characters/Ilse.md", label: "sister", line: 3 },
+      { target: "Nobody", targetPath: null, label: "?", line: 4 },
+    ]);
+    expect(notes.find((n) => n.path === "Novel/One.md")!.relations).toEqual([]);
   });
   it("copes without a bookmarks plugin", async () => {
     const notes = await new VaultProjectNotes({ ...app, internalPlugins: undefined }).notes(source.projects()[0]!);

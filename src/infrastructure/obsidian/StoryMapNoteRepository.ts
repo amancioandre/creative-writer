@@ -36,4 +36,17 @@ export class StoryMapNoteRepository implements StoryMapRepository {
   async save(project: ProjectSpec, file: StoryMapFile): Promise<void> {
     await this.vault.write(StoryMapNoteRepository.pathFor(project), serializeStoryMapNote(file, project.name));
   }
+
+  private queue: Promise<unknown> = Promise.resolve();
+
+  /** Updates are serialised so two quick edits (a drag, then a reading) cannot interleave their read and write. */
+  update(project: ProjectSpec, change: (file: StoryMapFile) => StoryMapFile): Promise<StoryMapFile> {
+    const run = this.queue.then(async () => {
+      const next = change(await this.load(project));
+      await this.save(project, next);
+      return next;
+    });
+    this.queue = run.catch(() => undefined);
+    return run;
+  }
 }

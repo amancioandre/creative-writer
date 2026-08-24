@@ -20,7 +20,8 @@ const notes = {
 function memoryRepo() {
   let file: StoryMapFile = EMPTY_STORY_MAP_FILE;
   let saves = 0;
-  return { load: async () => file, save: async (_p: ProjectSpec, f: StoryMapFile) => { file = f; saves++; }, get file() { return file; }, get saves() { return saves; } };
+  const save = async (_p: ProjectSpec, f: StoryMapFile) => { file = f; saves++; };
+  return { load: async () => file, save, update: async (p: ProjectSpec, change: (f: StoryMapFile) => StoryMapFile) => { await save(p, change(file)); return file; }, get file() { return file; }, get saves() { return saves; } };
 }
 
 describe("AnalyzeSceneRelations", () => {

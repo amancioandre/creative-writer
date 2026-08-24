@@ -16,6 +16,17 @@ export interface ProjectNote {
   /** Headings bookmarked in this note. */
   readonly bookmarkedHeadings: readonly string[];
   readonly scenes: readonly Scene[];
+  /** Relationships written under `## Relationships` in this note; `targetPath` when the link resolved. */
+  readonly relations?: readonly ProjectRelation[];
+}
+
+export interface ProjectRelation {
+  /** Link target as written. */
+  readonly target: string;
+  readonly targetPath: string | null;
+  readonly label: string;
+  /** 0-based line of the list item in the note. */
+  readonly line: number;
 }
 
 export interface BuildOptions {
@@ -140,7 +151,7 @@ export function buildStoryGraph(project: string, notes: readonly ProjectNote[], 
     if (cur) {
       const ev = evidence && !cur.evidence.some((e) => sceneKey(e) === sceneKey(evidence)) ? [...cur.evidence, evidence] : cur.evidence;
       edges.set(key, { ...cur, weight: cur.weight + 1, evidence: ev, stale: cur.stale && stale });
-    } else edges.set(key, { from, to, kind, layer: layerOf(kind), source, weight: 1, label, evidence: evidence ? [evidence] : [], stale });
+    } else edges.set(key, { from, to, kind, layer: layerOf(kind), source, weight: 1, label, evidence: evidence ? [evidence] : [], stale, conflict: [] });
   };
 
   // Explicit layer: links the writer wrote, and which note an entity appears in.
@@ -158,12 +169,23 @@ export function buildStoryGraph(project: string, notes: readonly ProjectNote[], 
     for (let a = 0; a < ids.length; a++) for (let b = a + 1; b < ids.length; b++) add(ids[a]!, ids[b]!, "co-occurrence", "extracted", "", s.ref);
   }
 
-  // Model layers: relations (internal) and references (external), keyed back to entities by name.
   const names = new NameLookup<string>();
   for (const e of entities) {
     names.add(e.name, e.id);
     for (const a of e.aliases) names.add(a, e.id);
   }
+
+  // Authored layer: relationships the writer drew by hand, written in the note they start from.
+  for (const note of sorted) {
+    if (!nodeIds.has(note.path)) continue;
+    for (const rel of note.relations ?? []) {
+      const to = rel.targetPath && nodeIds.has(rel.targetPath) ? rel.targetPath : names.resolve(basenameOf(rel.target));
+      if (!to) continue;
+      add(note.path, to, "authored", "writer", rel.label, { path: note.path, title: RELATIONS_TITLE, line: rel.line });
+    }
+  }
+
+  // Model layers: relations (internal) and references (external), keyed back to entities by name.
   const hashes = new Map(sceneMentions.map((s) => [sceneKey(s.ref), textHash(s.scene.prose)]));
   const eventsByScene = new Map<string, string[]>();
   for (const r of file.readings) {
@@ -199,5 +221,29 @@ export function buildStoryGraph(project: string, notes: readonly ProjectNote[], 
     }))
     .filter((row) => row.words > 0);
 
-  return { project, entities, edges: [...edges.values()], timeline };
+  return { project, entities, edges: markConflicts([...edges.values()]), timeline };
+}
+
+/** The heading an authored relationship's evidence points at. */
+export const RELATIONS_TITLE = "Relationships";
+
+/**
+ * Where the writer and the model describe the same pair differently, both
+ * edges carry the other's labels. Same label (case-insensitive) is
+ * agreement, not conflict; a pair only one side mentions is not either.
+ */
+export function markConflicts(edges: readonly Edge[]): Edge[] {
+  const authored = new Map<string, string[]>(), model = new Map<string, string[]>();
+  for (const e of edges) {
+    const bucket = e.kind === "authored" ? authored : e.kind === "relationship" ? model : null;
+    if (!bucket) continue;
+    const key = pairKey(e.from, e.to);
+    (bucket.get(key) ?? bucket.set(key, []).get(key)!).push(e.label);
+  }
+  const differing = (mine: string, theirs: readonly string[] | undefined) => (theirs ?? []).filter((t) => t.toLowerCase() !== mine.toLowerCase());
+  return edges.map((e) => {
+    if (e.kind === "authored") { const c = differing(e.label, model.get(pairKey(e.from, e.to))); return c.length ? { ...e, conflict: c } : e; }
+    if (e.kind === "relationship") { const c = differing(e.label, authored.get(pairKey(e.from, e.to))); return c.length ? { ...e, conflict: c } : e; }
+    return e;
+  });
 }

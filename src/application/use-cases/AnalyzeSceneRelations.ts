@@ -61,8 +61,7 @@ export class AnalyzeSceneRelations {
       const raw = await this.analyser.analyse(scene.prose, names, signal);
       const valid = validateReading(raw, scene.prose, names);
       const reading: SceneReading = { scene: ref, hash, model: this.analyser.name, ...valid };
-      file = putReading(file, reading);
-      await this.repo.save(project, file);
+      file = await this.repo.update(project, (latest) => putReading(latest, reading));
       analysed++;
       onProgress?.({ done: i + 1, total: scenes.length, scene: ref, skipped: false });
     }

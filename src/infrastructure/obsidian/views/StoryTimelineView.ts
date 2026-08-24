@@ -70,7 +70,7 @@ export class StoryTimelineView extends ItemView {
     search.value = this.query;
     search.addEventListener("input", () => { this.query = search.value; this.render(); this.contentEl.querySelector<HTMLInputElement>(".czm-map-search")?.focus(); });
 
-    if (!this.project) { root.createEl("p", { text: "No project yet — add writing-target: 50000 to a note's front matter and its folder becomes one.", cls: "czm-map-hint" }); return; }
+    if (!this.project) { root.createEl("p", { text: "No project yet — put story: true (or writing-target: 50000) in a note's front matter and its folder becomes one.", cls: "czm-map-hint" }); return; }
     const rows = this.graph.timeline;
     const q = this.query.trim().toLowerCase();
     const settings = this.source.settings();

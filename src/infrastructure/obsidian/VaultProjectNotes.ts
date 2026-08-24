@@ -1,6 +1,7 @@
 import type { ProjectNotes } from "../../application/ports/ProjectNotes";
 import { inScope, parseProjectFrontmatter, type ProjectSpec } from "../../domain/progress/Project";
 import type { ProjectNote } from "../../domain/story/BuildGraph";
+import { parseRelations } from "../../domain/story/Relations";
 import { STORY_MAP_FLAG } from "../../domain/story/StoryMapFile";
 import { splitScenes } from "../../domain/text/Scenes";
 
@@ -47,13 +48,15 @@ export class VaultProjectNotes implements ProjectNotes {
         const target = this.app.metadataCache.getFirstLinkpathDest(l.link.split("#")[0]!.split("|")[0]!, f.path);
         if (target && target.path !== f.path) links.add(target.path);
       }
+      const text = await this.app.vault.cachedRead(f);
       out.push({
         path: f.path,
         frontmatter: fm ?? {},
         links: [...links],
         bookmarked: bookmarks.files.has(f.path),
         bookmarkedHeadings: bookmarks.headings.get(f.path) ?? [],
-        scenes: splitScenes(await this.app.vault.cachedRead(f)),
+        scenes: splitScenes(text),
+        relations: parseRelations(text).map((r) => ({ ...r, targetPath: this.app.metadataCache.getFirstLinkpathDest(r.target, f.path)?.path ?? null })),
       });
     }
     return out;

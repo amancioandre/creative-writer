@@ -4,7 +4,7 @@ import { DEFAULT_FORCES } from "../../../src/domain/settings/Settings";
 import type { Edge, Entity } from "../../../src/domain/story/StoryGraph";
 
 const ent = (id: string): Entity => ({ id, name: id, kind: "character", path: null, aliases: [], bookmarked: false, appearances: [], mentions: 0 });
-const edge = (from: string, to: string, weight = 1): Edge => ({ from, to, kind: "co-occurrence", layer: "internal", source: "extracted", weight, label: "", evidence: [], stale: false });
+const edge = (from: string, to: string, weight = 1): Edge => ({ from, to, kind: "co-occurrence", layer: "internal", source: "extracted", weight, label: "", evidence: [], stale: false, conflict: [] });
 const dist = (s: Simulation, a: string, b: string) => Math.hypot(s.position(a)!.x - s.position(b)!.x, s.position(a)!.y - s.position(b)!.y);
 
 describe("Simulation", () => {
@@ -50,6 +50,31 @@ describe("Simulation", () => {
     s.setForces({ ...DEFAULT_FORCES, gravity: 0.5 });
     s.settle(500);
     expect(s.position("a")).not.toEqual({ x: 100, y: 100 });
+  });
+  it("starts a seeded node where it was seeded, pinned when asked, and reports pinned positions", () => {
+    const s = new Simulation(DEFAULT_FORCES, 0, 0);
+    s.seed("a", { x: 200, y: -50 }, true);
+    s.seed("b", { x: -200, y: 50 });
+    s.setGraph(["a", "b", "c"].map(ent), [edge("a", "b"), edge("b", "c")]);
+    expect(s.position("a")).toEqual({ x: 200, y: -50 });
+    expect(s.position("b")).toEqual({ x: -200, y: 50 });
+    expect(s.isPinned("a")).toBe(true);
+    expect(s.isPinned("b")).toBe(false);
+    s.settle(300);
+    expect(s.position("a")).toEqual({ x: 200, y: -50 });
+    expect(s.position("b")).not.toEqual({ x: -200, y: 50 });
+    // Seeding a node already on the map moves it there.
+    s.seed("c", { x: 5, y: 5 });
+    expect(s.position("c")).toEqual({ x: 5, y: 5 });
+    expect([...s.pinnedPositions().keys()]).toEqual(["a"]);
+  });
+  it("pins a node that was dragged, so the hand-placed position survives", () => {
+    const s = new Simulation(DEFAULT_FORCES, 0, 0);
+    s.setGraph(["a", "b"].map(ent), [edge("a", "b")]);
+    s.drag("a", { x: 100, y: 100 });
+    s.settle(300);
+    expect(s.position("a")).toEqual({ x: 100, y: 100 });
+    expect(s.pinnedPositions().get("a")).toEqual({ x: 100, y: 100 });
   });
   it("handles an empty graph", () => {
     const s = new Simulation(DEFAULT_FORCES, 0, 0);

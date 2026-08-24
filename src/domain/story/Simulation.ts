@@ -23,19 +23,33 @@ interface Body {
  */
 export class Simulation {
   private readonly bodies = new Map<string, Body>();
+  private readonly seeds = new Map<string, { p: Point; pinned: boolean }>();
   private ids: string[] = [];
   private links: { a: string; b: string; w: number }[] = [];
   private alpha = 1;
 
   constructor(private forces: ForceSettings, private cx: number, private cy: number) {}
 
-  /** Replace the graph, keeping positions of nodes that survive. New nodes start near a neighbour or on the spiral. */
+  /**
+   * Where a node should appear when it first joins the graph — under the
+   * cursor that created it, or where the writer pinned it last time. A
+   * seed for a node already present moves it there (and pins it if asked).
+   */
+  seed(id: string, p: Point, pinned = false): void {
+    const b = this.bodies.get(id);
+    if (b) { b.x = p.x; b.y = p.y; b.vx = 0; b.vy = 0; b.pinned = b.pinned || pinned; return; }
+    this.seeds.set(id, { p, pinned });
+  }
+
+  /** Replace the graph, keeping positions of nodes that survive. New nodes start at their seed, or on the spiral. */
   setGraph(entities: readonly Entity[], edges: readonly Edge[]): void {
     const next = new Map<string, Body>();
     const radius = 60 + 12 * Math.sqrt(entities.length);
     entities.forEach((e, i) => {
       const old = this.bodies.get(e.id);
       if (old) { next.set(e.id, old); return; }
+      const seed = this.seeds.get(e.id);
+      if (seed) { this.seeds.delete(e.id); next.set(e.id, { x: seed.p.x, y: seed.p.y, vx: 0, vy: 0, pinned: seed.pinned }); return; }
       const a = i * 2.399963;
       const r = radius * Math.sqrt((i + 0.5) / Math.max(1, entities.length));
       next.set(e.id, { x: this.cx + r * Math.cos(a), y: this.cy + r * Math.sin(a), vx: 0, vy: 0, pinned: false });
@@ -46,12 +60,14 @@ export class Simulation {
     this.links = edges
       .filter((e) => e.kind !== "appearance" && this.bodies.has(e.from) && this.bodies.has(e.to))
       .map((e) => ({ a: e.from, b: e.to, w: Math.min(3, Math.sqrt(e.weight)) }));
-    // Drop a new node next to its first neighbour rather than across the map.
-    for (const l of this.links) {
-      const a = this.bodies.get(l.a)!, b = this.bodies.get(l.b)!;
-      if (!next.has(l.a) || !next.has(l.b)) continue;
-    }
     this.reheat();
+  }
+
+  /** Ids of pinned nodes with where they sit — what is worth remembering. */
+  pinnedPositions(): Map<string, Point> {
+    const out = new Map<string, Point>();
+    for (const [id, b] of this.bodies) if (b.pinned) out.set(id, { x: b.x, y: b.y });
+    return out;
   }
 
   setForces(f: ForceSettings): void {
@@ -83,11 +99,11 @@ export class Simulation {
     return out;
   }
 
-  /** Hold a node where the pointer put it; the rest of the graph keeps reacting. */
+  /** Hold a node where the pointer put it; the rest of the graph keeps reacting. A dragged node stays pinned — hand-placed means remembered. */
   drag(id: string, p: Point): void {
     const b = this.bodies.get(id);
     if (!b) return;
-    b.x = p.x; b.y = p.y; b.vx = 0; b.vy = 0;
+    b.x = p.x; b.y = p.y; b.vx = 0; b.vy = 0; b.pinned = true;
     this.reheat(0.3);
   }
 

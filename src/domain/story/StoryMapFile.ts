@@ -45,15 +45,31 @@ export interface SceneReading {
   readonly events: readonly ModelEvent[];
 }
 
+/** Where the writer put a node by hand. Only pinned nodes are remembered; the rest settle deterministically. */
+export interface LayoutPoint {
+  readonly x: number;
+  readonly y: number;
+}
+
+export type Layout = Readonly<Record<string, LayoutPoint>>;
+
 export interface StoryMapFile {
   readonly version: number;
   readonly readings: readonly SceneReading[];
+  /** Node id → hand-placed position. */
+  readonly layout: Layout;
 }
 
-export const EMPTY_STORY_MAP_FILE: StoryMapFile = { version: STORY_MAP_VERSION, readings: [] };
+export const EMPTY_STORY_MAP_FILE: StoryMapFile = { version: STORY_MAP_VERSION, readings: [], layout: {} };
 
 export function normalizeStoryMapFile(raw: unknown): StoryMapFile {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const layout: Record<string, LayoutPoint> = {};
+  const rawLayout = (r.layout && typeof r.layout === "object" ? r.layout : {}) as Record<string, unknown>;
+  for (const [id, v] of Object.entries(rawLayout)) {
+    const p = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
+    if (typeof p.x === "number" && Number.isFinite(p.x) && typeof p.y === "number" && Number.isFinite(p.y)) layout[id] = { x: Math.round(p.x), y: Math.round(p.y) };
+  }
   const readings: SceneReading[] = [];
   for (const item of Array.isArray(r.readings) ? (r.readings as unknown[]) : []) {
     const o = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
@@ -68,19 +84,29 @@ export function normalizeStoryMapFile(raw: unknown): StoryMapFile {
       events: list(o.events).map((x) => ({ summary: str(x.summary), participants: Array.isArray(x.participants) ? (x.participants as unknown[]).map(str).filter(Boolean) : [], evidence: str(x.evidence) })).filter((x) => x.summary),
     });
   }
-  return { version: STORY_MAP_VERSION, readings };
+  return { version: STORY_MAP_VERSION, readings, layout };
 }
 
 /** Replaces any earlier reading of the same scene. Readings are keyed by path and title so a renamed heading reads as new. */
 export function putReading(file: StoryMapFile, reading: SceneReading): StoryMapFile {
   const key = (s: SceneRef) => `${s.path}#${s.title}`;
   const rest = file.readings.filter((r) => key(r.scene) !== key(reading.scene));
-  return { version: STORY_MAP_VERSION, readings: [...rest, reading] };
+  return { ...file, version: STORY_MAP_VERSION, readings: [...rest, reading] };
+}
+
+/** Replaces the remembered layout wholesale — the view owns which nodes are pinned. */
+export function setLayout(file: StoryMapFile, layout: Layout): StoryMapFile {
+  const next: Record<string, LayoutPoint> = {};
+  for (const [id, p] of Object.entries(layout)) next[id] = { x: Math.round(p.x), y: Math.round(p.y) };
+  return { ...file, layout: next };
 }
 
 export function renameReadings(file: StoryMapFile, from: string, to: string): StoryMapFile {
-  if (!file.readings.some((r) => r.scene.path === from)) return file;
-  return { ...file, readings: file.readings.map((r) => (r.scene.path === from ? { ...r, scene: { ...r.scene, path: to } } : r)) };
+  const movesLayout = from in file.layout, movesReadings = file.readings.some((r) => r.scene.path === from);
+  if (!movesLayout && !movesReadings) return file;
+  const layout = { ...file.layout };
+  if (movesLayout) { layout[to] = layout[from]!; delete layout[from]; }
+  return { ...file, layout, readings: file.readings.map((r) => (r.scene.path === from ? { ...r, scene: { ...r.scene, path: to } } : r)) };
 }
 
 /** The note's body: a short explanation for a human who opens it, then the data. */
@@ -90,7 +116,7 @@ export function serializeStoryMapNote(file: StoryMapFile, project: string): stri
     "creative-writer: false",
     `${STORY_MAP_FLAG}: ${STORY_MAP_VERSION}`,
     "---",
-    `Story map data for **${project}**. Creative Writer rebuilds the map from your notes; this file only keeps what the model inferred (relationships, references, events per scene) so it follows the project across devices. Safe to sync, safe to delete — you would just re-run the analysis.`,
+    `Story map data for **${project}**. Creative Writer rebuilds the map from your notes; this file only keeps what the model inferred (relationships, references, events per scene) and where you pinned nodes by hand, so both follow the project across devices. Relationships you draw yourself live in the entity notes, not here. Safe to sync, safe to delete — you would just re-run the analysis and re-place pinned nodes.`,
     "",
     "```json",
     JSON.stringify(file, null, 2),

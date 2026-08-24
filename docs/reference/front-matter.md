@@ -14,7 +14,8 @@ The note whose front matter declares a [project](/guide/projects). Any note in t
 
 | Key | Values | Effect |
 |---|---|---|
-| `writing-target` | words, e.g. `80000` | Makes the note's folder a project. Required for everything else here. |
+| `writing-target` | words, e.g. `80000` | Makes the note's folder a project with a word goal. |
+| `story` | `true` | Makes the note's folder a project with **no** goal — a book you are reading and mapping, or a map sketched before the draft. The story map and timeline see it; the writing desk does not. Either key is enough; `writing-target` adds the goal on top. |
 | `writing-deadline` | `YYYY-MM-DD` | Pace and verdict against a date. |
 | `writing-daily` | words, e.g. `500` | A per-project daily goal with its own streak. |
 | `writing-name` | text | Display name instead of the folder name. |

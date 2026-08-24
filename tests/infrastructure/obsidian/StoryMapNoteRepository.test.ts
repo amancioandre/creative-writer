@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { StoryMapNoteRepository } from "../../../src/infrastructure/obsidian/StoryMapNoteRepository";
-import { EMPTY_STORY_MAP_FILE, putReading } from "../../../src/domain/story/StoryMapFile";
+import { EMPTY_STORY_MAP_FILE, putReading, setLayout } from "../../../src/domain/story/StoryMapFile";
 import type { ProjectSpec } from "../../../src/domain/progress/Project";
 
 function fakeVault(files: Record<string, string> = {}) {
@@ -23,5 +23,17 @@ describe("StoryMapNoteRepository", () => {
     await repo.save(folderProject, file);
     expect(vault.files["Novel/Story map.md"]).toContain("creative-writer-storymap: 1");
     expect(await repo.load(folderProject)).toEqual(file);
+  });
+  it("serialises updates so a layout save and a reading save both land", async () => {
+    const vault = fakeVault();
+    const repo = new StoryMapNoteRepository(vault);
+    const reading = { scene: { path: "Novel/One.md", title: "A", line: 0 }, hash: "h", model: "m", relations: [], references: [], events: [] };
+    await Promise.all([
+      repo.update(folderProject, (f) => setLayout(f, { "Novel/Characters/Ilse.md": { x: 1, y: 2 } })),
+      repo.update(folderProject, (f) => putReading(f, reading)),
+    ]);
+    const final = await repo.load(folderProject);
+    expect(final.layout).toEqual({ "Novel/Characters/Ilse.md": { x: 1, y: 2 } });
+    expect(final.readings).toHaveLength(1);
   });
 });

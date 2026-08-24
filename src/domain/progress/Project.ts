@@ -9,6 +9,12 @@ import type { WritingLog } from "./WritingLog";
  *   writing-daily: 500           (optional; words per day on this project)
  *   story-ignore: [LOW, POV]     (optional; capitalised words the story map must not take for names)
  * The folder — or that one note — is what gets counted.
+ *
+ * A folder can also be a project with no goal at all:
+ *   story: true
+ * — a novel being read and mapped rather than written, or a map sketched
+ * before a word exists. The story map and timeline see it; the writing
+ * desk, which paces words against a target, does not.
  */
 export interface ProjectSpec {
   readonly name: string;
@@ -16,6 +22,7 @@ export interface ProjectSpec {
   readonly notePath: string;
   /** A folder prefix ending in "/" (or "" for the vault root), or a single note's path. */
   readonly scope: string;
+  /** 0 for a `story: true` project: nothing to count towards. */
   readonly targetWords: number;
   readonly deadline: Day | null;
   /** Words to add to this project per day; 0 = none. */
@@ -27,7 +34,9 @@ export interface ProjectSpec {
 export function parseProjectFrontmatter(frontmatter: unknown, notePath: string): ProjectSpec | null {
   const fm = (frontmatter && typeof frontmatter === "object" ? frontmatter : {}) as Record<string, unknown>;
   const target = Number(fm["writing-target"]);
-  if (!Number.isFinite(target) || target <= 0) return null;
+  const hasTarget = Number.isFinite(target) && target > 0;
+  const storyOnly = fm["story"] === true || fm["story"] === "true";
+  if (!hasTarget && !storyOnly) return null;
   const rawDeadline = fm["writing-deadline"];
   const deadline = isDay(rawDeadline) ? rawDeadline : rawDeadline instanceof Date ? toIso(rawDeadline) : null;
   const slash = notePath.lastIndexOf("/");
@@ -38,7 +47,7 @@ export function parseProjectFrontmatter(frontmatter: unknown, notePath: string):
   const daily = Number(fm["writing-daily"]);
   const rawIgnore = fm["story-ignore"];
   const ignoredNames = (Array.isArray(rawIgnore) ? rawIgnore : typeof rawIgnore === "string" ? rawIgnore.split(",") : []).filter((x): x is string => typeof x === "string").map((x) => x.trim()).filter(Boolean);
-  return { name, notePath, scope: noteScope ? notePath : folder, targetWords: Math.floor(target), deadline, dailyWords: Number.isFinite(daily) && daily > 0 ? Math.floor(daily) : 0, ignoredNames };
+  return { name, notePath, scope: noteScope ? notePath : folder, targetWords: hasTarget ? Math.floor(target) : 0, deadline, dailyWords: Number.isFinite(daily) && daily > 0 ? Math.floor(daily) : 0, ignoredNames };
 }
 
 function toIso(d: Date): Day {

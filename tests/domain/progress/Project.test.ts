@@ -23,6 +23,13 @@ describe("parseProjectFrontmatter", () => {
     const spec = parseProjectFrontmatter({ "writing-target": 100, "writing-deadline": new Date(Date.UTC(2026, 11, 1)) }, "root.md");
     expect(spec).toMatchObject({ name: "root", scope: "", deadline: "2026-12-01" });
   });
+  it("accepts story: true as a project with no target — mapped, not paced", () => {
+    expect(parseProjectFrontmatter({ story: true }, "Reading/Dune/Dune.md")).toEqual({ name: "Dune", scope: "Reading/Dune/", targetWords: 0, deadline: null, dailyWords: 0, notePath: "Reading/Dune/Dune.md", ignoredNames: [] });
+    expect(parseProjectFrontmatter({ story: "true", "story-ignore": ["Bene"] }, "a/b.md")!.ignoredNames).toEqual(["Bene"]);
+    expect(parseProjectFrontmatter({ story: true, "writing-target": 500 }, "a/b.md")!.targetWords).toBe(500);
+    expect(parseProjectFrontmatter({ story: false }, "a.md")).toBeNull();
+    expect(parseProjectFrontmatter({ story: "yes" }, "a.md")).toBeNull();
+  });
   it("ignores notes without a positive target or bad deadlines", () => {
     expect(parseProjectFrontmatter({}, "a.md")).toBeNull();
     expect(parseProjectFrontmatter({ "writing-target": 0 }, "a.md")).toBeNull();

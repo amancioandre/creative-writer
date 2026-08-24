@@ -115,6 +115,46 @@ describe("buildStoryGraph", () => {
     const g2 = buildStoryGraph("Novel", [...notes].reverse(), EMPTY_STORY_MAP_FILE);
     expect(g2).toEqual(g);
   });
+
+  describe("authored relationships", () => {
+    const withRelations = notes.map((n) => (n.path === "Novel/Characters/Marta Kovács.md"
+      ? { ...n, relations: [
+        { target: "Ilse", targetPath: "Novel/Characters/Ilse.md", label: "sister", line: 4 },
+        { target: "Lisbon", targetPath: null, label: "born in", line: 5 },
+        { target: "Nobody", targetPath: null, label: "?", line: 6 },
+        { target: "Marta Kovács", targetPath: "Novel/Characters/Marta Kovács.md", label: "self", line: 7 },
+      ] }
+      : n));
+
+    it("become explicit writer edges with the note as evidence, resolved by path or by name; unknown targets and self-links are dropped", () => {
+      const g2 = buildStoryGraph("Novel", withRelations, EMPTY_STORY_MAP_FILE);
+      const authored = g2.edges.filter((e) => e.kind === "authored");
+      expect(authored.map((e) => [e.to, e.label])).toEqual([["Novel/Characters/Ilse.md", "sister"], ["Novel/Places/Lisbon.md", "born in"]]);
+      const sister = authored[0]!;
+      expect(sister.from).toBe("Novel/Characters/Marta Kovács.md");
+      expect(sister.layer).toBe("explicit");
+      expect(sister.source).toBe("writer");
+      expect(sister.evidence).toEqual([{ path: "Novel/Characters/Marta Kovács.md", title: "Relationships", line: 4 }]);
+      expect(sister.conflict).toEqual([]);
+    });
+
+    it("flags a pair where the writer and the model disagree, on both edges, and not where they agree", () => {
+      const camp = splitScenes(chapterOne)[0]!;
+      const file = putReading(EMPTY_STORY_MAP_FILE, {
+        scene: { path: "Novel/Chapters/One.md", title: "Camp", line: 0 }, hash: textHash(camp.prose), model: "m",
+        relations: [{ from: "Marta", to: "Ilse", label: "Rival", evidence: "x" }, { from: "Marta", to: "Lisbon", label: "Born In", evidence: "x" }],
+        references: [], events: [],
+      });
+      const g2 = buildStoryGraph("Novel", withRelations, file);
+      const mine = g2.edges.find((e) => e.kind === "authored" && e.label === "sister")!;
+      const theirs = g2.edges.find((e) => e.kind === "relationship" && e.label === "Rival")!;
+      expect(mine.conflict).toEqual(["Rival"]);
+      expect(theirs.conflict).toEqual(["sister"]);
+      expect(g2.edges.find((e) => e.kind === "authored" && e.label === "born in")!.conflict).toEqual([]);
+      expect(g2.edges.find((e) => e.kind === "relationship" && e.label === "Born In")!.conflict).toEqual([]);
+      expect(g2.edges.filter((e) => e.kind === "co-occurrence").every((e) => e.conflict.length === 0)).toBe(true);
+    });
+  });
 });
 
 describe("looksLikeName", () => {

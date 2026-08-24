@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { EMPTY_STORY_MAP_FILE, normalizeStoryMapFile, parseStoryMapNote, putReading, renameReadings, serializeStoryMapNote, type SceneReading } from "../../../src/domain/story/StoryMapFile";
+import { EMPTY_STORY_MAP_FILE, normalizeStoryMapFile, parseStoryMapNote, putReading, renameReadings, serializeStoryMapNote, setLayout, type SceneReading } from "../../../src/domain/story/StoryMapFile";
 
 const reading: SceneReading = {
   scene: { path: "Chapters/One.md", title: "Camp", line: 3 },
@@ -30,10 +30,20 @@ describe("StoryMapFile", () => {
     const c = putReading(b, { ...reading, scene: { ...reading.scene, title: "Creek" } });
     expect(c.readings).toHaveLength(2);
   });
-  it("follows a note rename", () => {
-    const a = putReading(EMPTY_STORY_MAP_FILE, reading);
-    expect(renameReadings(a, "Chapters/One.md", "Chapters/1.md").readings[0]!.scene.path).toBe("Chapters/1.md");
+  it("follows a note rename, for readings and for layout", () => {
+    const a = setLayout(putReading(EMPTY_STORY_MAP_FILE, reading), { "Chapters/One.md": { x: 1, y: 2 }, "Characters/Ilse.md": { x: 3, y: 4 } });
+    const b = renameReadings(a, "Chapters/One.md", "Chapters/1.md");
+    expect(b.readings[0]!.scene.path).toBe("Chapters/1.md");
+    expect(b.layout).toEqual({ "Chapters/1.md": { x: 1, y: 2 }, "Characters/Ilse.md": { x: 3, y: 4 } });
     expect(renameReadings(a, "nope.md", "x.md")).toBe(a);
+    expect(renameReadings(a, "Characters/Ilse.md", "Characters/Ilsa.md").layout["Characters/Ilsa.md"]).toEqual({ x: 3, y: 4 });
+  });
+  it("keeps hand-placed layout beside the readings, rounded, and drops junk", () => {
+    const a = setLayout(putReading(EMPTY_STORY_MAP_FILE, reading), { "Characters/Ilse.md": { x: 10.6, y: -3.2 } });
+    expect(a.layout).toEqual({ "Characters/Ilse.md": { x: 11, y: -3 } });
+    expect(parseStoryMapNote(serializeStoryMapNote(a, "Novel"))).toEqual(a);
+    expect(putReading(a, { ...reading, hash: "z" }).layout).toEqual(a.layout);
+    expect(normalizeStoryMapFile({ layout: { ok: { x: 1, y: 2 }, bad: { x: "1" }, worse: 3, nan: { x: NaN, y: 1 } } }).layout).toEqual({ ok: { x: 1, y: 2 } });
   });
   it("normalises junk defensively", () => {
     const f = normalizeStoryMapFile({ readings: [{ scene: { path: "a.md" }, hash: "h", relations: [{ from: "A" }, { from: "A", to: "B" }], references: [{ name: "X", kind: "weird" }], events: [{ summary: "s", participants: ["p", 3] }] }, 42, { scene: {} }] });

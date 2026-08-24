@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { WorkspaceLeaf, Setting } from "obsidian";
 import { STORY_MAP_VIEW_TYPE, StoryMapView, edgeSummary, type StoryMapSource } from "../../../src/infrastructure/obsidian/views/StoryMapView";
-import { buildStoryGraph, type ProjectNote } from "../../../src/domain/story/BuildGraph";
+import { buildStoryGraph, type ProjectNote, type ProjectRelation } from "../../../src/domain/story/BuildGraph";
 import { splitScenes } from "../../../src/domain/text/Scenes";
-import { EMPTY_STORY_MAP_FILE, putReading } from "../../../src/domain/story/StoryMapFile";
+import { EMPTY_STORY_MAP_FILE, putReading, type Layout } from "../../../src/domain/story/StoryMapFile";
 import { textHash } from "../../../src/domain/story/StoryGraph";
 import type { ProjectSpec } from "../../../src/domain/progress/Project";
 import { DEFAULT_STORY_MAP, type StoryMapSettings } from "../../../src/domain/settings/Settings";
@@ -26,19 +26,32 @@ const file = putReading(EMPTY_STORY_MAP_FILE, {
 });
 
 function source(overrides: Partial<StoryMapSource> = {}) {
-  const calls = { opened: [] as string[], revealed: [] as string[], promoted: [] as string[], ignored: [] as string[], aliased: [] as string[], timeline: 0 };
+  const calls = { opened: [] as string[], revealed: [] as string[], promoted: [] as string[], ignored: [] as string[], aliased: [] as string[], relations: [] as string[], renamed: [] as string[], removed: [] as string[], layouts: [] as Layout[], timeline: 0 };
   let settings: StoryMapSettings = DEFAULT_STORY_MAP;
+  // Relations written through the source show up in the next build, as they would from the vault.
+  const authored: ProjectRelation[] = [];
   const src: StoryMapSource = {
     projects: () => [novel],
     activeProject: () => novel,
     activeNotePath: () => "Novel/One.md",
-    build: async () => buildStoryGraph("Novel", notes, file),
+    build: async () => buildStoryGraph("Novel", notes.map((n) => (n.path === "Novel/Characters/Marta Kovács.md" ? { ...n, relations: authored } : n)), file),
     openNote: (p) => { calls.opened.push(p); },
     reveal: (r) => { calls.revealed.push(`${r.title}@${r.line}`); },
     promote: async (_p, name, kind) => { calls.promoted.push(`${kind}:${name}`); return `Novel/${name}.md`; },
     ignore: async (_p, name) => { calls.ignored.push(name); },
     unignore: async (_p, name) => { calls.ignored = calls.ignored.filter((n) => n !== name); },
     alias: async (_p, path, name) => { calls.aliased.push(`${path}+${name}`); },
+    setRelation: async (from, to, label, previous) => {
+      calls.relations.push(`${from} -> ${to}: ${label}${previous !== undefined ? ` (was ${previous})` : ""}`);
+      const i = authored.findIndex((r) => r.targetPath === to && (previous === undefined || r.label === previous));
+      const rel = { target: to, targetPath: to, label, line: 3 };
+      if (i >= 0) authored[i] = rel; else authored.push(rel);
+    },
+    removeRelation: async (from, to, label) => { calls.relations.push(`${from} -x ${to}: ${label}`); const i = authored.findIndex((r) => r.targetPath === to && r.label === label); if (i >= 0) authored.splice(i, 1); },
+    rename: async (path, name) => { calls.renamed.push(`${path} -> ${name}`); return `Novel/Characters/${name}.md`; },
+    remove: async (path) => { calls.removed.push(path); },
+    loadLayout: async () => ({}),
+    saveLayout: async (_p, layout) => { calls.layouts.push(layout); },
     analyse: async () => { throw new Error("no model"); },
     settings: () => settings,
     updateSettings: (next) => { settings = next; },
@@ -245,11 +258,181 @@ describe("StoryMapView", () => {
   });
 
   it("summarises edges", () => {
-    const base = { from: "a", to: "b", layer: "internal" as const, source: "extracted" as const, weight: 2, label: "", evidence: [], stale: false };
+    const base = { from: "a", to: "b", layer: "internal" as const, source: "extracted" as const, weight: 2, label: "", evidence: [], stale: false, conflict: [] };
     expect(edgeSummary({ ...base, kind: "co-occurrence" })).toBe("2 scenes together");
     expect(edgeSummary({ ...base, kind: "relationship", label: "rival" })).toBe("rival");
     expect(edgeSummary({ ...base, kind: "link" })).toBe("linked");
     expect(edgeSummary({ ...base, kind: "reference" })).toBe("reference");
     expect(edgeSummary({ ...base, kind: "appearance" })).toBe("appears · 2");
+    expect(edgeSummary({ ...base, kind: "authored", label: "sister" })).toBe("sister · yours");
+    expect(edgeSummary({ ...base, kind: "authored" })).toBe("related · yours");
+  });
+
+  describe("drawing by hand", () => {
+    const marta = "Novel/Characters/Marta Kovács.md", ilse = "Novel/Characters/Ilse.md", lisbon = "Novel/Places/Lisbon.md";
+
+    it("adds a node from a double-click on the background: name, kind, note created, placed and pinned there", async () => {
+      const { el, calls } = await open();
+      const svg = el.querySelector("svg")!;
+      svg.dispatchEvent(new MouseEvent("dblclick", { clientX: 120, clientY: 80, bubbles: true }));
+      const form = el.querySelector(".czm-map-new.is-open")!;
+      expect(form).not.toBeNull();
+      const input = form.querySelector(".czm-map-new-name") as HTMLInputElement;
+      input.value = "The Guild";
+      (form.querySelector(".czm-act-faction") as HTMLElement).click();
+      await tick(); await tick();
+      expect(calls.promoted).toEqual(["faction:The Guild"]);
+      expect(el.querySelector(".czm-map-new.is-open")).toBeNull();
+      // The panel's Add button opens the same form; Esc closes it.
+      (el.querySelector(".czm-map-add") as HTMLElement).click();
+      expect(el.querySelector(".czm-map-new.is-open")).not.toBeNull();
+      el.querySelector<HTMLElement>(".czm-map")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      expect(el.querySelector(".czm-map-new.is-open")).toBeNull();
+    });
+
+    it("connects two nodes from the card: link mode, a label form, a relationship written into the first note", async () => {
+      const { el, calls } = await open();
+      clickNode(el, marta);
+      (el.querySelector(".czm-act-connect") as HTMLElement).click();
+      expect(el.querySelector(".czm-map")!.classList.contains("is-linking")).toBe(true);
+      expect(el.querySelector(".czm-map-status")!.textContent).toContain("Connecting Marta Kovács");
+      clickNode(el, lisbon);
+      const card = el.querySelector(".czm-map-card.is-open")!;
+      expect(card.querySelector(".czm-map-card-name")?.textContent).toBe("Marta Kovács — Lisbon");
+      const input = card.querySelector(".czm-map-label-input") as HTMLInputElement;
+      input.value = "born in";
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+      await tick(); await tick(); await tick();
+      expect(calls.relations).toEqual([`${marta} -> ${lisbon}: born in`]);
+      const line = el.querySelector(".czm-edge-authored")!;
+      expect(line.getAttribute("data-from")).toBe(marta);
+      expect(line.getAttribute("data-to")).toBe(lisbon);
+      expect(el.querySelector(".czm-map")!.classList.contains("is-linking")).toBe(false);
+      // The new edge is selected, with its own card.
+      expect(el.querySelector(".czm-edge.is-selected")?.classList.contains("czm-edge-authored")).toBe(true);
+      expect(el.querySelector(".czm-map-card.is-open")!.textContent).toContain("born in · yours");
+    });
+
+    it("starts link mode with shift-click, cancels with Esc, and refuses ends without a note", async () => {
+      const { el } = await open();
+      const g = el.querySelector<SVGGElement>(`.czm-node[data-id="${marta}"]`)!;
+      g.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+      g.dispatchEvent(new MouseEvent("pointerup", { bubbles: true, shiftKey: true }));
+      expect(el.querySelector(".czm-map")!.classList.contains("is-linking")).toBe(true);
+      clickNode(el, "name:zsofi");
+      expect(el.querySelector(".czm-map-status")!.textContent).toContain("no note yet");
+      expect(el.querySelector(".czm-map")!.classList.contains("is-linking")).toBe(true);
+      el.querySelector<HTMLElement>(".czm-map")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      expect(el.querySelector(".czm-map")!.classList.contains("is-linking")).toBe(false);
+    });
+
+    it("relabels and removes an authored relationship from its card", async () => {
+      const { el: v, calls } = await open();
+      clickNode(v, marta);
+      (v.querySelector(".czm-act-connect") as HTMLElement).click();
+      clickNode(v, ilse);
+      const input = v.querySelector(".czm-map-label-input") as HTMLInputElement;
+      input.value = "sister";
+      (v.querySelector(".czm-act-save-label") as HTMLElement).click();
+      await tick(); await tick(); await tick();
+      const card = v.querySelector(".czm-map-card.is-open")!;
+      expect(card.textContent).toContain("written in Marta Kovács's note");
+      expect(card.textContent).toContain("Written in");
+      const relabel = card.querySelector(".czm-map-label-input") as HTMLInputElement;
+      relabel.value = "half-sister";
+      (card.querySelector(".czm-act-save-label") as HTMLElement).click();
+      await tick(); await tick(); await tick();
+      expect(calls.relations.at(-1)).toBe(`${marta} -> ${ilse}: half-sister (was sister)`);
+      (v.querySelector(".czm-act-remove-relation") as HTMLElement).click();
+      await tick(); await tick(); await tick();
+      expect(calls.relations.at(-1)).toBe(`${marta} -x ${ilse}: half-sister`);
+      expect(v.querySelectorAll(".czm-edge-authored")).toHaveLength(0);
+    });
+
+    it("shows a disagreement between the writer and the model on both edges, and lets either side be adopted", async () => {
+      const { el, calls } = await open();
+      clickNode(el, marta);
+      (el.querySelector(".czm-act-connect") as HTMLElement).click();
+      clickNode(el, ilse);
+      (el.querySelector(".czm-map-label-input") as HTMLInputElement).value = "rival";
+      (el.querySelector(".czm-act-save-label") as HTMLElement).click();
+      await tick(); await tick(); await tick();
+      expect(el.querySelectorAll(".czm-edge.is-conflict")).toHaveLength(2);
+      const mine = el.querySelector(".czm-map-card.is-open")!;
+      expect(mine.querySelector(".czm-map-conflict-text")!.textContent).toContain("you wrote “rival”; the model read the prose as “sister”");
+      (mine.querySelector(".czm-map-conflict .czm-act-adopt") as HTMLElement).click();
+      await tick(); await tick(); await tick();
+      expect(calls.relations.at(-1)).toBe(`${marta} -> ${ilse}: sister (was rival)`);
+      expect(el.querySelectorAll(".czm-edge.is-conflict")).toHaveLength(0);
+      // From the model's side, now that the two agree: nothing to write down, nothing to replace.
+      (el.querySelector(".czm-edge-relationship") as SVGLineElement).dispatchEvent(new MouseEvent("click"));
+      expect(el.querySelector(".czm-map-card .czm-act-adopt")).toBeNull();
+      expect(el.querySelector(".czm-map-card .czm-map-conflict")).toBeNull();
+    });
+
+    it("offers, on the model's edge, to replace what the writer wrote when they disagree", async () => {
+      const { el, calls } = await open();
+      clickNode(el, marta);
+      (el.querySelector(".czm-act-connect") as HTMLElement).click();
+      clickNode(el, ilse);
+      (el.querySelector(".czm-map-label-input") as HTMLInputElement).value = "rival";
+      (el.querySelector(".czm-act-save-label") as HTMLElement).click();
+      await tick(); await tick(); await tick();
+      (el.querySelector(".czm-edge-relationship") as SVGLineElement).dispatchEvent(new MouseEvent("click"));
+      const card = el.querySelector(".czm-map-card.is-open")!;
+      expect(card.querySelector(".czm-map-conflict-text")!.textContent).toContain("the model read this as “sister”; you wrote “rival”");
+      (card.querySelector(".czm-map-conflict .czm-act-adopt") as HTMLElement).click();
+      await tick(); await tick(); await tick();
+      expect(calls.relations.at(-1)).toBe(`${marta} -> ${ilse}: sister (was rival)`);
+    });
+
+    it("writes the model's reading down as a relationship of the writer's own", async () => {
+      const { el, calls } = await open();
+      (el.querySelector(".czm-edge-relationship") as SVGLineElement).dispatchEvent(new MouseEvent("click"));
+      (el.querySelector(".czm-map-card .czm-act-adopt") as HTMLElement).click();
+      await tick(); await tick(); await tick();
+      expect(calls.relations).toEqual([`${marta} -> ${ilse}: sister`]);
+      expect(el.querySelectorAll(".czm-edge-authored")).toHaveLength(1);
+      expect(el.querySelectorAll(".czm-edge.is-conflict")).toHaveLength(0);
+    });
+
+    it("renames and deletes a note from its card, the delete needing a second click", async () => {
+      const { el, calls } = await open();
+      clickNode(el, ilse);
+      (el.querySelector(".czm-act-rename") as HTMLElement).click();
+      const input = el.querySelector(".czm-map-rename") as HTMLInputElement;
+      input.value = "Ilsa";
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+      await tick(); await tick(); await tick();
+      expect(calls.renamed).toEqual([`${ilse} -> Ilsa`]);
+      clickNode(el, lisbon);
+      const del = el.querySelector(".czm-act-delete") as HTMLElement;
+      del.click();
+      expect(del.textContent).toBe("Delete note?");
+      expect(calls.removed).toEqual([]);
+      del.click();
+      await tick(); await tick(); await tick();
+      expect(calls.removed).toEqual([lisbon]);
+    });
+
+    it("remembers hand-placed nodes: a drag pins and saves, Shake forgets", async () => {
+      const layouts: Layout[] = [];
+      const { el, v } = await open({ loadLayout: async () => ({ [ilse]: { x: 300, y: 300 }, "Novel/Gone.md": { x: 1, y: 1 } }), saveLayout: async (_p, l) => { layouts.push(l); } });
+      // A remembered node starts where it was left, pinned.
+      expect(el.querySelector(`.czm-node[data-id="${ilse}"]`)!.classList.contains("is-pinned")).toBe(true);
+      expect(el.querySelector(`.czm-node[data-id="${ilse}"]`)!.getAttribute("transform")).toBe("translate(300.0 300.0)");
+      const g = el.querySelector<SVGGElement>(`.czm-node[data-id="${marta}"]`)!;
+      g.dispatchEvent(new MouseEvent("pointerdown", { clientX: 0, clientY: 0, bubbles: true }));
+      g.dispatchEvent(new MouseEvent("pointermove", { clientX: 50, clientY: 50, bubbles: true }));
+      g.dispatchEvent(new MouseEvent("pointerup", { clientX: 50, clientY: 50, bubbles: true }));
+      expect(g.classList.contains("is-pinned")).toBe(true);
+      await new Promise((r) => setTimeout(r, 900));
+      expect(layouts).toHaveLength(1);
+      expect(Object.keys(layouts[0]!).sort()).toEqual([ilse, marta, "Novel/Gone.md"].sort());
+      (el.querySelector(".czm-map-shake") as HTMLElement).click();
+      await new Promise((r) => setTimeout(r, 900));
+      expect(Object.keys(layouts.at(-1)!)).toEqual(["Novel/Gone.md"]);
+      await v.onClose();
+    });
   });
 });

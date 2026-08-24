@@ -13,7 +13,7 @@ const notes = {
     { path: "Novel/One.md", frontmatter: {}, links: [], bookmarked: false, bookmarkedHeadings: [], scenes: splitScenes("# A\nMarta walked.") },
   ],
 };
-const repo = { load: async () => EMPTY_STORY_MAP_FILE, save: async () => undefined };
+const repo = { load: async () => EMPTY_STORY_MAP_FILE, save: async () => undefined, update: async () => EMPTY_STORY_MAP_FILE };
 
 describe("BuildStoryMap", () => {
   it("builds a graph for a project", async () => {

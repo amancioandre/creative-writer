@@ -13,6 +13,14 @@ story-ignore: [LOW, POV]       # optional: names the story map must not take for
 ---
 ```
 
+A project with no target is a folder you want to *map* but not *pace* — the novel you are reading and taking apart, or a story you are sketching before a word of it exists. Declare it with one line instead:
+
+```yaml
+---
+story: true                    # a project for the story map and timeline; the writing desk leaves it alone
+---
+```
+
 The note that carries these lines is the **project note**. It can be the manuscript itself (a short story with one heading per scene), an outline, or an otherwise empty `My Novel.md` — the plugin only reads its front matter, and writes back to it when you tell the story map that a name is [not a name](/guide/story-map#candidates).
 
 ## What is counted

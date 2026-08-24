@@ -47,6 +47,8 @@ import { OllamaRelationAnalyser } from "./infrastructure/llm/OllamaRelationAnaly
 import { STORY_MAP_VIEW_TYPE, StoryMapView } from "./infrastructure/obsidian/views/StoryMapView";
 import { STORY_TIMELINE_VIEW_TYPE, StoryTimelineView } from "./infrastructure/obsidian/views/StoryTimelineView";
 import type { EntityKind, SceneRef } from "./domain/story/StoryGraph";
+import { removeRelation, upsertRelation } from "./domain/story/Relations";
+import { setLayout } from "./domain/story/StoryMapFile";
 import { TFile, TFolder, normalizePath } from "obsidian";
 
 /**
@@ -179,6 +181,12 @@ export default class CreativeZenModePlugin extends Plugin {
       ignore: (project, name) => this.editList(project.notePath, "story-ignore", (list) => [...list.filter((n) => n !== name), name]),
       unignore: (project, name) => this.editList(project.notePath, "story-ignore", (list) => list.filter((n) => n !== name)),
       alias: (_project, entityPath, name) => this.editList(entityPath, "aliases", (list) => [...list.filter((n) => n !== name), name]),
+      setRelation: (fromPath, toPath, label, previousLabel) => this.editRelation(fromPath, toPath, (text, link) => upsertRelation(text, link, label, previousLabel)),
+      removeRelation: (fromPath, toPath, label) => this.editRelation(fromPath, toPath, (text, link) => removeRelation(text, link, label)),
+      rename: (path, name) => this.renameNote(path, name),
+      remove: async (path) => { const f = this.app.vault.getAbstractFileByPath(path); if (f instanceof TFile) await this.app.vault.trash(f, true); },
+      loadLayout: (project) => storyRepo.load(project).then((f) => f.layout),
+      saveLayout: (project, layout) => storyRepo.update(project, (f) => setLayout(f, layout)).then(() => undefined),
       updateSettings: (next) => void this.updateSettings({ ...this.current, storyMap: next }),
       openTimeline: (project) => void this.openStoryTimeline(project),
       // Checked at click time, not load time, so switching the model on in settings takes effect without a reload.
@@ -261,7 +269,7 @@ export default class CreativeZenModePlugin extends Plugin {
     const files = this.app.vault.getMarkdownFiles();
     const specs = files
       .map((f) => parseProjectFrontmatter(this.app.metadataCache.getFileCache(f)?.frontmatter, f.path))
-      .filter((s): s is NonNullable<typeof s> => s !== null)
+      .filter((s): s is NonNullable<typeof s> => s !== null && s.targetWords > 0) // `story: true` projects have nothing to pace
       .sort((a, b) => a.name.localeCompare(b.name));
     if (specs.length === 0) return [];
     const counts = new Map<string, number>();
@@ -338,6 +346,26 @@ export default class CreativeZenModePlugin extends Plugin {
       const next = edit(list);
       if (next.length) fm[key] = next; else delete fm[key];
     });
+  }
+
+  /** Rewrites the `## Relationships` section of one note; the link is generated the way the writer's vault writes links. */
+  private async editRelation(fromPath: string, toPath: string, edit: (text: string, link: string) => string): Promise<void> {
+    const from = this.app.vault.getAbstractFileByPath(fromPath), to = this.app.vault.getAbstractFileByPath(toPath);
+    if (!(from instanceof TFile) || !(to instanceof TFile)) return;
+    const link = this.app.fileManager.generateMarkdownLink(to, fromPath);
+    await this.app.vault.process(from, (text) => edit(text, link));
+  }
+
+  /** Renames a note in place; Obsidian updates every link to it. Returns the new path. */
+  private async renameNote(path: string, name: string): Promise<string> {
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) return path;
+    const safe = name.replace(/[\\/:*?"<>|#^[\]]/g, "").trim();
+    if (!safe || safe === file.basename) return path;
+    const next = normalizePath(`${file.parent?.path && file.parent.path !== "/" ? `${file.parent.path}/` : ""}${safe}.md`);
+    if (this.app.vault.getAbstractFileByPath(next)) throw new Error(`A note called "${safe}" already exists there.`);
+    await this.app.fileManager.renameFile(file, next);
+    return next;
   }
 
   /** A candidate becomes a real entity: a typed note in the project's Characters/, Places/, Items/… folder (created if missing). */

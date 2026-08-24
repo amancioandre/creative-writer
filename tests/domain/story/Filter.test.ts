@@ -3,7 +3,7 @@ import { ALL_KINDS, ALL_LAYERS, DEFAULT_FILTER, applyFilter, neighbours } from "
 import type { Edge, Entity, StoryGraph } from "../../../src/domain/story/StoryGraph";
 
 const ent = (id: string, kind: Entity["kind"]): Entity => ({ id, name: id, kind, path: null, aliases: [], bookmarked: false, appearances: [], mentions: 0 });
-const edge = (from: string, to: string, kind: Edge["kind"], layer: Edge["layer"], weight = 1): Edge => ({ from, to, kind, layer, source: "extracted", weight, label: "", evidence: [], stale: false });
+const edge = (from: string, to: string, kind: Edge["kind"], layer: Edge["layer"], weight = 1): Edge => ({ from, to, kind, layer, source: "extracted", weight, label: "", evidence: [], stale: false, conflict: [] });
 const graph: StoryGraph = {
   project: "p",
   entities: [ent("marta", "character"), ent("ilse", "character"), ent("lisbon", "location"), ent("ch1", "note"), ent("orpheus", "reference"), ent("nobody", "candidate")],

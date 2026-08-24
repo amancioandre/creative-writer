@@ -5,6 +5,7 @@ import { applyFilter, neighbours, type GraphFilter } from "../../../domain/story
 import { Simulation, type Point } from "../../../domain/story/Simulation";
 import { EMPTY_GRAPH, type Edge, type Entity, type EntityKind, type SceneRef, type StoryGraph } from "../../../domain/story/StoryGraph";
 import { basenameOf } from "../../../domain/story/EntityIndex";
+import type { Layout } from "../../../domain/story/StoryMapFile";
 import type { AnalyzeProgress } from "../../../application/use-cases/AnalyzeSceneRelations";
 
 export const STORY_MAP_VIEW_TYPE = "creative-writer-story-map";
@@ -24,6 +25,15 @@ export interface StoryMapSource {
   unignore(project: ProjectSpec, name: string): Promise<void>;
   /** Adds a name to an existing entity note's `aliases`. */
   alias(project: ProjectSpec, entityPath: string, name: string): Promise<void>;
+  /** Writes (or relabels, when `previousLabel` is given) a `## Relationships` line in `fromPath` pointing at `toPath`. */
+  setRelation(fromPath: string, toPath: string, label: string, previousLabel?: string): Promise<void>;
+  removeRelation(fromPath: string, toPath: string, label: string): Promise<void>;
+  /** Renames a note (links follow); returns the new path. */
+  rename(path: string, name: string): Promise<string>;
+  /** Moves a note to the trash. */
+  remove(path: string): Promise<void>;
+  loadLayout(project: ProjectSpec): Promise<Layout>;
+  saveLayout(project: ProjectSpec, layout: Layout): Promise<void>;
   /** Runs the model over one note's scenes, or the whole project's when `notePath` is null. Throws with a human message when no local model is configured. */
   analyse(project: ProjectSpec, notePath: string | null, graph: StoryGraph, signal: AbortSignal, onProgress: (p: AnalyzeProgress) => void): Promise<number>;
   settings(): StoryMapSettings;
@@ -39,7 +49,8 @@ const FORCE_LABEL: Record<keyof ForceSettings, string> = { repulsion: "Repulsion
 const DISPLAY_LABEL: Record<keyof DisplaySettings, string> = { nodeSize: "Node size", edgeWidth: "Edge thickness", edgeOpacity: "Edge opacity", labelSize: "Label size" };
 const MIN_ZOOM = 0.15, MAX_ZOOM = 5;
 
-type Selection = { kind: "node"; id: string } | { kind: "edge"; edge: Edge } | null;
+type Selection = { kind: "node"; id: string } | { kind: "edge"; edge: Edge } | { kind: "new-edge"; from: string; to: string } | null;
+const ENTITY_EXITS: readonly [string, EntityKind, string][] = [["Character", "character", "czm-act-character"], ["Place", "location", "czm-act-place"], ["Item", "item", "czm-act-item"], ["Faction", "faction", "czm-act-faction"], ["Event", "event", "czm-act-event"]];
 
 /**
  * The story map fills its leaf like Obsidian's own graph view: the graph
@@ -64,6 +75,13 @@ export class StoryMapView extends ItemView {
   private fitted = false;
   private saveTimer: number | null = null;
   private pendingSettings: StoryMapSettings | null = null;
+  /** Hand-placed positions as last loaded or saved; hidden nodes keep theirs. */
+  private layout: Layout = {};
+  private layoutTimer: number | null = null;
+  /** Node a new relationship is being drawn from, while in link mode. */
+  private linking: string | null = null;
+  /** Where (in graph space) the new-node form was opened. */
+  private composerAt: Point | null = null;
 
   // DOM kept between ticks
   private root!: HTMLElement;
@@ -71,7 +89,9 @@ export class StoryMapView extends ItemView {
   private viewport!: SVGGElement;
   private nodeEls = new Map<string, SVGGElement>();
   private edgeEls: { el: SVGLineElement; edge: Edge }[] = [];
+  private rubber!: SVGLineElement;
   private card!: HTMLElement;
+  private composer!: HTMLElement;
   private panel!: HTMLElement;
   private statusEl!: HTMLElement;
 
@@ -92,6 +112,7 @@ export class StoryMapView extends ItemView {
     this.running?.abort();
     this.stopLoop();
     this.flushSettings();
+    this.flushLayout();
   }
 
   private get settings(): StoryMapSettings { return this.pendingSettings ?? this.source.settings(); }
@@ -99,12 +120,15 @@ export class StoryMapView extends ItemView {
   /** Rebuilds the graph for a project and redraws; positions of surviving nodes are kept. */
   async show(project: ProjectSpec | null, keepSelection = false): Promise<void> {
     const generation = ++this.generation;
-    if (this.project?.scope !== project?.scope) { this.selection = null; this.focusId = null; this.fitted = false; }
+    if (this.project?.scope !== project?.scope) { this.selection = null; this.focusId = null; this.fitted = false; this.cancelLink(); this.closeComposer(); this.flushLayout(); this.layout = {}; }
     this.project = project;
     if (!project) { this.graph = EMPTY_GRAPH; this.rebuild(); return; }
-    const graph = await this.source.build(project);
+    const [graph, layout] = await Promise.all([this.source.build(project), this.source.loadLayout(project)]);
     if (generation !== this.generation) return;
     this.graph = graph;
+    this.layout = layout;
+    // Nodes the writer placed by hand come back where they were; nodes already on screen keep going.
+    for (const [id, p] of Object.entries(layout)) if (!this.sim.position(id)) this.sim.seed(id, p, true);
     if (!keepSelection || !this.stillValid(this.selection)) this.selection = this.stillValid(this.selection) ? this.selection : null;
     this.rebuild(true);
   }
@@ -116,7 +140,15 @@ export class StoryMapView extends ItemView {
   private stillValid(sel: Selection): boolean {
     if (!sel) return false;
     if (sel.kind === "node") return this.graph.entities.some((e) => e.id === sel.id);
+    if (sel.kind === "new-edge") return this.graph.entities.some((e) => e.id === sel.from) && this.graph.entities.some((e) => e.id === sel.to);
     return this.graph.edges.some((e) => sameEdge(e, sel.edge));
+  }
+
+  /** After a refresh, point the selection at the graph's own copy of an edge (with its evidence and conflicts). */
+  private selectEdgeLike(kind: Edge["kind"], from: string, to: string, label: string): void {
+    const probe = { kind, from, to, label } as Edge;
+    const real = this.graph.edges.find((e) => sameEdge(e, probe) || sameEdge(e, { ...probe, from: to, to: from }));
+    this.selection = real ? { kind: "edge", edge: real } : { kind: "node", id: from };
   }
 
   // --- skeleton ----------------------------------------------------------------
@@ -131,6 +163,9 @@ export class StoryMapView extends ItemView {
     this.root.appendChild(this.svg);
     this.viewport = document.createElementNS(SVG, "g");
     this.svg.appendChild(this.viewport);
+    this.rubber = document.createElementNS(SVG, "line");
+    this.rubber.setAttribute("class", "czm-map-rubber");
+    this.svg.appendChild(this.rubber);
     this.attachPanZoom();
 
     const corner = this.root.createDiv({ cls: "czm-map-corner" });
@@ -139,8 +174,14 @@ export class StoryMapView extends ItemView {
     toggle.addEventListener("click", () => { this.saveSettings({ ...this.settings, panelOpen: !this.settings.panelOpen }); this.renderPanel(); });
     this.panel = this.root.createDiv({ cls: "czm-map-panel" });
     this.card = this.root.createDiv({ cls: "czm-map-card" });
+    this.composer = this.root.createDiv({ cls: "czm-map-new" });
     this.statusEl = this.root.createDiv({ cls: "czm-map-status" });
-    this.root.addEventListener("keydown", (e) => { if (e.key === "Escape") this.select(null); });
+    this.root.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      if (this.linking) { this.cancelLink(); return; }
+      if (this.composerAt) { this.closeComposer(); return; }
+      this.select(null);
+    });
     this.root.tabIndex = -1;
   }
 
@@ -180,9 +221,11 @@ export class StoryMapView extends ItemView {
     this.viewport.style.setProperty("--czm-label-size", `${display.labelSize}px`);
     this.viewport.classList.toggle("czm-no-labels", display.labelSize === 0);
     const edgesG = document.createElementNS(SVG, "g");
-    for (const edge of shown.edges) {
+    // Authored edges paint last, so a hand-drawn line sits on top of whatever the prose or the model says about the same pair.
+    const ordered = [...shown.edges].sort((a, b) => Number(a.kind === "authored") - Number(b.kind === "authored"));
+    for (const edge of ordered) {
       const line = document.createElementNS(SVG, "line");
-      line.setAttribute("class", `czm-edge czm-edge-${edge.kind} czm-layer-${edge.layer}${edge.stale ? " is-stale" : ""}`);
+      line.setAttribute("class", `czm-edge czm-edge-${edge.kind} czm-layer-${edge.layer}${edge.stale ? " is-stale" : ""}${edge.conflict.length ? " is-conflict" : ""}`);
       line.setAttribute("stroke-width", f((1 + Math.min(4, Math.sqrt(edge.weight))) * display.edgeWidth));
       line.setAttribute("data-from", edge.from); line.setAttribute("data-to", edge.to);
       const title = document.createElementNS(SVG, "title");
@@ -231,12 +274,21 @@ export class StoryMapView extends ItemView {
       const t = document.createElementNS(SVG, "text");
       t.setAttribute("class", "czm-map-empty"); t.setAttribute("text-anchor", "middle");
       t.textContent = !this.project
-        ? "No project yet — add writing-target: 50000 to a note's front matter and its folder becomes one."
-        : this.graph.entities.length === 0 ? "Nothing to map yet — name your characters and places in typed notes, or write until names recur." : "Nothing matches the current filters.";
+        ? "No project yet — put story: true (or writing-target: 50000) in a note's front matter and its folder becomes one."
+        : this.graph.entities.length === 0 ? "Nothing to map yet — double-click here to add a character or place, or write until names recur." : "Nothing matches the current filters.";
       this.viewport.appendChild(t);
     }
     this.applySelectionClasses();
     this.paint();
+  }
+
+  private paintRubber(): void {
+    const from = this.linking ? this.sim.position(this.linking) : undefined;
+    this.rubber.classList.toggle("is-open", !!from);
+    if (!from) return;
+    const a = this.toScreen(from);
+    this.rubber.setAttribute("x1", f(a.x)); this.rubber.setAttribute("y1", f(a.y));
+    if (!this.rubber.hasAttribute("x2")) { this.rubber.setAttribute("x2", f(a.x)); this.rubber.setAttribute("y2", f(a.y)); }
   }
 
   /** Move every element to the simulation's current positions. Called per frame. */
@@ -252,6 +304,8 @@ export class StoryMapView extends ItemView {
     }
     this.viewport.setAttribute("transform", `translate(${f(this.view.x)} ${f(this.view.y)}) scale(${this.view.k.toFixed(3)})`);
     this.placeCard();
+    this.placeComposer();
+    this.paintRubber();
   }
 
   private startLoop(): void {
@@ -313,6 +367,10 @@ export class StoryMapView extends ItemView {
       this.svg.setPointerCapture?.(ev.pointerId);
     });
     this.svg.addEventListener("pointermove", (ev) => {
+      if (this.linking) {
+        const rect = this.svg.getBoundingClientRect();
+        this.rubber.setAttribute("x2", f(ev.clientX - rect.left)); this.rubber.setAttribute("y2", f(ev.clientY - rect.top));
+      }
       if (!pan) return;
       const dx = ev.clientX - pan.x, dy = ev.clientY - pan.y;
       if (!moved && Math.hypot(dx, dy) < 3) return;
@@ -320,9 +378,16 @@ export class StoryMapView extends ItemView {
       this.view = { ...this.view, x: pan.vx + dx, y: pan.vy + dy };
       this.paint();
     });
-    const end = () => { if (pan && !moved) this.select(null); pan = null; };
+    const end = () => {
+      if (pan && !moved) { if (this.linking) this.cancelLink(); else if (this.composerAt) this.closeComposer(); else this.select(null); }
+      pan = null;
+    };
     this.svg.addEventListener("pointerup", end);
     this.svg.addEventListener("pointercancel", end);
+    this.svg.addEventListener("dblclick", (ev) => {
+      if ((ev.target as Element | null)?.closest?.(".czm-node, .czm-edge")) return;
+      this.openComposer(this.toWorld(ev.clientX, ev.clientY));
+    });
     this.svg.addEventListener("wheel", (ev) => {
       ev.preventDefault();
       this.zoomAt(ev.clientX, ev.clientY, Math.exp(-ev.deltaY * 0.0015));
@@ -372,10 +437,159 @@ export class StoryMapView extends ItemView {
       ev.stopPropagation();
       if (!start) return;
       start = null;
-      if (!moved) this.select(this.selection?.kind === "node" && this.selection.id === id ? null : { kind: "node", id });
+      if (moved) { this.applySelectionClasses(); this.renderCard(); this.queueLayoutSave(); return; }
+      if (this.linking) { if (this.linking === id) this.cancelLink(); else this.finishLink(id); return; }
+      if (ev.shiftKey) { this.startLink(id); return; }
+      this.select(this.selection?.kind === "node" && this.selection.id === id ? null : { kind: "node", id });
     };
     g.addEventListener("pointerup", end);
     g.addEventListener("pointercancel", end);
+  }
+
+  // --- drawing: nodes and relationships by hand -------------------------------------
+
+  /** Link mode: the next node clicked becomes the other end of a new relationship. */
+  startLink(id: string): void {
+    const e = this.graph.entities.find((x) => x.id === id);
+    if (!e) return;
+    if (!e.path) { this.flash(`${e.name} has no note yet — make one first (What is this? on its card).`); return; }
+    this.closeComposer();
+    this.linking = id;
+    this.selection = { kind: "node", id };
+    this.rubber.removeAttribute("x2"); this.rubber.removeAttribute("y2");
+    this.root.classList.add("is-linking");
+    this.status = `Connecting ${e.name} — click another node, Esc to cancel.`;
+    this.applySelectionClasses(); this.renderCard(); this.renderStatus(); this.paint();
+  }
+
+  cancelLink(): void {
+    if (!this.linking) return;
+    this.linking = null;
+    this.root.classList.remove("is-linking");
+    this.status = "";
+    this.renderStatus(); this.renderCard(); this.paint();
+  }
+
+  private finishLink(to: string): void {
+    const from = this.linking!;
+    const target = this.graph.entities.find((x) => x.id === to);
+    if (!target?.path) { this.flash(`${target?.name ?? to} has no note yet — make one first.`); return; }
+    this.linking = null;
+    this.root.classList.remove("is-linking");
+    this.status = "";
+    this.renderStatus();
+    this.select({ kind: "new-edge", from, to });
+    this.card.querySelector<HTMLInputElement>(".czm-map-label-input")?.focus();
+  }
+
+  private async writeRelation(fromPath: string, toPath: string, label: string, previousLabel?: string): Promise<void> {
+    if (!this.project) return;
+    try {
+      await this.source.setRelation(fromPath, toPath, label, previousLabel);
+    } catch (e) { this.flash(e instanceof Error ? e.message : String(e)); return; }
+    await this.show(this.project, true);
+    this.selectEdgeLike("authored", fromPath, toPath, label);
+    this.select(this.selection);
+  }
+
+  private async eraseRelation(edge: Edge): Promise<void> {
+    if (!this.project) return;
+    const holder = edge.evidence[0]?.path ?? edge.from;
+    const other = holder === edge.from ? edge.to : edge.from;
+    await this.source.removeRelation(holder, other, edge.label);
+    this.selection = { kind: "node", id: holder };
+    await this.show(this.project, true);
+  }
+
+  /** The floating "new node" form, at a point in graph space. */
+  openComposer(at: Point): void {
+    if (!this.project) return;
+    this.cancelLink();
+    this.composerAt = at;
+    this.composer.empty();
+    this.composer.classList.add("is-open");
+    const input = this.composer.createEl("input", { cls: "czm-map-new-name", attr: { type: "text", placeholder: "Name…", "aria-label": "Name of the new node" } }) as HTMLInputElement;
+    const grid = this.composer.createDiv({ cls: "czm-map-exits" });
+    const create = (kind: EntityKind) => { const name = input.value.trim(); if (name) void this.createNode(name, kind, at); else input.focus(); };
+    for (const [label, kind, cls] of ENTITY_EXITS) {
+      const b = grid.createEl("button", { text: label, cls });
+      b.style.setProperty("--czm-kind", this.settings.colors[kind]);
+      b.addEventListener("click", () => create(kind));
+    }
+    input.addEventListener("keydown", (ev) => { if (ev.key === "Enter") create("character"); if (ev.key === "Escape") { ev.stopPropagation(); this.closeComposer(); } });
+    const cancel = this.composer.createEl("button", { text: "Cancel", cls: "czm-map-new-cancel" });
+    cancel.addEventListener("click", () => this.closeComposer());
+    this.placeComposer();
+    input.focus();
+  }
+
+  closeComposer(): void {
+    if (!this.composerAt) return;
+    this.composerAt = null;
+    this.composer.empty();
+    this.composer.classList.remove("is-open");
+  }
+
+  private placeComposer(): void {
+    if (!this.composerAt) return;
+    const s = this.toScreen(this.composerAt);
+    const rect = this.svg.getBoundingClientRect();
+    const w = rect.width || 800, h = rect.height || 600;
+    const cw = this.composer.offsetWidth || 240, ch = this.composer.offsetHeight || 120;
+    this.composer.style.left = `${Math.round(clamp(s.x - cw / 2, 8, Math.max(8, w - cw - 8)))}px`;
+    this.composer.style.top = `${Math.round(clamp(s.y + 16, 8, Math.max(8, h - ch - 8)))}px`;
+  }
+
+  private async createNode(name: string, kind: EntityKind, at: Point): Promise<void> {
+    if (!this.project) return;
+    this.closeComposer();
+    const path = await this.source.promote(this.project, name, kind);
+    this.sim.seed(path, at, true);
+    this.selection = { kind: "node", id: path };
+    await this.show(this.project, true);
+    this.queueLayoutSave();
+  }
+
+  private async renameNode(e: Entity, name: string): Promise<void> {
+    if (!this.project || !e.path || !name.trim() || name.trim() === e.name) return;
+    let path: string;
+    try { path = await this.source.rename(e.path, name.trim()); } catch (err) { this.flash(err instanceof Error ? err.message : String(err)); return; }
+    const p = this.sim.position(e.id);
+    if (p) this.sim.seed(path, p, this.sim.isPinned(e.id));
+    this.selection = { kind: "node", id: path };
+    await this.show(this.project, true);
+    this.queueLayoutSave();
+  }
+
+  private async deleteNode(e: Entity): Promise<void> {
+    if (!this.project || !e.path) return;
+    await this.source.remove(e.path);
+    this.selection = null;
+    await this.show(this.project, true);
+    this.queueLayoutSave();
+  }
+
+  /** Pinned nodes are the ones worth remembering; the file keeps what it had for nodes not currently shown. */
+  private queueLayoutSave(): void {
+    if (this.layoutTimer !== null) window.clearTimeout(this.layoutTimer);
+    this.layoutTimer = window.setTimeout(() => this.flushLayout(), 800);
+  }
+
+  private flushLayout(): void {
+    if (this.layoutTimer !== null) { window.clearTimeout(this.layoutTimer); this.layoutTimer = null; }
+    if (!this.project || this.graph === EMPTY_GRAPH) return;
+    const next: Record<string, Point> = { ...this.layout };
+    for (const id of this.nodeEls.keys()) delete next[id];
+    for (const [id, p] of this.sim.pinnedPositions()) next[id] = { x: Math.round(p.x), y: Math.round(p.y) };
+    if (sameLayout(next, this.layout)) return;
+    this.layout = next;
+    void this.source.saveLayout(this.project, next);
+  }
+
+  private flash(message: string): void {
+    this.status = message;
+    this.renderStatus();
+    window.setTimeout(() => { if (this.status === message) { this.status = ""; this.renderStatus(); } }, 4000);
   }
 
   // --- floating panel ------------------------------------------------------------
@@ -410,8 +624,9 @@ export class StoryMapView extends ItemView {
       btn(this.running ? "Stop" : "Read project with model", "czm-map-analyse", () => void this.toggleAnalyse(null), "Asks the local model (Ollama) for relationships, outside references and events in every scene. Unchanged scenes are skipped.");
       btn("Timeline", "czm-map-timeline-btn", () => this.source.openTimeline(this.project!), "Open the Who-is-where timeline for this project.");
     }
+    if (this.project) btn("Add", "czm-map-add", () => { const r = this.svg.getBoundingClientRect(); this.openComposer(this.toWorld(r.left + (r.width || 800) / 2, r.top + (r.height || 600) / 2)); }, "Add a character, place, item, faction or event as a new note. Or double-click the background.");
     btn("Fit", "czm-map-fit", () => this.fit());
-    btn("Shake", "czm-map-shake", () => { for (const id of this.nodeEls.keys()) this.sim.pin(id, false); this.sim.reheat(); this.applySelectionClasses(); this.startLoop(); }, "Unpin everything and let the layout settle again.");
+    btn("Shake", "czm-map-shake", () => { for (const id of this.nodeEls.keys()) this.sim.pin(id, false); this.sim.reheat(); this.applySelectionClasses(); this.startLoop(); this.queueLayoutSave(); }, "Unpin everything (forgetting hand-placed positions) and let the layout settle again.");
     if (this.focusId) btn("Show all", "czm-map-unfocus", () => { this.focusId = null; this.rebuild(); });
 
     const section = (title: string, open = true) => {
@@ -497,27 +712,67 @@ export class StoryMapView extends ItemView {
     setIcon(close, "x");
     close.addEventListener("click", () => this.select(null));
     if (sel.kind === "node") this.renderNodeCard(sel.id);
+    else if (sel.kind === "new-edge") this.renderNewEdgeCard(sel.from, sel.to);
     else this.renderEdgeCard(sel.edge);
     this.placeCard();
+  }
+
+  /** A label form for a relationship just drawn between two nodes. */
+  private renderNewEdgeCard(from: string, to: string): void {
+    const a = this.graph.entities.find((x) => x.id === from), b = this.graph.entities.find((x) => x.id === to);
+    if (!a?.path || !b?.path) return;
+    const head = this.card.createDiv({ cls: "czm-map-card-head" });
+    head.createSpan({ text: `${a.name} — ${b.name}`, cls: "czm-map-card-name" });
+    this.card.createDiv({ text: `Written in ${a.name}'s note under Relationships.`, cls: "czm-map-hint" });
+    this.labelForm("", (label) => void this.writeRelation(a.path!, b.path!, label), () => this.select({ kind: "node", id: from }));
+  }
+
+  private labelForm(initial: string, save: (label: string) => void, cancel: () => void, saveText = "Save"): void {
+    const form = this.card.createDiv({ cls: "czm-map-label" });
+    const input = form.createEl("input", { cls: "czm-map-label-input", attr: { type: "text", placeholder: "sister, rival, owes a debt…", "aria-label": "Relationship label" } }) as HTMLInputElement;
+    input.value = initial;
+    const ok = form.createEl("button", { text: saveText, cls: "czm-act-save-label" });
+    ok.addEventListener("click", () => save(input.value.trim()));
+    input.addEventListener("keydown", (ev) => { if (ev.key === "Enter") save(input.value.trim()); if (ev.key === "Escape") { ev.stopPropagation(); cancel(); } });
+    const no = form.createEl("button", { text: "Cancel", cls: "czm-act-cancel-label" });
+    no.addEventListener("click", cancel);
   }
 
   private renderNodeCard(id: string): void {
     const e = this.graph.entities.find((x) => x.id === id);
     if (!e) return;
     const head = this.card.createDiv({ cls: "czm-map-card-head" });
-    head.createSpan({ text: e.name, cls: "czm-map-card-name" });
+    const nameEl = head.createSpan({ text: e.name, cls: "czm-map-card-name" });
     const kind = head.createSpan({ text: KIND_LABEL[e.kind], cls: "czm-map-kind" });
     kind.style.color = this.settings.colors[e.kind];
     if (e.aliases.length) this.card.createDiv({ text: `also ${e.aliases.join(", ")}`, cls: "czm-map-hint" });
     if (e.mentions) this.card.createDiv({ text: `${e.mentions} mention${e.mentions === 1 ? "" : "s"} in ${e.appearances.length} scene${e.appearances.length === 1 ? "" : "s"}`, cls: "czm-map-hint" });
     if (e.kind === "candidate") this.card.createDiv({ text: "No note yet — make one and it becomes part of the cast.", cls: "czm-map-hint" });
+    if (this.linking === e.id) this.card.createDiv({ text: "Click another node to connect, or Esc.", cls: "czm-map-hint czm-map-linking" });
 
     const actions = this.card.createDiv({ cls: "czm-map-card-actions" });
     const btn = (text: string, cls: string, onClick: () => void) => { const b = actions.createEl("button", { text, cls }); b.addEventListener("click", onClick); return b; };
     if (e.path) btn("Open note", "czm-act-open", () => this.source.openNote(e.path!));
     if (e.kind === "note" && this.graph.timeline.some((t) => t.scene.path === e.path)) btn(this.running ? "Stop" : "Read with model", "czm-map-analyse-note", () => void this.toggleAnalyse(e.path));
     btn(this.focusId === e.id ? "Show all" : "Focus", "czm-act-focus", () => { this.focusId = this.focusId === e.id ? null : e.id; this.rebuild(); });
-    btn(this.sim.isPinned(e.id) ? "Unpin" : "Pin", "czm-act-pin", () => { this.sim.pin(e.id, !this.sim.isPinned(e.id)); this.applySelectionClasses(); this.renderCard(); this.startLoop(); });
+    btn(this.sim.isPinned(e.id) ? "Unpin" : "Pin", "czm-act-pin", () => { this.sim.pin(e.id, !this.sim.isPinned(e.id)); this.applySelectionClasses(); this.renderCard(); this.startLoop(); this.queueLayoutSave(); });
+    if (e.path && this.project) {
+      btn(this.linking === e.id ? "Stop connecting" : "Connect…", "czm-act-connect", () => (this.linking === e.id ? this.cancelLink() : this.startLink(e.id)));
+      if (e.kind !== "note") {
+        btn("Rename", "czm-act-rename", () => {
+          const input = createEl("input", { cls: "czm-map-rename", attr: { type: "text", "aria-label": "New name" } }) as HTMLInputElement;
+          input.value = e.name;
+          nameEl.replaceWith(input);
+          input.addEventListener("keydown", (ev) => { if (ev.key === "Enter") void this.renameNode(e, input.value); if (ev.key === "Escape") { ev.stopPropagation(); this.renderCard(); } });
+          input.addEventListener("blur", () => { if (input.isConnected && input.value.trim() === e.name) this.renderCard(); });
+          input.focus(); input.select();
+        });
+        const del = btn("Delete", "czm-act-delete", () => {
+          del.setText("Delete note?"); del.classList.add("is-armed");
+          del.onclick = () => void this.deleteNode(e);
+        });
+      }
+    }
     if (e.kind === "candidate" && this.project) this.renderCandidateExits(e);
 
     if (e.appearances.length) {
@@ -544,8 +799,7 @@ export class StoryMapView extends ItemView {
   private renderCandidateExits(e: Entity): void {
     this.card.createEl("h4", { text: "What is this?" });
     const grid = this.card.createDiv({ cls: "czm-map-exits" });
-    const exits: [string, EntityKind, string][] = [["Character", "character", "czm-act-character"], ["Place", "location", "czm-act-place"], ["Item", "item", "czm-act-item"], ["Faction", "faction", "czm-act-faction"], ["Event", "event", "czm-act-event"]];
-    for (const [label, kind, cls] of exits) {
+    for (const [label, kind, cls] of ENTITY_EXITS) {
       const b = grid.createEl("button", { text: label, cls });
       b.style.setProperty("--czm-kind", this.settings.colors[kind]);
       b.addEventListener("click", () => void this.promote(e, kind));
@@ -570,18 +824,65 @@ export class StoryMapView extends ItemView {
     const a = this.graph.entities.find((x) => x.id === edge.from), b = this.graph.entities.find((x) => x.id === edge.to);
     const head = this.card.createDiv({ cls: "czm-map-card-head" });
     head.createSpan({ text: `${a?.name ?? edge.from} — ${b?.name ?? edge.to}`, cls: "czm-map-card-name" });
-    this.card.createDiv({ text: edgeSummary(edge), cls: `czm-map-kind czm-layer-${edge.layer}` });
+    this.card.createDiv({ text: edgeSummary(edge), cls: `czm-map-kind czm-layer-${edge.layer}${edge.kind === "authored" ? " czm-authored" : ""}` });
     if (edge.stale) this.card.createEl("p", { text: "The scene changed since the model read it — re-read to refresh.", cls: "czm-map-warn" });
     if (edge.kind === "link") this.card.createEl("p", { text: "A link one of these notes makes to the other.", cls: "czm-map-hint" });
+    const holder = edge.kind === "authored" ? edge.evidence[0]?.path ?? edge.from : null;
+    const holderEntity = holder ? this.graph.entities.find((x) => x.id === holder) : null;
+    if (holder) this.card.createEl("p", { text: `You drew this — it is written in ${holderEntity?.name ?? basenameOf(holder)}'s note under Relationships.`, cls: "czm-map-hint" });
     const actions = this.card.createDiv({ cls: "czm-map-card-actions" });
     for (const end of [a, b]) if (end) {
       const btn = actions.createEl("button", { text: end.name, cls: "czm-act-end" });
       btn.addEventListener("click", () => this.select({ kind: "node", id: end.id }));
     }
+    if (holder && this.project) {
+      const other = holder === edge.from ? edge.to : edge.from;
+      const remove = actions.createEl("button", { text: "Remove", cls: "czm-act-remove-relation" });
+      remove.addEventListener("click", () => void this.eraseRelation(edge));
+      this.labelForm(edge.label, (label) => { if (label !== edge.label) void this.writeRelation(holder, other, label, edge.label); else this.renderCard(); }, () => this.renderCard(), "Relabel");
+    }
+    if (edge.kind === "relationship" && a?.path && b?.path && this.project) {
+      const authored = this.graph.edges.find((x) => x.kind === "authored" && ((x.from === edge.from && x.to === edge.to) || (x.from === edge.to && x.to === edge.from)));
+      if (!authored) {
+        const take = actions.createEl("button", { text: "Write down", cls: "czm-act-adopt" });
+        take.title = `Keep the model's reading in ${a.name}'s note as a relationship of your own.`;
+        take.addEventListener("click", () => void this.writeRelation(a.path!, b.path!, edge.label));
+      }
+    }
+    this.renderConflict(edge, a, b);
     if (edge.evidence.length) {
-      this.card.createEl("h4", { text: edge.kind === "co-occurrence" ? "Share these scenes" : "Seen in" });
+      this.card.createEl("h4", { text: edge.kind === "co-occurrence" ? "Share these scenes" : edge.kind === "authored" ? "Written in" : "Seen in" });
       this.sceneList(this.card, edge.evidence);
     }
+  }
+
+  /**
+   * The writer and the model disagree about this pair. Say so plainly, show
+   * both readings, and offer to take the other side's label — never
+   * silently pick one.
+   */
+  private renderConflict(edge: Edge, a: Entity | undefined, b: Entity | undefined): void {
+    if (!edge.conflict.length || !this.project) return;
+    const box = this.card.createDiv({ cls: "czm-map-conflict" });
+    const authored = edge.kind === "authored" ? edge : this.graph.edges.find((x) => x.kind === "authored" && ((x.from === edge.from && x.to === edge.to) || (x.from === edge.to && x.to === edge.from)));
+    const holder = authored?.evidence[0]?.path ?? authored?.from ?? a?.path ?? null;
+    const other = holder ? (holder === edge.from ? edge.to : edge.from) : null;
+    if (edge.kind === "authored") {
+      box.createDiv({ text: `Disagreement: you wrote “${edge.label || "related"}”; the model read the prose as ${edge.conflict.map((c) => `“${c}”`).join(", ")}.`, cls: "czm-map-conflict-text" });
+      box.createDiv({ text: "Yours stays until you change it. The model's edge is drawn underneath, dashed.", cls: "czm-map-hint" });
+      for (const c of edge.conflict) {
+        const adopt = box.createEl("button", { text: `Use “${c}”`, cls: "czm-act-adopt" });
+        adopt.addEventListener("click", () => void this.writeRelation(holder!, other!, c, edge.label));
+      }
+    } else {
+      box.createDiv({ text: `Disagreement: the model read this as “${edge.label}”; you wrote ${edge.conflict.map((c) => `“${c}”`).join(", ")}.`, cls: "czm-map-conflict-text" });
+      box.createDiv({ text: "Your version is the one drawn on top; this reading is dashed underneath.", cls: "czm-map-hint" });
+      if (holder && other && authored) {
+        const replace = box.createEl("button", { text: `Replace mine with “${edge.label}”`, cls: "czm-act-adopt" });
+        replace.addEventListener("click", () => void this.writeRelation(holder, other, edge.label, authored.label));
+      }
+    }
+    void b;
   }
 
   private sceneList(parent: HTMLElement, refs: readonly SceneRef[]): void {
@@ -606,7 +907,8 @@ export class StoryMapView extends ItemView {
     let anchor: Point | undefined;
     if (sel.kind === "node") anchor = this.sim.position(sel.id);
     else {
-      const a = this.sim.position(sel.edge.from), b = this.sim.position(sel.edge.to);
+      const [fromId, toId] = sel.kind === "edge" ? [sel.edge.from, sel.edge.to] : [sel.from, sel.to];
+      const a = this.sim.position(fromId), b = this.sim.position(toId);
       if (a && b) anchor = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     }
     if (!anchor) return;
@@ -684,6 +986,10 @@ export class StoryMapView extends ItemView {
 function f(n: number): string { return n.toFixed(1); }
 function clamp(v: number, lo: number, hi: number): number { return v < lo ? lo : v > hi ? hi : v; }
 function sameEdge(a: Edge, b: Edge): boolean { return a.kind === b.kind && a.from === b.from && a.to === b.to && a.label === b.label; }
+function sameLayout(a: Layout, b: Layout): boolean {
+  const ka = Object.keys(a), kb = Object.keys(b);
+  return ka.length === kb.length && ka.every((k) => b[k] && b[k]!.x === a[k]!.x && b[k]!.y === a[k]!.y);
+}
 
 export function edgeSummary(edge: Edge): string {
   switch (edge.kind) {
@@ -692,10 +998,12 @@ export function edgeSummary(edge: Edge): string {
     case "co-occurrence": return `${edge.weight} scene${edge.weight === 1 ? "" : "s"} together`;
     case "relationship": return edge.label;
     case "reference": return edge.label || "reference";
+    case "authored": return edge.label ? `${edge.label} · yours` : "related · yours";
   }
 }
 
 function edgeTitle(edge: Edge, g: StoryGraph): string {
   const name = (id: string) => g.entities.find((e) => e.id === id)?.name ?? id;
-  return `${name(edge.from)} — ${name(edge.to)}: ${edgeSummary(edge)}${edge.stale ? " (stale)" : ""}`;
+  const clash = edge.conflict.length ? ` — disagrees with ${edge.kind === "authored" ? "the model" : "what you wrote"}: ${edge.conflict.join(", ")}` : "";
+  return `${name(edge.from)} — ${name(edge.to)}: ${edgeSummary(edge)}${edge.stale ? " (stale)" : ""}${clash}`;
 }
