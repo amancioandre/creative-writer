@@ -18,6 +18,7 @@ An Obsidian plugin for creative writing. Everything that touches the page lives 
 | **Writing desk** | Words added and cut today against a daily goal, streak, this week's total, and a 12-week calendar heatmap. Deletions are tracked separately, so a revision day still shows as work. History lives in `progress.json` beside the plugin's settings. | `Open writing desk`; Settings → Goals |
 | **Project targets** | Add `writing-target: 50000` (and optionally `writing-deadline: 2026-10-31`) to any note's front matter and its folder becomes a project: total words, words per day needed vs. your last-7-day pace, and the projected finish date. `writing-daily: 500` adds a per-project daily goal with its own streak; `writing-scope: note` limits it to that note; `writing-name` overrides the title. | Writing desk → Projects |
 | **Scene outline** | The desk lists the active note's headings with words, reading-ease band and dialogue share per scene, bar-scaled to the longest; click to jump. Heatmap days where cutting outweighed adding are shown as revision days. | Writing desk → Scenes |
+| **Story map** | One graph of a project: characters, places and things as nodes (typed notes — `type: character` / `type: location` in front matter, or a `Characters/` / `Places/` folder — plus recurring unnamed names as dashed *candidates* you can turn into notes with one click); three toggleable layers of edges — **Links** you wrote (wikilinks, backlinks, bookmarks ★), **Scenes** shared (who appears with whom, weighted by count), **References** a local model spots outside the story (myth, history, literature) along with labelled relationships and events. Click a node or edge to see its evidence and jump to the scene; drag to pin; a *Who is where* timeline shows every scene in order with the cast present. Everything is rebuilt from your notes; only model readings persist, in a `Story map.md` note inside the project folder, so it syncs with the project to every device. | `Open story map`; button *Read project with model* (Ollama), or *Read this note with model* on a chapter node |
 | **Style checks** | Tints clichés, passive voice, filter verbs, adverbs, repetition, nominalisations, weak verbs and metaphor candidates in the current paragraph; hover for the note. Offline: rules + a POS tagger + concreteness norms. | Settings → Style checks (per-kind toggles) |
 
 Editing mode only (Source + Live Preview); Reading view has no CodeMirror and is untouched.
@@ -42,7 +43,7 @@ Then in Obsidian: Settings → Community plugins → enable **Creative Writer**,
 For development: `npm run dev` (esbuild watch) plus the **Hot Reload** community plugin.
 
 ```bash
-npm test              # 465 tests
+npm test              # 542 tests
 npm run eval          # rule scorecard on eval/corpus.ts (see eval/RESULTS.md)
 npm run eval:ollama   # the same corpus through the local model, ~1s
 npm run test:watch
@@ -65,6 +66,8 @@ src/
 │   ├── style/        Finding, Tokenizer, StyleRule (+AnalysisContext), PosTagger & Concreteness
 │   │                 (ports), rules/ (Cliche, PassiveVoice, FilterVerb, Adverb, Repetition,
 │   │                 Nominalization, WeakVerb, MetaphorCandidate, PhraseMatcher), lexicon/
+│   ├── story/        StoryGraph, EntityIndex (+NameLookup), Mentions, BuildGraph, Filter, Layout,
+│   │                 StoryMapFile (the syncable note), SceneReading (model validation)
 │   ├── focus/        FocusTier
 │   ├── zen/          ZenMode
 │   └── settings/     PluginSettings, normalizeSettings

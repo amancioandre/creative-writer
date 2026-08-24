@@ -1,0 +1,81 @@
+import type { ProjectNotes } from "../../application/ports/ProjectNotes";
+import { inScope, parseProjectFrontmatter, type ProjectSpec } from "../../domain/progress/Project";
+import type { ProjectNote } from "../../domain/story/BuildGraph";
+import { STORY_MAP_FLAG } from "../../domain/story/StoryMapFile";
+import { splitScenes } from "../../domain/text/Scenes";
+
+/** The slice of Obsidian's `App` this adapter touches, typed structurally so tests can fake it. */
+export interface FileLike { readonly path: string }
+export interface CacheLike {
+  readonly frontmatter?: Record<string, unknown>;
+  readonly links?: ReadonlyArray<{ link: string }>;
+  readonly embeds?: ReadonlyArray<{ link: string }>;
+  readonly frontmatterLinks?: ReadonlyArray<{ link: string }>;
+}
+export interface VaultAppLike {
+  readonly vault: { getMarkdownFiles(): FileLike[]; cachedRead(f: FileLike): Promise<string> };
+  readonly metadataCache: { getFileCache(f: FileLike): CacheLike | null; getFirstLinkpathDest(link: string, source: string): FileLike | null };
+  /** Obsidian's core Bookmarks plugin, reached through the (undocumented but stable) internal-plugins registry. */
+  readonly internalPlugins?: { getPluginById(id: string): { enabled?: boolean; instance?: { items?: unknown[] } } | null };
+}
+
+interface BookmarkItem { type?: string; path?: string; subpath?: string; items?: BookmarkItem[] }
+
+/** Reads a project's notes through the metadata cache — links already resolved, front matter already parsed. */
+export class VaultProjectNotes implements ProjectNotes {
+  constructor(private readonly app: VaultAppLike) {}
+
+  projects(): ProjectSpec[] {
+    return this.app.vault
+      .getMarkdownFiles()
+      .map((f) => parseProjectFrontmatter(this.app.metadataCache.getFileCache(f)?.frontmatter, f.path))
+      .filter((s): s is ProjectSpec => s !== null)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async notes(project: ProjectSpec): Promise<ProjectNote[]> {
+    const bookmarks = this.bookmarks();
+    const out: ProjectNote[] = [];
+    for (const f of this.app.vault.getMarkdownFiles()) {
+      if (!inScope(project, f.path)) continue;
+      const cache = this.app.metadataCache.getFileCache(f);
+      const fm = cache?.frontmatter;
+      if (fm && fm[STORY_MAP_FLAG] !== undefined) continue; // our own data note
+      const links = new Set<string>();
+      for (const l of [...(cache?.links ?? []), ...(cache?.embeds ?? []), ...(cache?.frontmatterLinks ?? [])]) {
+        const target = this.app.metadataCache.getFirstLinkpathDest(l.link.split("#")[0]!.split("|")[0]!, f.path);
+        if (target && target.path !== f.path) links.add(target.path);
+      }
+      out.push({
+        path: f.path,
+        frontmatter: fm ?? {},
+        links: [...links],
+        bookmarked: bookmarks.files.has(f.path),
+        bookmarkedHeadings: bookmarks.headings.get(f.path) ?? [],
+        scenes: splitScenes(await this.app.vault.cachedRead(f)),
+      });
+    }
+    return out;
+  }
+
+  private bookmarks(): { files: Set<string>; headings: Map<string, string[]> } {
+    const files = new Set<string>();
+    const headings = new Map<string, string[]>();
+    const plugin = this.app.internalPlugins?.getPluginById("bookmarks");
+    const walk = (items: unknown[] | undefined) => {
+      for (const raw of items ?? []) {
+        const item = (raw && typeof raw === "object" ? raw : {}) as BookmarkItem;
+        if (item.type === "group") walk(item.items);
+        if (!item.path) continue;
+        if (item.type === "file") files.add(item.path);
+        if (item.type === "heading" && item.subpath) {
+          const list = headings.get(item.path) ?? [];
+          list.push(item.subpath.replace(/^#/, ""));
+          headings.set(item.path, list);
+        }
+      }
+    };
+    if (plugin?.enabled !== false) walk(plugin?.instance?.items);
+    return { files, headings };
+  }
+}

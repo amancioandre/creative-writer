@@ -125,3 +125,28 @@ Invariants worth knowing:
 - **Rules own the mechanical checks.** `MODEL_KINDS` restricts what the model is asked about; `asyncFindingsExtension` drops model findings that overlap a rule finding of the same kind.
 - **Money is counted in one place.** `ConfiguredLlmAnalyser` prices Claude usage with `CostLedger` and enforces the daily cap before the request; spend persists in settings.
 - **Nothing runs on idle unless you opt in.** `llm.onIdle` defaults to false; the command always works.
+
+## Story map
+
+A project (a folder with a `writing-target` note) becomes one graph, built in the domain from parsed notes and rendered by a plain-SVG `ItemView`.
+
+```
+VaultProjectNotes ──ProjectNote[]──► buildStoryGraph ──StoryGraph──► applyFilter ──► forceLayout ──► StoryMapView
+       │                                    ▲
+ metadataCache (links, front matter),       │ StoryMapFile (model readings only)
+ Bookmarks core plugin                      │
+                                 StoryMapNoteRepository ◄── AnalyzeSceneRelations ◄── RelationAnalyser (Ollama)
+```
+
+| Term | Meaning | Lives in |
+|---|---|---|
+| **Entity** | A node: a typed note (character, location, item, faction, event), a plain note, a *candidate* (recurring unknown name), or a *reference* the model named outside the story. | `domain/story/StoryGraph.ts` |
+| **Layer** | How an edge is known: `explicit` (links, appearances), `internal` (co-occurrence, model relationships), `external` (model references). Views toggle layers, never edge kinds. | `StoryGraph.layerOf` |
+| **Scene** | A heading and its prose (`domain/text/Scenes`); the unit of evidence. Every extracted edge carries the scenes that justify it. | `SceneRef` |
+| **Reading** | One model pass over one scene: relations, references, events, and the hash of the prose it read. A hash mismatch marks its edges *stale* rather than dropping them. | `domain/story/StoryMapFile.ts` |
+
+Entity resolution (`EntityIndex`, `Mentions`) is deliberately tagger-free: a capital mid-sentence is a name, sentence-initial capitals count only when they resolve to a known entity or a name already seen mid-sentence elsewhere in the project (two passes in `buildStoryGraph`). Full names, `aliases:`, a leading article and unique name parts all resolve; an ambiguous surname ("Kovács" with two Kovácses) does not. The `NameLookup` is shared with `validateReading`, so the model may say "Marta" and the graph still finds "Marta Kovács".
+
+**Persistence and sync.** The graph is a pure function of the vault, so nothing derived is stored — two machines with the same notes draw the same map (the layout is seeded deterministically for the same reason). Only model readings persist, and they live in `Story map.md` inside the project folder: front matter (`creative-writer-storymap: 1`, `creative-writer: false`) plus one ```json block. A markdown note is the one file type every sync path — Obsidian Sync, git, Syncthing, a shared drive — carries by default; a sidecar `.json` beside the notes is not. Readings are keyed by `path#heading` and hashed, so an edit re-reads one scene, not a chapter; saving after every scene means an abort loses nothing.
+
+Layout is Fruchterman–Reingold on a golden-angle spiral start (`domain/story/Layout.ts`), pinned positions honoured; ~200 iterations over a hundred nodes is a few milliseconds. `.canvas` files are not used.

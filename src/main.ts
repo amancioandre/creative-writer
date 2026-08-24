@@ -37,6 +37,14 @@ import { toDay } from "./domain/progress/Dates";
 import { splitScenes } from "./domain/text/Scenes";
 import { inScope, parseProjectFrontmatter, projectStatus, projectStreak, recentAdded, type ProjectStatus } from "./domain/progress/Project";
 import { enabledStyleKinds } from "./domain/settings/Settings";
+import { BuildStoryMap } from "./application/use-cases/BuildStoryMap";
+import { AnalyzeSceneRelations } from "./application/use-cases/AnalyzeSceneRelations";
+import { VaultProjectNotes, type VaultAppLike } from "./infrastructure/obsidian/VaultProjectNotes";
+import { StoryMapNoteRepository } from "./infrastructure/obsidian/StoryMapNoteRepository";
+import { OllamaRelationAnalyser } from "./infrastructure/llm/OllamaRelationAnalyser";
+import { STORY_MAP_VIEW_TYPE, StoryMapView } from "./infrastructure/obsidian/views/StoryMapView";
+import type { EntityKind } from "./domain/story/StoryGraph";
+import { TFile, TFolder, normalizePath } from "obsidian";
 
 /**
  * Composition root. The only file that knows about every layer: it builds
@@ -139,6 +147,47 @@ export default class CreativeZenModePlugin extends Plugin {
       },
     }));
     this.addCommand({ id: "open-writing-desk", name: "Open writing desk", callback: () => void this.openDesk() });
+
+    // Story map: rebuilt from the vault on demand; only model readings persist, in `Story map.md` inside the project.
+    const projectNotes = new VaultProjectNotes(this.app as unknown as VaultAppLike);
+    const storyRepo = new StoryMapNoteRepository({
+      exists: async (p) => this.app.vault.getAbstractFileByPath(p) instanceof TFile,
+      read: async (p) => this.app.vault.cachedRead(this.app.vault.getAbstractFileByPath(p) as TFile),
+      write: async (p, content) => {
+        const existing = this.app.vault.getAbstractFileByPath(p);
+        if (existing instanceof TFile) await this.app.vault.modify(existing, content);
+        else await this.app.vault.create(p, content);
+      },
+    });
+    const buildStoryMap = new BuildStoryMap(projectNotes, storyRepo);
+    this.registerView(STORY_MAP_VIEW_TYPE, (leaf: WorkspaceLeaf) => new StoryMapView(leaf, {
+      projects: () => buildStoryMap.projects(),
+      activeProject: () => {
+        const path = this.app.workspace.getActiveViewOfType(MarkdownView)?.file?.path;
+        return path ? buildStoryMap.projectFor(path) : null;
+      },
+      activeNotePath: () => this.app.workspace.getActiveViewOfType(MarkdownView)?.file?.path ?? null,
+      build: (project) => buildStoryMap.execute(project),
+      openNote: (path) => void this.app.workspace.openLinkText(path, "", false),
+      reveal: (ref) => void this.revealScene(ref.path, ref.line),
+      promote: (project, name, kind) => this.createEntityNote(project.scope, name, kind),
+      // Checked at click time, not load time, so switching the model on in settings takes effect without a reload.
+      analyse: (project, notePath, graph, signal, onProgress) => {
+        const cfg = this.current.llm;
+        if (cfg.provider !== "ollama") throw new Error("Reading a note needs a local model — set Model to Local (Ollama) in Creative Writer settings.");
+        const analyser = new OllamaRelationAnalyser(new RequestUrlHttpClient(), { baseUrl: cfg.ollamaUrl, model: cfg.ollamaModel });
+        return new AnalyzeSceneRelations(projectNotes, storyRepo, analyser).execute(project, notePath, graph, signal, onProgress);
+      },
+    }));
+    this.addCommand({ id: "open-story-map", name: "Open story map", callback: () => void this.openStoryMap() });
+    this.addCommand({
+      id: "read-note-for-story-map",
+      name: "Read this note with model (story map)",
+      editorCallback: () => void this.openStoryMap().then(() => (this.app.workspace.getLeavesOfType(STORY_MAP_VIEW_TYPE)[0]?.view as StoryMapView | undefined)?.readActiveNote()),
+    });
+    this.registerEvent(this.app.metadataCache.on("resolved", () => this.refreshStoryMap()));
+    this.registerEvent(this.app.vault.on("rename", () => this.refreshStoryMap()));
+    this.registerEvent(this.app.vault.on("delete", () => this.refreshStoryMap()));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.refreshDesk()));
     this.registerEvent(this.app.workspace.on("file-open", (file) => {
       const md = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -222,6 +271,53 @@ export default class CreativeZenModePlugin extends Plugin {
     await leaf.setViewState({ type: DESK_VIEW_TYPE, active: true });
     await this.app.workspace.revealLeaf(leaf);
     (leaf.view as DeskView).refresh();
+  }
+
+  private async openStoryMap(): Promise<void> {
+    const existing = this.app.workspace.getLeavesOfType(STORY_MAP_VIEW_TYPE)[0];
+    const leaf = existing ?? this.app.workspace.getLeaf("tab");
+    if (!existing) await leaf.setViewState({ type: STORY_MAP_VIEW_TYPE, active: true });
+    await this.app.workspace.revealLeaf(leaf);
+    await (leaf.view as StoryMapView).onOpen();
+  }
+
+  private storyMapRefreshTimer: number | null = null;
+  /** The metadata cache fires `resolved` on every edit; a rebuild every couple of seconds is plenty for a map. */
+  private refreshStoryMap(): void {
+    const leaf = this.app.workspace.getLeavesOfType(STORY_MAP_VIEW_TYPE)[0];
+    if (!leaf) return;
+    if (this.storyMapRefreshTimer !== null) window.clearTimeout(this.storyMapRefreshTimer);
+    this.storyMapRefreshTimer = window.setTimeout(() => {
+      this.storyMapRefreshTimer = null;
+      void (leaf.view as StoryMapView).refresh();
+    }, 2000);
+  }
+
+  /** Opens the note and puts the cursor on a scene's heading line. */
+  private async revealScene(path: string, line: number): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) return;
+    const leaf = this.app.workspace.getLeaf(false);
+    await leaf.openFile(file, { active: true });
+    const md = leaf.view instanceof MarkdownView ? leaf.view : null;
+    if (!md) return;
+    md.editor.setCursor({ line, ch: 0 });
+    md.editor.scrollIntoView({ from: { line, ch: 0 }, to: { line, ch: 0 } }, true);
+    md.editor.focus();
+  }
+
+  /** A candidate becomes a real entity: a typed note in the project's Characters/ or Places/ folder (created if missing). */
+  private async createEntityNote(scope: string, name: string, kind: EntityKind): Promise<string> {
+    const folder = scope.endsWith("/") || scope === "" ? scope : scope.slice(0, scope.lastIndexOf("/") + 1);
+    const sub = kind === "location" ? "Places" : "Characters";
+    const dir = normalizePath(`${folder}${sub}`);
+    if (!(this.app.vault.getAbstractFileByPath(dir) instanceof TFolder)) await this.app.vault.createFolder(dir);
+    const safe = name.replace(/[\\/:*?"<>|#^[\]]/g, "").trim() || "Unnamed";
+    const path = normalizePath(`${dir}/${safe}.md`);
+    if (!(this.app.vault.getAbstractFileByPath(path) instanceof TFile)) {
+      await this.app.vault.create(path, `---\ntype: ${kind}\naliases: []\n---\n`);
+    }
+    return path;
   }
 
   private deskRefreshTimer: number | null = null;
