@@ -36,4 +36,4 @@ Each project declared in front matter with its total, target, percentage, pace l
 
 ## Where the log lives
 
-`progress.json` beside the plugin's `data.json`, kept separate so a settings reset never erases a year of history. Obsidian Sync does not carry it; see [Files & sync](/reference/data-and-sync).
+In a note — `Creative Writer/Writing log.md` by default; change the path under Settings → Goals → *Writing log note* — so it syncs with the vault and your streak is the same on every machine. The note is flagged `creative-writer: false` so the plugin never counts it, and edits to it are never logged. A log from an earlier version (`progress.json` in the plugin folder) is imported the first time the note is missing. See [Files & sync](/reference/data-and-sync).

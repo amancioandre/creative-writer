@@ -131,9 +131,11 @@ export interface PluginSettings {
 export interface GoalSettings {
   /** Words added per day; 0 = no daily goal (any writing day counts for streaks). */
   readonly dailyWords: number;
+  /** Vault-relative path of the note that holds the writing log, so it syncs. */
+  readonly logNote: string;
 }
 
-export const DEFAULT_GOALS: GoalSettings = { dailyWords: 500 };
+export const DEFAULT_GOALS: GoalSettings = { dailyWords: 500, logNote: "Creative Writer/Writing log.md" };
 
 export const DEFAULT_STYLE_CHECKS: Readonly<Record<FindingKind, boolean>> = {
   cliche: true, passive: true, filter: true, adverb: true, repetition: true,
@@ -301,5 +303,15 @@ export function llmConfigEquals(a: LlmSettings, b: LlmSettings): boolean {
 function normalizeGoals(raw: unknown): GoalSettings {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const dailyWords = typeof r.dailyWords === "number" && Number.isFinite(r.dailyWords) ? clampInt(r.dailyWords, 0, 50_000) : DEFAULT_GOALS.dailyWords;
-  return { dailyWords };
+  const logNote = normalizeNotePath(r.logNote) ?? DEFAULT_GOALS.logNote;
+  return { dailyWords, logNote };
+}
+
+/** A vault-relative markdown path: trimmed, forward slashes, no leading slash, `.md` appended if missing; null when unusable. */
+export function normalizeNotePath(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  let p = raw.trim().replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/+/g, "/");
+  if (!p || p.endsWith("/")) return null;
+  if (!/\.md$/i.test(p)) p += ".md";
+  return p;
 }

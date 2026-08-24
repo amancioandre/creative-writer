@@ -40,6 +40,10 @@ aliases: []
 ---
 ```
 
+## Writing log note
+
+`Creative Writer/Writing log.md` (or the path in Settings → Goals) carries `creative-writer: false` and `creative-writer-log: 1`, a line of explanation and one JSON block. Safe to edit; deleting it starts the log afresh.
+
 ## Story map data note
 
 `Story map.md` in the project folder is written by the plugin and carries:

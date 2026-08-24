@@ -1,6 +1,6 @@
 import { type App, type Plugin, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
 import { RhythmScale } from "../../domain/rhythm/RhythmScale";
-import { foldersToText, textToFolders, type ClaudeModelId, type LlmProvider, type PluginSettings } from "../../domain/settings/Settings";
+import { DEFAULT_GOALS, foldersToText, normalizeNotePath, textToFolders, type ClaudeModelId, type LlmProvider, type PluginSettings } from "../../domain/settings/Settings";
 import type { ScopeMode } from "../../domain/scope/NoteScope";
 import type { FindingKind } from "../../domain/style/Finding";
 
@@ -143,6 +143,8 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
     new Setting(containerEl).setName("Goals").setHeading();
     new Setting(containerEl).setName("Daily word goal").setDesc("Words added per day for the streak and the progress bar in the writing desk. 0 = any day you write counts.")
       .addSlider((sl) => sl.setLimits(0, 5000, 50).setValue(s.goals.dailyWords).onChange((v) => set({ goals: { ...this.port.current().goals, dailyWords: v } })));
+    new Setting(containerEl).setName("Writing log note").setDesc("Vault-relative path of the note that keeps the log (words added and cut per day), so streaks sync with the vault. Takes effect at the next save; reload to read from a new path.")
+      .addText((t) => t.setPlaceholder(DEFAULT_GOALS.logNote).setValue(s.goals.logNote).onChange((v) => { const p = normalizeNotePath(v); if (p) set({ goals: { ...this.port.current().goals, logNote: p } }); }));
 
     new Setting(containerEl).setName("Style checks").setHeading();
     new Setting(containerEl).setName("Style checks").setDesc("Highlight clichés, passive voice, filter verbs, adverbs, repetition and more in the current paragraph. Hover a highlight for the note.")

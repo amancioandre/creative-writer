@@ -29,6 +29,7 @@ Settings → Community plugins → Creative Writer. Everything here is stored in
 | Setting | Default | What |
 |---|---|---|
 | Daily word goal | 500 | Words added per day for the streak and the desk's bar. 0 = any day you write counts. |
+| Writing log note | `Creative Writer/Writing log.md` | Vault-relative path of the note that keeps the log, so it syncs. Takes effect at the next save; reload to read from a new path. |
 
 ## Style checks
 

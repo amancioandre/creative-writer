@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DEFAULT_SETTINGS, normalizeSettings } from "../../../src/domain/settings/Settings";
+import { DEFAULT_SETTINGS, normalizeNotePath, normalizeSettings } from "../../../src/domain/settings/Settings";
 
 describe("normalizeSettings", () => {
   it("returns defaults for undefined input", () => {
@@ -62,6 +62,18 @@ describe("llm settings", () => {
     expect(s.llm.dailyCapUsd).toBe(100);
     expect(s.llm.spend).toEqual({ day: "2026-08-23", usd: 0 });
     expect(normalizeSettings({ llm: { claudeModel: "claude-3" } }).llm.claudeModel).toBe("claude-opus-5");
+  });
+});
+
+describe("normalizeNotePath", () => {
+  it("cleans a vault-relative markdown path", () => {
+    expect(normalizeNotePath(" /Creative Writer\\Writing log ")).toBe("Creative Writer/Writing log.md");
+    expect(normalizeNotePath("a//b.MD")).toBe("a/b.MD");
+    expect(normalizeNotePath("")).toBeNull();
+    expect(normalizeNotePath("folder/")).toBeNull();
+    expect(normalizeNotePath(3)).toBeNull();
+    expect(normalizeSettings({ goals: { logNote: "" } }).goals.logNote).toBe("Creative Writer/Writing log.md");
+    expect(normalizeSettings({ goals: { logNote: "Logs/me" } }).goals.logNote).toBe("Logs/me.md");
   });
 });
 

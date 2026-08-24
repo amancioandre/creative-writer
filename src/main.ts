@@ -32,6 +32,8 @@ import { readabilityStatusExtension, statusLabel } from "./infrastructure/codemi
 import { DeskView, DESK_VIEW_TYPE } from "./infrastructure/obsidian/views/DeskView";
 import { TrackWriting } from "./application/use-cases/TrackWriting";
 import { AdapterProgressRepository } from "./infrastructure/obsidian/AdapterProgressRepository";
+import { NoteProgressRepository } from "./infrastructure/obsidian/NoteProgressRepository";
+import { vaultNoteIO } from "./infrastructure/obsidian/VaultNoteIO";
 import { countWords } from "./domain/text/Dialogue";
 import { toDay } from "./domain/progress/Dates";
 import { splitScenes } from "./domain/text/Scenes";
@@ -121,8 +123,12 @@ export default class CreativeZenModePlugin extends Plugin {
     });
 
     const profile = new ProfileProse(new IntlSentenceSegmenter());
+    // The log lives in a vault note so streaks sync; progress.json from earlier versions is imported once and left in place.
+    const notes = vaultNoteIO(this.app.vault);
+    const legacyProgress = new AdapterProgressRepository(this.app.vault.adapter, `${this.app.vault.configDir}/plugins/${this.manifest.id}/progress.json`);
+    const isLogNote = (path: string) => path === this.current.goals.logNote;
     this.tracker = new TrackWriting(
-      new AdapterProgressRepository(this.app.vault.adapter, `${this.app.vault.configDir}/plugins/${this.manifest.id}/progress.json`),
+      new NoteProgressRepository(notes, () => this.current.goals.logNote, legacyProgress),
       { timers: { set: (fn, ms) => window.setTimeout(fn, ms), clear: (id) => window.clearTimeout(id) }, today: () => toDay(new Date()), debounceMs: 800, saveMs: 10_000, onChange: () => this.refreshDesk() },
     );
     await this.tracker.start();
@@ -151,15 +157,7 @@ export default class CreativeZenModePlugin extends Plugin {
 
     // Story map: rebuilt from the vault on demand; only model readings persist, in `Story map.md` inside the project.
     const projectNotes = new VaultProjectNotes(this.app as unknown as VaultAppLike);
-    const storyRepo = new StoryMapNoteRepository({
-      exists: async (p) => this.app.vault.getAbstractFileByPath(p) instanceof TFile,
-      read: async (p) => this.app.vault.cachedRead(this.app.vault.getAbstractFileByPath(p) as TFile),
-      write: async (p, content) => {
-        const existing = this.app.vault.getAbstractFileByPath(p);
-        if (existing instanceof TFile) await this.app.vault.modify(existing, content);
-        else await this.app.vault.create(p, content);
-      },
-    });
+    const storyRepo = new StoryMapNoteRepository(notes);
     const buildStoryMap = new BuildStoryMap(projectNotes, storyRepo, { candidateMinMentions: 3, tagger: new CompromiseTagger() });
     const storySource = {
       projects: () => buildStoryMap.projects(),
@@ -205,16 +203,16 @@ export default class CreativeZenModePlugin extends Plugin {
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.refreshDesk()));
     this.registerEvent(this.app.workspace.on("file-open", (file) => {
       const md = this.app.workspace.getActiveViewOfType(MarkdownView);
-      if (file && md?.file === file) this.tracker.opened(file.path, countWords(md.editor.getValue()));
+      if (file && md?.file === file && !isLogNote(file.path)) this.tracker.opened(file.path, countWords(md.editor.getValue()));
     }));
     this.registerEvent(this.app.workspace.on("editor-change", (editor, info) => {
-      if (info.file) this.tracker.changed(info.file.path, countWords(editor.getValue()));
+      if (info.file && !isLogNote(info.file.path)) this.tracker.changed(info.file.path, countWords(editor.getValue()));
     }));
     this.registerEvent(this.app.vault.on("rename", (file, oldPath) => this.tracker.renamed(oldPath, file.path)));
     this.registerEvent(this.app.vault.on("delete", (file) => this.tracker.deleted(file.path)));
     this.app.workspace.onLayoutReady(() => {
       const md = this.app.workspace.getActiveViewOfType(MarkdownView);
-      if (md?.file) this.tracker.opened(md.file.path, countWords(md.editor.getValue()));
+      if (md?.file && !isLogNote(md.file.path)) this.tracker.opened(md.file.path, countWords(md.editor.getValue()));
     });
 
     const readability = this.addStatusBarItem();

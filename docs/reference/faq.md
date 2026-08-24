@@ -19,8 +19,8 @@ By design where they overlap; if it is an intensifier or filler word, Creative W
 **Today's words are wrong after I pasted a chapter in.**
 Pasting counts as adding. Cutting counts as cutting. That is the model: the log measures the file's size over time, not keystrokes.
 
-**My streak reset on the laptop.**
-The writing log is per machine; see [Files & sync](/reference/data-and-sync).
+**My streak differs on the laptop.**
+The log is a note (`Creative Writer/Writing log.md`) and syncs with the vault; give the sync a moment, and avoid writing on both machines on the same day before they have synced — see [Files & sync](/reference/data-and-sync).
 
 ## Story map
 
