@@ -3,3 +3,5 @@ main.js
 coverage/
 .vault/
 *.log
+docs/.vitepress/dist/
+docs/.vitepress/cache/

@@ -1,6 +1,6 @@
 # Creative Writer
 
-Repository: [github.com/amancioandre/creative-writer](https://github.com/amancioandre/creative-writer)
+Repository: [github.com/amancioandre/creative-writer](https://github.com/amancioandre/creative-writer) · Documentation: [amancioandre.github.io/creative-writer](https://amancioandre.github.io/creative-writer/)
 
 An Obsidian plugin for creative writing. Everything that touches the page lives in the editor; everything about the work (progress, goals, readability) lives in a side panel that Zen Mode hides.
 
@@ -24,7 +24,7 @@ An Obsidian plugin for creative writing. Everything that touches the page lives 
 
 Editing mode only (Source + Live Preview); Reading view has no CodeMirror and is untouched.
 
-How to lay out a project folder so the story map and timeline read it well — typed notes, aliases, opting memos out with `creative-writer: false` — is in [docs/STORY-PROJECTS.md](docs/STORY-PROJECTS.md).
+How to lay out a project folder so the story map and timeline read it well — typed notes, aliases, opting memos out with `creative-writer: false` — is in [docs/guide/story-projects.md](docs/STORY-PROJECTS.md).
 
 ## Pair it with Harper
 
@@ -56,7 +56,7 @@ npm run typecheck
 
 ## Architecture
 
-Clean Architecture, dependencies point inward. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Clean Architecture, dependencies point inward. See [docs/development/architecture.md](docs/ARCHITECTURE.md).
 
 ```
 src/
