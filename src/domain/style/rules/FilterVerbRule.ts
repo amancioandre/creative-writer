@@ -9,7 +9,7 @@ import { insideQuotes, quoteSpans } from "../Quotes";
 type Guard = (tokens: readonly Token[], start: number, end: number) => boolean;
 const prevIs = (t: readonly Token[], s: number, re: RegExp) => re.test(t[s - 1]?.text ?? "");
 const nextIs = (t: readonly Token[], e: number, re: RegExp) => re.test(t[e]?.text ?? "");
-const atSentenceEnd = (t: readonly Token[], e: number) => t[e] === undefined || t[e]!.startsSentence;
+const atSentenceEnd = (t: readonly Token[], e: number) => t[e] === undefined || t[e].startsSentence;
 
 /** "the felt", "a thought", "of feeling": a noun, not a verb. */
 const NOUN_SLOT = /^(the|a|an|of|my|his|her|their|our|your|its|this|that|every|no|any|second|for|made)$/;
@@ -73,7 +73,7 @@ export class FilterVerbRule implements StyleRule {
         const tag = tagged?.get(first.from);
         if (tag && !tag.tags.has("Verb")) continue;
         // "The soup tasted good", "she seemed tired": linking verb with an adjective complement.
-        if (/^(tasted|smelled|felt|seemed|seems|feels|looked)$/.test(value.phrase) && tokens[e] && tagged?.get(tokens[e]!.from)?.tags.has("Adjective") && !prevIs(tokens, s, /^(he|she|i|they|we|you)$/)) continue;
+        if (/^(tasted|smelled|felt|seemed|seems|feels|looked)$/.test(value.phrase) && tokens[e] && tagged?.get(tokens[e].from)?.tags.has("Adjective") && !prevIs(tokens, s, /^(he|she|i|they|we|you)$/)) continue;
       }
       out.push(Finding.create("filter", m.from, m.to, value.note));
     }

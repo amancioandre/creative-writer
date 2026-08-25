@@ -1,7 +1,7 @@
 import { effectiveSettings } from "./activeNote";
 import { Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 import { RangeSetBuilder } from "@codemirror/state";
-import { settingsFacet, settingsChanged } from "./settingsFacet";
+import { settingsChanged } from "./settingsFacet";
 import { editorClassWhen } from "./editorClassToggle";
 import { ComputeFocusFade } from "../../application/use-cases/ComputeFocusFade";
 import { DEFAULT_MAX_FOCUS_TIER } from "../../domain/focus/FocusTier";

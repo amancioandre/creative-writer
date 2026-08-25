@@ -1,6 +1,6 @@
 import { effectiveSettings } from "./activeNote";
 import { ViewPlugin, type EditorView, type ViewUpdate } from "@codemirror/view";
-import { settingsFacet, settingsChanged } from "./settingsFacet";
+import { settingsChanged } from "./settingsFacet";
 import { cursorParagraph } from "./cursorParagraph";
 import type { ProfileProse, ProseProfile } from "../../application/use-cases/ProfileProse";
 

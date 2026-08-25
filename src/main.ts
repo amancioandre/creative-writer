@@ -41,7 +41,7 @@ import { inScope, parseProjectFrontmatter, projectStatus, projectStreak, recentA
 import { enabledStyleKinds } from "./domain/settings/Settings";
 import { BuildStoryMap } from "./application/use-cases/BuildStoryMap";
 import { AnalyzeSceneRelations } from "./application/use-cases/AnalyzeSceneRelations";
-import { VaultProjectNotes, type VaultAppLike } from "./infrastructure/obsidian/VaultProjectNotes";
+import { VaultProjectNotes } from "./infrastructure/obsidian/VaultProjectNotes";
 import { StoryMapNoteRepository } from "./infrastructure/obsidian/StoryMapNoteRepository";
 import { OllamaRelationAnalyser } from "./infrastructure/llm/OllamaRelationAnalyser";
 import { STORY_MAP_VIEW_TYPE, StoryMapView } from "./infrastructure/obsidian/views/StoryMapView";
@@ -83,7 +83,7 @@ export default class CreativeZenModePlugin extends Plugin {
     });
     this.addCommand({
       id: "toggle-enabled",
-      name: "Toggle Creative Writer (everywhere)",
+      name: "Toggle everywhere",
       callback: () => {
         void this.updateSettings({ ...this.current, enabled: !this.current.enabled });
         new Notice(`creative-writer: ${this.current.enabled ? "on" : "off"}`);
@@ -91,7 +91,7 @@ export default class CreativeZenModePlugin extends Plugin {
     });
     this.addCommand({
       id: "toggle-note",
-      name: "Toggle Creative Writer for this note",
+      name: "Toggle for this note",
       editorCallback: (editor, view) => {
         const file = (view as MarkdownView).file;
         if (!file) return;
@@ -164,7 +164,7 @@ export default class CreativeZenModePlugin extends Plugin {
     this.addCommand({ id: "open-writing-desk", name: "Open writing desk", callback: () => void this.openDesk() });
 
     // Story map: rebuilt from the vault on demand; only model readings persist, in `Story map.md` inside the project.
-    const projectNotes = new VaultProjectNotes(this.app as unknown as VaultAppLike);
+    const projectNotes = new VaultProjectNotes(this.app);
     const storyRepo = new StoryMapNoteRepository(notes);
     const buildStoryMap = new BuildStoryMap(projectNotes, storyRepo, { candidateMinMentions: 3, tagger: new CompromiseTagger() });
     const storySource = {
@@ -190,7 +190,7 @@ export default class CreativeZenModePlugin extends Plugin {
       setRelation: (fromPath, toPath, label, previousLabel) => this.editRelation(fromPath, toPath, (text, link) => upsertRelation(text, link, label, previousLabel)),
       removeRelation: (fromPath, toPath, label) => this.editRelation(fromPath, toPath, (text, link) => removeRelation(text, link, label)),
       rename: (path, name) => this.renameNote(path, name),
-      remove: async (path) => { const f = this.app.vault.getAbstractFileByPath(path); if (f instanceof TFile) await this.app.vault.trash(f, true); },
+      remove: async (path) => { const f = this.app.vault.getAbstractFileByPath(path); if (f instanceof TFile) await this.app.fileManager.trashFile(f); },
       loadLayout: (project) => storyRepo.load(project).then((f) => f.layout),
       saveLayout: (project, layout) => storyRepo.update(project, (f) => setLayout(f, layout)).then(() => undefined),
       updateSettings: (next) => void this.updateSettings({ ...this.current, storyMap: next }),

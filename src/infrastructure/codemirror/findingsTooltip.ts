@@ -27,7 +27,8 @@ export function tooltipFor(f: Finding): Tooltip {
       const dom = createDiv({ cls: `czm-style-tooltip czm-style-tooltip-${f.kind}` });
       dom.createDiv({ cls: "czm-style-tooltip-kind", text: f.kind });
       dom.createDiv({ text: f.note });
-      return { dom };
+      // hoverTooltip nests this inside a host `.cm-tooltip`; tag the host so styles.css can theme it without `:has()`.
+      return { dom, mount: () => dom.parentElement?.classList.add("czm-style-tooltip-host") };
     },
   };
 }

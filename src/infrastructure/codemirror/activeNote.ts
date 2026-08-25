@@ -63,7 +63,7 @@ export function activeNoteExtension(pathOf: (state: EditorState) => string | nul
   };
   const plugin = ViewPlugin.fromClass(
     class {
-      private pending: ReturnType<typeof setTimeout> | null = null;
+      private pending: number | null = null;
       constructor(private readonly view: EditorView) {
         this.sync();
       }
@@ -74,13 +74,13 @@ export function activeNoteExtension(pathOf: (state: EditorState) => string | nul
       private sync() {
         const want = resolve(this.view.state);
         if (want === isActive(this.view.state) || this.pending !== null) return;
-        this.pending = setTimeout(() => {
+        this.pending = window.setTimeout(() => {
           this.pending = null;
           if (want !== isActive(this.view.state)) this.view.dispatch({ effects: setActive.of(want) });
         }, 0);
       }
       destroy() {
-        if (this.pending !== null) clearTimeout(this.pending);
+        if (this.pending !== null) window.clearTimeout(this.pending);
       }
     },
   );

@@ -59,14 +59,14 @@ export class StoryTimelineView extends ItemView {
     const root = this.contentEl.createDiv({ cls: "czm-tl" });
     const head = root.createDiv({ cls: "czm-tl-head" });
     const projects = this.source.projects();
-    const select = head.createEl("select", { cls: "dropdown", attr: { "aria-label": "Project" } }) as HTMLSelectElement;
+    const select = head.createEl("select", { cls: "dropdown", attr: { "aria-label": "Project" } });
     for (const p of projects) {
-      const opt = select.createEl("option", { text: p.name }) as HTMLOptionElement;
+      const opt = select.createEl("option", { text: p.name });
       opt.value = p.scope;
       if (this.project?.scope === p.scope) opt.selected = true;
     }
     select.addEventListener("change", () => void this.show(projects.find((p) => p.scope === select.value) ?? null));
-    const search = head.createEl("input", { cls: "czm-map-search", attr: { type: "search", placeholder: "Filter the cast…", "aria-label": "Filter the cast" } }) as HTMLInputElement;
+    const search = head.createEl("input", { cls: "czm-map-search", attr: { type: "search", placeholder: "Filter the cast…", "aria-label": "Filter the cast" } });
     search.value = this.query;
     search.addEventListener("input", () => { this.query = search.value; this.render(); this.contentEl.querySelector<HTMLInputElement>(".czm-map-search")?.focus(); });
 

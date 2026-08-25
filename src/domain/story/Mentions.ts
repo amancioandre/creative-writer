@@ -44,7 +44,7 @@ export const NOT_A_NAME = new Set([
  * dash, a bracket, a colon or semicolon. A capital right after one of
  * these ("he said, \"This is good") is a sentence start, not a name.
  */
-const CLAUSE_OPENER = /[“"‘(\[—–:;]|\s-\s|(?:^|\s)'/;
+const CLAUSE_OPENER = /[“"‘([—–:;]|\s-\s|(?:^|\s)'/;
 
 /** "Marta Kovács", "St. Ives", "Mount Doom", "the Grey Tower" (article dropped) — a run of capitalised tokens, optionally joined by a particle. */
 const JOINERS = new Set(["of", "de", "da", "do", "di", "van", "von", "der", "den", "la", "le", "del", "the", "y", "e"]);

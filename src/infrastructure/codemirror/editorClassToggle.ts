@@ -1,6 +1,5 @@
 import { effectiveSettings } from "./activeNote";
 import { EditorView } from "@codemirror/view";
-import { settingsFacet } from "./settingsFacet";
 import type { PluginSettings } from "../../domain/settings/Settings";
 
 /**

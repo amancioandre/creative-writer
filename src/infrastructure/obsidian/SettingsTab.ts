@@ -128,9 +128,9 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
     new Setting(containerEl).setName("Focus fade").setDesc("Fade lines progressively the further they are from the cursor.")
       .addToggle((t) => t.setValue(s.focusFadeEnabled).onChange((v) => set({ focusFadeEnabled: v })));
     new Setting(containerEl).setName("Paragraph strength").setDesc("How visible the rest of the cursor paragraph is next to the current line.")
-      .addSlider((sl) => sl.setLimits(0.1, 1, 0.05).setValue(s.focusParagraphOpacity).setDynamicTooltip().onChange((v) => set({ focusParagraphOpacity: v })));
+      .addSlider((sl) => sl.setLimits(0.1, 1, 0.05).setValue(s.focusParagraphOpacity).onChange((v) => set({ focusParagraphOpacity: v })));
     new Setting(containerEl).setName("Far text strength").setDesc("How visible the paragraphs furthest from the cursor are.")
-      .addSlider((sl) => sl.setLimits(0.05, 1, 0.05).setValue(s.focusFarOpacity).setDynamicTooltip().onChange((v) => set({ focusFarOpacity: v })));
+      .addSlider((sl) => sl.setLimits(0.05, 1, 0.05).setValue(s.focusFarOpacity).onChange((v) => set({ focusFarOpacity: v })));
     new Setting(containerEl).setName("Paragraph rhythm").setDesc("Colour each sentence of the current paragraph by its length and weight.")
       .addToggle((t) => t.setValue(s.rhythmEnabled).onChange((v) => set({ rhythmEnabled: v })));
     new Setting(containerEl).setName("Rhythm tiers").setDesc("How many colour steps the rhythm gradient uses.")
@@ -144,7 +144,7 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
     new Setting(containerEl).setName("Daily word goal").setDesc("Words added per day for the streak and the progress bar in the writing desk. 0 = any day you write counts.")
       .addSlider((sl) => sl.setLimits(0, 5000, 50).setValue(s.goals.dailyWords).onChange((v) => set({ goals: { ...this.port.current().goals, dailyWords: v } })));
     new Setting(containerEl).setName("Writing log note").setDesc("Vault-relative path of the note that keeps the log (words added and cut per day), so streaks sync with the vault. Takes effect at the next save; reload to read from a new path.")
-      .addText((t) => t.setPlaceholder(DEFAULT_GOALS.logNote).setValue(s.goals.logNote).onChange((v) => { const p = normalizeNotePath(v); if (p) set({ goals: { ...this.port.current().goals, logNote: p } }); }));
+      .addText((t) => t.setPlaceholder(DEFAULT_GOALS.logNote).setValue(s.goals.logNote).onChange((v) => { const p = normalizeNotePath(v); if (p) void set({ goals: { ...this.port.current().goals, logNote: p } }); }));
 
     new Setting(containerEl).setName("Style checks").setHeading();
     new Setting(containerEl).setName("Style checks").setDesc("Highlight clichés, passive voice, filter verbs, adverbs, repetition and more in the current paragraph. Hover a highlight for the note.")

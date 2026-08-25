@@ -119,12 +119,12 @@ declare global {
     addClass(cls: string): void;
     empty(): void;
     setText(text: string): void;
-    createEl(tag: string, o?: DomOpts): HTMLElement;
+    createEl<K extends keyof HTMLElementTagNameMap>(tag: K, o?: DomOpts): HTMLElementTagNameMap[K];
     createDiv(o?: DomOpts): HTMLElement;
     createSpan(o?: DomOpts): HTMLElement;
   }
   type DomOpts = { text?: string; cls?: string; attr?: Record<string, string> };
-  function createEl(tag: string, o?: DomOpts): HTMLElement;
+  function createEl<K extends keyof HTMLElementTagNameMap>(tag: K, o?: DomOpts): HTMLElementTagNameMap[K];
   function createDiv(o?: DomOpts): HTMLElement;
   function createSpan(o?: DomOpts): HTMLElement;
 }

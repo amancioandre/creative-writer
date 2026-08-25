@@ -1,6 +1,5 @@
 import { effectiveSettings } from "./activeNote";
 import { EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view";
-import { settingsFacet } from "./settingsFacet";
 import { editorClassWhen } from "./editorClassToggle";
 
 export const TYPEWRITER_EDITOR_CLASS = "czm-typewriter";

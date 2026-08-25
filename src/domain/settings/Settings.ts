@@ -199,8 +199,10 @@ export function normalizeSettings(raw: unknown): PluginSettings {
   const bool = (key: keyof PluginSettings) =>
     typeof r[key] === "boolean" ? r[key] : (DEFAULT_SETTINGS[key] as boolean);
 
-  const unit = (key: "focusParagraphOpacity" | "focusFarOpacity") =>
-    typeof r[key] === "number" && Number.isFinite(r[key]) ? Math.min(1, Math.max(0.05, r[key] as number)) : DEFAULT_SETTINGS[key];
+  const unit = (key: "focusParagraphOpacity" | "focusFarOpacity") => {
+    const v = r[key];
+    return typeof v === "number" && Number.isFinite(v) ? Math.min(1, Math.max(0.05, v)) : DEFAULT_SETTINGS[key];
+  };
 
   return {
     enabled: bool("enabled"),
@@ -232,7 +234,7 @@ const HEX = /^#[0-9a-f]{6}$/i;
 const flags = <K extends string>(v: unknown, keys: readonly K[], defaults: Readonly<Record<K, boolean>>): Record<K, boolean> => {
   const o = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
   const out: Record<K, boolean> = { ...defaults };
-  for (const k of keys) if (typeof o[k] === "boolean") out[k] = o[k] as boolean;
+  for (const k of keys) { const v = o[k]; if (typeof v === "boolean") out[k] = v; }
   return out;
 };
 
@@ -266,7 +268,7 @@ export function normalizeStoryMap(raw: unknown): StoryMapSettings {
   };
   const c = (r.colors && typeof r.colors === "object" ? r.colors : {}) as Record<string, unknown>;
   const colors = { ...DEFAULT_STORY_COLORS };
-  for (const k of STORY_KINDS) if (typeof c[k] === "string" && HEX.test(c[k] as string)) colors[k] = (c[k] as string).toLowerCase();
+  for (const k of STORY_KINDS) { const v = c[k]; if (typeof v === "string" && HEX.test(v)) colors[k] = v.toLowerCase(); }
   return {
     display: { nodeSize: display("nodeSize"), edgeWidth: display("edgeWidth"), edgeOpacity: display("edgeOpacity"), labelSize: display("labelSize") },
     layers: flags(r.layers, STORY_LAYERS, DEFAULT_STORY_MAP.layers),

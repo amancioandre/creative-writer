@@ -311,17 +311,17 @@ export class StoryMapView extends ItemView {
   }
 
   private startLoop(): void {
-    if (this.frame !== null || typeof requestAnimationFrame !== "function") return;
+    if (this.frame !== null) return;
     const step = () => {
       const moving = this.sim.tick();
       this.paint();
-      this.frame = moving ? requestAnimationFrame(step) : null;
+      this.frame = moving ? window.requestAnimationFrame(step) : null;
     };
-    this.frame = requestAnimationFrame(step);
+    this.frame = window.requestAnimationFrame(step);
   }
 
   private stopLoop(): void {
-    if (this.frame !== null && typeof cancelAnimationFrame === "function") cancelAnimationFrame(this.frame);
+    if (this.frame !== null) window.cancelAnimationFrame(this.frame);
     this.frame = null;
   }
 
@@ -510,7 +510,7 @@ export class StoryMapView extends ItemView {
     this.composerAt = at;
     this.composer.empty();
     this.composer.classList.add("is-open");
-    const input = this.composer.createEl("input", { cls: "czm-map-new-name", attr: { type: "text", placeholder: "Name…", "aria-label": "Name of the new node" } }) as HTMLInputElement;
+    const input = this.composer.createEl("input", { cls: "czm-map-new-name", attr: { type: "text", placeholder: "Name…", "aria-label": "Name of the new node" } });
     const grid = this.composer.createDiv({ cls: "czm-map-exits" });
     const create = (kind: EntityKind) => { const name = input.value.trim(); if (name) void this.createNode(name, kind, at); else input.focus(); };
     for (const [label, kind, cls] of ENTITY_EXITS) {
@@ -603,15 +603,15 @@ export class StoryMapView extends ItemView {
     if (!s.panelOpen) return;
     const projects = this.source.projects();
     const head = this.panel.createDiv({ cls: "czm-map-panel-head" });
-    const select = head.createEl("select", { cls: "dropdown", attr: { "aria-label": "Project" } }) as HTMLSelectElement;
+    const select = head.createEl("select", { cls: "dropdown", attr: { "aria-label": "Project" } });
     for (const p of projects) {
-      const opt = select.createEl("option", { text: p.name }) as HTMLOptionElement;
+      const opt = select.createEl("option", { text: p.name });
       opt.value = p.scope;
       if (this.project?.scope === p.scope) opt.selected = true;
     }
     if (projects.length === 0) select.createEl("option", { text: "No projects" });
     select.addEventListener("change", () => void this.show(projects.find((p) => p.scope === select.value) ?? null));
-    const search = head.createEl("input", { cls: "czm-map-search", attr: { type: "search", placeholder: "Find a name…", "aria-label": "Find a name" } }) as HTMLInputElement;
+    const search = head.createEl("input", { cls: "czm-map-search", attr: { type: "search", placeholder: "Find a name…", "aria-label": "Find a name" } });
     search.value = this.query;
     search.addEventListener("input", () => { this.query = search.value; this.rebuild(); this.panel.querySelector<HTMLInputElement>(".czm-map-search")?.focus(); });
 
@@ -633,7 +633,7 @@ export class StoryMapView extends ItemView {
     if (this.focusId) btn("Show all", "czm-map-unfocus", () => { this.focusId = null; this.rebuild(); });
 
     const section = (title: string, open = true) => {
-      const d = this.panel.createEl("details", { cls: `czm-map-section czm-map-section-${title.split(" ")[0]!.toLowerCase()}` }) as HTMLDetailsElement;
+      const d = this.panel.createEl("details", { cls: `czm-map-section czm-map-section-${title.split(" ")[0]!.toLowerCase()}` });
       d.open = open;
       d.createEl("summary", { text: title });
       return d;
@@ -664,7 +664,7 @@ export class StoryMapView extends ItemView {
     const displaySec = section("Display", false);
     for (const key of Object.keys(DISPLAY_LABEL) as (keyof DisplaySettings)[]) {
       const [min, max, step] = DISPLAY_RANGES[key];
-      new Setting(displaySec).setName(DISPLAY_LABEL[key]).setClass(`czm-set-display-${key}`).addSlider((sl) => sl.setLimits(min, max, step).setValue(s.display[key]).setDynamicTooltip().onChange((v) => {
+      new Setting(displaySec).setName(DISPLAY_LABEL[key]).setClass(`czm-set-display-${key}`).addSlider((sl) => sl.setLimits(min, max, step).setValue(s.display[key]).onChange((v) => {
         this.saveSettings({ ...this.settings, display: { ...this.settings.display, [key]: v } });
         this.renderGraph();
       }));
@@ -674,7 +674,7 @@ export class StoryMapView extends ItemView {
     const forces = section("Forces", false);
     for (const key of Object.keys(FORCE_LABEL) as (keyof ForceSettings)[]) {
       const [min, max, step] = FORCE_RANGES[key];
-      new Setting(forces).setName(FORCE_LABEL[key]).setClass(`czm-set-force-${key}`).addSlider((sl) => sl.setLimits(min, max, step).setValue(s.forces[key]).setDynamicTooltip().onChange((v) => {
+      new Setting(forces).setName(FORCE_LABEL[key]).setClass(`czm-set-force-${key}`).addSlider((sl) => sl.setLimits(min, max, step).setValue(s.forces[key]).onChange((v) => {
         this.saveSettings({ ...this.settings, forces: { ...this.settings.forces, [key]: v } });
         this.sim.setForces(this.settings.forces);
         this.startLoop();
@@ -732,7 +732,7 @@ export class StoryMapView extends ItemView {
 
   private labelForm(initial: string, save: (label: string) => void, cancel: () => void, saveText = "Save"): void {
     const form = this.card.createDiv({ cls: "czm-map-label" });
-    const input = form.createEl("input", { cls: "czm-map-label-input", attr: { type: "text", placeholder: "sister, rival, owes a debt…", "aria-label": "Relationship label" } }) as HTMLInputElement;
+    const input = form.createEl("input", { cls: "czm-map-label-input", attr: { type: "text", placeholder: "sister, rival, owes a debt…", "aria-label": "Relationship label" } });
     input.value = initial;
     const ok = form.createEl("button", { text: saveText, cls: "czm-act-save-label" });
     ok.addEventListener("click", () => save(input.value.trim()));
@@ -763,7 +763,7 @@ export class StoryMapView extends ItemView {
       btn(this.linking === e.id ? "Stop connecting" : "Connect…", "czm-act-connect", () => (this.linking === e.id ? this.cancelLink() : this.startLink(e.id)));
       if (e.kind !== "note") {
         btn("Rename", "czm-act-rename", () => {
-          const input = createEl("input", { cls: "czm-map-rename", attr: { type: "text", "aria-label": "New name" } }) as HTMLInputElement;
+          const input = createEl("input", { cls: "czm-map-rename", attr: { type: "text", "aria-label": "New name" } });
           input.value = e.name;
           nameEl.replaceWith(input);
           input.addEventListener("keydown", (ev) => { if (ev.key === "Enter") void this.renameNode(e, input.value); if (ev.key === "Escape") { ev.stopPropagation(); this.renderCard(); } });
@@ -810,10 +810,10 @@ export class StoryMapView extends ItemView {
     const targets = this.graph.entities.filter((x) => x.path && x.kind !== "note" && x.kind !== "candidate" && x.kind !== "reference");
     if (targets.length) {
       const row = this.card.createDiv({ cls: "czm-map-alias" });
-      const select = row.createEl("select", { cls: "dropdown czm-act-alias-target", attr: { "aria-label": "Alias of" } }) as HTMLSelectElement;
+      const select = row.createEl("select", { cls: "dropdown czm-act-alias-target", attr: { "aria-label": "Alias of" } });
       select.createEl("option", { text: "Alias of…", attr: { value: "" } });
-      for (const t of targets) { const o = select.createEl("option", { text: `${t.name} (${KIND_LABEL[t.kind].toLowerCase()})` }) as HTMLOptionElement; o.value = t.path!; }
-      const apply = row.createEl("button", { text: "Apply", cls: "czm-act-alias" }) as HTMLButtonElement;
+      for (const t of targets) { const o = select.createEl("option", { text: `${t.name} (${KIND_LABEL[t.kind].toLowerCase()})` }); o.value = t.path!; }
+      const apply = row.createEl("button", { text: "Apply", cls: "czm-act-alias" });
       apply.disabled = true;
       select.addEventListener("change", () => { apply.disabled = !select.value; });
       apply.addEventListener("click", () => void this.aliasTo(e, select.value));
@@ -991,7 +991,7 @@ function clamp(v: number, lo: number, hi: number): number { return v < lo ? lo :
 function sameEdge(a: Edge, b: Edge): boolean { return a.kind === b.kind && a.from === b.from && a.to === b.to && a.label === b.label; }
 function sameLayout(a: Layout, b: Layout): boolean {
   const ka = Object.keys(a), kb = Object.keys(b);
-  return ka.length === kb.length && ka.every((k) => b[k] && b[k]!.x === a[k]!.x && b[k]!.y === a[k]!.y);
+  return ka.length === kb.length && ka.every((k) => { const pa = a[k], pb = b[k]; return pa !== undefined && pb !== undefined && pa.x === pb.x && pa.y === pb.y; });
 }
 
 export function edgeSummary(edge: Edge): string {

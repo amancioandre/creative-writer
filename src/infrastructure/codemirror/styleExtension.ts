@@ -1,7 +1,6 @@
 import { effectiveSettings } from "./activeNote";
 import { StateField } from "@codemirror/state";
 import { Decoration, EditorView } from "@codemirror/view";
-import { settingsFacet } from "./settingsFacet";
 import { cursorParagraph } from "./cursorParagraph";
 import { decorateFindings } from "./findingDecorations";
 import { findingProviders } from "./findingsTooltip";
