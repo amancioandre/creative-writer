@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { WorkspaceLeaf, Setting } from "obsidian";
-import { STORY_MAP_VIEW_TYPE, StoryMapView, edgeSummary, type StoryMapSource } from "../../../src/infrastructure/obsidian/views/StoryMapView";
+import { STORY_MAP_VIEW_TYPE, StoryMapView, edgeGeometry, edgeLanes, edgeSummary, type StoryMapSource } from "../../../src/infrastructure/obsidian/views/StoryMapView";
 import { buildStoryGraph, type ProjectNote, type ProjectRelation } from "../../../src/domain/story/BuildGraph";
 import { splitScenes } from "../../../src/domain/text/Scenes";
 import { EMPTY_STORY_MAP_FILE, putReading, type Layout } from "../../../src/domain/story/StoryMapFile";
@@ -258,6 +258,37 @@ describe("StoryMapView", () => {
     (el.querySelector(".czm-map-analyse") as HTMLButtonElement).click();
     await tick(); await tick();
     expect(el.querySelector(".czm-map-status")!.textContent).toContain("no model");
+  });
+
+  it("writes a labelled edge's word on the line and selects the edge from it", async () => {
+    const { el } = await open();
+    const label = el.querySelector<SVGTextElement>(".czm-edge-label-relationship")!;
+    expect(label.textContent).toBe("sister");
+    expect(label.getAttribute("x")).not.toBeNull();
+    label.dispatchEvent(new MouseEvent("click"));
+    expect(el.querySelector(".czm-edge.is-selected")?.classList.contains("czm-edge-relationship")).toBe(true);
+    expect(label.classList.contains("is-selected")).toBe(true);
+  });
+
+  it("spreads the edges of one pair into lanes, whichever way they point, and bends them apart", () => {
+    const base = { layer: "internal" as const, source: "extracted" as const, weight: 1, label: "", evidence: [], stale: false, conflict: [] };
+    const owns = { ...base, kind: "authored" as const, from: "man", to: "horse", label: "owns" };
+    const helps = { ...base, kind: "relationship" as const, from: "horse", to: "man", label: "helps" };
+    const other = { ...base, kind: "link" as const, from: "man", to: "dog" };
+    const lanes = edgeLanes([owns, helps, other]);
+    expect(lanes.get(owns)).toBe(-0.5);
+    expect(lanes.get(helps)).toBe(0.5);
+    expect(lanes.get(other)).toBe(0);
+    const a = { x: 0, y: 0 }, b = { x: 100, y: 0 };
+    expect(edgeGeometry(a, b, 0, true).d).toBe("M0.0 0.0L100.0 0.0");
+    // The same lane bows to the same side of the chord no matter which end the edge starts from.
+    const fwd = edgeGeometry(a, b, 0.5, true), back = edgeGeometry(b, a, 0.5, false);
+    expect(fwd.d.startsWith("M0.0 0.0Q50.0 11.0")).toBe(true);
+    expect(back.d.startsWith("M100.0 0.0Q50.0 11.0")).toBe(true);
+    expect(fwd.mid).toEqual({ x: 50, y: 5.5 });
+    expect(edgeGeometry(a, b, -0.5, true).mid.y).toBe(-5.5);
+    // Labels stay upright: a right-to-left edge is rotated like a left-to-right one.
+    expect(edgeGeometry(b, a, 0, false).angle).toBe(0);
   });
 
   it("summarises edges", () => {

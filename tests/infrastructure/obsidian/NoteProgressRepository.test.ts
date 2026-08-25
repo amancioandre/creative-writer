@@ -33,6 +33,16 @@ describe("NoteProgressRepository", () => {
     await repo.save({ ...log, counts: { "a.md": 41 } });
     expect((await repo.load()).counts["a.md"]).toBe(41);
   });
+  it("keeps a parent folder the index does not know yet instead of failing the write", async () => {
+    // On "Reload app without saving" the vault index lags the disk: the folder is there, getAbstractFileByPath says it is not.
+    const { vault, files } = fakeVault();
+    const strict: VaultLike = { ...vault, createFolder: async (p) => { if (p === "Creative Writer") throw new Error("Folder already exists."); await vault.createFolder(p); } };
+    await new NoteProgressRepository(vaultNoteIO(strict), () => "Creative Writer/Writing log.md").save(log);
+    expect(files.has("Creative Writer/Writing log.md")).toBe(true);
+    const broken: VaultLike = { ...vault, createFolder: async () => { throw new Error("EACCES"); } };
+    await expect(new NoteProgressRepository(vaultNoteIO(broken), () => "Locked/Writing log.md").save(log)).rejects.toThrow("EACCES");
+  });
+
   it("imports legacy history once, when the note does not exist yet", async () => {
     const { vault, files } = fakeVault();
     let legacyLoads = 0;

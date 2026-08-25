@@ -217,6 +217,12 @@ body.czm-zen .workspace-split.mod-root {
 .czm-edge.is-selected { opacity: 1; stroke: var(--text-normal); }
 .czm-edge.is-dim { opacity: 0.06; }
 .czm-edge:hover { opacity: 1; }
+/* The relationship's word on the line itself, rotated along it, haloed so it reads over other edges. */
+.czm-edge-label { fill: var(--text-muted); font-size: calc(var(--czm-label-size, 11px) * 0.85); font-style: italic; cursor: pointer; user-select: none; dominant-baseline: middle; paint-order: stroke; stroke: var(--background-primary); stroke-width: 3px; stroke-linejoin: round; }
+.czm-edge-label-authored { fill: var(--color-orange); }
+.czm-edge-label.is-selected { fill: var(--text-normal); font-weight: 600; }
+.czm-edge-label.is-dim { opacity: 0.06; }
+.czm-no-labels .czm-edge-label { display: none; }
 .czm-map-rubber { display: none; stroke: var(--color-orange); stroke-width: 2; stroke-dasharray: 5 4; pointer-events: none; }
 .czm-map-rubber.is-open { display: block; }
 .czm-map.is-linking .czm-node { cursor: crosshair; }

@@ -90,7 +90,8 @@ export class StoryMapView extends ItemView {
   private svg!: SVGSVGElement;
   private viewport!: SVGGElement;
   private nodeEls = new Map<string, SVGGElement>();
-  private edgeEls: { el: SVGLineElement; edge: Edge }[] = [];
+  /** One entry per edge: the path, its inline label (when the edge has one) and its lane among the edges of the same pair (0 when alone). */
+  private edgeEls: { el: SVGPathElement; label: SVGTextElement | null; edge: Edge; lane: number }[] = [];
   private rubber!: SVGLineElement;
   private card!: HTMLElement;
   private composer!: HTMLElement;
@@ -223,21 +224,37 @@ export class StoryMapView extends ItemView {
     this.viewport.style.setProperty("--czm-label-size", `${display.labelSize}px`);
     this.viewport.classList.toggle("czm-no-labels", display.labelSize === 0);
     const edgesG = document.createElementNS(SVG, "g");
+    const labelsG = document.createElementNS(SVG, "g");
     // Authored edges paint last, so a hand-drawn line sits on top of whatever the prose or the model says about the same pair.
     const ordered = [...shown.edges].sort((a, b) => Number(a.kind === "authored") - Number(b.kind === "authored"));
+    const lanes = edgeLanes(ordered);
     for (const edge of ordered) {
-      const line = document.createElementNS(SVG, "line");
-      line.setAttribute("class", `czm-edge czm-edge-${edge.kind} czm-layer-${edge.layer}${edge.stale ? " is-stale" : ""}${edge.conflict.length ? " is-conflict" : ""}`);
-      line.setAttribute("stroke-width", f((1 + Math.min(4, Math.sqrt(edge.weight))) * display.edgeWidth));
-      line.setAttribute("data-from", edge.from); line.setAttribute("data-to", edge.to);
+      const lane = lanes.get(edge) ?? 0;
+      const path = document.createElementNS(SVG, "path");
+      path.setAttribute("class", `czm-edge czm-edge-${edge.kind} czm-layer-${edge.layer}${edge.stale ? " is-stale" : ""}${edge.conflict.length ? " is-conflict" : ""}`);
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke-width", f((1 + Math.min(4, Math.sqrt(edge.weight))) * display.edgeWidth));
+      path.setAttribute("data-from", edge.from); path.setAttribute("data-to", edge.to);
       const title = document.createElementNS(SVG, "title");
       title.textContent = edgeTitle(edge, shown);
-      line.appendChild(title);
-      line.addEventListener("click", (ev) => { ev.stopPropagation(); this.select({ kind: "edge", edge }); });
-      edgesG.appendChild(line);
-      this.edgeEls.push({ el: line, edge });
+      path.appendChild(title);
+      const pick = (ev: Event) => { ev.stopPropagation(); this.select({ kind: "edge", edge }); };
+      path.addEventListener("click", pick);
+      edgesG.appendChild(path);
+      // A labelled edge (a relationship, yours or the model's, or a reference) says what it is on the line itself.
+      let label: SVGTextElement | null = null;
+      if (edge.label) {
+        label = document.createElementNS(SVG, "text");
+        label.setAttribute("class", `czm-edge-label czm-edge-label-${edge.kind}`);
+        label.setAttribute("text-anchor", "middle");
+        label.textContent = edge.label;
+        label.addEventListener("click", pick);
+        labelsG.appendChild(label);
+      }
+      this.edgeEls.push({ el: path, label, edge, lane });
     }
     this.viewport.appendChild(edgesG);
+    this.viewport.appendChild(labelsG);
 
     const maxMentions = Math.max(1, ...shown.entities.map((e) => e.mentions));
     const nodesG = document.createElementNS(SVG, "g");
@@ -299,10 +316,15 @@ export class StoryMapView extends ItemView {
       const p = this.sim.position(id);
       if (p) g.setAttribute("transform", `translate(${f(p.x)} ${f(p.y)})`);
     }
-    for (const { el, edge } of this.edgeEls) {
+    for (const { el, label, edge, lane } of this.edgeEls) {
       const a = this.sim.position(edge.from), b = this.sim.position(edge.to);
       if (!a || !b) continue;
-      el.setAttribute("x1", f(a.x)); el.setAttribute("y1", f(a.y)); el.setAttribute("x2", f(b.x)); el.setAttribute("y2", f(b.y));
+      const geo = edgeGeometry(a, b, lane, edge.from < edge.to);
+      el.setAttribute("d", geo.d);
+      if (label) {
+        label.setAttribute("x", f(geo.mid.x)); label.setAttribute("y", f(geo.mid.y));
+        label.setAttribute("transform", `rotate(${geo.angle.toFixed(1)} ${f(geo.mid.x)} ${f(geo.mid.y)})`);
+      }
     }
     this.viewport.setAttribute("transform", `translate(${f(this.view.x)} ${f(this.view.y)}) scale(${this.view.k.toFixed(3)})`);
     this.placeCard();
@@ -335,9 +357,11 @@ export class StoryMapView extends ItemView {
       g.classList.toggle("is-dim", selectedId !== null && selectedId !== id && !touching.has(id));
       g.classList.toggle("is-pinned", this.sim.isPinned(id));
     }
-    for (const { el, edge } of this.edgeEls) {
-      el.classList.toggle("is-selected", sel?.kind === "edge" && sameEdge(sel.edge, edge));
-      el.classList.toggle("is-dim", selectedId !== null && edge.from !== selectedId && edge.to !== selectedId);
+    for (const { el, label, edge } of this.edgeEls) {
+      const selected = sel?.kind === "edge" && sameEdge(sel.edge, edge);
+      const dim = selectedId !== null && edge.from !== selectedId && edge.to !== selectedId;
+      el.classList.toggle("is-selected", selected); el.classList.toggle("is-dim", dim);
+      label?.classList.toggle("is-selected", selected); label?.classList.toggle("is-dim", dim);
     }
   }
 
@@ -988,6 +1012,44 @@ export class StoryMapView extends ItemView {
 
 function f(n: number): string { return n.toFixed(1); }
 function clamp(v: number, lo: number, hi: number): number { return v < lo ? lo : v > hi ? hi : v; }
+/** How far apart (in graph units) the lanes of a multi-edge pair sit. */
+const LANE_GAP = 22;
+
+/**
+ * Assigns each edge a lane among the edges joining the same two nodes (either direction), centred on zero:
+ * a lone edge gets 0, a pair gets -0.5 and 0.5, three get -1, 0, 1 — so "man owns horse" and "horse helps man"
+ * bend away from each other instead of painting over one another.
+ */
+export function edgeLanes(edges: readonly Edge[]): Map<Edge, number> {
+  const groups = new Map<string, Edge[]>();
+  for (const e of edges) {
+    const key = e.from < e.to ? `${e.from}\u0000${e.to}` : `${e.to}\u0000${e.from}`;
+    const g = groups.get(key); if (g) g.push(e); else groups.set(key, [e]);
+  }
+  const lanes = new Map<Edge, number>();
+  for (const g of groups.values()) g.forEach((e, i) => lanes.set(e, i - (g.length - 1) / 2));
+  return lanes;
+}
+
+/**
+ * The path for an edge from `a` to `b` in the given lane: straight when alone, a quadratic curve bowing sideways
+ * otherwise. `forward` fixes which side is positive regardless of the edge's direction, so two edges of one pair
+ * always bend apart. Returns the label anchor (the curve's midpoint) and the angle that keeps the label readable.
+ */
+export function edgeGeometry(a: Point, b: Point, lane: number, forward: boolean): { d: string; mid: Point; angle: number } {
+  const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+  const sign = forward ? 1 : -1;
+  const nx = (-dy / len) * sign, ny = (dx / len) * sign;
+  const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+  let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+  if (angle > 90) angle -= 180; else if (angle < -90) angle += 180;
+  if (lane === 0) return { d: `M${f(a.x)} ${f(a.y)}L${f(b.x)} ${f(b.y)}`, mid: { x: mx, y: my }, angle };
+  const off = lane * LANE_GAP;
+  const cx = mx + nx * off, cy = my + ny * off;
+  // A quadratic curve passes through the midpoint between its chord centre and its control point.
+  return { d: `M${f(a.x)} ${f(a.y)}Q${f(cx)} ${f(cy)} ${f(b.x)} ${f(b.y)}`, mid: { x: mx + nx * off / 2, y: my + ny * off / 2 }, angle };
+}
+
 function sameEdge(a: Edge, b: Edge): boolean { return a.kind === b.kind && a.from === b.from && a.to === b.to && a.label === b.label; }
 function sameLayout(a: Layout, b: Layout): boolean {
   const ka = Object.keys(a), kb = Object.keys(b);

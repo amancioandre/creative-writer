@@ -25,7 +25,10 @@ export function vaultNoteIO(vault: VaultLike): NoteVaultLike {
       const parts = p.split("/").slice(0, -1);
       for (let i = 1; i <= parts.length; i++) {
         const dir = parts.slice(0, i).join("/");
-        if (!vault.getAbstractFileByPath(dir)) await vault.createFolder(dir);
+        if (vault.getAbstractFileByPath(dir)) continue;
+        // The index can lag the disk (early in a reload, or after an external sync): a folder that is there but not
+        // yet known is fine to keep, so only a genuinely failed create is an error.
+        try { await vault.createFolder(dir); } catch (e) { if (!/already exists/i.test(e instanceof Error ? e.message : String(e))) throw e; }
       }
       await vault.create(p, content);
     },
