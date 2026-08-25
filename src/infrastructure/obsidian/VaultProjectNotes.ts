@@ -2,8 +2,7 @@ import type { ProjectNotes } from "../../application/ports/ProjectNotes";
 import { inScope, parseProjectFrontmatter, type ProjectSpec } from "../../domain/progress/Project";
 import type { ProjectNote } from "../../domain/story/BuildGraph";
 import { parseRelations } from "../../domain/story/Relations";
-import { STORY_MAP_FLAG } from "../../domain/story/StoryMapFile";
-import { STORY_THREADS_FLAG } from "../../domain/threads/StoryThreadsNote";
+import { isNoteCounted } from "../../domain/scope/NoteScope";
 import { splitScenes } from "../../domain/text/Scenes";
 
 /** The slice of Obsidian's `App` this adapter touches, typed structurally so tests can fake it. */
@@ -23,9 +22,20 @@ export interface VaultAppLike {
 
 interface BookmarkItem { type?: string; path?: string; subpath?: string; items?: BookmarkItem[] }
 
-/** Reads a project's notes through the metadata cache — links already resolved, front matter already parsed. */
+/** Without a scope from the host: every note but the opted-out ones and the plugin's own data notes. */
+const anyNote = (path: string, frontmatter: Record<string, unknown> | undefined): boolean =>
+  isNoteCounted({ enabled: true, scope: { mode: "all", folders: [] }, path, flag: frontmatter?.["creative-writer"] === false ? false : null, frontmatter });
+
+/**
+ * Reads a project's notes through the metadata cache — links already resolved, front matter already parsed.
+ * `counted` is the vault-wide scope rule (see WritingScope): memos, research and reviews that the writer
+ * opted out, notes outside the configured scope, and the plugin's own data notes are not read.
+ */
 export class VaultProjectNotes implements ProjectNotes {
-  constructor(private readonly app: VaultAppLike) {}
+  constructor(
+    private readonly app: VaultAppLike,
+    private readonly counted: (path: string, frontmatter: Record<string, unknown> | undefined) => boolean = anyNote,
+  ) {}
 
   projects(): ProjectSpec[] {
     return this.app.vault
@@ -42,8 +52,7 @@ export class VaultProjectNotes implements ProjectNotes {
       if (!inScope(project, f.path)) continue;
       const cache = this.app.metadataCache.getFileCache(f);
       const fm = cache?.frontmatter;
-      if (fm && (fm[STORY_MAP_FLAG] !== undefined || fm[STORY_THREADS_FLAG] !== undefined)) continue; // our own data notes
-      if (fm && fm["creative-writer"] === false) continue; // memos, research, reviews: the writer opted the note out
+      if (!this.counted(f.path, fm)) continue;
       const links = new Set<string>();
       for (const l of [...(cache?.links ?? []), ...(cache?.embeds ?? []), ...(cache?.frontmatterLinks ?? [])]) {
         const target = this.app.metadataCache.getFirstLinkpathDest(l.link.split("#")[0]!.split("|")[0]!, f.path);

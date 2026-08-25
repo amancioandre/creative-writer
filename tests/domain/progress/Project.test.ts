@@ -11,6 +11,9 @@ describe("parseProjectFrontmatter — story-ignore", () => {
 });
 
 describe("parseProjectFrontmatter", () => {
+  it("reads writing-goal as writing-daily, the key writers reach for", () => {
+    expect(parseProjectFrontmatter({ "writing-target": "5000", "writing-goal": "1000" }, "WH/Thesis.md")!.dailyWords).toBe(1000);
+  });
   it("scopes to the note's folder by default and names it after the folder", () => {
     const spec = parseProjectFrontmatter({ "writing-target": 50000, "writing-deadline": "2026-10-31" }, "Novels/Camp/notes.md");
     expect(spec).toEqual({ name: "Camp", scope: "Novels/Camp/", targetWords: 50000, deadline: "2026-10-31", dailyWords: 0, notePath: "Novels/Camp/notes.md", ignoredNames: [] });

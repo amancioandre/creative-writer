@@ -14,13 +14,14 @@ Twelve weeks, one cell per day, shaded by words added *or* cut (busiest day sets
 
 ## How words are counted
 
-The plugin watches every open note. When a note opens, its word count is the **baseline**; each edit, after an 800 ms pause, records the delta against the last count as added or removed for that file and that day. Renames follow the file; deletes forget it. The log is saved at most every ten seconds and flushed on unload.
+The plugin watches every open note that is [in scope](/guide/where-it-runs) — the story, not the side material. When a note opens, its word count is the **baseline**; each edit, after an 800 ms pause, records the delta against the last count as added or removed for that file and that day. Renames follow the file; deletes forget it. The log is saved at most every ten seconds and flushed on unload.
 
 This means:
 
 - pasting a chapter in counts as adding it; deleting one counts as cutting it;
 - a note edited outside Obsidian is re-baselined the next time it opens, so nothing is counted twice;
-- the log is per file, so [projects](/guide/projects) can sum only their own folder.
+- the log is per file, so [projects](/guide/projects) can sum only their own folder;
+- the desk reads the log through the scope, so changing *Where it runs* re-derives the totals and the streak without touching the log.
 
 ## Readability of the note
 

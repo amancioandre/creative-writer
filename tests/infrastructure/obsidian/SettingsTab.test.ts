@@ -22,10 +22,17 @@ describe("CreativeZenSettingsTab", () => {
       current: () => current,
       update: async (s) => { saved.push(s); current = s; },
       configDir: () => ".obsidian-custom",
+      scopeSummary: () => ({ counted: 3, total: 5 }),
     });
   });
 
   describe("declarative definitions (Obsidian ≥ 1.13)", () => {
+    it("tells the writer how many notes the scope takes in and offers the project-folders mode", () => {
+      type Item = { name?: string; desc?: string; control?: { options?: Record<string, string> }; items?: Item[] };
+      const notes = (tab.getSettingDefinitions() as Item[]).flatMap((d) => d.items ?? [d]).find((d) => d.name === "Notes")!;
+      expect(notes.desc).toContain("3 of 5 notes");
+      expect(notes.control?.options).toHaveProperty("projects");
+    });
     it("declares every setting with a searchable name", () => {
       const all = names(tab.getSettingDefinitions());
       expect(all).toEqual(expect.arrayContaining([

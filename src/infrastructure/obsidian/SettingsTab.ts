@@ -10,7 +10,19 @@ export interface SettingsPort {
   update(next: PluginSettings): Promise<void>;
   /** The vault's configuration folder name (usually ".obsidian", but user-configurable). */
   configDir(): string;
+  /** How many notes the scope rule currently takes in, out of the vault's Markdown notes. */
+  scopeSummary(): { counted: number; total: number };
 }
+
+const SCOPE_OPTIONS: Record<ScopeMode, string> = {
+  projects: "Project folders only",
+  all: "Project folders and every other note",
+  folders: "Project folders and these folders",
+  marked: "Project folders and notes marked creative-writer: true",
+};
+
+const SCOPE_DESC = "One rule for everything: the notes the editor tools run in are the notes the daily goal, the project totals, the story map and the threads count. A declared project (writing-target or story: true in a note's front matter) is always in; the mode decides what else is. Side material — memos, research, reviews — stays out with creative-writer: false in its front matter, wherever it lives; creative-writer: true lets a note in whatever the mode. The plugin's own notes (writing log, story map, threads) are never counted.";
+
 
 const STYLE_CHECKS: ReadonlyArray<[FindingKind, string, string]> = [
   ["cliche", "Clichés", "Phrases worn smooth by overuse."],
@@ -41,7 +53,7 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
         heading: "Where it runs",
         items: [
           { name: "Enabled", desc: "Master switch. The \"Toggle Creative Writer (everywhere)\" command flips it.", control: { type: "toggle", key: "enabled" } },
-          { name: "Notes", desc: "Which notes get the writing tools. A note's own front matter always wins: creative-writer: true or false (the \"Toggle Creative Writer for this note\" command writes it).", control: { type: "dropdown", key: "scope.mode", options: { all: "Every note", marked: "Only notes marked creative-writer: true", folders: "Only notes in these folders" } } },
+          { name: "Notes", desc: `${SCOPE_DESC} ${this.scopeLine()}`, control: { type: "dropdown", key: "scope.mode", options: SCOPE_OPTIONS } },
           { name: "Folders", desc: "One vault-relative folder per line, e.g. storytelling/novel.", control: { type: "text", key: "scope.foldersText", placeholder: "storytelling" } },
         ],
       },
@@ -58,7 +70,7 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
         type: "group",
         heading: "Goals",
         items: [
-          { name: "Daily word goal", desc: "Words added per day for the streak and the progress bar in the writing desk. 0 = any day you write counts.", control: { type: "slider", key: "goals.dailyWords", min: 0, max: 5000, step: 50 } },
+          { name: "Daily word goal", desc: "Words added per day, in the notes the scope above takes in, for the streak and the progress bar in the writing desk. 0 = any day you write counts.", control: { type: "slider", key: "goals.dailyWords", min: 0, max: 5000, step: 50 } },
         ],
       },
       {
@@ -84,6 +96,11 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
         ],
       },
     ];
+  }
+
+  private scopeLine(): string {
+    const { counted, total } = this.port.scopeSummary();
+    return `Right now: ${counted} of ${total} notes.`;
   }
 
   getControlValue(key: string): unknown {
@@ -117,8 +134,8 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
 
     new Setting(containerEl).setName("Enabled").setDesc("Master switch.")
       .addToggle((t) => t.setValue(s.enabled).onChange((v) => set({ enabled: v })));
-    new Setting(containerEl).setName("Notes").setDesc("Which notes get the writing tools; a note's front matter creative-writer: true/false always wins.")
-      .addDropdown((d) => d.addOptions({ all: "Every note", marked: "Only notes marked creative-writer: true", folders: "Only notes in these folders" }).setValue(s.scope.mode).onChange((v) => set({ scope: { ...this.port.current().scope, mode: v as ScopeMode } })));
+    new Setting(containerEl).setName("Notes").setDesc(`${SCOPE_DESC} ${this.scopeLine()}`)
+      .addDropdown((d) => d.addOptions(SCOPE_OPTIONS).setValue(s.scope.mode).onChange((v) => set({ scope: { ...this.port.current().scope, mode: v as ScopeMode } })));
     new Setting(containerEl).setName("Folders").setDesc("One vault-relative folder per line.")
       .addText((t) => t.setPlaceholder("storytelling").setValue(foldersToText(s.scope.folders)).onChange((v) => set({ scope: { ...this.port.current().scope, folders: textToFolders(v) } })));
     new Setting(containerEl).setName("Typewriter scrolling").setDesc("Keep the line you are writing vertically centred.")
@@ -141,7 +158,7 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
       .addToggle((t) => t.setValue(s.readabilityEnabled).onChange((v) => set({ readabilityEnabled: v })));
 
     new Setting(containerEl).setName("Goals").setHeading();
-    new Setting(containerEl).setName("Daily word goal").setDesc("Words added per day for the streak and the progress bar in the writing desk. 0 = any day you write counts.")
+    new Setting(containerEl).setName("Daily word goal").setDesc("Words added per day, in the notes the scope takes in, for the streak and the progress bar in the writing desk. 0 = any day you write counts.")
       .addSlider((sl) => sl.setLimits(0, 5000, 50).setValue(s.goals.dailyWords).onChange((v) => set({ goals: { ...this.port.current().goals, dailyWords: v } })));
     new Setting(containerEl).setName("Writing log note").setDesc("Vault-relative path of the note that keeps the log (words added and cut per day), so streaks sync with the vault. Takes effect at the next save; reload to read from a new path.")
       .addText((t) => t.setPlaceholder(DEFAULT_GOALS.logNote).setValue(s.goals.logNote).onChange((v) => { const p = normalizeNotePath(v); if (p) void set({ goals: { ...this.port.current().goals, logNote: p } }); }));

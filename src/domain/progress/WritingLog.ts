@@ -45,6 +45,28 @@ export function recordWordCount(log: WritingLog, path: string, words: number, da
   };
 }
 
+/**
+ * The log seen through a scope: only the files `keep` accepts contribute to
+ * each day. The log itself records every note it was shown, so a change of
+ * scope re-derives history instead of losing it. Baselines are kept as they are.
+ */
+export function filterLog(log: WritingLog, keep: (path: string) => boolean): WritingLog {
+  const days: Record<Day, DayEntry> = {};
+  for (const [day, entry] of Object.entries(log.days)) {
+    let added = 0;
+    let removed = 0;
+    const files: Record<string, FileDelta> = {};
+    for (const [path, f] of Object.entries(entry.files)) {
+      if (!keep(path)) continue;
+      files[path] = f;
+      added += f.added;
+      removed += f.removed;
+    }
+    if (Object.keys(files).length > 0) days[day] = { added, removed, files };
+  }
+  return { days, counts: log.counts };
+}
+
 /** Sets the baseline for a file not yet seen, so its first edit is measured from here. */
 export function baselineWordCount(log: WritingLog, path: string, words: number): WritingLog {
   if (log.counts[path] !== undefined) return log;

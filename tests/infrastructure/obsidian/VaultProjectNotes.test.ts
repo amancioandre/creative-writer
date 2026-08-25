@@ -51,6 +51,11 @@ describe("VaultProjectNotes", () => {
     ]);
     expect(notes.find((n) => n.path === "Novel/One.md")!.relations).toEqual([]);
   });
+  it("reads through the host's scope rule when given one", async () => {
+    const scoped = new VaultProjectNotes(app, (path) => path.startsWith("Novel/Characters/"));
+    const notes = await scoped.notes(source.projects()[0]!);
+    expect(notes.map((n) => n.path)).toEqual(["Novel/Characters/Marta.md", "Novel/Characters/Ilse.md"]);
+  });
   it("copes without a bookmarks plugin", async () => {
     const notes = await new VaultProjectNotes({ ...app, internalPlugins: undefined }).notes(source.projects()[0]!);
     expect(notes.every((n) => !n.bookmarked)).toBe(true);

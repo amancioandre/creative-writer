@@ -280,7 +280,7 @@ export function normalizeStoryMap(raw: unknown): StoryMapSettings {
   };
 }
 
-const SCOPE_MODES: readonly ScopeMode[] = ["all", "marked", "folders"];
+const SCOPE_MODES: readonly ScopeMode[] = ["all", "marked", "folders", "projects"];
 
 function normalizeScope(raw: unknown): ScopeSettings {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;

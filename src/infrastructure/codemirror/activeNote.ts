@@ -1,8 +1,13 @@
-import { StateEffect, StateField, type EditorState } from "@codemirror/state";
+import { Facet, StateEffect, StateField, type EditorState } from "@codemirror/state";
 import { EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 import { frontmatterFlag, isNoteActive } from "../../domain/scope/NoteScope";
 import { DEFAULT_SETTINGS, type PluginSettings } from "../../domain/settings/Settings";
 import { settingsFacet } from "./settingsFacet";
+
+/** Scopes of the vault's declared projects, for the "projects" scope mode; the host reconfigures it as front matter changes. */
+export const projectScopesFacet = Facet.define<readonly string[], readonly string[]>({
+  combine: (values) => values[values.length - 1] ?? [],
+});
 
 /** Per-editor: does the plugin run in this note? Decided by the master switch, scope and front matter. */
 export const setActive = StateEffect.define<boolean>();
@@ -59,7 +64,7 @@ export function activeNoteExtension(pathOf: (state: EditorState) => string | nul
   const resolve = (state: EditorState): boolean => {
     const s = state.facet(settingsFacet) ?? DEFAULT_SETTINGS;
     const head = state.doc.sliceString(0, Math.min(state.doc.length, 4000));
-    return isNoteActive({ enabled: s.enabled, scope: s.scope, path: pathOf(state), flag: frontmatterFlag(head) });
+    return isNoteActive({ enabled: s.enabled, scope: s.scope, path: pathOf(state), flag: frontmatterFlag(head), projectScopes: state.facet(projectScopesFacet) });
   };
   const plugin = ViewPlugin.fromClass(
     class {
@@ -69,7 +74,8 @@ export function activeNoteExtension(pathOf: (state: EditorState) => string | nul
       }
       update(u: ViewUpdate) {
         const frontmatterMaybeChanged = u.docChanged && u.changes.touchesRange(0, Math.min(u.state.doc.length, 4000));
-        if (frontmatterMaybeChanged || u.startState.facet(settingsFacet) !== u.state.facet(settingsFacet)) this.sync();
+        const facetsChanged = u.startState.facet(settingsFacet) !== u.state.facet(settingsFacet) || u.startState.facet(projectScopesFacet) !== u.state.facet(projectScopesFacet);
+        if (frontmatterMaybeChanged || facetsChanged) this.sync();
       }
       private sync() {
         const want = resolve(this.view.state);

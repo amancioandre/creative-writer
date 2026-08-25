@@ -13,7 +13,9 @@ import { DomWorkspaceChrome } from "./infrastructure/obsidian/DomWorkspaceChrome
 import { PluginDataSettingsRepository } from "./infrastructure/obsidian/PluginDataSettingsRepository";
 import { CreativeZenSettingsTab } from "./infrastructure/obsidian/SettingsTab";
 import { settingsFacet } from "./infrastructure/codemirror/settingsFacet";
-import { activeNoteExtension } from "./infrastructure/codemirror/activeNote";
+import { activeNoteExtension, projectScopesFacet } from "./infrastructure/codemirror/activeNote";
+import { VaultWritingScope } from "./infrastructure/obsidian/VaultWritingScope";
+import { filterLog, type WritingLog } from "./domain/progress/WritingLog";
 import { FRONTMATTER_KEY, frontmatterFlag, isNoteActive } from "./domain/scope/NoteScope";
 import { typewriterExtension } from "./infrastructure/codemirror/typewriterExtension";
 import { currentLineExtension } from "./infrastructure/codemirror/currentLineExtension";
@@ -65,6 +67,10 @@ import { TFile, TFolder, normalizePath } from "obsidian";
 export default class CreativeZenModePlugin extends Plugin {
   private current!: PluginSettings;
   private readonly settingsCompartment = new Compartment();
+  private readonly projectsCompartment = new Compartment();
+  /** The one scope rule: what the editor runs in is what the log, the projects and the story map count. */
+  private scope!: VaultWritingScope;
+  private projectScopesKey = "";
   private settingsRepo!: PluginDataSettingsRepository;
   private zen!: ToggleZenMode;
   private myth: AnalyzeMyth | null = null;
@@ -95,7 +101,7 @@ export default class CreativeZenModePlugin extends Plugin {
       editorCallback: (editor, view) => {
         const file = (view as MarkdownView).file;
         if (!file) return;
-        const active = isNoteActive({ enabled: this.current.enabled, scope: this.current.scope, path: file.path, flag: frontmatterFlag(editor.getValue()) });
+        const active = isNoteActive({ enabled: this.current.enabled, scope: this.current.scope, path: file.path, flag: frontmatterFlag(editor.getValue()), projectScopes: this.projectScopes() });
         void this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => { fm[FRONTMATTER_KEY] = !active; });
         new Notice(`creative-writer: ${!active ? "on" : "off"} for this note`);
       },
@@ -134,21 +140,22 @@ export default class CreativeZenModePlugin extends Plugin {
     // The log lives in a vault note so streaks sync; progress.json from earlier versions is imported once and left in place.
     const notes = vaultNoteIO(this.app.vault);
     const legacyProgress = new AdapterProgressRepository(this.app.vault.adapter, `${this.app.vault.configDir}/plugins/${this.manifest.id}/progress.json`);
-    const isLogNote = (path: string) => path === this.current.goals.logNote;
+    this.scope = new VaultWritingScope(this.app, () => this.current, () => this.projectScopes());
+    // The log records every note it is shown; the desk reads it through the scope, so a change of scope re-derives history.
+    const countedLog = () => filterLog(this.tracker.current, (path) => this.scope.counts(path));
     this.tracker = new TrackWriting(
       new NoteProgressRepository(notes, () => this.current.goals.logNote, legacyProgress),
       { timers: { set: (fn, ms) => window.setTimeout(fn, ms), clear: (id) => window.clearTimeout(id) }, today: () => toDay(new Date()), debounceMs: 800, saveMs: 10_000, onChange: () => this.refreshDesk() },
     );
-    await this.tracker.start();
     this.registerView(DESK_VIEW_TYPE, (leaf: WorkspaceLeaf) => new DeskView(leaf, {
       activeProfile: () => {
         const md = this.app.workspace.getActiveViewOfType(MarkdownView);
         return md?.file ? { name: md.file.basename, profile: profile.document(md.editor.getValue()) } : null;
       },
-      log: () => this.tracker.current,
+      log: countedLog,
       today: () => toDay(new Date()),
       dailyGoal: () => this.current.goals.dailyWords,
-      projects: () => this.projectStatuses(),
+      projects: () => this.projectStatuses(countedLog()),
       scenes: () => {
         const md = this.app.workspace.getActiveViewOfType(MarkdownView);
         return md?.file ? splitScenes(md.editor.getValue()).map((scene) => ({ scene, profile: profile.paragraph(scene.prose) })) : [];
@@ -164,7 +171,7 @@ export default class CreativeZenModePlugin extends Plugin {
     this.addCommand({ id: "open-writing-desk", name: "Open writing desk", callback: () => void this.openDesk() });
 
     // Story map: rebuilt from the vault on demand; only model readings persist, in `Story map.md` inside the project.
-    const projectNotes = new VaultProjectNotes(this.app);
+    const projectNotes = new VaultProjectNotes(this.app, (path) => this.scope.counts(path));
     const storyRepo = new StoryMapNoteRepository(notes);
     const buildStoryMap = new BuildStoryMap(projectNotes, storyRepo, { candidateMinMentions: 3, tagger: new CompromiseTagger() });
     const storySource = {
@@ -247,23 +254,27 @@ export default class CreativeZenModePlugin extends Plugin {
       name: "Read this note for facts (story threads)",
       editorCallback: () => void this.openStoryThreads(null).then(() => (this.app.workspace.getLeavesOfType(STORY_THREADS_VIEW_TYPE)[0]?.view as StoryThreadsView | undefined)?.readActiveNote()),
     });
-    this.registerEvent(this.app.metadataCache.on("resolved", () => this.refreshStoryMap()));
+    this.registerEvent(this.app.metadataCache.on("resolved", () => { this.refreshStoryMap(); this.pushProjectScopes(); }));
     this.registerEvent(this.app.vault.on("rename", () => this.refreshStoryMap()));
     this.registerEvent(this.app.vault.on("delete", () => this.refreshStoryMap()));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.refreshDesk()));
     this.registerEvent(this.app.workspace.on("file-open", (file) => {
       const md = this.app.workspace.getActiveViewOfType(MarkdownView);
-      if (file && md?.file === file && !isLogNote(file.path)) this.tracker.opened(file.path, countWords(md.editor.getValue()));
+      if (file && md?.file === file) this.observe(file.path, md.editor.getValue());
     }));
     this.registerEvent(this.app.workspace.on("editor-change", (editor, info) => {
-      if (info.file && !isLogNote(info.file.path)) this.tracker.changed(info.file.path, countWords(editor.getValue()));
+      const text = editor.getValue();
+      if (info.file && this.scope.counts(info.file.path, text)) this.tracker.changed(info.file.path, countWords(text));
     }));
     this.registerEvent(this.app.vault.on("rename", (file, oldPath) => this.tracker.renamed(oldPath, file.path)));
     this.registerEvent(this.app.vault.on("delete", (file) => this.tracker.deleted(file.path)));
-    this.app.workspace.onLayoutReady(() => {
+    // The log lives in the vault, and on "Reload app without saving" the plugin loads before the vault is indexed:
+    // read it too early and the note looks missing, so the legacy import would recreate its folder (which throws) and
+    // overwrite the real log. Nothing touches the vault until the layout — and with it the file index — is ready.
+    this.app.workspace.onLayoutReady(() => void this.tracker.start().then(() => {
       const md = this.app.workspace.getActiveViewOfType(MarkdownView);
-      if (md?.file && !isLogNote(md.file.path)) this.tracker.opened(md.file.path, countWords(md.editor.getValue()));
-    });
+      if (md?.file) this.observe(md.file.path, md.editor.getValue());
+    }));
 
     const readability = this.addStatusBarItem();
     readability.addClass("czm-status-readability");
@@ -272,6 +283,7 @@ export default class CreativeZenModePlugin extends Plugin {
 
     this.registerEditorExtension([
       this.settingsCompartment.of(settingsFacet.of(this.current)),
+      this.projectsCompartment.of(projectScopesFacet.of(this.projectScopes())),
       activeNoteExtension((state) => state.field(editorInfoField, false)?.file?.path ?? null),
       readabilityStatusExtension(profile, (p) => {
         readability.setText(statusLabel(p));
@@ -302,12 +314,45 @@ export default class CreativeZenModePlugin extends Plugin {
         current: () => this.current,
         update: (next) => this.updateSettings(next),
         configDir: () => this.app.vault.configDir,
+        scopeSummary: () => this.scopeSummary(),
       }),
     );
   }
 
+  /** A note came into view: its size is the baseline for what follows, even if the scope later lets it in. */
+  private observe(path: string, text: string): void {
+    if (this.scope.counts(path, text)) this.tracker.opened(path, countWords(text));
+  }
+
+  /** Every declared project's folder (or note), `story: true` ones included — they are the story too. */
+  private projectScopes(): string[] {
+    return this.app.vault
+      .getMarkdownFiles()
+      .map((f) => parseProjectFrontmatter(this.app.metadataCache.getFileCache(f)?.frontmatter, f.path))
+      .filter((s): s is ProjectSpec => s !== null)
+      .map((s) => s.scope);
+  }
+
+  /** Editors decide activation from the project list under the "projects" scope mode; push it only when it changes. */
+  private pushProjectScopes(): void {
+    const scopes = this.projectScopes();
+    const key = scopes.join("\n");
+    if (key === this.projectScopesKey) return;
+    this.projectScopesKey = key;
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      const editor = (leaf.view as { editor?: { cm?: { dispatch: (spec: unknown) => void } } }).editor;
+      editor?.cm?.dispatch({ effects: this.projectsCompartment.reconfigure(projectScopesFacet.of(scopes)) });
+    });
+  }
+
+  /** For the settings tab: how many notes the current rule takes in. */
+  private scopeSummary(): { counted: number; total: number } {
+    const files = this.app.vault.getMarkdownFiles();
+    return { counted: files.filter((f) => this.scope.counts(f.path)).length, total: files.length };
+  }
+
   /** Projects are declared in front matter; totals come from the vault, not the log, so untracked files count too. */
-  private async projectStatuses(): Promise<ProjectStatus[]> {
+  private async projectStatuses(log: WritingLog): Promise<ProjectStatus[]> {
     const files = this.app.vault.getMarkdownFiles();
     const specs = files
       .map((f) => parseProjectFrontmatter(this.app.metadataCache.getFileCache(f)?.frontmatter, f.path))
@@ -316,14 +361,14 @@ export default class CreativeZenModePlugin extends Plugin {
     if (specs.length === 0) return [];
     const counts = new Map<string, number>();
     for (const f of files) {
-      if (!specs.some((s) => inScope(s, f.path))) continue;
+      if (!specs.some((s) => inScope(s, f.path)) || !this.scope.counts(f.path)) continue;
       counts.set(f.path, countWords(await this.app.vault.cachedRead(f)));
     }
     const today = toDay(new Date());
     return specs.map((spec) => {
       let total = 0;
       for (const [path, words] of counts) if (inScope(spec, path)) total += words;
-      return projectStatus(spec, total, recentAdded(this.tracker.current, spec, today, 7), today, projectStreak(this.tracker.current, spec, today));
+      return projectStatus(spec, total, recentAdded(log, spec, today, 7), today, projectStreak(log, spec, today));
     });
   }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { EMPTY_LOG, baselineWordCount, forgetPath, normalizeLog, recordWordCount, renamePath } from "../../../src/domain/progress/WritingLog";
+import { EMPTY_LOG, baselineWordCount, filterLog, forgetPath, normalizeLog, recordWordCount, renamePath } from "../../../src/domain/progress/WritingLog";
 
 const D = "2026-08-24";
 
@@ -80,5 +80,22 @@ describe("normalizeLog", () => {
     const out = normalizeLog({ counts: { a: "no", b: -3, c: 4.7 }, days: { bad: {}, "2026-01-01": { added: "x", removed: 2, files: { f: { added: 1 }, g: null } } } });
     expect(out.counts).toEqual({ b: 0, c: 4 });
     expect(out.days).toEqual({ "2026-01-01": { added: 0, removed: 2, files: { f: { added: 1, removed: 0 } } } });
+  });
+});
+
+describe("filterLog", () => {
+  it("keeps only the files the scope accepts and re-totals each day; days left empty disappear", () => {
+    let log = recordWordCount(recordWordCount(EMPTY_LOG, "Novel/a.md", 0, D), "Journal/j.md", 0, D);
+    log = recordWordCount(log, "Novel/a.md", 100, D);
+    log = recordWordCount(log, "Journal/j.md", 40, D);
+    log = recordWordCount(log, "Journal/j.md", 10, "2026-08-25");
+    const seen = filterLog(log, (p) => p.startsWith("Novel/"));
+    expect(seen.days[D]).toEqual({ added: 100, removed: 0, files: { "Novel/a.md": { added: 100, removed: 0 } } });
+    expect(seen.days["2026-08-25"]).toBeUndefined();
+    expect(seen.counts).toBe(log.counts);
+  });
+  it("is the identity in content for an all-accepting scope", () => {
+    const log = recordWordCount(recordWordCount(EMPTY_LOG, "a.md", 1, D), "a.md", 5, D);
+    expect(filterLog(log, () => true)).toEqual(log);
   });
 });

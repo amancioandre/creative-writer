@@ -6,7 +6,7 @@ A project is a folder with a target. Declare it in the front matter of any note 
 ---
 writing-target: 80000          # words; this line makes the folder a project
 writing-deadline: 2026-12-31   # optional
-writing-daily: 500             # optional: words per day on this project, with its own streak
+writing-daily: 500             # optional: words per day on this project, with its own streak (writing-goal is read as the same)
 writing-name: The Bear Hunt    # optional: overrides the folder name
 writing-scope: note            # optional: count only this note, not the folder
 story-ignore: [LOW, POV]       # optional: names the story map must not take for characters
@@ -25,7 +25,7 @@ The note that carries these lines is the **project note**. It can be the manuscr
 
 ## What is counted
 
-Every Markdown note whose path starts with the folder (or, with `writing-scope: note`, only the project note). Totals come from the vault, not the writing log, so a chapter you wrote before installing the plugin counts. Memos inside the folder count too — if you want them out of the word count, keep them beside the project folder rather than inside it, or use `writing-scope: note`. (They can still be kept out of the *story map* with `creative-writer: false`; see [Structuring a project](/guide/story-projects).)
+Every Markdown note whose path starts with the folder (or, with `writing-scope: note`, only the project note) **and** that is [in scope](/guide/where-it-runs). Totals come from the vault, not the writing log, so a chapter you wrote before installing the plugin counts. Memos inside the folder do not count once they carry `creative-writer: false` — the same line that keeps them out of the story map; see [Structuring a project](/guide/story-projects). `Story map.md` and `Story threads.md` never count.
 
 ## The pace line
 

@@ -6,7 +6,7 @@ An Obsidian plugin for creative writing. Everything that touches the page lives 
 
 | Feature | What it does | Command / setting |
 |---|---|---|
-| **Where it runs** | Every note, only notes marked `creative-writer: true`, or only listed folders. A note's front matter (`creative-writer: true` / `false`) always wins. Two commands: toggle everywhere, toggle for this note (writes the property). | Settings → Where it runs; `Toggle Creative Writer (everywhere)`, `Toggle Creative Writer for this note` |
+| **Where it runs** | One scope for everything — editor tools, daily goal, project totals, story map: a declared project is always in; the mode adds every other note, listed folders, notes marked `creative-writer: true`, or nothing. A note's front matter (`creative-writer: true` / `false`) always wins; the plugin's own notes never count. Two commands: toggle everywhere, toggle for this note (writes the property). | Settings → Where it runs; `Toggle Creative Writer (everywhere)`, `Toggle Creative Writer for this note` |
 | **Zen Mode** | Hides ribbon, tabs, sidebars, status bar. Optional fullscreen. | `creative-writer: Toggle Zen Mode` |
 | **Typewriter scrolling** | Keeps the line you're writing vertically centred. | Settings → Typewriter scrolling |
 | **Current line** | A faint band across the editor behind the line you are writing — the visual line, not the paragraph — so it stands out even inside a focused paragraph. | Settings → Current line |
