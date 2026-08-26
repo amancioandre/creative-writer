@@ -18,7 +18,7 @@ Everything that touches the page lives in the editor. Everything *about* the wor
 ## Who it's for
 
 - Novelists and short-fiction writers who want Obsidian to feel like a focused writing app — without moving the manuscript out of the vault.
-- Anyone tracking a draft against a deadline: NaNoWriMo, a 90,000-word target, a chapter a week.
+- Anyone tracking a draft against a deadline: a 90,000-word target, a chapter a week, a submission date.
 - Writers who want a **local**, on-command reader for craft feedback, not a cloud AI rewriting their prose.
 
 ## Features
