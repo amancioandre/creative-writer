@@ -1,103 +1,118 @@
-# Creative Writer
+# Creative Writer — Zen Mode, typewriter scrolling and story tools for fiction in Obsidian
 
-Repository: [github.com/amancioandre/creative-writer](https://github.com/amancioandre/creative-writer) · Documentation: [amancioandre.github.io/creative-writer](https://amancioandre.github.io/creative-writer/)
+[![Downloads](https://img.shields.io/badge/dynamic/json?label=downloads&query=%24%5B%22creative-writer%22%5D.downloads&url=https%3A%2F%2Fraw.githubusercontent.com%2Fobsidianmd%2Fobsidian-releases%2Fmaster%2Fcommunity-plugin-stats.json&color=573E7A)](https://obsidian.md/plugins?id=creative-writer)
+[![Latest release](https://img.shields.io/github/v/release/amancioandre/creative-writer?color=573E7A)](https://github.com/amancioandre/creative-writer/releases/latest)
+[![Support](https://img.shields.io/badge/%E2%9D%A4-Support%20the%20plugin-ff69b4)](#support)
+[![Docs](https://img.shields.io/badge/docs-amancioandre.github.io-blue)](https://amancioandre.github.io/creative-writer/)
 
-An Obsidian plugin for creative writing. Everything that touches the page lives in the editor; everything about the work (progress, goals, readability) lives in a side panel that Zen Mode hides.
+**Write novels, short stories and screenplays in Obsidian with nothing between you and the sentence.** A distraction-free zen mode, typewriter scrolling, focus fade, sentence rhythm, offline prose style checks, daily word-count goals, and a story map of your characters and places — all built from your own notes, all offline.
 
-| Feature | What it does | Command / setting |
-|---|---|---|
-| **Where it runs** | One scope for everything — editor tools, daily goal, project totals, story map: a declared project is always in; the mode adds every other note, listed folders, notes marked `creative-writer: true`, or nothing. A note's front matter (`creative-writer: true` / `false`) always wins; the plugin's own notes never count. Two commands: toggle everywhere, toggle for this note (writes the property). | Settings → Where it runs; `Toggle Creative Writer (everywhere)`, `Toggle Creative Writer for this note` |
-| **Zen Mode** | Hides ribbon, tabs, sidebars, status bar. Optional fullscreen. | `creative-writer: Toggle Zen Mode` |
-| **Typewriter scrolling** | Keeps the line you're writing vertically centred. | Settings → Typewriter scrolling |
-| **Current line** | A faint band across the editor behind the line you are writing — the visual line, not the paragraph — so it stands out even inside a focused paragraph. | Settings → Current line |
-| **Focus fade** | Three-level hierarchy: the line you are on at full strength; the rest of its paragraph slightly veiled; other paragraphs faded progressively by distance. Both strengths are sliders. | Settings → Focus fade / Paragraph strength / Far text strength |
-| **Paragraph rhythm** | Underlines each sentence of the current paragraph, cool → warm by "effective length". | Settings → Paragraph rhythm / Rhythm tiers |
-| **Model assistant** | Optional. A local model (Ollama) adds contextual findings — clichés in context, tired metaphors, passives hiding an agent — on command, or after a pause if you opt in. | `Analyse paragraph with model`; Settings → Model assistant |
-| **Myth & archetype** | Select a scene, get a sidebar report: mythic patterns, archetypes, what the pattern asks next. Local model, on command. | `Analyse selection for myth and archetype` |
-| **Readability** | Status bar shows the current paragraph's reading-ease band (Flesch) and sentence-rhythm band (monotone → dynamic). Click it, or run the command, for the **Writing desk**: the whole note's reading ease, grade level, sentence rhythm and dialogue share, each as a named band with a hint. | `Open writing desk`; Settings → Readability in status bar |
-| **Writing desk** | Words added and cut today against a daily goal, streak, this week's total, and a 12-week calendar heatmap. Deletions are tracked separately, so a revision day still shows as work. History lives in a vault note (`Creative Writer/Writing log.md`, path configurable) so streaks sync between your machines. | `Open writing desk`; Settings → Goals |
-| **Project targets** | Add `writing-target: 50000` (and optionally `writing-deadline: 2026-10-31`) to any note's front matter and its folder becomes a project: total words, words per day needed vs. your last-7-day pace, and the projected finish date. `writing-daily: 500` adds a per-project daily goal with its own streak; `writing-scope: note` limits it to that note; `writing-name` overrides the title. | Writing desk → Projects |
-| **Scene outline** | The desk lists the active note's headings with words, reading-ease band and dialogue share per scene, bar-scaled to the longest; click to jump. Heatmap days where cutting outweighed adding are shown as revision days. | Writing desk → Scenes |
-| **Story map** | One graph of a project: characters, places and things as nodes (typed notes — `type: character` / `type: location` in front matter, or a `Characters/` / `Places/` folder — plus recurring unnamed names as dashed *candidates* you can turn into notes with one click); three toggleable layers of edges — **Links** you wrote (wikilinks, backlinks, bookmarks ★), **Scenes** shared (who appears with whom, weighted by count), **References** a local model spots outside the story (myth, history, literature) along with labelled relationships and events. The graph fills the tab like Obsidian's graph view: pan by dragging, zoom with the wheel, drag nodes (pin them to hold), a floating panel top-right for project, search, layer/kind toggles, per-kind colours, display sliders (node size, edge thickness, edge opacity, label size) and the force sliders (repulsion, link distance, link strength, centre pull — all persisted), and a floating card beside whatever you click with its actions (open, read with model, make character/place, focus, pin) and evidence. Everything is rebuilt from your notes; only model readings persist, in a `Story map.md` note inside the project folder, so it syncs with the project to every device. | `Open story map` or the ribbon icon; panel button *Read project with model* (Ollama), or *Read with model* on a chapter's card |
-| **Story timeline** | Who is where: every scene of the project in reading order down the side, the cast across the top, a dot where someone is present, model-read events under each scene. The shape a story's absences make. Click a scene to jump, a name to open the note. | `Open story timeline`, the ribbon icon, or *Timeline* in the story map panel |
-| **Style checks** | Tints clichés, passive voice, filter verbs, adverbs, repetition, nominalisations, weak verbs and metaphor candidates in the current paragraph; hover for the note. Offline: rules + a POS tagger + concreteness norms. | Settings → Style checks (per-kind toggles) |
+![Zen Mode with typewriter scrolling and focus fade](docs/public/media/hero.gif)
+<!-- TODO record: toggle Zen Mode, type two sentences; 8 s loop, ≤ 800 px wide -->
 
-Editing mode only (Source + Live Preview); Reading view has no CodeMirror and is untouched.
+Everything that touches the page lives in the editor. Everything *about* the work — progress, readability, the cast, the shape of the story — lives in panels that Zen Mode hides.
 
-How to lay out a project folder so the story map and timeline read it well — typed notes, aliases, opting memos out with `creative-writer: false` — is in [docs/guide/story-projects.md](docs/STORY-PROJECTS.md).
+**[▶ Watch the 3-minute walkthrough](https://www.youtube.com/watch?v=VIDEO_ID)**
+<!-- TODO: replace with [![Watch](docs/public/media/youtube-thumb.jpg)](https://youtu.be/VIDEO_ID) once the unlisted video is up -->
+
+## Who it's for
+
+- Novelists and short-fiction writers who want Obsidian to feel like a focused writing app — without moving the manuscript out of the vault.
+- Anyone tracking a draft against a deadline: NaNoWriMo, a 90,000-word target, a chapter a week.
+- Writers who want a **local**, on-command reader for craft feedback, not a cloud AI rewriting their prose.
+
+## Features
+
+### Zen Mode, typewriter scrolling, focus fade
+
+One command hides the ribbon, tabs, sidebars and status bar (optionally fullscreen). Typewriter scrolling keeps the line you're writing centred; focus fade veils the rest of its paragraph slightly and farther paragraphs progressively by distance. A faint band marks the current line.
+
+`Toggle Zen Mode` · Settings → Typewriter scrolling / Focus fade / Current line
+
+### Paragraph rhythm and offline style checks
+
+![Sentence rhythm underlines and style tints](docs/public/media/rhythm.gif)
+<!-- TODO record: type a long sentence and watch underlines warm -->
+
+Each sentence of the current paragraph is underlined cool → warm by its felt length, so you *see* monotony before you hear it. Style checks tint clichés, passive voice, filter verbs, adverbs, repetition, nominalisations, weak verbs and metaphor candidates; hover for the note. Rules, a part-of-speech tagger and concreteness norms — no network, no model required.
+
+Settings → Paragraph rhythm / Style checks (every kind toggles individually)
+
+### Story map
+
+![Story map graph of characters, places and scenes](docs/public/media/story-map.gif)
+<!-- TODO record: open map, drag a node, click a card -->
+
+One graph of a project. Characters, places and things are nodes (typed notes — `type: character` in front matter or a `Characters/` folder — plus recurring unnamed names as *candidates* you can turn into notes with one click). Three layers of edges: **links** you wrote, **scenes** shared, and **references** a local model reads between the lines. Pan, zoom, drag, pin, search, tune the forces. Rebuilt from your notes every time; only model readings persist, in a `Story map.md` inside the project so it syncs with the manuscript.
+
+`Open story map` or the ribbon icon
+
+### Story timeline
+
+![Story timeline: scenes down the side, cast across the top](docs/public/media/timeline.png)
+
+Every scene in reading order down the side, the cast across the top, a dot where someone is present. The shape a story's absences make. Click a scene to jump, a name to open the note.
+
+`Open story timeline`
+
+### Writing desk: goals, streaks, readability, scenes
+
+![Writing desk with daily goal, heatmap and project targets](docs/public/media/desk.png)
+
+Words added *and cut* today against a daily goal, a streak, this week's total and a 12-week heatmap — revision days count as work. Add `writing-target: 50000` (and `writing-deadline: 2026-10-31`) to any note and its folder becomes a project with words-per-day needed vs. your last-7-day pace and a projected finish date. The desk also shows the note's reading ease, grade level, sentence rhythm and dialogue share, and a clickable scene outline. History lives in a vault note so it syncs between machines.
+
+`Open writing desk` · click the readability band in the status bar
+
+### Local model assistant — optional, on command, never by default
+
+![Myth and archetype report](docs/public/media/myth.png)
+
+If [Ollama](https://ollama.com) is running on your machine, the plugin can read a paragraph for contextual findings (clichés in context, tired metaphors, passives hiding an agent), a selection for mythic patterns and archetypes, or a chapter for relationships and references. Nothing leaves your computer, and nothing runs unless you ask. The offline rules beat a local 7B at every mechanical check ([eval results](eval/RESULTS.md)), which is why the model is a second opinion, not the default.
+
+`Analyse paragraph with model` · `Analyse selection for myth and archetype`
+
+### Where it runs
+
+Declared projects are always in. Beyond that, choose: every note, listed folders, notes marked `creative-writer: true`, or nothing. A note's own front matter always wins. Two commands toggle the plugin everywhere or for the current note.
+
+## Install
+
+**Community plugins:** Settings → Community plugins → Browse → search **Creative Writer** → Install, Enable.
+
+**Beta via [BRAT](https://github.com/TfTHacker/obsidian42-brat):** add `amancioandre/creative-writer`.
+
+Desktop only; editing mode (Source and Live Preview). Reading view is untouched.
 
 ## Pair it with Harper
 
-Install [Harper](https://writewithharper.com) alongside this plugin — it is the intended companion, not an alternative. Harper is a free, offline grammar and spelling checker with its own Obsidian plugin; Creative Writer deliberately does **not** check spelling, grammar, punctuation, agreement, homophones, or intensifiers/hedges/filler words ("very", "quite", "just") because Harper already does those well (`boring_words`, `filler_words`, `hedging`, `long_sentences`, and ~350 more rules).
+![Harper and Creative Writer marking the same paragraph](docs/public/media/harper.png)
 
-The split: **Harper edits the sentence, Creative Writer edits the prose.** Passive voice, filter verbs, nominalisations, clichés, metaphor, rhythm and readability are craft judgements no grammar checker makes; they stay here. Both plugins decorate the editor, so their marks can overlap on the same span — Harper underlines, Creative Writer tints, and the two are readable together.
+Install [Harper](https://writewithharper.com) alongside — it is the intended companion. Harper is a free, offline grammar and spelling checker; Creative Writer deliberately leaves spelling, grammar, punctuation and filler words to it. **Harper edits the sentence, Creative Writer edits the prose.** Their marks overlap cleanly: Harper underlines, Creative Writer tints.
 
-## Quick start
+## Privacy
 
-```bash
-npm install
-npm run build                                  # typecheck + bundle → main.js
-npm run install:vault -- /path/to/test-vault   # copies main.js, manifest.json, styles.css
-```
+No network requests. The only exception is the optional model assistant, which talks to the Ollama address you configure (default `localhost`). Progress and story-map readings are stored as plain Markdown notes in your vault.
 
-Then in Obsidian: Settings → Community plugins → enable **Creative Writer**, and reload (Ctrl/Cmd+R).
-`docs/QA-Rhythm-Sample.md` is a note written to exercise every feature — drop it in the vault.
+## FAQ
 
-For development: `npm run dev` (esbuild watch) plus the **Hot Reload** community plugin.
+**How is this different from Longform?** Longform organises scenes into a manuscript and compiles it. Creative Writer works on the prose inside the scenes and on the story as a graph. They coexist happily; Longform projects are read as ordinary folders.
 
-```bash
-npm test              # 554 tests
-npm run eval          # rule scorecard on eval/corpus.ts (see eval/RESULTS.md)
-npm run eval:ollama   # the same corpus through the local model, ~1s
-npm run test:watch
-npm run test:coverage # thresholds: 90% lines/functions/statements, 85% branches
-npm run typecheck
-```
+**Does it work on mobile?** Not yet — Zen Mode and the editor decorations are desktop-only.
 
-## Architecture
+**Does it need an AI?** No. Everything except the model assistant is deterministic and offline.
 
-Clean Architecture, dependencies point inward. See [docs/development/architecture.md](docs/ARCHITECTURE.md).
+## Support
 
-```
-src/
-├── domain/           pure TypeScript, no imports from outside this folder
-│   ├── rhythm/       Sentence, SentenceMetrics, SyllableEstimator, RhythmScale,
-│   │                 RhythmClassifier, AbbreviationMerger
-│   ├── text/         LineSource (port), Paragraph, ProseParagraphs, Scenes, Dialogue
-│   ├── readability/  Flesch reading ease / grade, variety and dialogue bands
-│   ├── progress/     Dates, WritingLog, ProgressSummary (streak, heatmap, session kind), Project
-│   ├── style/        Finding, Tokenizer, StyleRule (+AnalysisContext), PosTagger & Concreteness
-│   │                 (ports), rules/ (Cliche, PassiveVoice, FilterVerb, Adverb, Repetition,
-│   │                 Nominalization, WeakVerb, MetaphorCandidate, PhraseMatcher), lexicon/
-│   ├── story/        StoryGraph, EntityIndex (+NameLookup), Mentions, BuildGraph, Filter, Layout,
-│   │                 StoryMapFile (the syncable note), SceneReading (model validation)
-│   ├── focus/        FocusTier
-│   ├── zen/          ZenMode
-│   └── settings/     PluginSettings, normalizeSettings
-├── application/      use cases + the ports they need
-│   ├── ports/        SentenceSegmenter, WorkspaceChrome, SettingsRepository, ProgressRepository,
-│   │                 ParagraphAnalyser, LlmAnalyser, MythAnalyser, HttpClient, Timers
-│   └── use-cases/    AnalyzeParagraphRhythm, AnalyzeParagraphStyle, ScheduleAnalysis, ProfileProse,
-│                     TrackWriting, AnalyzeParagraphWithLlm, AnalyzeMyth, ComputeFocusFade, ToggleZenMode
-├── infrastructure/   adapters — the only place CodeMirror and Obsidian appear
-│   ├── segmentation/ IntlSentenceSegmenter
-│   ├── nlp/          CompromiseTagger, BrysbaertConcreteness (+ generated data)
-│   ├── llm/          OllamaAnalyser, OllamaMythAnalyser, ClaudeAnalyser (untested live),
-│   │                 ConfiguredLlmAnalyser, prompts/ (style + myth rulebooks)
-│   ├── codemirror/   settingsFacet, typewriter/currentLine/focusFade/rhythm/style/readabilityStatus extensions
-│   └── obsidian/     DomWorkspaceChrome, PluginDataSettingsRepository, AdapterProgressRepository,
-│                     SettingsTab, RequestUrlHttpClient, views/MythView, views/DeskView
-└── main.ts           composition root — wiring only
-```
+Creative Writer is free and MIT-licensed, built in evenings around a day job. If it has made your writing sessions better, you can keep the coffee coming:
 
-`styles.css` owns every visual. The code only toggles classes:
-`body.czm-zen`, `.czm-typewriter`, `.czm-current-line` (a CM layer below the text), `.czm-paragraph-veil` (a layer above it), `.czm-focus-fade` + `.czm-focus-{0..3}`, `.czm-rhythm-{1..6}`, `.czm-style-{kind}`.
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/USERNAME)
+[![GitHub Sponsors](https://img.shields.io/badge/GitHub%20Sponsors-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/amancioandre)
+<!-- TODO: confirm platforms; mirror them in manifest.json "fundingUrl" -->
 
-## Data and dependencies
+Bug reports and ideas: [GitHub issues](https://github.com/amancioandre/creative-writer/issues). Full documentation: [amancioandre.github.io/creative-writer](https://amancioandre.github.io/creative-writer/).
 
-- [`compromise`](https://github.com/spencermountain/compromise) (MIT) — part-of-speech tagging, the plugin's only runtime dependency.
-- Concreteness norms: Brysbaert, Warriner & Kuperman (2014), *Concreteness ratings for 40 thousand generally known English word lemmas*, Behavior Research Methods — CC-BY 4.0. `data/` holds the source; `npm run build:concreteness` regenerates the bundled subset (16k lemmas, SUBTLEX ≥ 20).
+## Contributing
 
-## Models
+Build, test, evaluation corpus and the Clean Architecture layout are in [docs/development](docs/development/architecture.md). Short version: `npm install && npm run build`, `npm test`.
 
-Everything up to and including the style checks is offline and deterministic. The model assistant and myth analysis need [Ollama](https://ollama.com) running locally (`ollama pull qwen2.5:7b` for style, `deepseek-r1:14b` does noticeably better for myth). A Claude adapter exists behind the same port but has not been exercised against the live API. See [eval/RESULTS.md](eval/RESULTS.md) for what the models actually score — the short version is that the rules beat a local 7B at every mechanical check, so the model is on-command by default.
+Part-of-speech tagging by [compromise](https://github.com/spencermountain/compromise) (MIT). Concreteness norms from Brysbaert, Warriner & Kuperman (2014), CC-BY 4.0.
