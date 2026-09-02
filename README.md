@@ -7,13 +7,7 @@
 
 **Write novels, short stories and screenplays in Obsidian with nothing between you and the sentence.** A distraction-free zen mode, typewriter scrolling, focus fade, sentence rhythm, offline prose style checks, daily word-count goals, and a story map of your characters and places — all built from your own notes, all offline.
 
-![Zen Mode with typewriter scrolling and focus fade](docs/public/media/hero.gif)
-<!-- TODO record: toggle Zen Mode, type two sentences; 8 s loop, ≤ 800 px wide -->
-
 Everything that touches the page lives in the editor. Everything *about* the work — progress, readability, the cast, the shape of the story — lives in panels that Zen Mode hides.
-
-**[▶ Watch the 3-minute walkthrough](https://www.youtube.com/watch?v=VIDEO_ID)**
-<!-- TODO: replace with [![Watch](docs/public/media/youtube-thumb.jpg)](https://youtu.be/VIDEO_ID) once the unlisted video is up -->
 
 ## Who it's for
 
@@ -31,25 +25,17 @@ One command hides the ribbon, tabs, sidebars and status bar (optionally fullscre
 
 ### Paragraph rhythm and offline style checks
 
-![Sentence rhythm underlines and style tints](docs/public/media/rhythm.gif)
-<!-- TODO record: type a long sentence and watch underlines warm -->
-
 Each sentence of the current paragraph is underlined cool → warm by its felt length, so you *see* monotony before you hear it. Style checks tint clichés, passive voice, filter verbs, adverbs, repetition, nominalisations, weak verbs and metaphor candidates; hover for the note. Rules, a part-of-speech tagger and concreteness norms — no network, no model required.
 
 Settings → Paragraph rhythm / Style checks (every kind toggles individually)
 
 ### Story map
 
-![Story map graph of characters, places and scenes](docs/public/media/story-map.gif)
-<!-- TODO record: open map, drag a node, click a card -->
-
 One graph of a project. Characters, places and things are nodes (typed notes — `type: character` in front matter or a `Characters/` folder — plus recurring unnamed names as *candidates* you can turn into notes with one click). Three layers of edges: **links** you wrote, **scenes** shared, and **references** a local model reads between the lines. Pan, zoom, drag, pin, search, tune the forces. Rebuilt from your notes every time; only model readings persist, in a `Story map.md` inside the project so it syncs with the manuscript.
 
 `Open story map` or the ribbon icon
 
 ### Story timeline
-
-![Story timeline: scenes down the side, cast across the top](docs/public/media/timeline.png)
 
 Every scene in reading order down the side, the cast across the top, a dot where someone is present. The shape a story's absences make. Click a scene to jump, a name to open the note.
 
@@ -63,15 +49,11 @@ Every prose note of a project stitched into one read-only page in reading order,
 
 ### Writing desk: goals, streaks, readability, scenes
 
-![Writing desk with daily goal, heatmap and project targets](docs/public/media/desk.png)
-
 Words added *and cut* today against a daily goal, a streak, this week's total and a 12-week heatmap — revision days count as work. Add `writing-target: 50000` (and `writing-deadline: 2026-10-31`) to any note and its folder becomes a project with words-per-day needed vs. your last-7-day pace and a projected finish date. The desk also shows the note's reading ease, grade level, sentence rhythm and dialogue share, and a clickable scene outline. History lives in a vault note so it syncs between machines.
 
 `Open writing desk` · click the readability band in the status bar
 
 ### Local model assistant — optional, on command, never by default
-
-![Myth and archetype report](docs/public/media/myth.png)
 
 If [Ollama](https://ollama.com) is running on your machine, the plugin can read a paragraph for contextual findings (clichés in context, tired metaphors, passives hiding an agent), a selection for mythic patterns and archetypes, or a chapter for relationships and references. Nothing leaves your computer, and nothing runs unless you ask. The offline rules beat a local 7B at every mechanical check ([eval results](eval/RESULTS.md)), which is why the model is a second opinion, not the default.
 
@@ -91,8 +73,6 @@ Desktop only; editing mode (Source and Live Preview). Reading view is untouched.
 
 ## Pair it with Harper
 
-![Harper and Creative Writer marking the same paragraph](docs/public/media/harper.png)
-
 Install [Harper](https://writewithharper.com) alongside — it is the intended companion. Harper is a free, offline grammar and spelling checker; Creative Writer deliberately leaves spelling, grammar, punctuation and filler words to it. **Harper edits the sentence, Creative Writer edits the prose.** Their marks overlap cleanly: Harper underlines, Creative Writer tints.
 
 ## Privacy
@@ -111,9 +91,7 @@ No network requests. The only exception is the optional model assistant, which t
 
 Creative Writer is free and MIT-licensed, built in evenings around a day job. If it has made your writing sessions better, you can keep the coffee coming:
 
-[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/USERNAME)
 [![GitHub Sponsors](https://img.shields.io/badge/GitHub%20Sponsors-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/amancioandre)
-<!-- TODO: confirm platforms; mirror them in manifest.json "fundingUrl" -->
 
 Bug reports and ideas: [GitHub issues](https://github.com/amancioandre/creative-writer/issues). Full documentation: [amancioandre.github.io/creative-writer](https://amancioandre.github.io/creative-writer/).
 

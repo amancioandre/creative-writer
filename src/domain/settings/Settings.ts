@@ -149,7 +149,7 @@ export const DEFAULT_MANUSCRIPT: ManuscriptSettings = {
 
 export function normalizeManuscript(raw: unknown): ManuscriptSettings {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  const bool = (key: "noteTitles" | "demoteHeadings" | "proseOnly" | "showComments" | "tintTags" | "showRuler" | "showStory") => (typeof r[key] === "boolean" ? (r[key] as boolean) : DEFAULT_MANUSCRIPT[key]);
+  const bool = (key: "noteTitles" | "demoteHeadings" | "proseOnly" | "showComments" | "tintTags" | "showRuler" | "showStory") => (typeof r[key] === "boolean" ? r[key] : DEFAULT_MANUSCRIPT[key]);
   return {
     folderDepth: typeof r.folderDepth === "number" && Number.isFinite(r.folderDepth) ? clampInt(r.folderDepth, 0, 6) : DEFAULT_MANUSCRIPT.folderDepth,
     noteTitles: bool("noteTitles"),

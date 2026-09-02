@@ -363,15 +363,15 @@ export class StoryThreadsView extends ItemView {
     if (!s.panelOpen) return;
     const projects = this.source.projects();
     const head = this.panel.createDiv({ cls: "czm-map-panel-head" });
-    const select = head.createEl("select", { cls: "dropdown", attr: { "aria-label": "Project" } }) as HTMLSelectElement;
+    const select = head.createEl("select", { cls: "dropdown", attr: { "aria-label": "Project" } });
     for (const p of projects) {
-      const opt = select.createEl("option", { text: p.name }) as HTMLOptionElement;
+      const opt = select.createEl("option", { text: p.name });
       opt.value = p.scope;
       if (this.project?.scope === p.scope) opt.selected = true;
     }
     if (projects.length === 0) select.createEl("option", { text: "No projects" });
     select.addEventListener("change", () => void this.show(projects.find((p) => p.scope === select.value) ?? null));
-    const search = head.createEl("input", { cls: "czm-map-search", attr: { type: "search", placeholder: "Find a thread…", "aria-label": "Find a thread" } }) as HTMLInputElement;
+    const search = head.createEl("input", { cls: "czm-map-search", attr: { type: "search", placeholder: "Find a thread…", "aria-label": "Find a thread" } });
     search.value = this.query;
     search.addEventListener("input", () => { this.query = search.value; this.renderChart(); this.renderCard(); });
 
@@ -390,7 +390,7 @@ export class StoryThreadsView extends ItemView {
     btn("Fit", "czm-map-fit", () => this.fit());
 
     const section = (title: string, cls: string, open = true) => {
-      const d = this.panel.createEl("details", { cls: `czm-map-section czm-map-section-${cls}` }) as HTMLDetailsElement;
+      const d = this.panel.createEl("details", { cls: `czm-map-section czm-map-section-${cls}` });
       d.open = open;
       d.createEl("summary", { text: title });
       return d;
@@ -404,9 +404,9 @@ export class StoryThreadsView extends ItemView {
     const entities = this.model.threads.filter((t) => t.kind === "entity");
     if (entities.length) {
       const row = threads.createDiv({ cls: "czm-th-entity-row" });
-      const pick = row.createEl("select", { cls: "dropdown czm-th-entity", attr: { "aria-label": "Follow one name" } }) as HTMLSelectElement;
+      const pick = row.createEl("select", { cls: "dropdown czm-th-entity", attr: { "aria-label": "Follow one name" } });
       pick.createEl("option", { text: "Follow one name…", attr: { value: "" } });
-      for (const t of entities) { const o = pick.createEl("option", { text: `${t.label} · ${t.refs.length}` }) as HTMLOptionElement; o.value = t.entityId!; if (this.entityFilter === t.entityId) o.selected = true; }
+      for (const t of entities) { const o = pick.createEl("option", { text: `${t.label} · ${t.refs.length}` }); o.value = t.entityId!; if (this.entityFilter === t.entityId) o.selected = true; }
       pick.addEventListener("change", () => { this.entityFilter = pick.value || null; this.renderChart(); this.renderCard(); });
     }
     const broken = this.model.threads.filter((t) => t.kind === "writer").flatMap((t) => t.refs.filter((r) => r.unresolved).map((r) => ({ thread: t.label, link: r.unresolved! })));
@@ -540,13 +540,13 @@ export class StoryThreadsView extends ItemView {
     this.card.createEl("h4", { text: "Add to a thread" });
     const row = this.card.createDiv({ cls: "czm-th-add" });
     const mine = this.model.threads.filter((t) => t.kind === "writer");
-    const pick = row.createEl("select", { cls: "dropdown czm-th-add-pick", attr: { "aria-label": "Thread" } }) as HTMLSelectElement;
-    for (const t of mine) { const o = pick.createEl("option", { text: t.label }) as HTMLOptionElement; o.value = t.label; }
+    const pick = row.createEl("select", { cls: "dropdown czm-th-add-pick", attr: { "aria-label": "Thread" } });
+    for (const t of mine) { const o = pick.createEl("option", { text: t.label }); o.value = t.label; }
     pick.createEl("option", { text: "New thread…", attr: { value: " new" } });
     if (mine.length === 0) pick.value = " new";
-    const name = row.createEl("input", { cls: "czm-th-add-name", attr: { type: "text", placeholder: "Thread name", "aria-label": "New thread name" } }) as HTMLInputElement;
-    const note = row.createEl("input", { cls: "czm-th-add-note", attr: { type: "text", placeholder: "What happens here (optional)", "aria-label": "Note" } }) as HTMLInputElement;
-    const sync = () => { name.style.display = pick.value === " new" ? "" : "none"; };
+    const name = row.createEl("input", { cls: "czm-th-add-name", attr: { type: "text", placeholder: "Thread name", "aria-label": "New thread name" } });
+    const note = row.createEl("input", { cls: "czm-th-add-note", attr: { type: "text", placeholder: "What happens here (optional)", "aria-label": "Note" } });
+    const sync = () => { name.hidden = pick.value !== " new"; };
     pick.addEventListener("change", sync); sync();
     const add = row.createEl("button", { text: "Add", cls: "czm-act-add-to-thread" });
     const submit = () => {

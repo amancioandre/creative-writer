@@ -2,6 +2,15 @@
 
 Release notes for every version are on the [releases page](https://github.com/amancioandre/creative-writer/releases). This file carries the same text for the versions since it was started.
 
+## 0.7.2 — Review housekeeping
+
+Fixes for the community plugin review of 0.7.1. Nothing changes on the page.
+
+- The manuscript comment field and its popover set their inline sizes through the Obsidian style helper rather than writing styles directly, which the review flags.
+- The dashed underline on a candidate name in a cast line uses the long-hand text-decoration properties, which older Obsidian builds render more reliably than the shorthand.
+- Redundant type assertions in the threads view and manuscript settings are gone.
+- The README no longer carries placeholder media, a placeholder video link or an unset sponsorship badge.
+
 ## 0.7.1 — After the first pass
 
 Small corrections from using the manuscript page for a day.

@@ -16,6 +16,7 @@ proto.createDiv = function (this: HTMLElement, o?: Opts) { return this.createEl(
 proto.createSpan = function (this: HTMLElement, o?: Opts) { return this.createEl("span", o); };
 proto.addClass = function (this: HTMLElement, c: string) { this.classList.add(c); };
 proto.empty = function (this: HTMLElement) { this.replaceChildren(); };
+(proto as HTMLElement & { setCssStyles?: unknown }).setCssStyles = function (this: HTMLElement, styles: Partial<CSSStyleDeclaration>) { Object.assign(this.style, styles); };
 (proto as HTMLElement & { setText?: unknown }).setText = function (this: HTMLElement, t: string) { this.textContent = t; };
 (globalThis as Record<string, unknown>).createEl = make;
 (globalThis as Record<string, unknown>).createDiv = (o?: Opts) => make("div", o);

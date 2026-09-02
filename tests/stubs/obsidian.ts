@@ -138,6 +138,7 @@ declare global {
     createEl<K extends keyof HTMLElementTagNameMap>(tag: K, o?: DomOpts): HTMLElementTagNameMap[K];
     createDiv(o?: DomOpts): HTMLElement;
     createSpan(o?: DomOpts): HTMLElement;
+    setCssStyles(styles: Partial<CSSStyleDeclaration>): void;
   }
   type DomOpts = { text?: string; cls?: string; attr?: Record<string, string> };
   function createEl<K extends keyof HTMLElementTagNameMap>(tag: K, o?: DomOpts): HTMLElementTagNameMap[K];

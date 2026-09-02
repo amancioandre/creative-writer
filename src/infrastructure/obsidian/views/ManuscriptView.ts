@@ -421,7 +421,7 @@ export class ManuscriptView extends ItemView {
       const color = colorOf(tag, settings.tags);
       if (color) chip.style.setProperty("--czm-tag", color); else chip.style.removeProperty("--czm-tag");
     };
-    const grow = () => { text.style.height = "auto"; text.style.height = `${text.scrollHeight}px`; };
+    const grow = () => { text.setCssStyles({ height: "auto" }); text.setCssStyles({ height: `${text.scrollHeight}px` }); };
     text.addEventListener("input", () => { this.draft = text.value; reflectTag(); grow(); });
     reflectTag();
     const submit = () => {
@@ -673,10 +673,10 @@ export class ManuscriptView extends ItemView {
     const r = el.getBoundingClientRect(), b = body.getBoundingClientRect(), p = page.getBoundingClientRect();
     const room = b.right - p.right;
     const top = r.top - b.top + body.scrollTop;
-    if (room >= 240) { pop.style.left = `${p.right - b.left + 8}px`; pop.style.top = `${top}px`; pop.style.maxWidth = `${Math.min(360, room - 16)}px`; }
-    else { pop.style.left = `${Math.max(0, r.left - b.left)}px`; pop.style.top = `${r.bottom - b.top + body.scrollTop}px`; pop.style.maxWidth = "360px"; }
+    if (room >= 240) pop.setCssStyles({ left: `${p.right - b.left + 8}px`, top: `${top}px`, maxWidth: `${Math.min(360, room - 16)}px` });
+    else pop.setCssStyles({ left: `${Math.max(0, r.left - b.left)}px`, top: `${r.bottom - b.top + body.scrollTop}px`, maxWidth: "360px" });
     const overflow = parseFloat(pop.style.top) + pop.offsetHeight - (body.scrollTop + body.clientHeight);
-    if (overflow > 0 && body.clientHeight > 0) pop.style.top = `${Math.max(0, parseFloat(pop.style.top) - overflow - 8)}px`;
+    if (overflow > 0 && body.clientHeight > 0) pop.setCssStyles({ top: `${Math.max(0, parseFloat(pop.style.top) - overflow - 8)}px` });
   }
 
   private hidePop(): void {
