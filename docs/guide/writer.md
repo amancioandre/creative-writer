@@ -27,6 +27,18 @@ Below the cards, two kinds of pill:
 - **Idea** pills are premise cards with no story yet. Select one and its side card offers **Make this a story…**: a name, a folder (the [stories folder](/reference/settings#writer) by default), and Create. A folder is scaffolded with Characters, Places, Items, three acts, `_Work`, and a project note carrying `story: true`, the stage, the premise (the idea's first sentence) and a link back to the idea; the idea note gets `writer-story` and stays where it is, tag and all. If any note in the vault carries `story-template: true`, its folder is copied instead, with `{{name}}` replaced in file names and text. **New story…** in the panel does the same from nothing.
 - **Unfiled** pills are folders directly under the stories folder that hold prose but declare no project, so the map, timeline, threads and desk cannot see them. Select one and **Declare a story** writes `story: true` into its namesake note, or its first note.
 
+## Uses and lines
+
+A story **uses** a card when any note in its folder links to it. A plain `[[wikilink]]` counts. So does a comment:
+
+```markdown
+%% REF: [[Invictus]] %%
+```
+
+**Reference a writer card** in the editor picks a card and drops that comment at the cursor. Like every comment it stays off the [manuscript](/guide/manuscript) page and out of any export, and `REF` is a built-in comment tag with its own colour. Each card shows how many stories use it; a card used by two or more is **recurring**, the simplest picture of what you keep returning to. A card's side card lists the stories, and a story's side card lists what it **draws on**.
+
+**Lines** join cards whose notes link. Click one, or *Name…* beside a linked card, and give it a name: *inspired by*, *contradicts*, *same theme*, *adopted*, or your own words, with a colour. A pair may carry several names. A line only lives between notes that link; remove the link and the line goes dashed until you restore it or remove the name. Names and colours live in the writer file.
+
 ## Moving around
 
 Drag the background to pan, wheel to zoom, **Fit** in the panel to see everything. Drag a card to place it; positions are kept relative to the group, so a card travels with its group. Groups **flow**: inside a layer they sit left to right and never overlap. Drag a group by its name or its empty area to change its place in the row, and drag the small square in its corner to resize it; the neighbours move along. Order and sizes are remembered in the writer file.
@@ -52,4 +64,4 @@ The board is the most private thing in the vault. Nothing on it is exported by t
 
 ## What comes next
 
-`REF` comments that count where a card is used, named lines between cards, voices and the reading list follow in the next releases. The [design note](/development/writer-design) has the order.
+Voices, the style fingerprint and the reading list follow in the next release. The [design note](/development/writer-design) has the order.

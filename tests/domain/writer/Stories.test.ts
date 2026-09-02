@@ -48,7 +48,7 @@ describe("Stories", () => {
     expect(lastWorkedOn(log, spec("Horse"))).toBeNull();
   });
   it("lays the band out above the board: story cards in a row, pills on a line below", () => {
-    const row = { stories: [storyCard(facts({ spec: spec("Bear") })), storyCard(facts({ spec: spec("Horse") }))], ideas: [{ path: "i.md", title: "An idea", story: null, groups: ["premise"], tagGroups: ["premise"], excerpt: "", position: null }], unfiled: ["storytelling/Loose"] };
+    const row = { stories: [storyCard(facts({ spec: spec("Bear") })), storyCard(facts({ spec: spec("Horse") }))], ideas: [{ path: "i.md", title: "An idea", story: null, groups: ["premise"], tagGroups: ["premise"], excerpt: "", position: null }], unfiled: ["storytelling/Loose"], uses: new Map() };
     const band = layoutStories(row, 0);
     expect(band.rect.y + band.rect.h).toBeLessThan(0);
     expect(band.stories.map((s) => s.story.spec.name)).toEqual(["Bear", "Horse"]);
@@ -57,7 +57,7 @@ describe("Stories", () => {
     expect(band.unfiled[0]!.label).toBe("Loose");
     expect(band.unfiled[0]!.x).toBeGreaterThan(band.ideas[0]!.x + band.ideas[0]!.w);
     expect(band.ideas[0]!.y).toBeGreaterThan(band.stories[0]!.y);
-    const empty = layoutStories({ stories: [], ideas: [], unfiled: [] }, 0);
+    const empty = layoutStories({ stories: [], ideas: [], unfiled: [], uses: new Map() }, 0);
     expect(empty.stories).toEqual([]);
     expect(empty.rect.h).toBeGreaterThan(0);
   });

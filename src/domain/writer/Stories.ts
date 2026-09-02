@@ -1,6 +1,7 @@
 import type { Day } from "../progress/Dates";
 import type { ProjectSpec } from "../progress/Project";
 import type { Board, Card } from "./Board";
+import type { Uses } from "./Uses";
 
 /**
  * The stories row: every declared project as a card with a stage, the
@@ -86,6 +87,8 @@ export interface StoriesRow {
   readonly ideas: readonly Card[];
   /** Folders under the stories folder with prose and no declaration. */
   readonly unfiled: readonly string[];
+  /** Card path to the names of the stories that link to it or REF it. */
+  readonly uses: Uses;
 }
 
 /** The premise cards still without a home: not linked to a project by `writer-story`, and not claimed by any project's `writing-idea`. */
@@ -95,4 +98,4 @@ export function ideasOf(board: Board, stories: readonly StoryCard[]): Card[] {
   return board.cards.filter((c) => c.groups.includes("premise") && !claimed.has(c.path) && !(c.story && notePaths.has(c.story)));
 }
 
-export const EMPTY_STORIES: StoriesRow = { stories: [], ideas: [], unfiled: [] };
+export const EMPTY_STORIES: StoriesRow = { stories: [], ideas: [], unfiled: [], uses: new Map() };

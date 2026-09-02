@@ -4,6 +4,8 @@ import { entityKindOf } from "../../domain/story/EntityIndex";
 import { countWords } from "../../domain/text/Dialogue";
 import type { Board } from "../../domain/writer/Board";
 import { type StoriesRow, type StoryCard, ideasOf, linkTarget, storyCard } from "../../domain/writer/Stories";
+import { type Story, usesOf } from "../../domain/writer/Uses";
+import type { ProjectNote } from "../../domain/story/BuildGraph";
 import type { ProjectNotes } from "../ports/ProjectNotes";
 import type { WriterVault } from "../ports/WriterVault";
 
@@ -25,13 +27,18 @@ export class BuildWriterStories {
   async execute(board: Board): Promise<StoriesRow> {
     const specs = this.projects.projects();
     const stories: StoryCard[] = [];
-    for (const spec of specs) stories.push(storyCard(await this.facts(spec)));
+    const read: Story[] = [];
+    for (const spec of specs) {
+      const notes = await this.projects.notes(spec);
+      stories.push(storyCard(this.facts(spec, notes)));
+      read.push({ name: spec.name, notes: notes.map((n) => ({ path: n.path, links: n.links, text: n.text ?? "" })) });
+    }
     stories.sort((a, b) => (b.lastWorked ?? "").localeCompare(a.lastWorked ?? "") || a.spec.name.localeCompare(b.spec.name));
-    return { stories, ideas: ideasOf(board, stories), unfiled: await this.unfiled(specs) };
+    const uses = usesOf(board.cards.map((c) => c.path), read, (link, from) => this.vault.resolve(link, from));
+    return { stories, ideas: ideasOf(board, stories), unfiled: await this.unfiled(specs), uses };
   }
 
-  private async facts(spec: ProjectSpec) {
-    const notes = await this.projects.notes(spec);
+  private facts(spec: ProjectSpec, notes: readonly ProjectNote[]) {
     let words = 0, cast = 0, hasProse = false;
     for (const n of notes) {
       words += countWords(n.text ?? "");

@@ -14,7 +14,7 @@ const note = (path: string, text: string, frontmatter: Record<string, unknown> =
 const projects: ProjectNotes = {
   projects: () => [bear, horse],
   notes: async (spec) => spec === bear
-    ? [note("storytelling/Bear/Bear.md", "# Plan\n- outline only\n"), note("storytelling/Bear/Characters/Lee.md", "Lee.", { type: "character" }), note("storytelling/Bear/One.md", "# Camp\nThey walked twelve words into the hills and the bear was there.\n")]
+    ? [note("storytelling/Bear/Bear.md", "# Plan\n- outline only\n"), note("storytelling/Bear/Characters/Lee.md", "Lee.", { type: "character" }), note("storytelling/Bear/One.md", "# Camp\nThey walked twelve words into the hills and the bear was there. %% REF: [[Bear idea]] %%\n", {}), { ...note("storytelling/Bear/Two.md", "Links.\n"), links: ["voices/The Narrator.md"] }]
     : [note("storytelling/Horse/Horse.md", "", {})],
 };
 const fm: Record<string, Record<string, unknown>> = { "storytelling/Bear/Bear.md": { "writing-premise": "A man hunts.", "writing-idea": "[[Bear idea]]", "writing-voice": "[[The Narrator]]" } };
@@ -28,7 +28,7 @@ const vault: WriterVault = {
 };
 const log = { counts: {}, days: { "2026-09-01": { added: 3, removed: 0, files: { "storytelling/Bear/One.md": { added: 3, removed: 0 } } } } };
 const wn = (path: string, tags: string[], story: string | null = null): WriterNote => ({ path, title: path, tags, links: [], excerpt: "", story });
-const board = buildBoard([wn("notes/Bear idea.md", ["#writer/premise"]), wn("notes/Other idea.md", ["#writer/premise"])], EMPTY_WRITER_FILE);
+const board = buildBoard([wn("notes/Bear idea.md", ["#writer/premise"]), wn("notes/Other idea.md", ["#writer/premise"]), wn("voices/The Narrator.md", ["#writer/voice"])], EMPTY_WRITER_FILE);
 
 describe("BuildWriterStories", () => {
   it("builds a card per project from the notes, the log and the project note's front matter, most recently worked first", async () => {
@@ -44,5 +44,11 @@ describe("BuildWriterStories", () => {
     expect(row.ideas.map((c) => c.path)).toEqual(["notes/Other idea.md"]);
     expect(row.unfiled).toEqual(["storytelling/Loose"]);
     expect((await new BuildWriterStories(projects, vault, () => log, () => "").execute(board)).unfiled).toEqual([]);
+  });
+  it("counts uses from links and REF comments in the project's notes", async () => {
+    const row = await new BuildWriterStories(projects, vault, () => log, () => "storytelling").execute(board);
+    expect(row.uses.get("notes/Bear idea.md")).toEqual(["Bear"]);
+    expect(row.uses.get("voices/The Narrator.md")).toEqual(["Bear"]);
+    expect(row.uses.has("notes/Other idea.md")).toBe(false);
   });
 });

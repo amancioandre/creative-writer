@@ -20,6 +20,12 @@ The writer is a fourth level above the sentence, the story and the vault: what t
 - **Idea** pills are premise cards with no story yet; **Make this a story…** scaffolds a folder (or copies one marked `story-template: true`, with `{{name}}` replaced), writes `story: true`, the stage, the premise and `writing-idea` into the project note, and `writer-story` into the idea, which stays where it is. **New story…** in the panel starts from nothing.
 - **Unfiled** pills are folders under the stories folder with prose and no declaration; **Declare a story** writes `story: true` into the folder's namesake or first note.
 
+### Uses and lines
+
+- A story **uses** a card when a note in its folder links to it, by wikilink or by a `%% REF: [[Card]] %%` comment. **Reference a writer card** drops one at the cursor from a picker; `REF` is now a built-in comment tag. Cards show how many stories use them, a card in two or more is marked **recurring**, a card's side card lists the stories, a story's lists what it draws on.
+- **Named lines.** Click a line between linked cards, or *Name…* beside a link, and give it a name and a colour; a pair may carry several. Names live in the writer file and go dashed when the notes stop linking.
+- A test pins the privacy rule: a REF comment never reaches the prose a model reading is built from.
+
 ### The protocol
 
 - **Copy writer schema** puts the [writer protocol](docs/reference/writer-file.md) on the clipboard for your vault's framework and tag prefix: which `#writer/<group>` tags make a note a card, the project-note keys, the `%% REF: [[Card]] %%` comment, and the `Writer.writer` file format. Paste it to a person or a tool migrating a board into the vault; the plugin ships no importer on purpose.

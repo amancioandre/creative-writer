@@ -12,12 +12,20 @@ export interface TagSpec {
   readonly color: string;
 }
 
+/**
+ * `%% REF: [[Card]] %%`: a link from prose to a card on the writer board,
+ * hidden from the manuscript page and any export like every comment, and
+ * counted by the board as a use. Built in: it is always among the tags.
+ */
+export const REF_TAG_SPEC: TagSpec = { name: "REF", color: "#d08c60" };
+
 export const DEFAULT_TAGS: readonly TagSpec[] = [
   { name: "TODO", color: "#d9a621" },
   { name: "FIX", color: "#d64545" },
   { name: "CHECK", color: "#4a8fe2" },
   { name: "IDEA", color: "#3fa66b" },
   { name: "CUT", color: "#8a8a8a" },
+  REF_TAG_SPEC,
 ];
 
 /** An uppercase word and a colon at the start of a comment. Lowercase "check the gate" is prose, not a tag. */

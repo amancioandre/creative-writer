@@ -76,6 +76,21 @@ import { FuzzySuggestModal, TFile, TFolder, normalizePath, type App, type Cached
 import { tagsOf } from "./infrastructure/obsidian/VaultWriterNotes";
 import { groupsFromTags } from "./domain/writer/Tags";
 
+/** A picker over the writer board's cards, for the REF command. */
+class CardPicker extends FuzzySuggestModal<{ path: string; title: string; groups: string }> {
+  private chosen: string | null = null;
+  private settled = false;
+  constructor(app: App, private readonly cards: { path: string; title: string; groups: string }[], private readonly resolve: (path: string | null) => void) {
+    super(app);
+    this.setPlaceholder("Reference a card from the writer board…");
+  }
+  getItems() { return this.cards; }
+  getItemText(item: { title: string; groups: string }): string { return `${item.title}  ·  ${item.groups}`; }
+  onChooseItem(item: { path: string }): void { this.chosen = item.path; this.settle(); }
+  onClose(): void { super.onClose(); window.setTimeout(() => this.settle(), 0); }
+  private settle(): void { if (this.settled) return; this.settled = true; this.resolve(this.chosen); }
+}
+
 /**
  * A picker over every Markdown note in the vault; resolves with the chosen
  * path, or null when dismissed. Obsidian closes the modal *before* it
@@ -325,6 +340,25 @@ export default class CreativeZenModePlugin extends Plugin {
       settings: () => this.current.writer,
       updateSettings: (next) => void this.updateSettings({ ...this.current, writer: next }),
     };
+    this.addCommand({
+      id: "reference-writer-card",
+      name: "Reference a writer card",
+      // `%% REF: [[Card]] %%` at the cursor: a link the manuscript page and any export hide, and the board counts as a use.
+      editorCallback: (editor) => {
+        void writerRepo.load().then(async (file) => {
+          const board = await buildWriterBoard.boardFor(file);
+          if (!board.cards.length) { new Notice("creative-writer: nothing on the writer board yet."); return; }
+          new CardPicker(this.app, board.cards.map((c) => ({ path: c.path, title: c.title, groups: c.groups.join(", ") })), (path) => {
+            if (!path) return;
+            const name = path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/i, "");
+            const from = editor.posToOffset(editor.getCursor("from"));
+            const text = `%% REF: [[${name}]] %%`;
+            editor.replaceSelection(text);
+            editor.setCursor(editor.offsetToPos(from + text.length));
+          }).open();
+        });
+      },
+    });
     this.registerView(WRITER_VIEW_TYPE, (leaf: WorkspaceLeaf) => new WriterView(leaf, writerSource));
     this.registerExtensions([WRITER_EXTENSION], WRITER_VIEW_TYPE);
     this.addCommand({ id: "open-writer", name: "Open writer", callback: () => void this.openWriter() });

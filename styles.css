@@ -543,3 +543,18 @@ body.czm-zen .workspace-split.mod-root {
 .czm-writer-promote { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; }
 .czm-writer-promote input { width: 100%; box-sizing: border-box; }
 .czm-writer-stage-select { width: 100%; }
+/* Uses and named lines. */
+.czm-writer-uses { font-size: 10px; padding: 0 6px; border-radius: 8px; border: 1px solid var(--text-faint); color: var(--text-muted); margin-left: auto; white-space: nowrap; }
+.czm-writer-uses.is-recurring { border-color: var(--text-accent); color: var(--text-accent); font-weight: 600; }
+.czm-writer-edge { pointer-events: visibleStroke; cursor: pointer; }
+.czm-writer-edge:hover { opacity: 1; stroke-width: 2.5; }
+.czm-writer-edge-named { stroke: var(--czm-edge, var(--text-accent)); stroke-dasharray: none; stroke-width: 1.8; opacity: 0.9; }
+.czm-writer-edge-named.is-stale { stroke-dasharray: 6 4; opacity: 0.5; }
+.czm-writer-edge-named.is-lit { stroke-width: 2.6; opacity: 1; }
+.czm-writer-edge-label { fill: var(--czm-edge, var(--text-accent)); font-size: 11px; font-style: italic; cursor: pointer; user-select: none; paint-order: stroke; stroke: var(--background-primary); stroke-width: 3px; stroke-linejoin: round; }
+.czm-writer-edge-label.is-lit { font-weight: 600; }
+.czm-writer-edge-row { align-items: center; }
+.czm-writer-edge-row .czm-writer-chip { margin-right: 4px; }
+.czm-writer-edge-colour { width: 20px; height: 20px; margin-left: auto; }
+.czm-writer-edge-suggest { grid-template-columns: repeat(2, 1fr); }
+.czm-act-name-line { font-size: var(--font-ui-smaller); padding: 0 6px; height: 20px; line-height: 1; margin-left: 4px; }

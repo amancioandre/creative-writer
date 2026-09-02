@@ -100,7 +100,7 @@ describe("manuscript settings", () => {
     const m = normalizeSettings(undefined).manuscript;
     expect(m).toMatchObject({ folderDepth: 2, noteTitles: true, stripPrefix: "^\\d+[\\s._)-]*", demoteHeadings: true, proseOnly: false, showComments: true, tintTags: true, showRuler: true, showStory: false });
     expect(normalizeSettings({ manuscript: { showStory: true, showRuler: "no" } }).manuscript).toMatchObject({ showStory: true, showRuler: true });
-    expect(m.tags.map((t) => t.name)).toEqual(["TODO", "FIX", "CHECK", "IDEA", "CUT"]);
+    expect(m.tags.map((t) => t.name)).toEqual(["TODO", "FIX", "CHECK", "IDEA", "CUT", "REF"]);
   });
   it("clamps the depth, keeps any pattern string and falls back on wrong types", () => {
     const m = normalizeSettings({ manuscript: { folderDepth: 40, stripPrefix: "(", noteTitles: "no", proseOnly: true } }).manuscript;
@@ -112,9 +112,10 @@ describe("manuscript settings", () => {
   });
   it("normalises tags: uppercase names, hex colours, no duplicates, a text round trip", () => {
     const tags = normalizeSettings({ manuscript: { tags: [{ name: "todo", color: "#ABCDEF" }, { name: "x" }, { name: "TODO", color: "#000000" }, { name: "NOTE", color: "red" }, 3] } }).manuscript.tags;
-    expect(tags).toEqual([{ name: "TODO", color: "#abcdef" }, { name: "NOTE", color: "#8a8a8a" }]);
+    expect(tags).toEqual([{ name: "TODO", color: "#abcdef" }, { name: "NOTE", color: "#8a8a8a" }, { name: "REF", color: "#d08c60" }]);
     expect(textToTags(tagsToText(tags))).toEqual(tags);
-    expect(textToTags("CHECK #4a8fe2\nfix\n\n")).toEqual([{ name: "CHECK", color: "#4a8fe2" }, { name: "FIX", color: "#8a8a8a" }]);
+    expect(textToTags("CHECK #4a8fe2\nfix\n\n")).toEqual([{ name: "CHECK", color: "#4a8fe2" }, { name: "FIX", color: "#8a8a8a" }, { name: "REF", color: "#d08c60" }]);
+    expect(textToTags("REF #000000").map((t) => t.color)).toEqual(["#000000"]);
   });
 });
 

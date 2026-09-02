@@ -237,7 +237,7 @@ describe("WriterView", () => {
     const empty = await open();
     expect(empty.el.querySelector(".czm-writer-band .czm-writer-hint-text")!.textContent).toContain("No story yet");
     const ideaNote = note("notes/Idea.md", ["#writer/premise"], [], "A man hunts a bear. Then more.");
-    const { el } = await open({}, [...baseNotes, ideaNote], undefined, { stories: [bearCard], ideas: [{ path: "notes/Other.md", title: "Other", story: null, groups: ["premise"], tagGroups: ["premise"], excerpt: "", position: null }], unfiled: ["storytelling/Loose"] });
+    const { el } = await open({}, [...baseNotes, ideaNote], undefined, { stories: [bearCard], ideas: [{ path: "notes/Other.md", title: "Other", story: null, groups: ["premise"], tagGroups: ["premise"], excerpt: "", position: null }], unfiled: ["storytelling/Loose"], uses: new Map() });
     const story = el.querySelector<SVGGElement>(".czm-writer-story")!;
     expect(story.getAttribute("data-scope")).toBe("storytelling/Bear/");
     expect(story.querySelector(".czm-writer-card-title")!.textContent).toBe("The Bear Hunt");
@@ -249,7 +249,7 @@ describe("WriterView", () => {
   });
   it("selects a story: stage select, view buttons, links to the idea it grew from; double click opens the note", async () => {
     const ideaNote = note("notes/Idea.md", ["#writer/premise"], [], "A man hunts a bear.");
-    const { el, calls } = await open({}, [...baseNotes, ideaNote], undefined, { stories: [bearCard], ideas: [], unfiled: [] });
+    const { el, calls } = await open({}, [...baseNotes, ideaNote], undefined, { stories: [bearCard], ideas: [], unfiled: [], uses: new Map() });
     const story = el.querySelector<SVGGElement>(".czm-writer-story")!;
     press(story); release(story);
     const side = el.querySelector(".czm-writer-side")!;
@@ -272,7 +272,7 @@ describe("WriterView", () => {
   });
   it("makes an idea a story from its card: the form, the promotion, the new story selected and its note opened", async () => {
     const ideaNote = note("notes/Idea.md", ["#writer/premise"], [], "A man hunts a bear.");
-    const { el, calls } = await open({}, [...baseNotes, ideaNote], undefined, { stories: [], ideas: [{ path: "notes/Idea.md", title: "Idea", story: null, groups: ["premise"], tagGroups: ["premise"], excerpt: "A man hunts a bear.", position: null }], unfiled: [] });
+    const { el, calls } = await open({}, [...baseNotes, ideaNote], undefined, { stories: [], ideas: [{ path: "notes/Idea.md", title: "Idea", story: null, groups: ["premise"], tagGroups: ["premise"], excerpt: "A man hunts a bear.", position: null }], unfiled: [], uses: new Map() });
     const pill = el.querySelector<SVGGElement>(".czm-writer-pill-idea")!;
     press(pill); release(pill);
     expect(card(el, "notes/Idea.md").classList.contains("is-selected")).toBe(true);
@@ -291,7 +291,7 @@ describe("WriterView", () => {
     expect(el.querySelector(".czm-act-story")!.textContent).toBe("Story: The Horse");
   });
   it("declares an unfiled folder from its pill, and starts a story from nothing from the panel", async () => {
-    const { el, calls } = await open({}, baseNotes, undefined, { stories: [], ideas: [], unfiled: ["storytelling/Loose"] });
+    const { el, calls } = await open({}, baseNotes, undefined, { stories: [], ideas: [], unfiled: ["storytelling/Loose"], uses: new Map() });
     const pill = el.querySelector<SVGGElement>(".czm-writer-pill-unfiled")!;
     press(pill); release(pill);
     expect(el.querySelector(".czm-writer-side .czm-map-card-name")!.textContent).toBe("Loose");
@@ -305,5 +305,47 @@ describe("WriterView", () => {
     name.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
     await tick(); await tick(); await tick();
     expect(calls.promoted).toEqual(["∅ -> storytelling/Fresh"]);
+  });
+
+  it("shows uses on cards and side cards, marks recurring ones, and lists what a story draws on", async () => {
+    const uses = new Map([["notes/Courage.md", ["The Bear Hunt", "Horse"]], ["sources/Invictus.md", ["The Bear Hunt"]]]);
+    const { el } = await open({}, baseNotes, undefined, { stories: [bearCard], ideas: [], unfiled: [], uses });
+    expect(card(el, "notes/Courage.md").querySelector(".czm-writer-uses")!.textContent).toBe("2 stories");
+    expect(card(el, "notes/Courage.md").querySelector(".czm-writer-uses")!.classList.contains("is-recurring")).toBe(true);
+    expect(card(el, "sources/Invictus.md").querySelector(".czm-writer-uses")!.classList.contains("is-recurring")).toBe(false);
+    expect(card(el, "notes/Wild.md").querySelector(".czm-writer-uses")).toBeNull();
+    press(card(el, "notes/Courage.md")); release(card(el, "notes/Courage.md"));
+    expect([...el.querySelectorAll(".czm-writer-use-row .czm-map-row-name")].map((r) => r.textContent)).toEqual(["The Bear Hunt", "Horse"]);
+    (el.querySelector(".czm-writer-use-row") as HTMLElement).click();
+    expect(el.querySelector(".czm-writer-story.is-selected")).not.toBeNull();
+    expect([...el.querySelectorAll(".czm-writer-draws-row .czm-map-row-name")].map((r) => r.textContent)).toEqual(["Courage", "Invictus"]);
+  });
+  it("names a line between linked cards, draws it with its label, recolours and removes it, and dashes it once the link is gone", async () => {
+    const { v, el, file } = await open();
+    press(card(el, "notes/Courage.md")); release(card(el, "notes/Courage.md"));
+    (el.querySelector(".czm-act-name-line") as HTMLElement).click();
+    expect(el.querySelector(".czm-writer-side .czm-map-card-name")!.textContent).toBe("Courage — Invictus");
+    (el.querySelector(".czm-act-suggest-edge") as HTMLElement).click();
+    await flush(v); await tick(); await tick();
+    expect(file().edges).toEqual([{ from: "notes/Courage.md", to: "sources/Invictus.md", label: "inspired by", colour: "" }]);
+    expect(el.querySelector(".czm-writer-edge-named")).not.toBeNull();
+    expect(el.querySelector(".czm-writer-edge-label")!.textContent).toBe("inspired by");
+    expect(el.querySelectorAll(".czm-writer-edge").length).toBe(1);
+    const colour = el.querySelector<HTMLInputElement>(".czm-writer-edge-colour")!;
+    colour.value = "#123456";
+    colour.dispatchEvent(new Event("input"));
+    await flush(v); await tick(); await tick();
+    expect(file().edges[0]!.colour).toBe("#123456");
+    (el.querySelector(".czm-act-remove-edge") as HTMLElement).click();
+    await flush(v); await tick(); await tick();
+    expect(file().edges).toEqual([]);
+    expect(el.querySelector(".czm-writer-edge-named")).toBeNull();
+
+    const stale = { ...EMPTY_WRITER_FILE, edges: [{ from: "notes/Courage.md", to: "notes/Wild.md", label: "odd", colour: "" }] };
+    const s = await open({}, baseNotes, stale);
+    expect(s.el.querySelector(".czm-writer-edge-named.is-stale")).not.toBeNull();
+    (s.el.querySelector(".czm-writer-edge-named") as unknown as HTMLElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(s.el.querySelector(".czm-writer-side .czm-map-kind")!.textContent).toBe("The notes no longer link");
+    expect(s.el.querySelector(".czm-writer-edge-input")).toBeNull();
   });
 });

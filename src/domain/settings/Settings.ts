@@ -2,7 +2,7 @@ import { RhythmScale } from "../rhythm/RhythmScale";
 import { FINDING_KINDS, type FindingKind } from "../style/Finding";
 import type { ScopeMode, ScopeSettings } from "../scope/NoteScope";
 import { DEFAULT_STRIP_PREFIX, type ManuscriptOptions } from "../manuscript/Manuscript";
-import { DEFAULT_TAGS, type TagSpec } from "../manuscript/Comments";
+import { DEFAULT_TAGS, REF_TAG_SPEC, type TagSpec } from "../manuscript/Comments";
 
 export type LlmProvider = "off" | "ollama" | "claude";
 export type ClaudeModelId = "claude-opus-5" | "claude-haiku-4-5";
@@ -175,6 +175,8 @@ export function normalizeTags(raw: readonly unknown[]): TagSpec[] {
     if (!TAG_NAME.test(name) || out.some((o) => o.name === name)) continue;
     out.push({ name, color: typeof t.color === "string" && HEX.test(t.color) ? t.color.toLowerCase() : "#8a8a8a" });
   }
+  // REF is the writer board's own tag; it is always there, in the writer's colour if they set one.
+  if (!out.some((o) => o.name === REF_TAG_SPEC.name)) out.push(REF_TAG_SPEC);
   return out;
 }
 
