@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { WorkspaceLeaf } from "obsidian";
+import { Menu, WorkspaceLeaf } from "obsidian";
 import { MANUSCRIPT_VIEW_TYPE, ManuscriptView, type ManuscriptSource } from "../../../src/infrastructure/obsidian/views/ManuscriptView";
 import { buildManuscript, type ManuscriptNote } from "../../../src/domain/manuscript/Manuscript";
 import { DEFAULT_MANUSCRIPT, type ManuscriptSettings } from "../../../src/domain/settings/Settings";
@@ -12,12 +12,12 @@ const novel: ProjectSpec = { name: "Novel", scope: "Novel/", targetWords: 1, dea
 const seg = new IntlSentenceSegmenter();
 
 function open(notes: ManuscriptNote[], overrides: Partial<ManuscriptSource> = {}) {
-  const calls = { revealed: [] as [string, number, number, boolean][], links: [] as string[], renders: 0, exported: [] as string[], comments: [] as [string, number, string][], facts: [] as [string[], boolean][] };
+  const calls = { revealed: [] as [string, number, number, boolean][], links: [] as string[], renders: 0, exported: [] as string[], comments: [] as [string, number, string][], facts: [] as [string[], boolean][], promoted: [] as [string, string][], ignored: [] as string[], builds: 0 };
   let settings: ManuscriptSettings = DEFAULT_MANUSCRIPT;
   const src: ManuscriptSource = {
     projects: () => [novel],
     activeProject: () => novel,
-    build: async () => buildManuscript(novel, notes, settings),
+    build: async () => { calls.builds++; return buildManuscript(novel, notes, settings); },
     render: async (md, el) => { calls.renders++; el.createEl("p").innerHTML = md.replace(/^#+\s*/, "").replace(/\*/g, ""); },
     segment: (t) => seg.segment(t),
     reveal: (p, l, c, f) => { calls.revealed.push([p, l, c, f]); },
@@ -28,6 +28,8 @@ function open(notes: ManuscriptNote[], overrides: Partial<ManuscriptSource> = {}
     appendComment: async (p, l, c) => { calls.comments.push([p, l, c]); },
     facts: async (_p, paths, story) => { calls.facts.push([[...paths], story]); return EMPTY_FACTS; },
     storyColors: () => DEFAULT_STORY_COLORS,
+    promote: async (_p, name, kind) => { calls.promoted.push([name, kind]); return `Novel/Characters/${name}.md`; },
+    ignore: async (_p, name) => { calls.ignored.push(name); },
     ...overrides,
   };
   const v = new ManuscriptView(new WorkspaceLeaf(), src);
@@ -306,6 +308,28 @@ describe("ManuscriptView", () => {
     expect(calls.revealed.at(-1)).toEqual(["Novel/Part One/02 Chapter Two.md", 0, 0, true]);
     blocks[2]!.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
     expect(v.contentEl.querySelector<HTMLElement>(".czm-ms-pop")!.hidden).toBe(false);
+  });
+
+  it("offers to make a candidate a note, or to dismiss it, from the cast line", async () => {
+    const zsofi = { name: "Zsófi", kind: "candidate" as const, path: null, mentions: 4 };
+    const facts: StoryFacts = { sections: new Map([["Novel/Part One/01 Chapter One.md", { readability: null, today: { added: 0, removed: 0 }, cast: [zsofi], scenes: [] }]]), conflicts: [] };
+    const { v, calls } = open(notes(), { facts: async () => facts });
+    await v.onOpen();
+    click(v.contentEl.querySelectorAll<HTMLElement>(".czm-ms-tool")[3]!);
+    await tick();
+    const name = v.contentEl.querySelector<HTMLElement>(".czm-ms-cast-name.is-candidate")!;
+    expect(name.textContent).toBe("Zsófi");
+    const builds = calls.builds;
+    click(name);
+    const menu = Menu.last!;
+    expect(menu.items.map((i) => i.title)).toEqual(["Zsófi is a character", "Zsófi is a place", "Zsófi is an item", "Zsófi is a faction", "Zsófi is an event", "Zsófi is not a name"]);
+    menu.items[0]!.cb();
+    await tick();
+    expect(calls.promoted).toEqual([["Zsófi", "character"]]);
+    expect(calls.builds).toBe(builds + 1);
+    menu.items[5]!.cb();
+    await tick();
+    expect(calls.ignored).toEqual(["Zsófi"]);
   });
 
   it("exports from the toolbar", async () => {

@@ -439,6 +439,8 @@ body.czm-zen .workspace-split.mod-root {
 .czm-ms-cast-name { color: var(--czm-kind, var(--text-muted)); }
 .czm-ms-cast-name.is-link { cursor: pointer; }
 .czm-ms-cast-name.is-link:hover { text-decoration: underline; }
+/* A candidate: a name the map found with no note yet. Dashed, like its node on the map; a click offers to make it one. */
+.czm-ms-cast-name.is-candidate { cursor: pointer; text-decoration: underline dashed; text-underline-offset: 3px; text-decoration-color: var(--text-faint); }
 .czm-ms-mark.is-conflict { border-radius: 1px; background: var(--color-red); transform: rotate(45deg) scale(0.85); }
 .czm-ms-cm-badge.is-conflict { background: color-mix(in srgb, var(--color-red) 20%, transparent); color: color-mix(in srgb, var(--color-red) 70%, var(--text-normal)); }
 

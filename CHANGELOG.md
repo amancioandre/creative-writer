@@ -6,6 +6,7 @@ Release notes for every version are on the [releases page](https://github.com/am
 
 - Selecting a paragraph on the manuscript page opens the note beside the page when no editor shows it (the editor beside the page swaps its file, or a split opens), still without taking focus. 0.7.0 only followed in an editor that was already open.
 - A click or Enter on a comment row takes the page to that paragraph, the editor following, focus staying in the list; a double click or Shift+Enter goes into the editor at the comment. The same for a contradiction row and the other scene.
+- A candidate in a cast line (a name the map found without a note) opens a menu on click: make it a character, place, item, faction or event note, or say it is not a name.
 
 ## 0.7.0 — The manuscript
 

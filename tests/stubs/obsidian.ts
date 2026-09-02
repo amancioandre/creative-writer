@@ -104,6 +104,20 @@ export class ButtonComponent {
   onClick(cb: () => unknown) { this.buttonEl.addEventListener("click", () => cb()); return this; }
 }
 export function setIcon(el: HTMLElement, icon: string): void { el.setAttribute("data-icon", icon); }
+export class MenuItem {
+  title = "";
+  cb: () => unknown = () => undefined;
+  setTitle(t: string) { this.title = t; return this; }
+  setIcon(_i: string) { return this; }
+  onClick(cb: () => unknown) { this.cb = cb; return this; }
+}
+export class Menu {
+  static last: Menu | null = null;
+  items: MenuItem[] = [];
+  addItem(cb: (i: MenuItem) => unknown) { const i = new MenuItem(); cb(i); this.items.push(i); return this; }
+  addSeparator() { return this; }
+  showAtMouseEvent(_e: MouseEvent) { Menu.last = this; return this; }
+}
 export class WorkspaceLeaf {}
 export interface DataAdapter { exists(p: string): Promise<boolean>; read(p: string): Promise<string>; write(p: string, d: string): Promise<void>; }
 export class ItemView {

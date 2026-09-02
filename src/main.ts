@@ -298,6 +298,8 @@ export default class CreativeZenModePlugin extends Plugin {
         return { sections, conflicts };
       },
       storyColors: () => this.current.storyMap.colors,
+      promote: (project, name, kind) => this.createEntityNote(project.scope, name, kind),
+      ignore: (project, name) => this.editList(project.notePath, "story-ignore", (list) => [...list.filter((n) => n !== name), name]),
     }));
     this.addCommand({ id: "open-manuscript", name: "Open manuscript", callback: () => void this.openManuscript(null) });
     this.addCommand({

@@ -1,4 +1,4 @@
-import { ItemView, setIcon, type WorkspaceLeaf } from "obsidian";
+import { ItemView, Menu, setIcon, type WorkspaceLeaf } from "obsidian";
 import type { ProjectSpec } from "../../../domain/progress/Project";
 import { EMPTY_MANUSCRIPT, type Manuscript, type ManuscriptBlock, type NoteItem } from "../../../domain/manuscript/Manuscript";
 import { locateInBlock } from "../../../domain/manuscript/Locate";
@@ -33,6 +33,10 @@ export interface ManuscriptSource {
   /** Readability, today's words, and — with `story` — cast and contradictions for these notes. */
   facts(project: ProjectSpec, paths: readonly string[], story: boolean): Promise<StoryFacts>;
   storyColors(): Readonly<Record<EntityKind, string>>;
+  /** A candidate becomes a typed note in the project's folder for that kind; resolves to its path. */
+  promote(project: ProjectSpec, name: string, kind: EntityKind): Promise<string>;
+  /** A candidate that is not a name: added to the project's `story-ignore`. */
+  ignore(project: ProjectSpec, name: string): Promise<void>;
 }
 
 interface Rendered { readonly el: HTMLElement; readonly key: string }
@@ -296,11 +300,28 @@ export class ManuscriptView extends ItemView {
     if (label) line.createSpan({ text: label, cls: "czm-ms-cast-label" });
     cast.forEach((m, i) => {
       if (i) line.appendChild(document.createTextNode(" · "));
-      const name = line.createSpan({ text: m.name, cls: `czm-ms-cast-name${m.path ? " is-link" : ""}`, attr: { title: `${m.name} — ${m.kind}, ${m.mentions} mention${m.mentions === 1 ? "" : "s"}` } });
+      const candidate = m.kind === "candidate";
+      const title = candidate ? `${m.name} — a name the map found, ${m.mentions} mention${m.mentions === 1 ? "" : "s"}. Click to make it a note, or to say it is not a name.` : `${m.name} — ${m.kind}, ${m.mentions} mention${m.mentions === 1 ? "" : "s"}`;
+      const name = line.createSpan({ text: m.name, cls: `czm-ms-cast-name${m.path ? " is-link" : ""}${candidate ? " is-candidate" : ""}`, attr: { title } });
       name.style.setProperty("--czm-kind", colors[m.kind]);
       if (m.path) name.addEventListener("click", (ev) => { ev.stopPropagation(); this.source.openLink(m.path!, sourcePath); });
+      else if (candidate) name.addEventListener("click", (ev) => { ev.stopPropagation(); this.candidateMenu(ev, m.name); });
     });
     return line;
+  }
+
+  /** What a candidate is: the same exits the map offers. A choice makes the note and the page refreshes with the name linked. */
+  private candidateMenu(ev: MouseEvent, name: string): void {
+    const project = this.project;
+    if (!project) return;
+    const menu = new Menu();
+    const kinds: [EntityKind, string, string][] = [["character", "a character", "user"], ["location", "a place", "map-pin"], ["item", "an item", "package"], ["faction", "a faction", "flag"], ["event", "an event", "calendar"]];
+    for (const [kind, label, icon] of kinds) {
+      menu.addItem((i) => i.setTitle(`${name} is ${label}`).setIcon(icon).onClick(() => void this.source.promote(project, name, kind).then(() => this.refresh())));
+    }
+    menu.addSeparator();
+    menu.addItem((i) => i.setTitle(`${name} is not a name`).setIcon("x").onClick(() => void this.source.ignore(project, name).then(() => this.refresh())));
+    menu.showAtMouseEvent(ev);
   }
 
   /** The block of a note that holds a line. */
