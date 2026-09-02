@@ -4,7 +4,7 @@ import { STORY_MAP_NOTE } from "../story/StoryMapFile";
 import { STORY_THREADS_NOTE } from "../threads/StoryThreadsNote";
 import { countWords } from "../text/Dialogue";
 import { PROSE_KINDS, splitBlocks, type SourceBlock } from "./Blocks";
-import { findAnnotations, type Annotation } from "./Comments";
+import { findAnnotations, stripComments, type Annotation } from "./Comments";
 
 /**
  * The manuscript: every prose note of a project stitched into one document
@@ -164,7 +164,7 @@ export function buildManuscript(project: { readonly scope: string }, notes: read
       pending = [];
     }
     if (pending.length && blocks.length) { const last = blocks[blocks.length - 1]!; blocks[blocks.length - 1] = { ...last, annotations: [...last.annotations, ...pending] }; }
-    const w = countWords(stripFrontMatter(note.text));
+    const w = countWords(stripComments(stripFrontMatter(note.text)));
     items.push({ kind: "note", level: noteLevel, title, path: note.path, showTitle, blocks, words: w, annotations });
     count++;
     words += w;

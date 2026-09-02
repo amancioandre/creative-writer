@@ -1,3 +1,4 @@
+import { stripPresetOf } from "../../../src/infrastructure/obsidian/SettingsTab";
 import { describe, it, expect, beforeEach } from "vitest";
 import { App, Plugin, Setting } from "obsidian";
 import { CreativeZenSettingsTab } from "../../../src/infrastructure/obsidian/SettingsTab";
@@ -90,5 +91,13 @@ describe("CreativeZenSettingsTab", () => {
   it("display() falls back to the legacy renderer when the app has no base display()", () => {
     tab.display();
     expect(Setting.created.length).toBeGreaterThan(0);
+  });
+});
+
+describe("stripPresetOf", () => {
+  it("names the default, the empty pattern and anything else", () => {
+    expect(stripPresetOf("^\\d+[\\s._)-]*")).toBe("numbers");
+    expect(stripPresetOf("  ")).toBe("none");
+    expect(stripPresetOf("^Draft ")).toBe("custom");
   });
 });

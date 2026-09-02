@@ -274,7 +274,7 @@ export default class CreativeZenModePlugin extends Plugin {
       build: (project) => buildManuscript.execute(project),
       render: (markdown, el, sourcePath, view) => MarkdownRenderer.render(this.app, markdown, el, sourcePath, view),
       segment: (text) => manuscriptSegmenter.segment(text),
-      reveal: (path, line, ch) => void this.revealPosition(path, line, ch),
+      reveal: (path, line, ch, focus) => void (focus ? this.revealPosition(path, line, ch) : this.followPosition(path, line, ch)),
       openLink: (link, sourcePath) => void this.app.workspace.openLinkText(link, sourcePath, false),
       settings: () => this.current.manuscript,
       updateSettings: (next) => void this.updateSettings({ ...this.current, manuscript: next }),
@@ -282,6 +282,19 @@ export default class CreativeZenModePlugin extends Plugin {
       appendComment: (path, line, comment) => this.appendComment(path, line, comment),
     }));
     this.addCommand({ id: "open-manuscript", name: "Open manuscript", callback: () => void this.openManuscript(null) });
+    this.addCommand({
+      id: "return-to-manuscript",
+      name: "Return to manuscript",
+      // The way back from the editor: the page takes focus at the paragraph the cursor is in.
+      callback: () => {
+        const md = this.app.workspace.getActiveViewOfType(MarkdownView);
+        const at = md?.file ? { path: md.file.path, line: md.editor.getCursor().line } : null;
+        void this.openManuscript(null).then(() => {
+          const view = this.app.workspace.getLeavesOfType(MANUSCRIPT_VIEW_TYPE)[0]?.view as ManuscriptView | undefined;
+          view?.focusAt(at?.path ?? null, at?.line ?? 0);
+        });
+      },
+    });
     this.addCommand({
       id: "export-manuscript",
       name: "Export manuscript to a note",
@@ -531,6 +544,15 @@ export default class CreativeZenModePlugin extends Plugin {
   /** Opens the note and puts the cursor on a scene's heading line. */
   private revealScene(path: string, line: number): Promise<void> {
     return this.revealPosition(path, line, 0);
+  }
+
+  /** An editor already showing the note follows to the position without taking focus; nothing opens otherwise. */
+  private async followPosition(path: string, line: number, ch: number): Promise<void> {
+    const leaf = this.app.workspace.getLeavesOfType("markdown").find((l) => l.view instanceof MarkdownView && l.view.file?.path === path);
+    const md = leaf?.view instanceof MarkdownView ? leaf.view : null;
+    if (!md) return;
+    md.editor.setCursor({ line, ch });
+    md.editor.scrollIntoView({ from: { line, ch }, to: { line, ch } }, true);
   }
 
   /**

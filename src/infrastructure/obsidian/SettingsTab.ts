@@ -24,6 +24,13 @@ const SCOPE_OPTIONS: Record<ScopeMode, string> = {
 const SCOPE_DESC = "One rule for everything: the notes the editor tools run in are the notes the daily goal, the project totals, the story map and the threads count. A declared project (writing-target or story: true in a note's front matter) is always in; the mode decides what else is. Side material — memos, research, reviews — stays out with creative-writer: false in its front matter, wherever it lives; creative-writer: true lets a note in whatever the mode. The plugin's own notes (writing log, story map, threads) are never counted.";
 
 
+const STRIP_PRESETS: Record<string, string> = { numbers: "Numbers and separators (01 -, 3., 2))", none: "Nothing", custom: "Custom pattern" };
+
+/** Which preset a pattern is; anything but the default and empty is custom. */
+export function stripPresetOf(pattern: string): keyof typeof STRIP_PRESETS {
+  return pattern === DEFAULT_MANUSCRIPT.stripPrefix ? "numbers" : pattern.trim() === "" ? "none" : "custom";
+}
+
 const STYLE_CHECKS: ReadonlyArray<[FindingKind, string, string]> = [
   ["cliche", "Clichés", "Phrases worn smooth by overuse."],
   ["passive", "Passive voice", "\"The letter was written\" — by whom?"],
@@ -79,7 +86,8 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
         items: [
           { name: "Folder levels as headings", desc: "How many folder levels below the project folder become headings in the manuscript view. 0 = none: notes follow one another with no outline.", control: { type: "slider", key: "manuscript.folderDepth", min: 0, max: 6, step: 1 } },
           { name: "Note names as headings", desc: "Put each note's name above its text. A note whose first heading already is its name shows that heading once.", control: { type: "toggle", key: "manuscript.noteTitles" } },
-          { name: "Strip from names", desc: "A regular expression removed from the start of folder and note names before they become headings: the sort prefix in \"01 - Camp\". Empty keeps names as they are.", control: { type: "text", key: "manuscript.stripPrefix", placeholder: DEFAULT_MANUSCRIPT.stripPrefix } },
+          { name: "Strip from names", desc: "What to remove from the start of folder and note names before they become headings: the sort prefix in \"01 - Camp\".", control: { type: "dropdown", key: "manuscript.stripPreset", options: STRIP_PRESETS } },
+          { name: "Custom pattern", desc: "With Custom above: a regular expression removed from the start of names.", control: { type: "text", key: "manuscript.stripPrefix", placeholder: DEFAULT_MANUSCRIPT.stripPrefix } },
           { name: "Nest the notes' own headings", desc: "Push the headings inside a note down below the outline, so a scene inside a chapter inside a part reads as level three.", control: { type: "toggle", key: "manuscript.demoteHeadings" } },
           { name: "Prose only", desc: "Show only paragraphs, headings, quotes and scene breaks: no lists, tables, code or callouts. Also toggled at the top of the view.", control: { type: "toggle", key: "manuscript.proseOnly" } },
           { name: "Comments pane", desc: "A pane beside the manuscript page: the active paragraph's %% comments %% with a box to add one, and every comment in reading order. Also toggled at the top of the view.", control: { type: "toggle", key: "manuscript.showComments" } },
@@ -120,10 +128,17 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
   getControlValue(key: string): unknown {
     if (key === "scope.foldersText") return foldersToText(this.port.current().scope.folders);
     if (key === "manuscript.tagsText") return tagsToText(this.port.current().manuscript.tags);
+    if (key === "manuscript.stripPreset") return stripPresetOf(this.port.current().manuscript.stripPrefix);
     return key.split(".").reduce<unknown>((o, k) => (o && typeof o === "object" ? (o as Record<string, unknown>)[k] : undefined), this.port.current());
   }
 
   async setControlValue(key: string, value: unknown): Promise<void> {
+    if (key === "manuscript.stripPreset") {
+      const c = this.port.current();
+      const pattern = value === "numbers" ? DEFAULT_MANUSCRIPT.stripPrefix : value === "none" ? "" : stripPresetOf(c.manuscript.stripPrefix) === "custom" ? c.manuscript.stripPrefix : DEFAULT_MANUSCRIPT.stripPrefix;
+      await this.port.update({ ...c, manuscript: { ...c.manuscript, stripPrefix: pattern } });
+      return;
+    }
     if (key === "manuscript.tagsText") {
       const c = this.port.current();
       await this.port.update({ ...c, manuscript: { ...c.manuscript, tags: textToTags(String(value ?? "")) } });
@@ -189,7 +204,9 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
       .addSlider((sl) => sl.setLimits(0, 6, 1).setValue(s.manuscript.folderDepth).onChange((v) => ms({ folderDepth: v })));
     new Setting(containerEl).setName("Note names as headings").setDesc("Put each note's name above its text. A note whose first heading already is its name shows that heading once.")
       .addToggle((t) => t.setValue(s.manuscript.noteTitles).onChange((v) => ms({ noteTitles: v })));
-    new Setting(containerEl).setName("Strip from names").setDesc("A regular expression removed from the start of folder and note names before they become headings. Empty keeps names as they are.")
+    new Setting(containerEl).setName("Strip from names").setDesc("What to remove from the start of folder and note names before they become headings.")
+      .addDropdown((d) => d.addOptions(STRIP_PRESETS).setValue(stripPresetOf(s.manuscript.stripPrefix)).onChange((v) => ms({ stripPrefix: v === "numbers" ? DEFAULT_MANUSCRIPT.stripPrefix : v === "none" ? "" : this.port.current().manuscript.stripPrefix })));
+    new Setting(containerEl).setName("Custom pattern").setDesc("With Custom above: a regular expression removed from the start of names.")
       .addText((t) => t.setPlaceholder(DEFAULT_MANUSCRIPT.stripPrefix).setValue(s.manuscript.stripPrefix).onChange((v) => ms({ stripPrefix: v })));
     new Setting(containerEl).setName("Nest the notes' own headings").setDesc("Push the headings inside a note down below the outline.")
       .addToggle((t) => t.setValue(s.manuscript.demoteHeadings).onChange((v) => ms({ demoteHeadings: v })));

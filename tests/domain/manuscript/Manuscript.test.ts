@@ -105,8 +105,8 @@ describe("buildManuscript", () => {
     expect(prose.map((b) => b.annotations.map((a) => a.tag))).toEqual([["ORPHAN", "TODO", null, "FIX", "IDEA"], []]);
   });
 
-  it("counts words without front matter and handles a single-note or root scope", () => {
-    const m = buildManuscript({ scope: "Novel/One.md" }, [note("Novel/One.md", "---\nx: y\n---\nOne two three.")], opts);
+  it("counts words without front matter or comments and handles a single-note or root scope", () => {
+    const m = buildManuscript({ scope: "Novel/One.md" }, [note("Novel/One.md", "---\nx: y\n---\nOne two three. %% not these four %%")], opts);
     expect(m.words).toBe(3);
     expect(m.items).toHaveLength(1);
     const root = buildManuscript({ scope: "" }, [note("Part/One.md", "Hi.")], opts);

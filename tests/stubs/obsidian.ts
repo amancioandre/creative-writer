@@ -110,6 +110,7 @@ export class ItemView {
   containerEl: HTMLElement = document.createElement("div");
   contentEl: HTMLElement = document.createElement("div");
   constructor(public leaf: WorkspaceLeaf) {}
+  register(_cb: () => void): void {}
   getViewType(): string { return ""; }
   getDisplayText(): string { return ""; }
   getIcon(): string { return ""; }

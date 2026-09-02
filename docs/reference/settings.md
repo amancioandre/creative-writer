@@ -37,7 +37,8 @@ Settings → Community plugins → Creative Writer. Everything here is stored in
 |---|---|---|
 | Folder levels as headings | 2 | How many folder levels below the project folder become headings on the [manuscript](/guide/manuscript) page. 0 = no outline. |
 | Note names as headings | on | Each note's name above its text. A note whose first heading already is its name shows that heading once. |
-| Strip from names | `^\d+[\s._)-]*` | A regular expression removed from the start of folder and note names: the sort prefix in `01 - Camp`. Empty keeps names as they are. |
+| Strip from names | Numbers and separators | What to remove from the start of folder and note names: the sort prefix in `01 - Camp`. *Nothing* keeps names as they are; *Custom pattern* uses the regular expression in the next row. |
+| Custom pattern | `^\d+[\s._)-]*` | The regular expression used with *Custom pattern*. |
 | Nest the notes' own headings | on | Push a note's headings down below the outline, so a scene in a chapter in a part is level three. Off: headings keep the level they have in the note. |
 | Prose only | off | Show only paragraphs, headings, quotes and scene breaks. Also toggled at the top of the page. |
 | Comments | on | The pane beside the page: the active paragraph's `%% comments %%` with a box to add one, and every comment in reading order. Dots on marked paragraphs and the hover box show either way. Also toggled at the top of the page. |

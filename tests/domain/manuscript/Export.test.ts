@@ -20,7 +20,7 @@ describe("exportNote", () => {
   it("carries the flag that keeps it out of every count and view", () => {
     const text = exportNote("Novel", buildManuscript({ scope: "Novel/" }, notes, opts));
     expect(text.startsWith(`---\ncreative-writer: false\n${MANUSCRIPT_EXPORT_FLAG}: 1\n---\n`)).toBe(true);
-    expect(text).toContain("2 notes (16 words)");
+    expect(text).toContain("2 notes (9 words)");
     expect(isPluginDataNote({ [MANUSCRIPT_EXPORT_FLAG]: 1 })).toBe(true);
     expect(isNoteCounted({ enabled: true, scope: { mode: "all", folders: [] }, path: "Novel/Novel (manuscript).md", flag: null, frontmatter: { [MANUSCRIPT_EXPORT_FLAG]: 1 } })).toBe(false);
   });

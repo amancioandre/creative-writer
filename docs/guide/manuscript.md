@@ -4,13 +4,29 @@
 
 ## Reading it
 
-- **The outline** comes from your folders. `Part One/03 Chapter Three.md` reads as *Part One* › *Chapter Three*, with the sort prefix stripped. Folder headings are muted, so the outline reads apart from the text.
+- **The outline** comes from your folders. `Part One/03 Chapter Three.md` reads as *Part One* › *Chapter Three*, with the sort prefix stripped. Folder names are small eyebrows above the chapter title, so the outline reads apart from the text.
 - **Each note** gets its name as a heading, then its text as reading view would show it. A note whose first heading already is its name shows that heading once. The headings inside a note nest under the outline: a `# Camp` scene in a chapter in a part reads as level three.
 - **Order** is manuscript order, the same the [story map](/guide/story-map), [timeline](/guide/story-timeline) and [threads](/guide/story-threads) use: notes by path, unless `story-order: 3` in a note's front matter says otherwise.
-- **Click any passage** and the note opens in the editor with the cursor at that sentence. Click a heading to open the note at its top. Links in the text work as they do anywhere.
-- **Prose only**, at the top of the page, hides lists, tables, code and callouts and keeps paragraphs, headings, quotes and scene breaks (`***`).
+- **Selecting a paragraph** (a click, or the arrow keys) marks it and makes an editor already showing that note follow to it without taking focus. **Enter** or a **double click** goes into the editor at that sentence, opening the note beside the page if it is not open. Click a heading to open the note at its top. Links in the text work as they do anywhere.
+- **Prose only**, in the toolbar, hides lists, tables, code and callouts and keeps paragraphs, headings, quotes and scene breaks (`***`).
 
-The page follows your typing: edit a chapter in the editor beside it and that chapter redraws after a moment, the rest of the page untouched, the scroll position kept. A page in a hidden tab waits and redraws when it is shown.
+The page follows your typing: edit a chapter in the editor beside it and that chapter redraws after a moment, the rest of the page untouched, the scroll position and the selection kept. A page in a hidden tab waits and redraws when it is shown. **Return to manuscript** (a command; give it a hotkey) brings you back from the editor to the paragraph the cursor was in.
+
+## Keyboard
+
+The page is one Tab stop; Tab and Shift+Tab move between the project list, the toolbar, the page, the comment field and the comment list.
+
+| Key | Where | Does |
+|---|---|---|
+| Up / Down | page | previous / next paragraph |
+| Alt + Up / Down | page | previous / next chapter |
+| Home / End | page | first / last paragraph |
+| Enter | page | edit this paragraph in the editor |
+| c | page | write a comment on it |
+| Enter | comment field | save the comment |
+| Shift + Enter | comment field | new line |
+| Escape | comment field, list | clear the field, then back to the page |
+| Up / Down, Enter | comment list | move, open the editor on that comment |
 
 ## What is on the page
 
@@ -25,18 +41,20 @@ Only the story. These stay out:
 
 ## Comments and tags
 
-Obsidian's `%% comments %%` are the right place for notes to self: they live in the text, sync with it, and never count as words. Reading view hides them; the manuscript page can show them.
+Obsidian's `%% comments %%` are the right place for notes to self: they live in the text, sync with it, and never count as words. Reading view hides them; the manuscript page keeps them beside the text.
 
-- **Marked paragraphs** carry a dot at their edge per comment, in the tag's colour; ==highlights== show as they do in reading view. Hover the paragraph and its comments appear in a box.
-- **The pane** beside the page (the **Comments** toggle at the top) has two parts. *This paragraph* shows the comments of the paragraph you last clicked and a box to write a new one: pick a tag or none, write, **Add comment** (or Ctrl+Enter), and ` %% TAG: your note %%` lands at the end of that paragraph in the note, through the open editor if there is one. *All comments* lists every comment and highlight of the manuscript in reading order, with the note each is in; the dropdown filters by tag. Click any row and the editor opens on that comment.
+- **Marked paragraphs** carry a dot in the gutter per comment, in the tag's colour; a highlight is a small square. Hover the dot's paragraph for a moment, or move onto it with the keyboard, and its comments appear in a box.
+- **The pane** (the speech-bubble toggle in the toolbar) has two parts. *This paragraph* shows the comments of the selected paragraph and one field: type `CHECK: was it a coat in chapter three?` and press **Enter**, and ` %% CHECK: was it a coat in chapter three? %%` lands at the end of that paragraph in the note, through the open editor if there is one. The tag is read from the prefix and shown as a chip while you type; no prefix means an untagged comment; Shift+Enter makes a new line. The chips under the field are a legend, and a click drops that prefix in. Press **c** on the page to jump to the field. *All comments* lists every comment and highlight of the manuscript in reading order, with the note each is in; the dropdown filters by tag, and Enter on a row opens the editor there.
 - A comment on a line of its own (`%%` … `%%` as a block) belongs to the paragraph before it.
-- **Tags** colour a comment by the word it opens with: `%% CHECK: was it a coat in chapter three? %%`. An uppercase word and a colon, nothing else. The defaults are `TODO` (something still to write), `FIX` (prose known to be wrong), `CHECK` (continuity, facts, names), `IDEA` (a possibility) and `CUT` (kept only until you are sure); add your own under Settings → Manuscript → Tags. Deleting the comment is how a tag is resolved: there is no other state.
+- **Tags** colour a comment by the word it opens with. An uppercase word and a colon, nothing else. The defaults are `TODO` (something still to write), `FIX` (prose known to be wrong), `CHECK` (continuity, facts, names), `IDEA` (a possibility) and `CUT` (kept only until you are sure); add your own under Settings → Manuscript → Tags. Deleting the comment is how a tag is resolved: there is no other state.
 - **In the editor**, the tag word is tinted in the same colour, so a `TODO` stands out in the dimmed comment. Only inside `%%`: a TODO in dialogue is left alone.
-- **Insert comment here** (a command; give it a hotkey) drops `%%  %%` at the cursor with the cursor inside. With a selection, the selection becomes a highlight and the comment follows it.
+- **Insert comment here** (a command) drops `%%  %%` at the cursor with the cursor inside. With a selection, the selection becomes a highlight and the comment follows it.
+
+When the view is narrow the pane sits under the page instead of beside it.
 
 ## Settings
 
-Settings → Manuscript: how many folder levels become headings, whether note names do, what to strip from names (a regular expression; the default removes a leading number and its separator), whether the notes' own headings nest under the outline, prose only, comments on or off, tag tinting in the editor, and the tag list. See [Settings](/reference/settings#manuscript).
+Settings → Manuscript: how many folder levels become headings, whether note names do, what to strip from names (numbers and separators, nothing, or a pattern of your own), whether the notes' own headings nest under the outline, prose only, the comments pane, tag tinting in the editor, and the tag list. See [Settings](/reference/settings#manuscript).
 
 ## Export
 

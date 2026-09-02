@@ -86,6 +86,11 @@ function skippedRanges(markdown: string): [number, number][] {
   return out;
 }
 
+/** The text with every `%% comment %%` removed: what a reader would count. */
+export function stripComments(markdown: string): string {
+  return markdown.replace(/%%[\s\S]*?%%/g, "");
+}
+
 export function colorOf(tag: string | null, tags: readonly TagSpec[]): string | null {
   return tag ? tags.find((t) => t.name === tag)?.color ?? null : null;
 }
