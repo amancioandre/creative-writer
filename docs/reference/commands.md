@@ -18,11 +18,13 @@ All commands appear in the palette under **Creative Writer:**. None has a defaul
 | **Return to manuscript** | Bring focus back to the [manuscript](/guide/manuscript) page at the paragraph the editor cursor is in. |
 | **Export manuscript to a note** | Write the active project's manuscript as one note beside it, `<Name> (manuscript).md`, comments left out. Overwritten on every export. |
 | **Insert comment here** | Drop `%%  %%` at the cursor, cursor inside. A selection becomes a `==highlight==` with the comment after it. |
+| **Open writer** | Open the [writer board](/guide/writer) in a tab: your tagged notes as cards in the groups of a framework, above every story. Also the dashboard ribbon icon, or open `Writer.writer` in the explorer. |
+| **Copy writer schema** | Put the [writer protocol](/reference/writer-file) on the clipboard, for your vault's framework and tag prefix: the tags, the front matter keys, the REF comment and the writer file format. Paste it to a person or a tool that is preparing or migrating your board. |
 | **Read this note for facts (story threads)** | Read the active note's scenes for concrete facts — eye colours, ages, places, who knows what — so scenes can be checked against each other. Local model only. |
 
 ## Ribbon
 
-Four ribbon icons: the fork opens the story map, the chart opens the story timeline, the curve opens the story threads, the book opens the manuscript. Obsidian lets you reorder or hide ribbon items from the ribbon's own menu.
+Five ribbon icons: the dashboard opens the writer, the fork opens the story map, the chart opens the story timeline, the curve opens the story threads, the book opens the manuscript. Obsidian lets you reorder or hide ribbon items from the ribbon's own menu.
 
 ## Status bar
 

@@ -38,6 +38,7 @@ export default defineConfig({
         {
           text: "About the work",
           items: [
+            { text: "Writer", link: "/guide/writer" },
             { text: "Writing desk & goals", link: "/guide/writing-desk" },
             { text: "Projects", link: "/guide/projects" },
             { text: "Structuring a project", link: "/guide/story-projects" },
@@ -69,6 +70,7 @@ export default defineConfig({
             { text: "Settings", link: "/reference/settings" },
             { text: "Front matter", link: "/reference/front-matter" },
             { text: "Files & sync", link: "/reference/data-and-sync" },
+            { text: "Writer protocol", link: "/reference/writer-file" },
             { text: "Harper companion", link: "/reference/harper" },
             { text: "FAQ & troubleshooting", link: "/reference/faq" },
           ],

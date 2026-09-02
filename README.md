@@ -47,6 +47,12 @@ Every prose note of a project stitched into one read-only page in reading order,
 
 `Open manuscript` or the ribbon icon · Settings → Manuscript
 
+### Writer: the level above every story
+
+A board of what you are made of. Tag any note `#writer/theme`, `#writer/archetype`, `#writer/poem`, `#writer/premise`… and it becomes a card inside the groups of a framework: Truby's wish list, premises, inspirations, references and voices by default, a Generic set, or your own. Every group is always drawn, with a hint while it is empty, so the structure teaches what to collect. Drag a card into another group and its tag follows. Layout lives in one `Writer.writer` file; the cards are your notes. Nothing on it is ever exported or sent to a model.
+
+`Open writer` or the ribbon icon · **Copy writer schema** puts the protocol on the clipboard for a tool migrating a board into your vault
+
 ### Writing desk: goals, streaks, readability, scenes
 
 Words added *and cut* today against a daily goal, a streak, this week's total and a 12-week heatmap — revision days count as work. Add `writing-target: 50000` (and `writing-deadline: 2026-10-31`) to any note and its folder becomes a project with words-per-day needed vs. your last-7-day pace and a projected finish date. The desk also shows the note's reading ease, grade level, sentence rhythm and dialogue share, and a clickable scene outline. History lives in a vault note so it syncs between machines.

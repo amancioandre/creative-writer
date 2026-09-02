@@ -48,6 +48,13 @@ import { VaultProjectNotes } from "./infrastructure/obsidian/VaultProjectNotes";
 import { StoryMapNoteRepository } from "./infrastructure/obsidian/StoryMapNoteRepository";
 import { OllamaRelationAnalyser } from "./infrastructure/llm/OllamaRelationAnalyser";
 import { STORY_MAP_VIEW_TYPE, StoryMapView } from "./infrastructure/obsidian/views/StoryMapView";
+import { BuildWriterBoard } from "./application/use-cases/BuildWriterBoard";
+import { VaultWriterNotes } from "./infrastructure/obsidian/VaultWriterNotes";
+import { WriterFileRepository } from "./infrastructure/obsidian/WriterFileRepository";
+import { VaultWriterTags } from "./infrastructure/obsidian/VaultWriterTags";
+import { WRITER_VIEW_TYPE, WriterView, type WriterSource } from "./infrastructure/obsidian/views/WriterView";
+import { WRITER_EXTENSION, renameCard } from "./domain/writer/WriterFile";
+import { writerTag } from "./domain/writer/Tags";
 import { STORY_TIMELINE_VIEW_TYPE, StoryTimelineView } from "./infrastructure/obsidian/views/StoryTimelineView";
 import { STORY_THREADS_VIEW_TYPE, StoryThreadsView } from "./infrastructure/obsidian/views/StoryThreadsView";
 import { StoryThreadsNoteRepository } from "./infrastructure/obsidian/StoryThreadsNoteRepository";
@@ -62,7 +69,28 @@ import { OllamaFactAnalyser } from "./infrastructure/llm/OllamaFactAnalyser";
 import type { EntityKind, SceneRef } from "./domain/story/StoryGraph";
 import { removeRelation, upsertRelation } from "./domain/story/Relations";
 import { setLayout } from "./domain/story/StoryMapFile";
-import { TFile, TFolder, normalizePath } from "obsidian";
+import { FuzzySuggestModal, TFile, TFolder, normalizePath, type App, type CachedMetadata } from "obsidian";
+import { tagsOf } from "./infrastructure/obsidian/VaultWriterNotes";
+import { groupsFromTags } from "./domain/writer/Tags";
+
+/**
+ * A picker over every Markdown note in the vault; resolves with the chosen
+ * path, or null when dismissed. Obsidian closes the modal *before* it
+ * reports the choice, so the answer is settled a tick after closing.
+ */
+class NotePicker extends FuzzySuggestModal<TFile> {
+  private chosen: string | null = null;
+  private settled = false;
+  constructor(app: App, private readonly resolve: (path: string | null) => void) {
+    super(app);
+    this.setPlaceholder("Put a note on the writer board…");
+  }
+  getItems(): TFile[] { return this.app.vault.getMarkdownFiles().sort((a, b) => b.stat.mtime - a.stat.mtime); }
+  getItemText(item: TFile): string { return item.path.replace(/\.md$/, ""); }
+  onChooseItem(item: TFile): void { this.chosen = item.path; this.settle(); }
+  onClose(): void { super.onClose(); window.setTimeout(() => this.settle(), 0); }
+  private settle(): void { if (this.settled) return; this.settled = true; this.resolve(this.chosen); }
+}
 
 /**
  * Composition root. The only file that knows about every layer: it builds
@@ -219,6 +247,59 @@ export default class CreativeZenModePlugin extends Plugin {
     }));
     this.addCommand({ id: "open-story-map", name: "Open story map", callback: () => void this.openStoryMap() });
     this.addRibbonIcon("git-fork", "Open story map", () => void this.openStoryMap());
+
+    // Writer: the board is rebuilt from tagged notes; only layout, colours and named edges persist, in the vault's one `.writer` file.
+    const writerRepo = new WriterFileRepository({ ...notes, paths: () => this.app.vault.getFiles().map((f) => f.path) }, () => this.current.writer.storiesFolder);
+    const buildWriterBoard = new BuildWriterBoard(new VaultWriterNotes(this.app, (path) => this.editorText(path)), writerRepo);
+    const copySchema = async () => {
+      await navigator.clipboard.writeText(await buildWriterBoard.schema());
+      new Notice("creative-writer: the writer protocol is on the clipboard.");
+    };
+    this.addCommand({ id: "copy-writer-schema", name: "Copy writer schema", callback: () => void copySchema() });
+    const asFile = (path: string): TFile | null => { const f = this.app.vault.getAbstractFileByPath(path); return f instanceof TFile ? f : null; };
+    const writerTags = new VaultWriterTags({
+      processFrontMatter: async (path, change) => { const f = asFile(path); if (f) await this.app.fileManager.processFrontMatter(f, change); },
+      process: async (path, change) => { const f = asFile(path); if (f) await this.app.vault.process(f, change); },
+    });
+    /** The metadata cache indexes a note a moment after it is written; the board reads the cache, so wait for it. */
+    const indexed = async (path: string, ok: (cache: CachedMetadata | null) => boolean): Promise<void> => {
+      for (let i = 0; i < 30; i++) {
+        const f = asFile(path);
+        if (f && ok(this.app.metadataCache.getFileCache(f))) return;
+        await new Promise((r) => window.setTimeout(r, 100));
+      }
+    };
+    const writerSource: WriterSource = {
+      build: async () => { const file = await writerRepo.load(); return { board: await buildWriterBoard.boardFor(file), file }; },
+      update: (change) => writerRepo.update(change),
+      filePath: () => writerRepo.path(),
+      openNote: (path) => void this.app.workspace.openLinkText(path, "", false),
+      retag: async (path, from, to) => {
+        const prefix = (await writerRepo.load()).prefix;
+        await writerTags.retag(path, prefix, from, to);
+        await indexed(path, (c) => { const g = groupsFromTags(tagsOf(c), prefix); return (!to || g.includes(to)) && (!from || !g.includes(from)); });
+      },
+      pickNote: () => new Promise((resolve) => new NotePicker(this.app, resolve).open()),
+      createNote: async (title, group) => {
+        const prefix = (await writerRepo.load()).prefix;
+        const folder = this.current.writer.storiesFolder;
+        const base = title.replace(/[\\/:*?"<>|#^[\]]+/g, " ").replace(/\s+/g, " ").trim() || "Untitled";
+        const at = (name: string) => normalizePath(folder ? `${folder}/${name}.md` : `${name}.md`);
+        let path = at(base);
+        for (let i = 2; await notes.exists(path); i++) path = at(`${base} ${i}`);
+        await notes.write(path, `---\ntags: [${writerTag(prefix, group)}]\n---\n`);
+        await indexed(path, (c) => !!c?.frontmatter);
+        return path;
+      },
+      copySchema,
+      settings: () => this.current.writer,
+      updateSettings: (next) => void this.updateSettings({ ...this.current, writer: next }),
+    };
+    this.registerView(WRITER_VIEW_TYPE, (leaf: WorkspaceLeaf) => new WriterView(leaf, writerSource));
+    this.registerExtensions([WRITER_EXTENSION], WRITER_VIEW_TYPE);
+    this.addCommand({ id: "open-writer", name: "Open writer", callback: () => void this.openWriter() });
+    this.addRibbonIcon("layout-dashboard", "Open writer", () => void this.openWriter());
+    this.registerEvent(this.app.vault.on("rename", (file, oldPath) => { if (file instanceof TFile && file.extension === "md") void writerRepo.update((f) => renameCard(f, oldPath, file.path)).then(() => this.refreshWriter()); }));
     this.addRibbonIcon("gantt-chart", "Open story timeline", () => void this.openStoryTimeline(null));
     this.addCommand({
       id: "read-note-for-story-map",
@@ -339,7 +420,7 @@ export default class CreativeZenModePlugin extends Plugin {
     this.addRibbonIcon("book-open", "Open manuscript", () => void this.openManuscript(null));
     this.registerEvent(this.app.workspace.on("editor-change", (_editor, info) => { if (info.file) this.refreshManuscript(); }));
     this.registerEvent(this.app.vault.on("modify", () => this.refreshManuscript()));
-    this.registerEvent(this.app.metadataCache.on("resolved", () => { this.refreshStoryMap(); this.pushProjectScopes(); }));
+    this.registerEvent(this.app.metadataCache.on("resolved", () => { this.refreshStoryMap(); this.refreshWriter(); this.pushProjectScopes(); }));
     this.registerEvent(this.app.vault.on("rename", () => this.refreshStoryMap()));
     this.registerEvent(this.app.vault.on("delete", () => this.refreshStoryMap()));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.refreshDesk()));
@@ -464,6 +545,24 @@ export default class CreativeZenModePlugin extends Plugin {
     await leaf.setViewState({ type: DESK_VIEW_TYPE, active: true });
     await this.app.workspace.revealLeaf(leaf);
     (leaf.view as DeskView).refresh();
+  }
+
+  private async openWriter(): Promise<void> {
+    const existing = this.app.workspace.getLeavesOfType(WRITER_VIEW_TYPE)[0];
+    const leaf = existing ?? this.app.workspace.getLeaf("tab");
+    if (!existing) await leaf.setViewState({ type: WRITER_VIEW_TYPE, active: true });
+    await this.app.workspace.revealLeaf(leaf);
+    await (leaf.view as WriterView).refresh();
+  }
+
+  private writerTimer: number | null = null;
+  /** The board follows the vault: a tag added by hand shows on the next metadata pass. */
+  private refreshWriter(): void {
+    if (this.writerTimer !== null) window.clearTimeout(this.writerTimer);
+    this.writerTimer = window.setTimeout(() => {
+      this.writerTimer = null;
+      for (const leaf of this.app.workspace.getLeavesOfType(WRITER_VIEW_TYPE)) void (leaf.view as WriterView).refresh();
+    }, 400);
   }
 
   private async openStoryMap(): Promise<void> {

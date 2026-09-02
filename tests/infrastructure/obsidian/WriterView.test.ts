@@ -1,0 +1,218 @@
+import { describe, it, expect } from "vitest";
+import { Setting, WorkspaceLeaf } from "obsidian";
+import { WRITER_VIEW_TYPE, WriterView, type WriterSource } from "../../../src/infrastructure/obsidian/views/WriterView";
+import { type WriterNote, buildBoard } from "../../../src/domain/writer/Board";
+import { EMPTY_WRITER_FILE, type WriterFile, placeGroup } from "../../../src/domain/writer/WriterFile";
+import { CARD_H, CARD_W, GROUP_HEAD, GROUP_PAD, layoutBoard } from "../../../src/domain/writer/Layout";
+import { DEFAULT_WRITER, type WriterSettings } from "../../../src/domain/settings/Settings";
+
+const note = (path: string, tags: string[], links: string[] = [], excerpt = ""): WriterNote => ({ path, title: path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/, ""), tags, links, excerpt });
+const baseNotes: WriterNote[] = [
+  note("notes/Courage.md", ["#writer/theme"], ["sources/Invictus.md"], "Courage is what is left."),
+  note("sources/Invictus.md", ["#writer/poem", "#writer/quote"], [], "Out of the night"),
+  note("notes/Wild.md", ["#writer/wildcard"]),
+];
+
+function source(overrides: Partial<WriterSource> = {}, notes: WriterNote[] = baseNotes, initial: WriterFile = EMPTY_WRITER_FILE) {
+  let file = initial;
+  let settings: WriterSettings = DEFAULT_WRITER;
+  let tagged = notes;
+  const calls = { opened: [] as string[], retags: [] as string[], created: [] as string[], schema: 0, picks: [] as (string | null)[] };
+  const src: WriterSource = {
+    build: async () => ({ board: buildBoard(tagged, file), file }),
+    update: async (change) => { file = change(file); return file; },
+    filePath: () => "storytelling/Writer.writer",
+    openNote: (p) => { calls.opened.push(p); },
+    retag: async (path, from, to) => {
+      calls.retags.push(`${path}: ${from ?? "∅"} -> ${to ?? "∅"}`);
+      if (!tagged.some((n) => n.path === path)) tagged = [...tagged, note(path, [])];
+      tagged = tagged.map((n) => n.path !== path ? n : { ...n, tags: [...n.tags.filter((t) => !from || t !== `#writer/${from}`), ...(to ? [`#writer/${to}`] : [])] });
+    },
+    pickNote: async () => { const p = calls.picks.shift() ?? null; return p; },
+    createNote: async (title, group) => { const p = `new/${title}.md`; calls.created.push(`${group}:${title}`); tagged = [...tagged, note(p, [`#writer/${group}`])]; return p; },
+    copySchema: async () => { calls.schema++; },
+    settings: () => settings,
+    updateSettings: (next) => { settings = next; },
+    ...overrides,
+  };
+  return { src, calls, file: () => file, settings: () => settings };
+}
+
+async function open(overrides: Partial<WriterSource> = {}, notes?: WriterNote[], initial?: WriterFile) {
+  Setting.created = [];
+  const s = source(overrides, notes, initial);
+  const v = new WriterView(new WorkspaceLeaf(), s.src);
+  await v.onOpen();
+  return { v, ...s, el: v.contentEl };
+}
+const tick = () => new Promise((r) => setTimeout(r, 0));
+const press = (el: Element, x = 0, y = 0) => el.dispatchEvent(new MouseEvent("pointerdown", { clientX: x, clientY: y, bubbles: true }));
+const move = (el: Element, x: number, y: number) => el.dispatchEvent(new MouseEvent("pointermove", { clientX: x, clientY: y, bubbles: true }));
+const release = (el: Element, x = 0, y = 0) => el.dispatchEvent(new MouseEvent("pointerup", { clientX: x, clientY: y, bubbles: true }));
+const card = (el: HTMLElement, path: string) => el.querySelector<SVGGElement>(`.czm-writer-card[data-path="${path}"]`)!;
+/** The board is fitted into jsdom's 800×600 fallback, so a screen delta is a graph delta times the zoom. */
+const zoom = (v: WriterView) => (v as unknown as { canvas: { view: { k: number } } }).canvas.view.k;
+const flush = (v: WriterView) => (v as unknown as { flushFile: () => Promise<void> }).flushFile();
+const group = (el: HTMLElement, id: string) => el.querySelector<SVGGElement>(`.czm-writer-group[data-id="${id}"]`)!;
+
+describe("WriterView", () => {
+  it("draws every group of the framework, cards once in their first group, hints in empty groups and lines between linked cards", async () => {
+    const { v, el } = await open();
+    expect(v.getViewType()).toBe(WRITER_VIEW_TYPE);
+    expect(v.getState()).toEqual({ file: "storytelling/Writer.writer" });
+    expect(el.querySelectorAll(".czm-writer-group").length).toBe(18);
+    expect(el.querySelectorAll(".czm-writer-card").length).toBe(3);
+    expect(group(el, "theme").querySelector(".czm-writer-group-name")!.textContent).toBe("Themes · 1");
+    expect(group(el, "genre").classList.contains("is-empty")).toBe(true);
+    expect(group(el, "genre").querySelector(".czm-writer-hint-text")!.textContent).toContain("genres");
+    expect(group(el, "unsorted")).not.toBeNull();
+    expect(card(el, "sources/Invictus.md").querySelectorAll(".czm-writer-chip").length).toBe(2);
+    expect(card(el, "sources/Invictus.md").querySelector(".czm-writer-card-title")!.textContent).toBe("Invictus");
+    expect(el.querySelectorAll(".czm-writer-edge").length).toBe(1);
+    expect(el.querySelectorAll(".czm-writer-layer").length).toBe(6);
+  });
+  it("selects a card on click, shows its groups and links in the side card, and opens the note on double click", async () => {
+    const { el, calls } = await open();
+    const c = card(el, "sources/Invictus.md");
+    press(c); release(c);
+    expect(c.classList.contains("is-selected")).toBe(true);
+    const side = el.querySelector(".czm-writer-side")!;
+    expect(side.classList.contains("is-open")).toBe(true);
+    expect(side.querySelector(".czm-map-card-name")!.textContent).toBe("Invictus");
+    expect([...side.querySelectorAll(".czm-writer-chip-label")].map((x) => x.textContent)).toEqual(["Poems", "Quotes"]);
+    expect(side.querySelector(".czm-writer-excerpt")!.textContent).toBe("Out of the night");
+    expect([...side.querySelectorAll(".czm-map-row-name")].map((x) => x.textContent)).toEqual(["Poems", "Quotes", "Courage"]);
+    c.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    expect(calls.opened).toEqual(["sources/Invictus.md"]);
+    press(c); release(c);
+    expect(side.classList.contains("is-open")).toBe(false);
+  });
+  it("moves a card's tag when it is dropped in another group, and only remembers the position when dropped on the background", async () => {
+    const { v, el, calls, file } = await open();
+    const layout = layoutBoard(buildBoard(baseNotes, EMPTY_WRITER_FILE));
+    const from = layout.cards.get("notes/Courage.md")!;
+    const target = layout.groups.find((g) => g.group.def.id === "world")!;
+    const c = card(el, "notes/Courage.md");
+    const k = zoom(v);
+    const dx = (target.rect.x + GROUP_PAD - from.x) * k, dy = (target.rect.y + GROUP_HEAD + GROUP_PAD - from.y) * k;
+    press(c, 0, 0); move(c, dx, dy); release(c, dx, dy);
+    await tick(); await tick();
+    expect(calls.retags).toEqual(["notes/Courage.md: theme -> world"]);
+    // Stored relative to the group it landed in: the first grid slot.
+    expect(file().cards["notes/Courage.md"]).toEqual({ x: GROUP_PAD, y: GROUP_HEAD + GROUP_PAD });
+    expect(group(el, "world").querySelector(".czm-writer-group-name")!.textContent).toBe("Worlds · 1");
+
+    const c2 = card(el, "sources/Invictus.md");
+    press(c2, 0, 0); move(c2, 5000, 5000); release(c2, 5000, 5000);
+    await tick(); await tick();
+    expect(calls.retags).toHaveLength(1);
+    expect(file().cards["sources/Invictus.md"]).toBeTruthy();
+    expect(card(el, "sources/Invictus.md").classList.contains("is-pinned")).toBe(true);
+  });
+  it("rewrites the tag from what it is when the card sits in Unsorted", async () => {
+    const { v, el, calls } = await open();
+    const layout = layoutBoard(buildBoard(baseNotes, EMPTY_WRITER_FILE));
+    const from = layout.cards.get("notes/Wild.md")!;
+    const target = layout.groups.find((g) => g.group.def.id === "theme")!;
+    const c = card(el, "notes/Wild.md");
+    const k = zoom(v);
+    const dx = (target.rect.x + GROUP_PAD + CARD_W - from.x) * k, dy = (target.rect.y + GROUP_HEAD + GROUP_PAD + CARD_H - from.y) * k;
+    press(c, 0, 0); move(c, dx, dy); release(c, dx, dy);
+    await tick(); await tick();
+    expect(calls.retags).toEqual(["notes/Wild.md: wildcard -> theme"]);
+  });
+  it("reorders a dragged group within its row, writing the whole row, and never overlaps; resizing remembers the rectangle", async () => {
+    const { v, el, file } = await open();
+    const g = group(el, "theme");
+    const k = zoom(v);
+    // Drag Themes left past Genres: it becomes the first of the Wish list row.
+    press(g, 0, 0); move(g, -2000 * k, 0); release(g, -2000 * k, 0);
+    await tick(); await tick();
+    expect(Object.keys(file().groups).sort()).toEqual(["archetype", "dialogue", "genre", "plot", "theme", "world"]);
+    expect(file().groups.theme!.x).toBe(0);
+    expect(file().cards["notes/Courage.md"]).toBeUndefined();
+    const row = [...el.querySelectorAll<SVGRectElement>(".czm-writer-group-rect")].slice(0, 6).map((r) => ({ x: Number(r.getAttribute("x")), w: Number(r.getAttribute("width")) })).sort((a, b) => a.x - b.x);
+    for (let i = 1; i < row.length; i++) expect(row[i]!.x).toBeGreaterThanOrEqual(row[i - 1]!.x + row[i - 1]!.w);
+    expect(group(el, "theme").querySelector<SVGRectElement>(".czm-writer-group-rect")!.getAttribute("x")).toBe("0.0");
+    const handle = group(el, "poem").querySelector(".czm-writer-resize")!;
+    press(handle, 0, 0); move(handle, 300, 200); release(handle, 300, 200);
+    await tick(); await tick();
+    expect(file().groups.poem!.w).toBeGreaterThan(400);
+  });
+  it("selects a group on click and lets its colour be changed and reset from the side card", async () => {
+    const { v, el, file } = await open();
+    const g = group(el, "theme");
+    press(g); release(g);
+    const side = el.querySelector(".czm-writer-side")!;
+    expect(side.querySelector(".czm-map-card-name")!.textContent).toBe("Themes");
+    const input = side.querySelector<HTMLInputElement>(".czm-writer-colour")!;
+    input.value = "#123456";
+    input.dispatchEvent(new Event("input"));
+    await flush(v);
+    expect(file().colours.theme).toBe("#123456");
+    expect(group(el, "theme").style.getPropertyValue("--czm-group")).toBe("#123456");
+    (side.querySelector(".czm-act-reset-colour") as HTMLElement).click();
+    await flush(v);
+    expect(file().colours.theme).toBeUndefined();
+  });
+  it("adds an existing note to the chosen group, creates a new note in it, and copies the schema", async () => {
+    const { el, calls } = await open();
+    calls.picks.push("journal/Today.md");
+    const into = el.querySelector<HTMLSelectElement>(".czm-writer-into")!;
+    into.value = "voice";
+    into.dispatchEvent(new Event("change"));
+    (el.querySelector(".czm-writer-add") as HTMLElement).click();
+    await tick(); await tick();
+    expect(calls.retags).toEqual(["journal/Today.md: ∅ -> voice"]);
+    expect(card(el, "journal/Today.md")).not.toBeNull();
+    expect(card(el, "journal/Today.md").classList.contains("is-selected")).toBe(true);
+
+    (el.querySelector(".czm-writer-new") as HTMLElement).click();
+    const title = el.querySelector<HTMLInputElement>(".czm-writer-new-title")!;
+    title.value = "The Narrator";
+    (el.querySelector(".czm-act-create") as HTMLElement).click();
+    await tick(); await tick();
+    expect(calls.created).toEqual(["voice:The Narrator"]);
+    expect(calls.opened).toEqual(["new/The Narrator.md"]);
+    expect(card(el, "new/The Narrator.md")).not.toBeNull();
+
+    (el.querySelector(".czm-writer-schema") as HTMLElement).click();
+    expect(calls.schema).toBe(1);
+  });
+  it("switches framework, keeping cards whose tags the new one knows and sending the rest to Unsorted", async () => {
+    const { el, file } = await open();
+    const fw = el.querySelector<HTMLSelectElement>(".czm-writer-framework")!;
+    fw.value = "generic";
+    fw.dispatchEvent(new Event("change"));
+    await tick(); await tick();
+    expect(file().framework).toBe("generic");
+    expect(el.querySelectorAll(".czm-writer-group").length).toBe(8);
+    expect(group(el, "unsorted").querySelector(".czm-writer-group-name")!.textContent).toBe("Unsorted · 2");
+  });
+  it("dims cards that do not match the search and hides a layer from the panel", async () => {
+    const { el } = await open();
+    const search = el.querySelector<HTMLInputElement>(".czm-map-search")!;
+    search.value = "invic";
+    search.dispatchEvent(new Event("input"));
+    expect(card(el, "notes/Courage.md").classList.contains("is-dim")).toBe(true);
+    expect(card(el, "sources/Invictus.md").classList.contains("is-dim")).toBe(false);
+    const wish = Setting.created.find((s) => s.name === "Wish list")!;
+    wish.toggle!.onChangeCb(false);
+    expect(card(el, "notes/Courage.md")).toBeNull();
+    expect(el.querySelectorAll(".czm-writer-layer").length).toBe(5);
+  });
+  it("shows the empty-board hint when nothing is tagged, and restores a saved view instead of fitting", async () => {
+    const { el } = await open({}, []);
+    expect(el.querySelector(".czm-writer-empty")!.textContent).toContain("#writer/theme");
+    expect(el.querySelectorAll(".czm-writer-card").length).toBe(0);
+    const saved = { ...placeGroup(EMPTY_WRITER_FILE, "theme", { x: 5, y: 5, w: 500, h: 300 }), view: { x: 12, y: 34, k: 0.5 } };
+    const { v } = await open({}, baseNotes, saved);
+    expect((v as unknown as { canvas: { view: unknown } }).canvas.view).toEqual({ x: 12, y: 34, k: 0.5 });
+  });
+  it("folds the panel through the corner button", async () => {
+    const { el, settings } = await open();
+    (el.querySelector(".czm-map-icon") as HTMLElement).click();
+    expect(settings().panelOpen).toBe(false);
+    expect(el.querySelector(".czm-writer-panel")!.classList.contains("is-open")).toBe(false);
+  });
+});

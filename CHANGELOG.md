@@ -2,6 +2,25 @@
 
 Release notes for every version are on the [releases page](https://github.com/amancioandre/creative-writer/releases). This file carries the same text for the versions since it was started.
 
+## Unreleased — The writer
+
+The writer is a fourth level above the sentence, the story and the vault: what the author is made of, and which stories they are carrying. This release ships the board and its protocol. Nothing on the page changes.
+
+### The board
+
+- **Open writer** (command, the dashboard ribbon icon, or opening `Writer.writer`) shows every note tagged `#writer/<group>` as a card inside the groups of a framework, layers stacked down the board: Truby's wish list, premises, inspirations, references and voices by default, or a Generic set, or one written into the writer file. Every group is drawn, with a hint while it is empty. A note in several groups is drawn once, with a chip per group; zoom in and cards show their first lines; lines join cards whose notes link.
+- Pan, zoom, **Fit**; drag cards, move groups with their cards, resize groups from the corner. **Drop a card into another group and its tag follows**, in the front matter or inline, whichever the note uses.
+- The panel: framework, search, a group for new cards, **Add note…** (a picker over the vault), **New note…** (a tagged note in the stories folder), colours per group, layers to hide, the tag prefix. A card's side panel opens the note, removes it from a group, adds it to another, and lists the cards it links to.
+- Layout, colours and the view go to one `Writer.writer` file, found by extension, created in the stories folder on first save. Obsidian Sync carries it with *Sync all other types* on; the docs say so first.
+- The board follows the vault: a tag added by hand appears on the next metadata pass, a renamed note keeps its place.
+
+### The protocol
+
+- **Copy writer schema** puts the [writer protocol](docs/reference/writer-file.md) on the clipboard for your vault's framework and tag prefix: which `#writer/<group>` tags make a note a card, the project-note keys, the `%% REF: [[Card]] %%` comment, and the `Writer.writer` file format. Paste it to a person or a tool migrating a board into the vault; the plugin ships no importer on purpose.
+- Two frameworks, both macro rather than per-story: **Truby** (wish list, premises, inspirations, references, voices) and **Generic**. Your own can be written into the writer file.
+- **Settings → Writer → Stories folder**: where ideas are scaffolded, new cards go and the writer file is created.
+- The domain for the board (frameworks, tags, the writer file, the board, uses) is in place and tested; the view follows in the next phase.
+
 ## 0.7.2 — Review housekeeping
 
 Fixes for the community plugin review of 0.7.1. Nothing changes on the page.
