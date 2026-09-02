@@ -57,6 +57,7 @@ import { AnalyzeSceneFacts } from "./application/use-cases/AnalyzeSceneFacts";
 import { BuildManuscript } from "./application/use-cases/BuildManuscript";
 import { ExportManuscript } from "./application/use-cases/ExportManuscript";
 import { MANUSCRIPT_VIEW_TYPE, ManuscriptView } from "./infrastructure/obsidian/views/ManuscriptView";
+import { castFromGraph, conflictMarks, type SectionFacts } from "./domain/manuscript/StoryFacts";
 import { OllamaFactAnalyser } from "./infrastructure/llm/OllamaFactAnalyser";
 import type { EntityKind, SceneRef } from "./domain/story/StoryGraph";
 import { removeRelation, upsertRelation } from "./domain/story/Relations";
@@ -280,6 +281,23 @@ export default class CreativeZenModePlugin extends Plugin {
       updateSettings: (next) => void this.updateSettings({ ...this.current, manuscript: next }),
       exportNote,
       appendComment: (path, line, comment) => this.appendComment(path, line, comment),
+      // Readability from the same profiler as the desk, today's words from the log, cast and contradictions from the map and threads.
+      facts: async (project, paths, story) => {
+        const texts = new Map((await projectNotes.notes(project)).map((n) => [n.path, n.text ?? ""]));
+        const log = countedLog();
+        const today = log.days[toDay(new Date())];
+        const cast = story ? castFromGraph(await buildStoryMap.execute(project)) : new Map<string, never>();
+        const sections = new Map<string, SectionFacts>();
+        for (const path of paths) {
+          const ease = profile.document(texts.get(path) ?? "").readingEase;
+          const delta = today?.files[path];
+          const c = cast.get(path);
+          sections.set(path, { readability: ease ? { label: ease.band.label, score: ease.score } : null, today: { added: delta?.added ?? 0, removed: delta?.removed ?? 0 }, cast: c?.cast ?? [], scenes: c?.scenes ?? [] });
+        }
+        const conflicts = story ? conflictMarks((await buildThreads.execute(project)).contradictions) : [];
+        return { sections, conflicts };
+      },
+      storyColors: () => this.current.storyMap.colors,
     }));
     this.addCommand({ id: "open-manuscript", name: "Open manuscript", callback: () => void this.openManuscript(null) });
     this.addCommand({

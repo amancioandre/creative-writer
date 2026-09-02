@@ -44,6 +44,8 @@ Settings → Community plugins → Creative Writer. Everything here is stored in
 | Comments | on | The pane beside the page: the active paragraph's `%% comments %%` with a box to add one, and every comment in reading order. Dots on marked paragraphs and the hover box show either way. Also toggled at the top of the page. |
 | Tint tags in the editor | on | Colour the tag word that opens a comment (`%% TODO: … %%`) in the editor. |
 | Tags | `TODO`, `FIX`, `CHECK`, `IDEA`, `CUT` | One per line, an uppercase word and a hex colour. See [Comments and tags](/guide/manuscript#comments-and-tags). |
+| Ruler | on | The strip at the top of the page: a segment per section, wide by words, coloured by readability, marked when changed today. |
+| Story on the page | off | Cast lines and scene cast in the map's colours, and the model's contradictions in the gutter. Builds the story map on each refresh. |
 
 ## Style checks
 

@@ -415,6 +415,33 @@ body.czm-zen .workspace-split.mod-root {
 .czm-ms-pop[hidden] { display: none; }
 .czm-ms-pop .czm-ms-cm-row { padding: 2px 6px; }
 
+/* The ruler: the shape of the book. Segments wide by words, coloured easy → dense, underlined when touched today. */
+.czm-ms-ruler { display: flex; gap: 2px; padding: 6px 10px 5px; border-bottom: 1px solid var(--background-modifier-border); }
+.czm-ms-ruler[hidden] { display: none; }
+.czm-ms-ruler-seg { position: relative; flex: 1 1 0; min-width: 6px; height: 9px; padding: 0; border: 0; border-radius: 2px; background: var(--czm-ease, var(--background-modifier-border)); cursor: pointer; opacity: 0.75; box-shadow: none; }
+.czm-ms-ruler-seg:hover { opacity: 1; }
+.czm-ms-ruler-seg:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; opacity: 1; }
+.czm-ms-ruler-seg.is-today::after { content: ""; position: absolute; left: 0; right: 0; bottom: -4px; height: 2px; background: var(--interactive-accent); border-radius: 1px; }
+.czm-ms-ruler-dot { position: absolute; top: -3px; right: -1px; width: 5px; height: 5px; border-radius: 50%; background: var(--text-muted); }
+.czm-ease-1 { --czm-ease: var(--color-cyan); }
+.czm-ease-2 { --czm-ease: var(--color-green); }
+.czm-ease-3 { --czm-ease: color-mix(in srgb, var(--color-green) 60%, var(--color-yellow)); }
+.czm-ease-4 { --czm-ease: var(--color-yellow); }
+.czm-ease-5 { --czm-ease: var(--color-orange); }
+.czm-ease-6 { --czm-ease: var(--color-red); }
+.czm-ease-7 { --czm-ease: var(--color-purple); }
+
+/* The story on the page: cast lines in the map's colours, contradictions as red diamonds in the gutter. */
+.czm-ms-cast { font-size: var(--font-ui-smaller); color: var(--text-muted); margin: -0.3em 0 0.9em; line-height: 1.6; }
+.czm-ms-title + .czm-ms-cast { margin-top: -0.6em; }
+.czm-ms-side .czm-ms-cast { margin: 8px 0 0; }
+.czm-ms-cast-label { color: var(--text-faint); }
+.czm-ms-cast-name { color: var(--czm-kind, var(--text-muted)); }
+.czm-ms-cast-name.is-link { cursor: pointer; }
+.czm-ms-cast-name.is-link:hover { text-decoration: underline; }
+.czm-ms-mark.is-conflict { border-radius: 1px; background: var(--color-red); transform: rotate(45deg) scale(0.85); }
+.czm-ms-cm-badge.is-conflict { background: color-mix(in srgb, var(--color-red) 20%, transparent); color: color-mix(in srgb, var(--color-red) 70%, var(--text-normal)); }
+
 /* The comments pane: this paragraph and its composer, then every comment. A drawer under the page when narrow. */
 .czm-ms-side { flex: 0 0 300px; max-width: 40%; border-left: 1px solid var(--background-modifier-border); overflow: auto; font-size: var(--font-ui-smaller); display: flex; flex-direction: column; }
 .czm-ms-side[hidden] { display: none; }

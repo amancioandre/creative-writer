@@ -5,12 +5,14 @@ import { buildManuscript, type ManuscriptNote } from "../../../src/domain/manusc
 import { DEFAULT_MANUSCRIPT, type ManuscriptSettings } from "../../../src/domain/settings/Settings";
 import { IntlSentenceSegmenter } from "../../../src/infrastructure/segmentation/IntlSentenceSegmenter";
 import type { ProjectSpec } from "../../../src/domain/progress/Project";
+import { EMPTY_FACTS, type StoryFacts } from "../../../src/domain/manuscript/StoryFacts";
+import { DEFAULT_STORY_COLORS } from "../../../src/domain/settings/Settings";
 
 const novel: ProjectSpec = { name: "Novel", scope: "Novel/", targetWords: 1, deadline: null, dailyWords: 0, notePath: "Novel/Novel.md", ignoredNames: [] };
 const seg = new IntlSentenceSegmenter();
 
 function open(notes: ManuscriptNote[], overrides: Partial<ManuscriptSource> = {}) {
-  const calls = { revealed: [] as [string, number, number, boolean][], links: [] as string[], renders: 0, exported: [] as string[], comments: [] as [string, number, string][] };
+  const calls = { revealed: [] as [string, number, number, boolean][], links: [] as string[], renders: 0, exported: [] as string[], comments: [] as [string, number, string][], facts: [] as [string[], boolean][] };
   let settings: ManuscriptSettings = DEFAULT_MANUSCRIPT;
   const src: ManuscriptSource = {
     projects: () => [novel],
@@ -24,6 +26,8 @@ function open(notes: ManuscriptNote[], overrides: Partial<ManuscriptSource> = {}
     updateSettings: (next) => { settings = next; },
     exportNote: async (p) => { calls.exported.push(p.name); return "Novel/Novel (manuscript).md"; },
     appendComment: async (p, l, c) => { calls.comments.push([p, l, c]); },
+    facts: async (_p, paths, story) => { calls.facts.push([[...paths], story]); return EMPTY_FACTS; },
+    storyColors: () => DEFAULT_STORY_COLORS,
     ...overrides,
   };
   const v = new ManuscriptView(new WorkspaceLeaf(), src);
@@ -62,7 +66,7 @@ describe("ManuscriptView", () => {
     expect([...one.querySelectorAll(".czm-ms-block")].map((b) => b.getAttribute("data-line"))).toEqual(["0", "1", "3", "4"]);
     expect(one.querySelector(".czm-ms-heading p")?.textContent).toBe("Chapter One");
     expect(el.querySelectorAll(".czm-ms-note")[1]!.querySelector(".czm-ms-title")?.textContent).toBe("Chapter Two1 words");
-    expect([...el.querySelectorAll(".czm-ms-tool")].map((b) => b.getAttribute("aria-pressed"))).toEqual(["false", "true", null]);
+    expect([...el.querySelectorAll(".czm-ms-tool")].map((b) => b.getAttribute("aria-pressed"))).toEqual(["false", "true", "true", "false", null]);
   });
 
   it("selects on click without taking the editor's focus, and edits on double click at the sentence", async () => {
@@ -235,6 +239,60 @@ describe("ManuscriptView", () => {
     expect(pop.hidden).toBe(false);
     marked!.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
     expect(pop.hidden).toBe(true);
+  });
+
+  it("draws the ruler from the sections and goes there on click", async () => {
+    const facts: StoryFacts = { sections: new Map([["Novel/Part One/01 Chapter One.md", { readability: { label: "Easy", score: 82 }, today: { added: 40, removed: 3 }, cast: [], scenes: [] }]]), conflicts: [] };
+    const { v, calls } = open(notes(), { facts: async () => facts });
+    await v.onOpen();
+    const segs = v.contentEl.querySelectorAll<HTMLElement>(".czm-ms-ruler-seg");
+    expect(segs).toHaveLength(2);
+    expect(segs[0]!.classList.contains("czm-ease-2")).toBe(true);
+    expect(segs[0]!.classList.contains("is-today")).toBe(true);
+    expect(segs[0]!.title).toBe("Chapter One · 13 words · Easy · today +40 −3");
+    expect(segs[1]!.title).toBe("Chapter Two · 1 words");
+    expect(Number(segs[0]!.style.flexGrow)).toBeGreaterThan(Number(segs[1]!.style.flexGrow));
+    click(segs[1]!);
+    expect(calls.revealed.at(-1)).toEqual(["Novel/Part One/02 Chapter Two.md", 0, 0, false]);
+    key(segs[0]!, "ArrowRight");
+    expect(document.activeElement).toBe(segs[1]);
+    click(v.contentEl.querySelectorAll<HTMLElement>(".czm-ms-tool")[2]!);
+    await tick();
+    expect(v.contentEl.querySelector<HTMLElement>(".czm-ms-ruler")!.hidden).toBe(true);
+  });
+
+  it("lays the story over the page when asked: cast lines, scene cast in the pane, contradictions in the gutter", async () => {
+    const marta = { name: "Marta", kind: "character" as const, path: "Novel/Characters/Marta.md", mentions: 3 };
+    const lisbon = { name: "Lisbon", kind: "location" as const, path: null, mentions: 1 };
+    const facts: StoryFacts = {
+      sections: new Map([["Novel/Part One/01 Chapter One.md", { readability: null, today: { added: 0, removed: 0 }, cast: [marta, lisbon], scenes: [{ line: 0, title: "Chapter One", cast: [marta] }, { line: 3, title: "Creek", cast: [lisbon] }] }]]),
+      conflicts: [{ path: "Novel/Part One/01 Chapter One.md", line: 3, text: "Ilse · age: nine vs twelve", otherPath: "Novel/Part One/02 Chapter Two.md", otherLine: 0 }],
+    };
+    let asked: [string[], boolean] | null = null;
+    const { v, calls } = open(notes(), { facts: async (_p, paths, story) => { asked = [[...paths], story]; return facts; } });
+    await v.onOpen();
+    expect(asked).toEqual([["Novel/Part One/01 Chapter One.md", "Novel/Part One/02 Chapter Two.md"], false]);
+    expect(v.contentEl.querySelector(".czm-ms-cast")).toBeNull();
+    click(v.contentEl.querySelectorAll<HTMLElement>(".czm-ms-tool")[3]!);
+    await tick();
+    expect(asked![1]).toBe(true);
+    const cast = v.contentEl.querySelector<HTMLElement>(".czm-ms-note .czm-ms-cast")!;
+    expect([...cast.querySelectorAll(".czm-ms-cast-name")].map((n) => n.textContent)).toEqual(["Marta", "Lisbon"]);
+    expect(cast.querySelector<HTMLElement>(".czm-ms-cast-name")!.style.getPropertyValue("--czm-kind")).toBe(DEFAULT_STORY_COLORS.character);
+    click(cast.querySelector<HTMLElement>(".czm-ms-cast-name.is-link")!);
+    expect(calls.links).toEqual(["Novel/Characters/Marta.md"]);
+    const blocks = v.contentEl.querySelectorAll<HTMLElement>(".czm-ms-block");
+    expect(blocks[2]!.querySelector(".czm-ms-mark.is-conflict")?.getAttribute("title")).toBe("Ilse · age: nine vs twelve");
+    click(blocks[3]!);
+    const para = v.contentEl.querySelector<HTMLElement>(".czm-ms-side-para")!;
+    expect([...para.querySelectorAll(".czm-ms-cast-name")].map((n) => n.textContent)).toEqual(["Lisbon"]);
+    click(blocks[2]!);
+    const clash = v.contentEl.querySelector<HTMLElement>(".czm-ms-side-para .czm-ms-cm-badge.is-conflict")!;
+    expect(clash.textContent).toBe("clash");
+    click(clash.parentElement!);
+    expect(calls.revealed.at(-1)).toEqual(["Novel/Part One/02 Chapter Two.md", 0, 0, true]);
+    blocks[2]!.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+    expect(v.contentEl.querySelector<HTMLElement>(".czm-ms-pop")!.hidden).toBe(false);
   });
 
   it("exports from the toolbar", async () => {

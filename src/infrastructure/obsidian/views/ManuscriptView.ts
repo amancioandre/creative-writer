@@ -6,6 +6,8 @@ import { colorOf, splitTag, type Annotation, type TagSpec } from "../../../domai
 import { stripInlineMarkup } from "../../../domain/text/ProseParagraphs";
 import type { Sentence } from "../../../domain/rhythm/Sentence";
 import type { ManuscriptSettings } from "../../../domain/settings/Settings";
+import { EMPTY_FACTS, NO_SECTION, easeLevel, type CastMember, type ConflictMark, type StoryFacts } from "../../../domain/manuscript/StoryFacts";
+import type { EntityKind } from "../../../domain/story/StoryGraph";
 
 export const MANUSCRIPT_VIEW_TYPE = "creative-writer-manuscript";
 
@@ -28,6 +30,9 @@ export interface ManuscriptSource {
   exportNote(project: ProjectSpec): Promise<string>;
   /** Appends ` %% comment %%` to the end of a line of the note, through its open editor when there is one. */
   appendComment(path: string, line: number, comment: string): Promise<void>;
+  /** Readability, today's words, and — with `story` — cast and contradictions for these notes. */
+  facts(project: ProjectSpec, paths: readonly string[], story: boolean): Promise<StoryFacts>;
+  storyColors(): Readonly<Record<EntityKind, string>>;
 }
 
 interface Rendered { readonly el: HTMLElement; readonly key: string }
@@ -60,7 +65,9 @@ export class ManuscriptView extends ItemView {
   /** A refresh arrived while the leaf was hidden; render when it shows again. */
   private dirty = false;
   private head: HTMLElement | null = null;
+  private ruler: HTMLElement | null = null;
   private body: HTMLElement | null = null;
+  private facts: StoryFacts = EMPTY_FACTS;
   private page: HTMLElement | null = null;
   private side: HTMLElement | null = null;
   private pop: HTMLElement | null = null;
@@ -86,6 +93,8 @@ export class ManuscriptView extends ItemView {
       this.contentEl.empty();
       const root = this.contentEl.createDiv({ cls: "czm-ms" });
       this.head = root.createDiv({ cls: "czm-ms-head" });
+      this.ruler = root.createDiv({ cls: "czm-ms-ruler", attr: { role: "navigation", "aria-label": "Sections" } });
+      this.ruler.addEventListener("keydown", (ev) => this.onRulerKey(ev));
       const main = root.createDiv({ cls: "czm-ms-main" });
       this.body = main.createDiv({ cls: "czm-ms-body" });
       this.page = this.body.createDiv({ cls: "czm-ms-page markdown-rendered", attr: { role: "region", "aria-label": "Manuscript" } });
@@ -113,11 +122,17 @@ export class ManuscriptView extends ItemView {
     if (this.project?.scope !== project?.scope) { this.rendered.clear(); this.active = null; }
     this.project = project;
     this.dirty = false;
-    if (!project) { this.manuscript = EMPTY_MANUSCRIPT; this.renderHead(); this.renderSide(); this.page?.empty(); return; }
+    if (!project) { this.manuscript = EMPTY_MANUSCRIPT; this.facts = EMPTY_FACTS; this.renderHead(); this.renderRuler(); this.renderSide(); this.page?.empty(); return; }
     const manuscript = await this.source.build(project);
     if (generation !== this.generation) return;
+    const s = this.source.settings();
+    const paths = manuscript.items.filter((i): i is NoteItem => i.kind === "note").map((i) => i.path);
+    const facts = s.showRuler || s.showStory ? await this.source.facts(project, paths, s.showStory) : EMPTY_FACTS;
+    if (generation !== this.generation) return;
     this.manuscript = manuscript;
+    this.facts = facts;
     this.renderHead();
+    this.renderRuler();
     await this.renderPage(generation);
     this.renderSide();
   }
@@ -197,6 +212,8 @@ export class ManuscriptView extends ItemView {
     };
     toggle("text", "Prose only: paragraphs, headings, quotes and scene breaks — no lists, tables, code or callouts", settings.proseOnly, (v) => ({ ...this.source.settings(), proseOnly: v }));
     toggle("message-square", "Comments pane: this paragraph's comments and a field to add one; every comment below", settings.showComments, (v) => ({ ...this.source.settings(), showComments: v }));
+    toggle("ruler", "Ruler: one segment per section, wide by words, coloured by readability, marked when it changed today", settings.showRuler, (v) => ({ ...this.source.settings(), showRuler: v }));
+    toggle("users", "Story: who is in each section and scene, and the model's contradictions in the gutter", settings.showStory, (v) => ({ ...this.source.settings(), showStory: v }));
     const project = this.project;
     const exportBtn = tools.createEl("button", { cls: "clickable-icon czm-ms-tool czm-ms-export", attr: { "aria-label": "Export as one note beside the project (comments left out)", title: "Export as one note beside the project (comments left out)" } });
     setIcon(exportBtn, "file-output");
@@ -207,6 +224,105 @@ export class ManuscriptView extends ItemView {
         window.setTimeout(() => setIcon(exportBtn, "file-output"), 1200);
       }).finally(() => { exportBtn.disabled = false; });
     });
+  }
+
+  // --- ruler --------------------------------------------------------------------------------------------------
+
+  /** The shape of the book: a segment per section, wide by words, coloured by how it reads, marked when it changed today. */
+  private renderRuler(): void {
+    const ruler = this.ruler;
+    if (!ruler) return;
+    ruler.empty();
+    const notes = this.manuscript.items.filter((i): i is NoteItem => i.kind === "note");
+    if (!this.project || !this.source.settings().showRuler || notes.length === 0) { ruler.hidden = true; return; }
+    ruler.hidden = false;
+    notes.forEach((n, i) => {
+      const f = this.facts.sections.get(n.path) ?? NO_SECTION;
+      const today = f.today.added || f.today.removed ? ` · today +${f.today.added.toLocaleString()} −${f.today.removed.toLocaleString()}` : "";
+      const comments = n.annotations.length ? ` · ${n.annotations.length} comment${n.annotations.length === 1 ? "" : "s"}` : "";
+      const label = `${n.title} · ${n.words.toLocaleString()} words${f.readability ? ` · ${f.readability.label}` : ""}${today}${comments}`;
+      const seg = ruler.createEl("button", { cls: `czm-ms-ruler-seg${today ? " is-today" : ""}`, attr: { title: label, "aria-label": label, tabindex: i === 0 ? "0" : "-1" } });
+      seg.style.flexGrow = String(Math.max(1, n.words));
+      const level = easeLevel(f.readability?.label);
+      if (level) seg.classList.add(`czm-ease-${level}`);
+      if (n.annotations.length) seg.createSpan({ cls: "czm-ms-ruler-dot" });
+      seg.addEventListener("click", () => this.selectNote(n.path));
+    });
+  }
+
+  private onRulerKey(ev: KeyboardEvent): void {
+    const segs = [...(this.ruler?.querySelectorAll<HTMLElement>(".czm-ms-ruler-seg") ?? [])];
+    const at = segs.indexOf(ev.target as HTMLElement);
+    if (at < 0) return;
+    const go = (n: number) => { const next = segs[Math.max(0, Math.min(segs.length - 1, n))]; if (!next) return; for (const s of segs) s.tabIndex = -1; next.tabIndex = 0; next.focus(); };
+    if (ev.key === "ArrowRight") { ev.preventDefault(); go(at + 1); }
+    else if (ev.key === "ArrowLeft") { ev.preventDefault(); go(at - 1); }
+    else if (ev.key === "Home") { ev.preventDefault(); go(0); }
+    else if (ev.key === "End") { ev.preventDefault(); go(segs.length - 1); }
+  }
+
+  /** Select a section's first paragraph, from the ruler. */
+  private selectNote(path: string): void {
+    const first = this.page?.querySelector<HTMLElement>(`.czm-ms-note[data-path="${cssEscape(path)}"] .czm-ms-block`);
+    if (first) this.select(first, true);
+  }
+
+  // --- story on the page --------------------------------------------------------------------------------------
+
+  /** Cast lines under the titles and contradiction marks in the gutter: laid over the cached note elements on every render. */
+  private decorate(settings: ManuscriptSettings): void {
+    const page = this.page;
+    if (!page) return;
+    for (const old of page.querySelectorAll(".czm-ms-cast, .czm-ms-mark.is-conflict")) old.remove();
+    if (!settings.showStory) return;
+    for (const noteEl of page.querySelectorAll<HTMLElement>(".czm-ms-note")) {
+      const f = this.facts.sections.get(noteEl.dataset.path ?? "");
+      if (!f || f.cast.length === 0) continue;
+      const line = this.castLine(f.cast, noteEl.dataset.path ?? "", "");
+      const title = noteEl.querySelector(".czm-ms-title");
+      if (title) title.after(line); else noteEl.prepend(line);
+    }
+    for (const c of this.facts.conflicts) {
+      const el = this.blockAt(c.path, c.line);
+      if (!el) continue;
+      const marks = el.querySelector<HTMLElement>(".czm-ms-marks") ?? el.createSpan({ cls: "czm-ms-marks" });
+      marks.createSpan({ cls: "czm-ms-mark is-conflict", attr: { title: c.text, "aria-label": c.text } });
+    }
+  }
+
+  private castLine(cast: readonly CastMember[], sourcePath: string, label: string): HTMLElement {
+    const colors = this.source.storyColors();
+    const line = createDiv({ cls: "czm-ms-cast" });
+    if (label) line.createSpan({ text: label, cls: "czm-ms-cast-label" });
+    cast.forEach((m, i) => {
+      if (i) line.appendChild(document.createTextNode(" · "));
+      const name = line.createSpan({ text: m.name, cls: `czm-ms-cast-name${m.path ? " is-link" : ""}`, attr: { title: `${m.name} — ${m.kind}, ${m.mentions} mention${m.mentions === 1 ? "" : "s"}` } });
+      name.style.setProperty("--czm-kind", colors[m.kind]);
+      if (m.path) name.addEventListener("click", (ev) => { ev.stopPropagation(); this.source.openLink(m.path!, sourcePath); });
+    });
+    return line;
+  }
+
+  /** The block of a note that holds a line. */
+  private blockAt(path: string, line: number): HTMLElement | null {
+    for (const el of this.page?.querySelectorAll<HTMLElement>(`.czm-ms-note[data-path="${cssEscape(path)}"] .czm-ms-block`) ?? []) {
+      const ref = this.refs.get(el);
+      if (ref?.block && line >= ref.block.from && line <= ref.block.to) return el;
+    }
+    return null;
+  }
+
+  private conflictsFor(path: string, block: ManuscriptBlock): ConflictMark[] {
+    return this.facts.conflicts.filter((c) => c.path === path && c.line >= block.from && c.line <= block.to);
+  }
+
+  private renderConflicts(parent: HTMLElement, conflicts: readonly ConflictMark[]): void {
+    for (const c of conflicts) {
+      const row = parent.createDiv({ cls: "czm-ms-cm-row", attr: { role: "button", tabindex: "-1", title: "Open the other scene" } });
+      row.createSpan({ text: "clash", cls: "czm-ms-cm-badge is-conflict" });
+      row.createSpan({ text: c.text, cls: "czm-ms-cm-text" });
+      row.addEventListener("click", () => this.source.reveal(c.otherPath, c.otherLine, 0, true));
+    }
   }
 
   // --- pane ---------------------------------------------------------------------------------------------------
@@ -233,8 +349,18 @@ export class ManuscriptView extends ItemView {
       const { item, block } = hit;
       const excerpt = block.kind === "heading" ? block.headingText : block.markdown.split("\n").map((l) => stripInlineMarkup(l)).join(" ").replace(/\s+/g, " ").trim();
       pane.createEl("p", { text: excerpt.length > 90 ? `${excerpt.slice(0, 90)}…` : excerpt, cls: "czm-ms-side-excerpt" });
-      if (block.annotations.length === 0) pane.createEl("p", { text: "No comments yet.", cls: "czm-ms-hint" });
-      else this.renderRows(pane.createDiv({ cls: "czm-ms-cm-rows" }), block.annotations.map((a) => ({ item, a })), settings.tags, false);
+      const conflicts = this.conflictsFor(item.path, block);
+      if (block.annotations.length === 0 && conflicts.length === 0) pane.createEl("p", { text: "No comments yet.", cls: "czm-ms-hint" });
+      else {
+        const rows = pane.createDiv({ cls: "czm-ms-cm-rows" });
+        this.renderRows(rows, block.annotations.map((a) => ({ item, a })), settings.tags, false);
+        this.renderConflicts(rows, conflicts);
+      }
+      if (settings.showStory) {
+        const scenes = this.facts.sections.get(item.path)?.scenes ?? [];
+        const scene = scenes.filter((s) => s.line <= block.from).pop();
+        if (scene && scene.cast.length) pane.appendChild(this.castLine(scene.cast, item.path, "In this scene: "));
+      }
     }
 
     // The composer: one field. `TODO: the lamp` and Enter. The tag is read from the prefix, shown as a chip while typing.
@@ -351,6 +477,7 @@ export class ManuscriptView extends ItemView {
     }
     for (const path of [...this.rendered.keys()]) if (!keep.has(path)) this.rendered.delete(path);
     page.replaceChildren(...order);
+    this.decorate(settings);
     this.markActive();
   }
 
@@ -478,7 +605,7 @@ export class ManuscriptView extends ItemView {
     const el = (ev.target as HTMLElement).closest<HTMLElement>(".czm-ms-block");
     if (this.hoverTimer !== null) { window.clearTimeout(this.hoverTimer); this.hoverTimer = null; }
     const ref = el ? this.refs.get(el) : undefined;
-    if (!el || !ref?.block || ref.block.annotations.length === 0) { this.hidePop(); return; }
+    if (!el || !ref?.block || (ref.block.annotations.length === 0 && this.conflictsFor(ref.path, ref.block).length === 0)) { this.hidePop(); return; }
     if (this.pop?.dataset.for === keyOf(ref) && !this.pop.hidden) return;
     // Intent, not passage: crossing three paragraphs on the way somewhere should not flash three boxes.
     this.hoverTimer = window.setTimeout(() => { this.hoverTimer = null; this.showPopFor(el); }, HOVER_DELAY_MS);
@@ -487,11 +614,13 @@ export class ManuscriptView extends ItemView {
   private showPopFor(el: HTMLElement | null): void {
     const ref = el ? this.refs.get(el) : undefined;
     const pop = this.pop, body = this.body, page = this.page;
-    if (!el || !ref?.block || ref.block.annotations.length === 0 || !pop || !body || !page) { this.hidePop(); return; }
+    const conflicts = el && ref?.block ? this.conflictsFor(ref.path, ref.block) : [];
+    if (!el || !ref?.block || (ref.block.annotations.length === 0 && conflicts.length === 0) || !pop || !body || !page) { this.hidePop(); return; }
     pop.empty();
     pop.dataset.for = keyOf(ref);
     const item = { title: ref.title, path: ref.path };
     this.renderRows(pop, ref.block.annotations.map((a) => ({ item, a })), this.source.settings().tags, false);
+    this.renderConflicts(pop, conflicts);
     for (const r of pop.querySelectorAll<HTMLElement>(".czm-ms-cm-row")) r.tabIndex = -1;
     pop.hidden = false;
     // Beside the page in the margin when there is room, else under the paragraph; never past the bottom.

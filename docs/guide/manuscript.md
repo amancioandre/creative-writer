@@ -56,6 +56,13 @@ When the view is narrow the pane sits under the page instead of beside it.
 
 Settings → Manuscript: how many folder levels become headings, whether note names do, what to strip from names (numbers and separators, nothing, or a pattern of your own), whether the notes' own headings nest under the outline, prose only, the comments pane, tag tinting in the editor, and the tag list. See [Settings](/reference/settings#manuscript).
 
+## The rest of the plugin on the page
+
+The page is the one place with the whole book in view, so the other views lend it what they know.
+
+- **The ruler** under the toolbar (the ruler toggle) is the shape of the book: one segment per section, wide by its word count, coloured from easy to dense by the same reading-ease bands as the [writing desk](/guide/writing-desk), underlined in the accent colour when the section changed today, a dot when it has comments. Hover a segment for the numbers, click it to go there; Left and Right walk it.
+- **Story** (the people toggle) lays the [story map](/guide/story-map) over the page: a cast line under each section title, everyone in it in the map's colours, most mentioned first; *In this scene* in the pane for the selected paragraph; a click on a name opens its note. Where the [threads](/guide/story-threads) view found two scenes disagreeing on a fact, a red diamond sits in the gutter of both, the hover box and the pane say what clashes, and a click on the row opens the other scene. This toggle builds the map on every refresh, so it is off by default.
+
 ## Export
 
 **Export** at the top of the page, or the command **Export manuscript to a note**, writes the page as one note beside the project: `My Novel (manuscript).md`, the outline as headings, the text as it is, comments left out, highlights kept. It is a snapshot for Pandoc, a reader or a printer: export again to refresh it, delete it whenever. Its front matter carries `creative-writer-manuscript: 1`, so the plugin never reads it back as a chapter, counts its words, or shows it on the page.

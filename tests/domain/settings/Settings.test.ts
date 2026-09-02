@@ -98,7 +98,8 @@ describe("normalizeSettings — story map", () => {
 describe("manuscript settings", () => {
   it("defaults to two folder levels, titles on, the numeric prefix pattern, demotion on and everything shown", () => {
     const m = normalizeSettings(undefined).manuscript;
-    expect(m).toMatchObject({ folderDepth: 2, noteTitles: true, stripPrefix: "^\\d+[\\s._)-]*", demoteHeadings: true, proseOnly: false, showComments: true, tintTags: true });
+    expect(m).toMatchObject({ folderDepth: 2, noteTitles: true, stripPrefix: "^\\d+[\\s._)-]*", demoteHeadings: true, proseOnly: false, showComments: true, tintTags: true, showRuler: true, showStory: false });
+    expect(normalizeSettings({ manuscript: { showStory: true, showRuler: "no" } }).manuscript).toMatchObject({ showStory: true, showRuler: true });
     expect(m.tags.map((t) => t.name)).toEqual(["TODO", "FIX", "CHECK", "IDEA", "CUT"]);
   });
   it("clamps the depth, keeps any pattern string and falls back on wrong types", () => {

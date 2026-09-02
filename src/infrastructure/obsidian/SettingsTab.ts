@@ -93,6 +93,8 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
           { name: "Comments pane", desc: "A pane beside the manuscript page: the active paragraph's %% comments %% with a box to add one, and every comment in reading order. Also toggled at the top of the view.", control: { type: "toggle", key: "manuscript.showComments" } },
           { name: "Tint tags in the editor", desc: "Colour the tag word that opens a comment, %% TODO: … %%, in the editor. Only inside comments; a TODO in dialogue is left alone.", control: { type: "toggle", key: "manuscript.tintTags" } },
           { name: "Tags", desc: "One per line: an uppercase word and a hex colour, e.g. CHECK #4a8fe2. A comment that opens with the word and a colon takes the colour, on the page and in the editor.", control: { type: "text", key: "manuscript.tagsText", placeholder: "TODO #d9a621" } },
+          { name: "Ruler", desc: "A strip at the top of the manuscript page: one segment per section, wide by words, coloured by readability, marked when it changed today. Click a segment to go there.", control: { type: "toggle", key: "manuscript.showRuler" } },
+          { name: "Story on the page", desc: "Who is in each section and scene, in the story map's colours, and the model's contradictions as red marks in the gutter. Builds the story map each refresh, so it is off by default.", control: { type: "toggle", key: "manuscript.showStory" } },
         ],
       },
       {
@@ -218,6 +220,10 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
       .addToggle((t) => t.setValue(s.manuscript.tintTags).onChange((v) => ms({ tintTags: v })));
     new Setting(containerEl).setName("Tags").setDesc("One per line: an uppercase word and a hex colour, e.g. CHECK #4a8fe2.")
       .addText((t) => t.setPlaceholder("TODO #d9a621").setValue(tagsToText(s.manuscript.tags)).onChange((v) => ms({ tags: textToTags(v) })));
+    new Setting(containerEl).setName("Ruler").setDesc("A strip at the top of the manuscript page: one segment per section, wide by words, coloured by readability.")
+      .addToggle((t) => t.setValue(s.manuscript.showRuler).onChange((v) => ms({ showRuler: v })));
+    new Setting(containerEl).setName("Story on the page").setDesc("Who is in each section and scene, and the model's contradictions in the gutter. Builds the story map each refresh.")
+      .addToggle((t) => t.setValue(s.manuscript.showStory).onChange((v) => ms({ showStory: v })));
 
     new Setting(containerEl).setName("Style checks").setHeading();
     new Setting(containerEl).setName("Style checks").setDesc("Highlight clichés, passive voice, filter verbs, adverbs, repetition and more in the current paragraph. Hover a highlight for the note.")

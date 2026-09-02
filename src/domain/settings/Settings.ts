@@ -136,16 +136,20 @@ export interface ManuscriptSettings extends ManuscriptOptions {
   readonly showComments: boolean;
   readonly tintTags: boolean;
   readonly tags: readonly TagSpec[];
+  /** The strip at the top: one segment per section, width by words, coloured by readability. */
+  readonly showRuler: boolean;
+  /** The story on the page: who is in each section and scene, and the model's contradictions in the gutter. Costs a map build. */
+  readonly showStory: boolean;
 }
 
 export const DEFAULT_MANUSCRIPT: ManuscriptSettings = {
   folderDepth: 2, noteTitles: true, stripPrefix: DEFAULT_STRIP_PREFIX, demoteHeadings: true, proseOnly: false,
-  showComments: true, tintTags: true, tags: DEFAULT_TAGS,
+  showComments: true, tintTags: true, tags: DEFAULT_TAGS, showRuler: true, showStory: false,
 };
 
 export function normalizeManuscript(raw: unknown): ManuscriptSettings {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  const bool = (key: "noteTitles" | "demoteHeadings" | "proseOnly" | "showComments" | "tintTags") => (typeof r[key] === "boolean" ? (r[key] as boolean) : DEFAULT_MANUSCRIPT[key]);
+  const bool = (key: "noteTitles" | "demoteHeadings" | "proseOnly" | "showComments" | "tintTags" | "showRuler" | "showStory") => (typeof r[key] === "boolean" ? (r[key] as boolean) : DEFAULT_MANUSCRIPT[key]);
   return {
     folderDepth: typeof r.folderDepth === "number" && Number.isFinite(r.folderDepth) ? clampInt(r.folderDepth, 0, 6) : DEFAULT_MANUSCRIPT.folderDepth,
     noteTitles: bool("noteTitles"),
@@ -155,6 +159,8 @@ export function normalizeManuscript(raw: unknown): ManuscriptSettings {
     showComments: bool("showComments"),
     tintTags: bool("tintTags"),
     tags: Array.isArray(r.tags) ? normalizeTags(r.tags) : DEFAULT_MANUSCRIPT.tags,
+    showRuler: bool("showRuler"),
+    showStory: bool("showStory"),
   };
 }
 
