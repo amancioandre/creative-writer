@@ -1,17 +1,30 @@
 import { ItemView, Setting, setIcon, type WorkspaceLeaf } from "obsidian";
+import type { ProjectSpec } from "../../../domain/progress/Project";
 import type { WriterSettings } from "../../../domain/settings/Settings";
 import { EMPTY_BOARD, type Board, type Card } from "../../../domain/writer/Board";
 import { FRAMEWORKS, UNSORTED, groupsOf, type GroupDef } from "../../../domain/writer/Framework";
-import { CARD_H, CARD_W, GROUP_HEAD, GROUP_PAD, MIN_GROUP_H, MIN_GROUP_W, type BoardLayout, type PlacedCard, type PlacedGroup, cardCentre, groupAt, layoutBoard, reorderedGroup } from "../../../domain/writer/Layout";
+import { CARD_H, CARD_W, GROUP_HEAD, GROUP_PAD, MIN_GROUP_H, MIN_GROUP_W, PILL_H, STORY_H, STORY_W, type BoardLayout, type PlacedCard, type PlacedGroup, type StoriesBand, cardCentre, groupAt, layoutBoard, layoutStories, reorderedGroup, unionRect } from "../../../domain/writer/Layout";
+import { EMPTY_STORIES, SETTABLE_STAGES, STAGE_LABEL, type Stage, type StoriesRow, type StoryCard } from "../../../domain/writer/Stories";
 import { EMPTY_WRITER_FILE, type Point, type Rect, type WriterFile, placeCard, placeGroup, setColour, setFramework, setView } from "../../../domain/writer/WriterFile";
 import { normalizePrefix } from "../../../domain/writer/Tags";
 import { GraphCanvas, f } from "./GraphCanvas";
 
 export const WRITER_VIEW_TYPE = "creative-writer-writer";
 
+export type StoryView = "map" | "timeline" | "threads" | "manuscript" | "desk";
+
 export interface WriterSource {
-  /** The board and the file it was built from. */
-  build(): Promise<{ board: Board; file: WriterFile }>;
+  /** The board, the file it was built from, and the stories row. */
+  build(): Promise<{ board: Board; file: WriterFile; stories: StoriesRow }>;
+  /** Writes `writing-stage` on the project note; null removes it so the stage is inferred again. */
+  setStage(spec: ProjectSpec, stage: Stage | null): Promise<void>;
+  /** Scaffolds a story from an idea (or from nothing) and returns the project note's path. */
+  promote(idea: Card | null, name: string, folder: string): Promise<string>;
+  /** Declares an unfiled folder a story. */
+  declare(folder: string): Promise<void>;
+  openStory(view: StoryView, spec: ProjectSpec): void;
+  /** The stories folder from settings, "" for none. */
+  storiesFolder(): string;
   /** Read, change, write the writer file. */
   update(change: (file: WriterFile) => WriterFile): Promise<WriterFile>;
   /** The writer file's path, or null before the first save. */
@@ -32,7 +45,7 @@ const SVG = "http://www.w3.org/2000/svg";
 const MIN_ZOOM = 0.08, MAX_ZOOM = 3;
 /** Above this zoom a card shows its first lines. */
 const READ_ZOOM = 0.85;
-type Selection = { kind: "card"; path: string } | { kind: "group"; id: string } | null;
+type Selection = { kind: "card"; path: string } | { kind: "group"; id: string } | { kind: "story"; scope: string } | { kind: "unfiled"; folder: string } | { kind: "new-story" } | null;
 
 /**
  * The writer board: the vault's tagged notes as cards inside the groups of
@@ -44,6 +57,8 @@ export class WriterView extends ItemView {
   private board: Board = EMPTY_BOARD;
   private file: WriterFile = EMPTY_WRITER_FILE;
   private layout: BoardLayout = layoutBoard(EMPTY_BOARD);
+  private stories: StoriesRow = EMPTY_STORIES;
+  private band: StoriesBand = layoutStories(EMPTY_STORIES, 0);
   private selection: Selection = null;
   private query = "";
   private hiddenLayers = new Set<string>();
@@ -92,11 +107,13 @@ export class WriterView extends ItemView {
   /** Rebuilds from the vault and redraws; the selection survives when its subject does. */
   async show(): Promise<void> {
     const generation = ++this.generation;
-    const { board, file } = await this.source.build();
+    const { board, file, stories } = await this.source.build();
     if (generation !== this.generation) return;
     this.board = board;
     this.file = file;
+    this.stories = stories;
     this.layout = layoutBoard(board);
+    this.band = layoutStories(stories, this.layout.bounds.y);
     if (!this.stillValid(this.selection)) this.selection = null;
     this.render();
     if (!this.fitted) {
@@ -110,13 +127,16 @@ export class WriterView extends ItemView {
   }
 
   fit(): void {
-    this.canvas.fit(this.layout.bounds, 40, 1);
+    this.canvas.fit(unionRect(this.layout.bounds, this.band.rect), 40, 1);
   }
 
   private stillValid(sel: Selection): boolean {
     if (!sel) return false;
     if (sel.kind === "card") return this.layout.cards.has(sel.path);
-    return this.layout.groups.some((g) => g.group.def.id === sel.id);
+    if (sel.kind === "group") return this.layout.groups.some((g) => g.group.def.id === sel.id);
+    if (sel.kind === "story") return this.stories.stories.some((s) => s.spec.scope === sel.scope);
+    if (sel.kind === "unfiled") return this.stories.unfiled.includes(sel.folder);
+    return true;
   }
 
   // --- skeleton ----------------------------------------------------------------
@@ -129,7 +149,7 @@ export class WriterView extends ItemView {
       cls: "czm-map-svg czm-writer-svg",
       minZoom: MIN_ZOOM,
       maxZoom: MAX_ZOOM,
-      interactive: ".czm-writer-card, .czm-writer-group",
+      interactive: ".czm-writer-card, .czm-writer-group, .czm-writer-story, .czm-writer-pill",
       onTap: () => this.select(null),
       onView: () => { this.paint(); this.queueView(); },
     });
@@ -161,6 +181,8 @@ export class WriterView extends ItemView {
     this.edgeEls = [];
     const shownCards = new Set<string>();
     this.canvas.svg.setAttribute("aria-label", `Writer board: ${this.board.cards.length} cards in ${this.board.framework.name}`);
+
+    vp.appendChild(this.bandElement());
 
     const groupsG = document.createElementNS(SVG, "g");
     for (const layer of this.layout.layers) {
@@ -206,6 +228,114 @@ export class WriterView extends ItemView {
     }
     this.applySelectionClasses();
     this.paint();
+  }
+
+  // --- the stories band ------------------------------------------------------------
+
+  private bandElement(): SVGGElement {
+    const band = this.band;
+    const g = document.createElementNS(SVG, "g");
+    g.setAttribute("class", "czm-writer-band");
+    const label = document.createElementNS(SVG, "text");
+    label.setAttribute("class", "czm-writer-layer");
+    label.setAttribute("x", f(band.rect.x)); label.setAttribute("y", f(band.rect.y - 10));
+    label.textContent = "Stories";
+    g.appendChild(label);
+    const rect = document.createElementNS(SVG, "rect");
+    rect.setAttribute("class", "czm-writer-band-rect");
+    rect.setAttribute("rx", "10");
+    rect.setAttribute("x", f(band.rect.x)); rect.setAttribute("y", f(band.rect.y)); rect.setAttribute("width", f(band.rect.w)); rect.setAttribute("height", f(band.rect.h));
+    g.appendChild(rect);
+    const head = document.createElementNS(SVG, "text");
+    head.setAttribute("class", "czm-writer-group-name czm-writer-band-name");
+    head.setAttribute("x", f(band.rect.x + 14)); head.setAttribute("y", f(band.rect.y + 23));
+    const n = this.stories.stories.length;
+    head.textContent = n ? `Stories · ${n}` : "Stories";
+    g.appendChild(head);
+    if (!n) {
+      const fo = document.createElementNS(SVG, "foreignObject");
+      fo.setAttribute("class", "czm-writer-hint");
+      fo.setAttribute("x", f(band.rect.x + GROUP_PAD)); fo.setAttribute("y", f(band.rect.y + GROUP_HEAD + 4));
+      fo.setAttribute("width", f(band.rect.w - 2 * GROUP_PAD)); fo.setAttribute("height", f(60));
+      const div = document.createElement("div");
+      div.className = "czm-writer-hint-text";
+      div.textContent = "No story yet. A folder becomes one with story: true or writing-target in a note's front matter; or select a premise card and make it a story.";
+      fo.appendChild(div);
+      g.appendChild(fo);
+    }
+    for (const ps of band.stories) g.appendChild(this.storyElement(ps.story, ps.x, ps.y));
+    for (const pill of band.ideas) g.appendChild(this.pillElement(pill, "idea", () => this.select({ kind: "card", path: pill.key })));
+    for (const pill of band.unfiled) g.appendChild(this.pillElement(pill, "unfiled", () => this.select({ kind: "unfiled", folder: pill.key })));
+    return g;
+  }
+
+  private storyElement(story: StoryCard, x: number, y: number): SVGGElement {
+    const g = document.createElementNS(SVG, "g");
+    g.setAttribute("class", `czm-writer-story czm-writer-stage-${story.stage}${this.selection?.kind === "story" && this.selection.scope === story.spec.scope ? " is-selected" : ""}`);
+    g.setAttribute("data-scope", story.spec.scope);
+    g.setAttribute("tabindex", "0");
+    g.setAttribute("role", "button");
+    g.setAttribute("transform", `translate(${f(x)} ${f(y)})`);
+    const rect = document.createElementNS(SVG, "rect");
+    rect.setAttribute("class", "czm-writer-story-rect");
+    rect.setAttribute("width", f(STORY_W)); rect.setAttribute("height", f(STORY_H)); rect.setAttribute("rx", "8");
+    g.appendChild(rect);
+    const fo = document.createElementNS(SVG, "foreignObject");
+    fo.setAttribute("width", f(STORY_W)); fo.setAttribute("height", f(STORY_H));
+    const body = document.createElement("div");
+    body.className = "czm-writer-card-body czm-writer-story-body";
+    const top = document.createElement("div");
+    top.className = "czm-writer-story-top";
+    const title = document.createElement("div");
+    title.className = "czm-writer-card-title";
+    title.textContent = story.spec.name;
+    top.appendChild(title);
+    const stage = document.createElement("span");
+    stage.className = `czm-writer-stage czm-writer-stage-${story.stage}`;
+    stage.textContent = STAGE_LABEL[story.stage];
+    top.appendChild(stage);
+    body.appendChild(top);
+    const premise = document.createElement("div");
+    premise.className = "czm-writer-story-premise";
+    premise.textContent = story.premise || "No premise yet: writing-premise in the project note.";
+    if (!story.premise) premise.classList.add("is-missing");
+    body.appendChild(premise);
+    const meta = document.createElement("div");
+    meta.className = "czm-writer-story-meta";
+    meta.textContent = storyMeta(story);
+    body.appendChild(meta);
+    fo.appendChild(body);
+    g.appendChild(fo);
+    const t = document.createElementNS(SVG, "title");
+    t.textContent = `${story.spec.name}: ${STAGE_LABEL[story.stage]}${story.premise ? `\n${story.premise}` : ""}`;
+    g.appendChild(t);
+    this.canvas.attachDrag(g, { onMove: () => undefined, onEnd: (moved) => { if (!moved) this.select(this.selection?.kind === "story" && this.selection.scope === story.spec.scope ? null : { kind: "story", scope: story.spec.scope }); } });
+    g.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); ev.stopPropagation(); this.select({ kind: "story", scope: story.spec.scope }); } });
+    g.addEventListener("dblclick", (ev) => { ev.stopPropagation(); this.source.openNote(story.spec.notePath); });
+    return g;
+  }
+
+  private pillElement(pill: { key: string; label: string; x: number; y: number; w: number }, kind: "idea" | "unfiled", onClick: () => void): SVGGElement {
+    const g = document.createElementNS(SVG, "g");
+    const selected = kind === "idea" ? this.selection?.kind === "card" && this.selection.path === pill.key : this.selection?.kind === "unfiled" && this.selection.folder === pill.key;
+    g.setAttribute("class", `czm-writer-pill czm-writer-pill-${kind}${selected ? " is-selected" : ""}`);
+    g.setAttribute("data-key", pill.key);
+    g.setAttribute("tabindex", "0");
+    g.setAttribute("role", "button");
+    g.setAttribute("transform", `translate(${f(pill.x)} ${f(pill.y)})`);
+    const rect = document.createElementNS(SVG, "rect");
+    rect.setAttribute("width", f(pill.w)); rect.setAttribute("height", f(PILL_H)); rect.setAttribute("rx", f(PILL_H / 2));
+    g.appendChild(rect);
+    const text = document.createElementNS(SVG, "text");
+    text.setAttribute("x", f(12)); text.setAttribute("y", f(PILL_H / 2 + 4));
+    text.textContent = `${kind === "idea" ? "Idea" : "Unfiled"} · ${pill.label}`;
+    g.appendChild(text);
+    const t = document.createElementNS(SVG, "title");
+    t.textContent = kind === "idea" ? `${pill.label}: a premise with no story yet. Select it to make one.` : `${pill.key}: prose with no project declaration. Select it to declare a story.`;
+    g.appendChild(t);
+    this.canvas.attachDrag(g, { onMove: () => undefined, onEnd: (moved) => { if (!moved) onClick(); } });
+    g.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); ev.stopPropagation(); onClick(); } });
+    return g;
   }
 
   private groupElement(pg: PlacedGroup): SVGGElement {
@@ -354,6 +484,11 @@ export class WriterView extends ItemView {
     }
     for (const [id, g] of this.groupEls) g.classList.toggle("is-selected", sel?.kind === "group" && sel.id === id);
     for (const { el, from, to } of this.edgeEls) el.classList.toggle("is-lit", sel?.kind === "card" && (sel.path === from || sel.path === to));
+    for (const el of this.canvas.viewport.querySelectorAll<SVGGElement>(".czm-writer-story")) el.classList.toggle("is-selected", sel?.kind === "story" && sel.scope === el.getAttribute("data-scope"));
+    for (const el of this.canvas.viewport.querySelectorAll<SVGGElement>(".czm-writer-pill")) {
+      const key = el.getAttribute("data-key");
+      el.classList.toggle("is-selected", (sel?.kind === "card" && el.classList.contains("czm-writer-pill-idea") && sel.path === key) || (sel?.kind === "unfiled" && sel.folder === key));
+    }
   }
 
   select(sel: Selection): void {
@@ -502,6 +637,7 @@ export class WriterView extends ItemView {
     into.addEventListener("change", () => { this.into = into.value; });
     btn("Add note…", "czm-writer-add", () => void this.addNote(into.value), "Put an existing note on the board, in the group chosen here.");
     btn("New note…", "czm-writer-new", () => this.newNoteForm(into.value), "Write a new note straight into the group chosen here.");
+    btn("New story…", "czm-writer-new-story", () => this.select({ kind: "new-story" }), "Scaffold a story folder in the stories folder.");
     btn("Fit", "czm-map-fit", () => this.fit());
     btn("Copy schema", "czm-writer-schema", () => void this.source.copySchema(), "Put the writer protocol on the clipboard, for a person or a tool preparing this vault.");
 
@@ -577,8 +713,85 @@ export class WriterView extends ItemView {
     const close = this.card.createEl("button", { cls: "czm-map-card-close clickable-icon", attr: { "aria-label": "Close" } });
     setIcon(close, "x");
     close.addEventListener("click", () => this.select(null));
-    if (sel.kind === "card") this.renderCardCard(sel.path); else this.renderGroupCard(sel.id);
+    if (sel.kind === "card") this.renderCardCard(sel.path);
+    else if (sel.kind === "group") this.renderGroupCard(sel.id);
+    else if (sel.kind === "story") this.renderStoryCard(sel.scope);
+    else if (sel.kind === "unfiled") this.renderUnfiledCard(sel.folder);
+    else this.renderNewStoryCard(null);
     this.placeCard();
+  }
+
+  private renderStoryCard(scope: string): void {
+    const story = this.stories.stories.find((s) => s.spec.scope === scope);
+    if (!story) return;
+    const head = this.card.createDiv({ cls: "czm-map-card-head" });
+    head.createSpan({ text: story.spec.name, cls: "czm-map-card-name" });
+    head.createSpan({ text: story.spec.scope || "vault root", cls: "czm-map-kind" });
+    if (story.premise) this.card.createEl("p", { text: story.premise, cls: "czm-writer-excerpt" });
+    const stageRow = this.card.createDiv({ cls: "czm-map-alias" });
+    const select = stageRow.createEl("select", { cls: "dropdown czm-writer-stage-select", attr: { "aria-label": "Stage" } });
+    for (const s of SETTABLE_STAGES) { const o = select.createEl("option", { text: STAGE_LABEL[s] }); o.value = s; }
+    const inferred = select.createEl("option", { text: `Inferred (${STAGE_LABEL[story.stage]})` });
+    inferred.value = "";
+    select.value = story.declared ? story.stage : "";
+    select.addEventListener("change", () => void this.source.setStage(story.spec, (select.value || null) as Stage | null).then(() => this.show(), (e: unknown) => this.flash(e instanceof Error ? e.message : String(e))));
+    this.card.createDiv({ text: storyMeta(story), cls: "czm-map-hint" });
+    const actions = this.card.createDiv({ cls: "czm-map-card-actions" });
+    const btn = (text: string, cls: string, onClick: () => void) => { const b = actions.createEl("button", { text, cls }); b.addEventListener("click", onClick); return b; };
+    btn("Map", "czm-act-story-map", () => this.source.openStory("map", story.spec));
+    btn("Timeline", "czm-act-story-timeline", () => this.source.openStory("timeline", story.spec));
+    btn("Threads", "czm-act-story-threads", () => this.source.openStory("threads", story.spec));
+    btn("Manuscript", "czm-act-story-manuscript", () => this.source.openStory("manuscript", story.spec));
+    if (story.target > 0) btn("Desk", "czm-act-story-desk", () => this.source.openStory("desk", story.spec));
+    btn("Open note", "czm-act-open", () => this.source.openNote(story.spec.notePath));
+    const links: [string, string | null][] = [["Grew from", story.idea], ["Voice", story.voice]];
+    for (const [label, path] of links) {
+      if (!path) continue;
+      const row = this.card.createDiv({ cls: "czm-map-row", attr: { role: "button", tabindex: "0" } });
+      row.createSpan({ text: label, cls: "czm-map-row-meta" });
+      row.createSpan({ text: this.layout.cards.get(path)?.card.title ?? path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/, ""), cls: "czm-map-row-name" });
+      row.addEventListener("click", () => { if (this.layout.cards.has(path)) this.select({ kind: "card", path }); else this.source.openNote(path); });
+    }
+  }
+
+  private renderUnfiledCard(folder: string): void {
+    const head = this.card.createDiv({ cls: "czm-map-card-head" });
+    head.createSpan({ text: folder.slice(folder.lastIndexOf("/") + 1), cls: "czm-map-card-name" });
+    head.createSpan({ text: "Unfiled", cls: "czm-map-kind" });
+    this.card.createEl("p", { text: `${folder} holds prose but no note in it declares a project, so the story map, timeline, threads and desk do not see it.`, cls: "czm-map-hint" });
+    const actions = this.card.createDiv({ cls: "czm-map-card-actions" });
+    const declare = actions.createEl("button", { text: "Declare a story", cls: "czm-act-declare" });
+    declare.title = "Writes story: true into the folder's namesake note, or its first note.";
+    declare.addEventListener("click", () => void this.source.declare(folder).then(() => { this.selection = null; return this.show(); }, (e: unknown) => this.flash(e instanceof Error ? e.message : String(e))));
+  }
+
+  /** The form that turns an idea (or nothing) into a scaffolded story. */
+  private renderNewStoryCard(idea: Card | null): void {
+    const head = this.card.createDiv({ cls: "czm-map-card-head" });
+    head.createSpan({ text: idea ? `Make “${idea.title}” a story` : "New story", cls: "czm-map-card-name" });
+    if (idea?.excerpt) this.card.createEl("p", { text: idea.excerpt, cls: "czm-writer-excerpt" });
+    const form = this.card.createDiv({ cls: "czm-writer-promote" });
+    const name = form.createEl("input", { cls: "czm-map-label-input czm-writer-promote-name", attr: { type: "text", placeholder: "Story name…", "aria-label": "Story name" } });
+    name.value = idea?.title ?? "";
+    const folder = form.createEl("input", { cls: "czm-map-label-input czm-writer-promote-folder", attr: { type: "text", placeholder: "Folder (empty = vault root)", "aria-label": "Folder" } });
+    folder.value = this.source.storiesFolder();
+    this.card.createDiv({ text: "A folder is scaffolded there: Characters, Places, Items, three acts, _Work, and a project note with story: true, the stage, the premise and a link back to the idea. A folder with a note marked story-template: true is copied instead.", cls: "czm-map-hint" });
+    const actions = this.card.createDiv({ cls: "czm-map-card-actions" });
+    const create = actions.createEl("button", { text: "Create", cls: "czm-act-promote" });
+    const go = () => {
+      const n = name.value.trim();
+      if (!n) { name.focus(); return; }
+      create.disabled = true;
+      void this.source.promote(idea, n, folder.value.trim()).then(
+        async (path) => { this.selection = null; await this.show(); const story = this.stories.stories.find((s) => s.spec.notePath === path); if (story) this.select({ kind: "story", scope: story.spec.scope }); this.source.openNote(path); },
+        (e: unknown) => { create.disabled = false; this.flash(e instanceof Error ? e.message : String(e)); },
+      );
+    };
+    create.addEventListener("click", go);
+    name.addEventListener("keydown", (ev) => { if (ev.key === "Enter") go(); if (ev.key === "Escape") { ev.stopPropagation(); this.select(null); } });
+    const cancel = actions.createEl("button", { text: "Cancel", cls: "czm-act-cancel-label" });
+    cancel.addEventListener("click", () => this.select(idea ? { kind: "card", path: idea.path } : null));
+    name.focus();
   }
 
   private renderCardCard(path: string): void {
@@ -594,6 +807,9 @@ export class WriterView extends ItemView {
     const actions = this.card.createDiv({ cls: "czm-map-card-actions" });
     const open = actions.createEl("button", { text: "Open note", cls: "czm-act-open" });
     open.addEventListener("click", () => this.source.openNote(path));
+    const became = c.story ? this.stories.stories.find((s) => s.spec.notePath === c.story) : null;
+    if (became) { const b = actions.createEl("button", { text: `Story: ${became.spec.name}`, cls: "czm-act-story" }); b.addEventListener("click", () => this.select({ kind: "story", scope: became.spec.scope })); }
+    else if (c.groups.includes("premise")) { const b = actions.createEl("button", { text: "Make this a story…", cls: "czm-act-make-story" }); b.addEventListener("click", () => { this.card.empty(); this.renderNewStoryCard(c); this.placeCard(); }); }
     if (pc.pinned) { const unpin = actions.createEl("button", { text: "Back to grid", cls: "czm-act-unpin" }); unpin.addEventListener("click", () => { this.queue((file) => placeCard(file, path, null)); void this.flushFile().then(() => this.show()); }); }
     this.card.createEl("h4", { text: "Groups" });
     const list = this.card.createDiv({ cls: "czm-map-list" });
@@ -656,19 +872,32 @@ export class WriterView extends ItemView {
     const rect = this.canvas.svg.getBoundingClientRect();
     const w = rect.width || 800, h = rect.height || 600;
     let anchor: Point | null = null;
-    if (sel.kind === "card") { const p = this.cardAt(sel.path); if (p) anchor = { x: p.x + CARD_W, y: p.y }; }
-    else { const pg = this.layout.groups.find((g) => g.group.def.id === sel.id); if (pg) { const r = this.rectOf(pg); anchor = { x: r.x + r.w, y: r.y }; } }
+    let subjectW = 0;
+    if (sel.kind === "card") { const p = this.cardAt(sel.path); if (p) { anchor = { x: p.x + CARD_W, y: p.y }; subjectW = CARD_W; } }
+    else if (sel.kind === "group") { const pg = this.layout.groups.find((g) => g.group.def.id === sel.id); if (pg) { const r = this.rectOf(pg); anchor = { x: r.x + r.w, y: r.y }; } }
+    else if (sel.kind === "story") { const ps = this.band.stories.find((s) => s.story.spec.scope === sel.scope); if (ps) { anchor = { x: ps.x + STORY_W, y: ps.y }; subjectW = STORY_W; } }
+    else if (sel.kind === "unfiled") { const pill = this.band.unfiled.find((p) => p.key === sel.folder); if (pill) { anchor = { x: pill.x + pill.w, y: pill.y }; subjectW = pill.w; } }
+    else anchor = { x: this.band.rect.x + this.band.rect.w, y: this.band.rect.y };
     if (!anchor) return;
     const s = this.canvas.toScreen(anchor);
     const cw = this.card.offsetWidth || 260, ch = this.card.offsetHeight || 200;
     let x = s.x + 12, y = s.y;
-    if (x + cw > w - 8) x = s.x - (sel.kind === "card" ? CARD_W : 0) * this.canvas.view.k - cw - 24;
+    if (x + cw > w - 8) x = s.x - subjectW * this.canvas.view.k - cw - 24;
     if (x < 8) x = 8;
     if (y + ch > h - 8) y = h - ch - 8;
     if (y < 8) y = 8;
     this.card.style.left = `${Math.round(x)}px`;
     this.card.style.top = `${Math.round(y)}px`;
   }
+}
+
+/** One line under a story: words against the target, the cast, the last day worked. */
+export function storyMeta(story: StoryCard): string {
+  const parts: string[] = [];
+  parts.push(story.target > 0 ? `${story.words.toLocaleString("en")} / ${story.target.toLocaleString("en")} words` : `${story.words.toLocaleString("en")} words`);
+  if (story.cast) parts.push(`${story.cast} in the cast`);
+  parts.push(story.lastWorked ? `worked ${story.lastWorked}` : "never logged");
+  return parts.join(" · ");
 }
 
 function contains(r: Rect, p: Point): boolean {

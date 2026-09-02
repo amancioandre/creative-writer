@@ -1,6 +1,6 @@
 # Writer: design note
 
-Status: **agreed 2026-09-02; phases 0 and 1 built the same day.** Phase 0: `domain/writer/*`, `BuildWriterBoard`, `VaultWriterNotes`, `WriterFileRepository`, *Copy writer schema*, `reference/writer-file.md`. Phase 1: `domain/writer/Layout.ts`, `views/GraphCanvas.ts`, `views/WriterView.ts`, `VaultWriterTags`, `guide/writer.md`.
+Status: **agreed 2026-09-02; phases 0, 1 and 2 built the same day.** Phase 2: `domain/writer/Stories.ts`, the stories band in `Layout.ts`, `BuildWriterStories`, `PromoteIdea`, `VaultWriterFiles`, the band and its side cards in `WriterView`. Phase 0: `domain/writer/*`, `BuildWriterBoard`, `VaultWriterNotes`, `WriterFileRepository`, *Copy writer schema*, `reference/writer-file.md`. Phase 1: `domain/writer/Layout.ts`, `views/GraphCanvas.ts`, `views/WriterView.ts`, `VaultWriterTags`, `guide/writer.md`.
 
 Departures from the agreed text, all deliberate:
 - The tag prefix lives only in the writer file, edited from the board's panel; settings hold the stories folder and the panel state alone.
@@ -8,6 +8,7 @@ Departures from the agreed text, all deliberate:
 - Dropping a card on the background **keeps its tag**; removal is a button on the card's side panel. An accidental drop should not edit a note.
 - `GraphCanvas` is new shared code that the writer uses; the story map still carries its own copy of the same mechanics. Migrating the map onto the base is a cleanup for later, kept out of this feature so the map's tests stay untouched.
 - Groups **flow** rather than float. After the first pass the user asked that rearranging groups never let them overlap. A saved group rectangle now means size plus order within its layer (by `x`); positions are recomputed on every draw, and dragging a group reorders the row. Card positions are stored **relative to their group** so they travel with it. The protocol page says so.
+- Promotion writes `story: true` rather than a `writing-target`, so a fresh story never shows a made-up pace on the desk; the writer adds a target when there is one. Ideas and unfiled folders are **pills** under the story cards rather than cards of their own, because an idea is already a card in the Premises group and drawing it twice would be noise.
 - Named edges wait for phase 3; derived edges (notes that link) are drawn now because the board already computes them.
 
 ## 1. Why

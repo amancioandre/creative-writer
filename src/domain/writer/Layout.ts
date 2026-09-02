@@ -1,5 +1,6 @@
 import type { Board, BoardGroup, Card } from "./Board";
 import { UNSORTED } from "./Framework";
+import type { StoriesRow, StoryCard } from "./Stories";
 import type { Point, Rect } from "./WriterFile";
 
 /**
@@ -186,3 +187,48 @@ export function reorderedGroup(layout: BoardLayout, id: string, x: number): { id
 }
 
 export const cardCentre = (c: { x: number; y: number }): Point => ({ x: c.x + CARD_W / 2, y: c.y + CARD_H / 2 });
+
+// --- the stories band ------------------------------------------------------------
+
+export const STORY_W = 280;
+export const STORY_H = 124;
+export const PILL_H = 30;
+export const PILL_GAP = 10;
+
+export interface PlacedStory { readonly story: StoryCard; readonly x: number; readonly y: number }
+export interface PlacedPill { readonly key: string; readonly label: string; readonly x: number; readonly y: number; readonly w: number }
+
+/** The band above the layers: story cards in a row, then ideas and unfiled folders as pills on a line below. */
+export interface StoriesBand {
+  readonly rect: Rect;
+  readonly stories: readonly PlacedStory[];
+  readonly ideas: readonly PlacedPill[];
+  readonly unfiled: readonly PlacedPill[];
+}
+
+const pillWidth = (label: string) => Math.min(320, Math.max(90, 24 + label.length * 7));
+
+/** Lays the band out above a board whose top edge is `top`, left-aligned at x = 0. */
+export function layoutStories(row: StoriesRow, top: number): StoriesBand {
+  const stories: PlacedStory[] = [];
+  const pillsLine = row.ideas.length || row.unfiled.length ? PILL_H + PILL_GAP : 0;
+  const h = GROUP_HEAD + GROUP_PAD + (row.stories.length ? STORY_H : MIN_GROUP_H - GROUP_HEAD - 2 * GROUP_PAD) + pillsLine + GROUP_PAD;
+  const y = top - LAYER_GAP - h;
+  let x = GROUP_PAD;
+  for (const story of row.stories) { stories.push({ story, x, y: y + GROUP_HEAD + GROUP_PAD }); x += STORY_W + CARD_GAP; }
+  const rowWidth = x;
+  const pillY = y + h - GROUP_PAD - PILL_H;
+  x = GROUP_PAD;
+  const ideas: PlacedPill[] = [];
+  for (const c of row.ideas) { const w = pillWidth(c.title); ideas.push({ key: c.path, label: c.title, x, y: pillY, w }); x += w + PILL_GAP; }
+  const unfiled: PlacedPill[] = [];
+  for (const f of row.unfiled) { const label = f.slice(f.lastIndexOf("/") + 1); const w = pillWidth(label); unfiled.push({ key: f, label, x, y: pillY, w }); x += w + PILL_GAP; }
+  const w = Math.max(rowWidth, x, 2 * STORY_W + CARD_GAP + 2 * GROUP_PAD);
+  return { rect: { x: 0, y, w: w + GROUP_PAD - (rowWidth > x ? CARD_GAP : PILL_GAP), h }, stories, ideas, unfiled };
+}
+
+/** The union of two rectangles. */
+export function unionRect(a: Rect, b: Rect): Rect {
+  const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y);
+  return { x, y, w: Math.max(a.x + a.w, b.x + b.w) - x, h: Math.max(a.y + a.h, b.y + b.h) - y };
+}

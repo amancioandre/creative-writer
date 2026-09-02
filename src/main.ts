@@ -52,6 +52,9 @@ import { BuildWriterBoard } from "./application/use-cases/BuildWriterBoard";
 import { VaultWriterNotes } from "./infrastructure/obsidian/VaultWriterNotes";
 import { WriterFileRepository } from "./infrastructure/obsidian/WriterFileRepository";
 import { VaultWriterTags } from "./infrastructure/obsidian/VaultWriterTags";
+import { VaultWriterFiles } from "./infrastructure/obsidian/VaultWriterFiles";
+import { BuildWriterStories } from "./application/use-cases/BuildWriterStories";
+import { PromoteIdea } from "./application/use-cases/PromoteIdea";
 import { WRITER_VIEW_TYPE, WriterView, type WriterSource } from "./infrastructure/obsidian/views/WriterView";
 import { WRITER_EXTENSION, renameCard } from "./domain/writer/WriterFile";
 import { writerTag } from "./domain/writer/Tags";
@@ -257,8 +260,9 @@ export default class CreativeZenModePlugin extends Plugin {
     };
     this.addCommand({ id: "copy-writer-schema", name: "Copy writer schema", callback: () => void copySchema() });
     const asFile = (path: string): TFile | null => { const f = this.app.vault.getAbstractFileByPath(path); return f instanceof TFile ? f : null; };
+    const frontMatterOf = async (path: string, change: (fm: Record<string, unknown>) => void) => { const f = asFile(path); if (f) await this.app.fileManager.processFrontMatter(f, change); };
     const writerTags = new VaultWriterTags({
-      processFrontMatter: async (path, change) => { const f = asFile(path); if (f) await this.app.fileManager.processFrontMatter(f, change); },
+      processFrontMatter: frontMatterOf,
       process: async (path, change) => { const f = asFile(path); if (f) await this.app.vault.process(f, change); },
     });
     /** The metadata cache indexes a note a moment after it is written; the board reads the cache, so wait for it. */
@@ -269,8 +273,34 @@ export default class CreativeZenModePlugin extends Plugin {
         await new Promise((r) => window.setTimeout(r, 100));
       }
     };
+    const writerFiles = new VaultWriterFiles(this.app, notes, frontMatterOf);
+    const buildWriterStories = new BuildWriterStories(projectNotes, writerFiles, () => this.tracker.current, () => this.current.writer.storiesFolder);
+    const promoteIdea = new PromoteIdea(writerFiles);
     const writerSource: WriterSource = {
-      build: async () => { const file = await writerRepo.load(); return { board: await buildWriterBoard.boardFor(file), file }; },
+      build: async () => {
+        const file = await writerRepo.load();
+        const board = await buildWriterBoard.boardFor(file);
+        return { board, file, stories: await buildWriterStories.execute(board) };
+      },
+      setStage: async (spec, stage) => {
+        await writerFiles.processFrontMatter(spec.notePath, (fm) => { if (stage) fm["writing-stage"] = stage; else delete fm["writing-stage"]; });
+        await indexed(spec.notePath, (c) => (stage ? c?.frontmatter?.["writing-stage"] === stage : c?.frontmatter?.["writing-stage"] === undefined));
+      },
+      promote: async (idea, name, folder) => {
+        const path = await promoteIdea.execute({ idea, name, folder });
+        await indexed(path, (c) => !!c?.frontmatter);
+        if (idea) await indexed(idea.path, (c) => c?.frontmatter?.["writer-story"] !== undefined);
+        return path;
+      },
+      declare: async (folder) => { const path = await promoteIdea.declare(folder); await indexed(path, (c) => c?.frontmatter?.["story"] !== undefined); },
+      openStory: (view, spec) => {
+        if (view === "map") void this.openStoryMap().then(() => (this.app.workspace.getLeavesOfType(STORY_MAP_VIEW_TYPE)[0]?.view as StoryMapView | undefined)?.show(spec));
+        else if (view === "timeline") void this.openStoryTimeline(spec);
+        else if (view === "threads") void this.openStoryThreads(spec);
+        else if (view === "manuscript") void this.openManuscript(spec);
+        else void this.openDesk();
+      },
+      storiesFolder: () => this.current.writer.storiesFolder,
       update: (change) => writerRepo.update(change),
       filePath: () => writerRepo.path(),
       openNote: (path) => void this.app.workspace.openLinkText(path, "", false),

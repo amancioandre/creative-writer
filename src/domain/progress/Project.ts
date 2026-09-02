@@ -74,6 +74,18 @@ export function recentAdded(log: WritingLog, spec: ProjectSpec, today: Day, days
   return out;
 }
 
+/** The last day any note of the project gained or lost words, or null when the log has never seen it. */
+export function lastWorkedOn(log: WritingLog, spec: ProjectSpec): Day | null {
+  let last: Day | null = null;
+  for (const [day, entry] of Object.entries(log.days)) {
+    if (last !== null && day <= last) continue;
+    for (const [path, f] of Object.entries(entry.files)) {
+      if ((f.added > 0 || f.removed > 0) && inScope(spec, path)) { last = day; break; }
+    }
+  }
+  return last;
+}
+
 export interface ProjectStatus {
   readonly spec: ProjectSpec;
   readonly totalWords: number;

@@ -514,3 +514,32 @@ body.czm-zen .workspace-split.mod-root {
 .czm-writer-panel .czm-writer-into { grid-column: 1 / -1; width: 100%; }
 .czm-writer-empty { font-size: 14px; }
 .czm-set-group-unsorted .setting-item-name { font-style: italic; }
+/* The stories band above the layers. */
+.czm-writer-band-rect { fill: var(--text-accent); fill-opacity: 0.05; stroke: var(--text-accent); stroke-opacity: 0.5; stroke-width: 1.5; stroke-dasharray: 6 4; }
+.czm-writer-band-name { fill: var(--text-accent); }
+.czm-writer-story { cursor: pointer; }
+.czm-writer-story-rect { fill: var(--background-primary); stroke: var(--text-accent); stroke-width: 1.5; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.18)); }
+.czm-writer-story:hover .czm-writer-story-rect { stroke-width: 2.5; }
+.czm-writer-story.is-selected .czm-writer-story-rect { stroke: var(--text-normal); stroke-width: 3; }
+.czm-writer-story foreignObject { pointer-events: none; overflow: hidden; }
+.czm-writer-story-body { gap: 5px; }
+.czm-writer-story-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.czm-writer-story-top .czm-writer-card-title { font-size: 14px; flex: 1 1 auto; }
+.czm-writer-stage { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; padding: 1px 7px; border-radius: 9px; flex: 0 0 auto; color: var(--text-on-accent); background: var(--text-muted); }
+.czm-writer-stage-development .czm-writer-stage, .czm-writer-stage.czm-writer-stage-development { background: #7f8fc9; }
+.czm-writer-stage.czm-writer-stage-drafting { background: #5b8bb5; }
+.czm-writer-stage.czm-writer-stage-revising { background: #c98f3f; }
+.czm-writer-stage.czm-writer-stage-finished { background: #7a9e7e; }
+.czm-writer-stage.czm-writer-stage-shelved { background: #8a8a8a; }
+.czm-writer-story-premise { font-size: 12px; line-height: 1.3; color: var(--text-normal); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.czm-writer-story-premise.is-missing { color: var(--text-faint); font-style: italic; }
+.czm-writer-story-meta { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: auto; }
+.czm-writer-pill { cursor: pointer; }
+.czm-writer-pill rect { fill: var(--background-primary); stroke: var(--text-muted); stroke-width: 1.2; }
+.czm-writer-pill-idea rect { stroke: #c25c5c; }
+.czm-writer-pill text { font-size: 12px; fill: var(--text-normal); user-select: none; pointer-events: none; }
+.czm-writer-pill:hover rect, .czm-writer-pill.is-selected rect { stroke-width: 2.5; }
+.czm-writer-pill.is-selected rect { stroke: var(--text-normal); }
+.czm-writer-promote { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; }
+.czm-writer-promote input { width: 100%; box-sizing: border-box; }
+.czm-writer-stage-select { width: 100%; }

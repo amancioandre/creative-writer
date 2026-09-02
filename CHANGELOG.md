@@ -14,6 +14,12 @@ The writer is a fourth level above the sentence, the story and the vault: what t
 - Layout, colours and the view go to one `Writer.writer` file, found by extension, created in the stories folder on first save. Obsidian Sync carries it with *Sync all other types* on; the docs say so first.
 - The board follows the vault: a tag added by hand appears on the next metadata pass, a renamed note keeps its place.
 
+### The stories band
+
+- Every declared project sits above the layers as a story card: name, stage, premise, and one line with words against the target, the cast and the last day the log saw it change. The side card sets the stage (`writing-stage`, or inferred from prose and the target), opens the map, timeline, threads, manuscript and desk for that project, and links to the idea it grew from.
+- **Idea** pills are premise cards with no story yet; **Make this a story…** scaffolds a folder (or copies one marked `story-template: true`, with `{{name}}` replaced), writes `story: true`, the stage, the premise and `writing-idea` into the project note, and `writer-story` into the idea, which stays where it is. **New story…** in the panel starts from nothing.
+- **Unfiled** pills are folders under the stories folder with prose and no declaration; **Declare a story** writes `story: true` into the folder's namesake or first note.
+
 ### The protocol
 
 - **Copy writer schema** puts the [writer protocol](docs/reference/writer-file.md) on the clipboard for your vault's framework and tag prefix: which `#writer/<group>` tags make a note a card, the project-note keys, the `%% REF: [[Card]] %%` comment, and the `Writer.writer` file format. Paste it to a person or a tool migrating a board into the vault; the plugin ships no importer on purpose.
