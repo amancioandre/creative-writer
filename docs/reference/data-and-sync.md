@@ -10,6 +10,7 @@ What the plugin writes, where, and what travels between your machines.
 | `Story map.md` | Inside each project folder | Model readings per scene — relationships, references, events, and (separately, with their own hash) facts — plus the contradictions you dismissed in the threads view and where you pinned nodes by hand | **Yes** — it is a Markdown note, and every sync method carries Markdown. |
 | `Story threads.md` | Inside each project folder | The threads you draw by hand: `## heading` per thread, `- [[Note#Heading]] — note` per scene | **Yes** — and it is prose you can edit. |
 | `<Name> (manuscript).md` | Inside the project folder, only when you export | A snapshot of the [manuscript](/guide/manuscript) as one note; flagged so it is never read back | **Yes** — a Markdown note; delete it freely. |
+| `Writer.writer` | The stories folder (Settings → Writer) or the vault root; found by extension wherever you move it | The writer board's framework, colours, card and group positions, named edges and view. Cards, stories and uses are rebuilt from your notes. See the [writer protocol](/reference/writer-file). | **Only with *Sync all other types* on** in Selective sync. Without it the board still works on each machine; positions and edge names differ. |
 | Entity notes, `## Relationships` lines, `story-ignore`, `aliases`, `story-order` | Your notes | Every decision you make in the story map and threads, including nodes, relationships and threads you draw | Yes — they are your notes. |
 
 ## The principle

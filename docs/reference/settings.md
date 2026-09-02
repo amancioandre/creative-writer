@@ -24,6 +24,12 @@ Settings → Community plugins → Creative Writer. Everything here is stored in
 | Fullscreen in Zen Mode | off | Also request window fullscreen. |
 | Readability in status bar | on | Show the current paragraph's bands; click to open the desk. |
 
+## Writer
+
+| Setting | Default | What |
+|---|---|---|
+| Stories folder | none | Vault-relative folder where your stories live. A promoted idea is scaffolded there, a new writer card goes there, the writer file is created there, and folders under it with prose but no project declaration are listed as unfiled on the board. Empty = the vault root, and no unfiled row. See the [writer protocol](/reference/writer-file). |
+
 ## Goals
 
 | Setting | Default | What |

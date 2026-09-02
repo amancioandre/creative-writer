@@ -212,7 +212,22 @@ export interface PluginSettings {
   readonly storyMap: StoryMapSettings;
   readonly threads: ThreadsSettings;
   readonly manuscript: ManuscriptSettings;
+  readonly writer: WriterSettings;
 }
+
+export interface WriterSettings {
+  /**
+   * Vault-relative folder where stories live: where a promoted idea is
+   * scaffolded, where a new card note goes, and where the writer file is
+   * created; folders under it with prose and no declaration are listed as
+   * unfiled. "" = none: the vault root, and no unfiled row.
+   */
+  readonly storiesFolder: string;
+  /** The board's floating panel, open or folded. */
+  readonly panelOpen: boolean;
+}
+
+export const DEFAULT_WRITER: WriterSettings = { storiesFolder: "", panelOpen: true };
 
 export interface GoalSettings {
   /** Words added per day; 0 = no daily goal (any writing day counts for streaks). */
@@ -249,6 +264,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   storyMap: DEFAULT_STORY_MAP,
   threads: DEFAULT_THREADS,
   manuscript: DEFAULT_MANUSCRIPT,
+  writer: DEFAULT_WRITER,
 };
 
 const clampInt = (v: number, min: number, max: number) => Math.min(max, Math.max(min, Math.floor(v)));
@@ -290,7 +306,19 @@ export function normalizeSettings(raw: unknown): PluginSettings {
     storyMap: normalizeStoryMap(r.storyMap),
     threads: normalizeThreads(r.threads),
     manuscript: normalizeManuscript(r.manuscript),
+    writer: normalizeWriter(r.writer),
   };
+}
+
+/** A vault-relative folder: trimmed, forward slashes, no leading or trailing slash; "" when unusable. */
+export function normalizeFolderPath(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+  return raw.trim().replace(/\\/g, "/").replace(/\/+/g, "/").replace(/^\/+|\/+$/g, "");
+}
+
+function normalizeWriter(raw: unknown): WriterSettings {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  return { storiesFolder: normalizeFolderPath(r.storiesFolder), panelOpen: typeof r.panelOpen === "boolean" ? r.panelOpen : DEFAULT_WRITER.panelOpen };
 }
 
 const HEX = /^#[0-9a-f]{6}$/i;

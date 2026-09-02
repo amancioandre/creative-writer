@@ -117,3 +117,12 @@ describe("manuscript settings", () => {
     expect(textToTags("CHECK #4a8fe2\nfix\n\n")).toEqual([{ name: "CHECK", color: "#4a8fe2" }, { name: "FIX", color: "#8a8a8a" }]);
   });
 });
+
+describe("writer settings", () => {
+  it("defaults to no stories folder and normalises one to a bare vault-relative path", () => {
+    expect(normalizeSettings(undefined).writer).toEqual({ storiesFolder: "", panelOpen: true });
+    expect(normalizeSettings({ writer: { panelOpen: false } }).writer.panelOpen).toBe(false);
+    expect(normalizeSettings({ writer: { storiesFolder: " /storytelling\\stories/ " } }).writer.storiesFolder).toBe("storytelling/stories");
+    expect(normalizeSettings({ writer: { storiesFolder: 3 } }).writer.storiesFolder).toBe("");
+  });
+});

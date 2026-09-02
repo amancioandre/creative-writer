@@ -1,6 +1,6 @@
 import { type App, type Plugin, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
 import { RhythmScale } from "../../domain/rhythm/RhythmScale";
-import { DEFAULT_GOALS, DEFAULT_MANUSCRIPT, foldersToText, normalizeNotePath, tagsToText, textToFolders, textToTags, type ClaudeModelId, type LlmProvider, type PluginSettings } from "../../domain/settings/Settings";
+import { DEFAULT_GOALS, DEFAULT_MANUSCRIPT, foldersToText, normalizeFolderPath, normalizeNotePath, tagsToText, textToFolders, textToTags, type ClaudeModelId, type LlmProvider, type PluginSettings } from "../../domain/settings/Settings";
 import type { ScopeMode } from "../../domain/scope/NoteScope";
 import type { FindingKind } from "../../domain/style/Finding";
 
@@ -23,6 +23,8 @@ const SCOPE_OPTIONS: Record<ScopeMode, string> = {
 
 const SCOPE_DESC = "One rule for everything: the notes the editor tools run in are the notes the daily goal, the project totals, the story map and the threads count. A declared project (writing-target or story: true in a note's front matter) is always in; the mode decides what else is. Side material — memos, research, reviews — stays out with creative-writer: false in its front matter, wherever it lives; creative-writer: true lets a note in whatever the mode. The plugin's own notes (writing log, story map, threads) are never counted.";
 
+
+const WRITER_FOLDER_DESC = "Vault-relative folder where your stories live. A promoted idea is scaffolded there, a new writer card goes there, the writer file is created there, and folders under it with prose but no project declaration are listed as unfiled on the writer board. Empty = the vault root, and no unfiled row.";
 
 const STRIP_PRESETS: Record<string, string> = { numbers: "Numbers and separators (01 -, 3., 2))", none: "Nothing", custom: "Custom pattern" };
 
@@ -73,6 +75,13 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
       { name: "Rhythm tiers", desc: "How many colour steps the rhythm gradient uses.", control: { type: "slider", key: "rhythmTiers", min: RhythmScale.MIN_TIERS, max: RhythmScale.MAX_TIERS, step: 1 } },
       { name: "Fullscreen in Zen Mode", desc: "Also request window fullscreen when Zen Mode is toggled on.", control: { type: "toggle", key: "zenFullscreen" } },
       { name: "Readability in status bar", desc: "Show the current paragraph's reading-ease and sentence-rhythm bands. Click it to open the writing desk with the whole note's profile.", control: { type: "toggle", key: "readabilityEnabled" } },
+      {
+        type: "group",
+        heading: "Writer",
+        items: [
+          { name: "Stories folder", desc: WRITER_FOLDER_DESC, control: { type: "text", key: "writer.storiesFolder", placeholder: "storytelling" } },
+        ],
+      },
       {
         type: "group",
         heading: "Goals",
@@ -193,6 +202,10 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
       .addToggle((t) => t.setValue(s.zenFullscreen).onChange((v) => set({ zenFullscreen: v })));
     new Setting(containerEl).setName("Readability in status bar").setDesc("Show the current paragraph's reading-ease and sentence-rhythm bands. Click it to open the writing desk.")
       .addToggle((t) => t.setValue(s.readabilityEnabled).onChange((v) => set({ readabilityEnabled: v })));
+
+    new Setting(containerEl).setName("Writer").setHeading();
+    new Setting(containerEl).setName("Stories folder").setDesc(WRITER_FOLDER_DESC)
+      .addText((t) => t.setPlaceholder("storytelling").setValue(s.writer.storiesFolder).onChange((v) => set({ writer: { ...this.port.current().writer, storiesFolder: normalizeFolderPath(v) } })));
 
     new Setting(containerEl).setName("Goals").setHeading();
     new Setting(containerEl).setName("Daily word goal").setDesc("Words added per day, in the notes the scope takes in, for the streak and the progress bar in the writing desk. 0 = any day you write counts.")

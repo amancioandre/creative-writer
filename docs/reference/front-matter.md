@@ -76,3 +76,16 @@ creative-writer-threads: 1
 ```
 
 and adds one `## heading` per thread and one `- [[Note#Heading]] — note` line per scene. Edit it freely, or write it from scratch without the front matter — a note named `Story threads` is never read as a chapter either way.
+
+## Writer
+
+The [writer board](/reference/writer-file) reads tags, not keys, to know which notes are on it: `tags: [writer/theme, writer/quote]` (or inline `#writer/theme`). A note may carry several. On a project note it reads, all optional:
+
+| Key | Values | Effect |
+|---|---|---|
+| `writing-stage` | `development`, `drafting`, `revising`, `finished`, `shelved` | Where the story is on the board. Without it, `drafting` is inferred once prose exists and `finished` once the target is met. |
+| `writing-premise` | one sentence | The story question on the story card. |
+| `writing-idea` | `"[[Idea note]]"` | The premise card the story grew from. Written by promotion. |
+| `writing-voice` | `"[[Voice note]]"` | The narrator persona the story adopts. |
+
+On an idea note (a `writer/premise` card): `writer-story: "[[Project note]]"`, written by promotion. On a `writer/reading` card: `reading: to-read`, `reading` or `read`. The board view and these keys arrive in the releases after the protocol; nothing else in the plugin reads them.
