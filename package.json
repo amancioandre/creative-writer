@@ -1,6 +1,6 @@
 {
   "name": "creative-writer",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Zen Mode, typewriter centering, focus fade and paragraph rhythm for creative writing in Obsidian.",
   "main": "main.js",
   "type": "module",
