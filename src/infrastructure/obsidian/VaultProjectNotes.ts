@@ -35,6 +35,8 @@ export class VaultProjectNotes implements ProjectNotes {
   constructor(
     private readonly app: VaultAppLike,
     private readonly counted: (path: string, frontmatter: Record<string, unknown> | undefined) => boolean = anyNote,
+    /** The text of a note open in an editor, unsaved edits included; null when it is not open. Disk otherwise. */
+    private readonly liveText: (path: string) => string | null = () => null,
   ) {}
 
   projects(): ProjectSpec[] {
@@ -58,10 +60,11 @@ export class VaultProjectNotes implements ProjectNotes {
         const target = this.app.metadataCache.getFirstLinkpathDest(l.link.split("#")[0]!.split("|")[0]!, f.path);
         if (target && target.path !== f.path) links.add(target.path);
       }
-      const text = await this.app.vault.cachedRead(f);
+      const text = this.liveText(f.path) ?? await this.app.vault.cachedRead(f);
       out.push({
         path: f.path,
         frontmatter: fm ?? {},
+        text,
         links: [...links],
         bookmarked: bookmarks.files.has(f.path),
         bookmarkedHeadings: bookmarks.headings.get(f.path) ?? [],

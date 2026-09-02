@@ -1,6 +1,6 @@
 import { type App, type Plugin, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
 import { RhythmScale } from "../../domain/rhythm/RhythmScale";
-import { DEFAULT_GOALS, foldersToText, normalizeNotePath, textToFolders, type ClaudeModelId, type LlmProvider, type PluginSettings } from "../../domain/settings/Settings";
+import { DEFAULT_GOALS, DEFAULT_MANUSCRIPT, foldersToText, normalizeNotePath, tagsToText, textToFolders, textToTags, type ClaudeModelId, type LlmProvider, type PluginSettings } from "../../domain/settings/Settings";
 import type { ScopeMode } from "../../domain/scope/NoteScope";
 import type { FindingKind } from "../../domain/style/Finding";
 
@@ -75,6 +75,20 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
       },
       {
         type: "group",
+        heading: "Manuscript",
+        items: [
+          { name: "Folder levels as headings", desc: "How many folder levels below the project folder become headings in the manuscript view. 0 = none: notes follow one another with no outline.", control: { type: "slider", key: "manuscript.folderDepth", min: 0, max: 6, step: 1 } },
+          { name: "Note names as headings", desc: "Put each note's name above its text. A note whose first heading already is its name shows that heading once.", control: { type: "toggle", key: "manuscript.noteTitles" } },
+          { name: "Strip from names", desc: "A regular expression removed from the start of folder and note names before they become headings: the sort prefix in \"01 - Camp\". Empty keeps names as they are.", control: { type: "text", key: "manuscript.stripPrefix", placeholder: DEFAULT_MANUSCRIPT.stripPrefix } },
+          { name: "Nest the notes' own headings", desc: "Push the headings inside a note down below the outline, so a scene inside a chapter inside a part reads as level three.", control: { type: "toggle", key: "manuscript.demoteHeadings" } },
+          { name: "Prose only", desc: "Show only paragraphs, headings, quotes and scene breaks: no lists, tables, code or callouts. Also toggled at the top of the view.", control: { type: "toggle", key: "manuscript.proseOnly" } },
+          { name: "Comments pane", desc: "A pane beside the manuscript page: the active paragraph's %% comments %% with a box to add one, and every comment in reading order. Also toggled at the top of the view.", control: { type: "toggle", key: "manuscript.showComments" } },
+          { name: "Tint tags in the editor", desc: "Colour the tag word that opens a comment, %% TODO: … %%, in the editor. Only inside comments; a TODO in dialogue is left alone.", control: { type: "toggle", key: "manuscript.tintTags" } },
+          { name: "Tags", desc: "One per line: an uppercase word and a hex colour, e.g. CHECK #4a8fe2. A comment that opens with the word and a colon takes the colour, on the page and in the editor.", control: { type: "text", key: "manuscript.tagsText", placeholder: "TODO #d9a621" } },
+        ],
+      },
+      {
+        type: "group",
         heading: "Style checks",
         items: [
           { name: "Style checks", desc: "Highlight clichés, passive voice, filter verbs, adverbs, repetition and more in the current paragraph. Hover a highlight for the note.", control: { type: "toggle", key: "styleEnabled" } },
@@ -105,10 +119,16 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
 
   getControlValue(key: string): unknown {
     if (key === "scope.foldersText") return foldersToText(this.port.current().scope.folders);
+    if (key === "manuscript.tagsText") return tagsToText(this.port.current().manuscript.tags);
     return key.split(".").reduce<unknown>((o, k) => (o && typeof o === "object" ? (o as Record<string, unknown>)[k] : undefined), this.port.current());
   }
 
   async setControlValue(key: string, value: unknown): Promise<void> {
+    if (key === "manuscript.tagsText") {
+      const c = this.port.current();
+      await this.port.update({ ...c, manuscript: { ...c.manuscript, tags: textToTags(String(value ?? "")) } });
+      return;
+    }
     if (key === "scope.foldersText") {
       const c = this.port.current();
       await this.port.update({ ...c, scope: { ...c.scope, folders: textToFolders(String(value ?? "")) } });
@@ -162,6 +182,25 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
       .addSlider((sl) => sl.setLimits(0, 5000, 50).setValue(s.goals.dailyWords).onChange((v) => set({ goals: { ...this.port.current().goals, dailyWords: v } })));
     new Setting(containerEl).setName("Writing log note").setDesc("Vault-relative path of the note that keeps the log (words added and cut per day), so streaks sync with the vault. Takes effect at the next save; reload to read from a new path.")
       .addText((t) => t.setPlaceholder(DEFAULT_GOALS.logNote).setValue(s.goals.logNote).onChange((v) => { const p = normalizeNotePath(v); if (p) void set({ goals: { ...this.port.current().goals, logNote: p } }); }));
+
+    new Setting(containerEl).setName("Manuscript").setHeading();
+    const ms = (patch: Partial<PluginSettings["manuscript"]>) => set({ manuscript: { ...this.port.current().manuscript, ...patch } });
+    new Setting(containerEl).setName("Folder levels as headings").setDesc("How many folder levels below the project folder become headings in the manuscript view. 0 = none.")
+      .addSlider((sl) => sl.setLimits(0, 6, 1).setValue(s.manuscript.folderDepth).onChange((v) => ms({ folderDepth: v })));
+    new Setting(containerEl).setName("Note names as headings").setDesc("Put each note's name above its text. A note whose first heading already is its name shows that heading once.")
+      .addToggle((t) => t.setValue(s.manuscript.noteTitles).onChange((v) => ms({ noteTitles: v })));
+    new Setting(containerEl).setName("Strip from names").setDesc("A regular expression removed from the start of folder and note names before they become headings. Empty keeps names as they are.")
+      .addText((t) => t.setPlaceholder(DEFAULT_MANUSCRIPT.stripPrefix).setValue(s.manuscript.stripPrefix).onChange((v) => ms({ stripPrefix: v })));
+    new Setting(containerEl).setName("Nest the notes' own headings").setDesc("Push the headings inside a note down below the outline.")
+      .addToggle((t) => t.setValue(s.manuscript.demoteHeadings).onChange((v) => ms({ demoteHeadings: v })));
+    new Setting(containerEl).setName("Prose only").setDesc("Show only paragraphs, headings, quotes and scene breaks. Also toggled at the top of the view.")
+      .addToggle((t) => t.setValue(s.manuscript.proseOnly).onChange((v) => ms({ proseOnly: v })));
+    new Setting(containerEl).setName("Comments pane").setDesc("A pane beside the manuscript page: the active paragraph's comments with a box to add one, and every comment in reading order.")
+      .addToggle((t) => t.setValue(s.manuscript.showComments).onChange((v) => ms({ showComments: v })));
+    new Setting(containerEl).setName("Tint tags in the editor").setDesc("Colour the tag word that opens a comment, %% TODO: … %%, in the editor.")
+      .addToggle((t) => t.setValue(s.manuscript.tintTags).onChange((v) => ms({ tintTags: v })));
+    new Setting(containerEl).setName("Tags").setDesc("One per line: an uppercase word and a hex colour, e.g. CHECK #4a8fe2.")
+      .addText((t) => t.setPlaceholder("TODO #d9a621").setValue(tagsToText(s.manuscript.tags)).onChange((v) => ms({ tags: textToTags(v) })));
 
     new Setting(containerEl).setName("Style checks").setHeading();
     new Setting(containerEl).setName("Style checks").setDesc("Highlight clichés, passive voice, filter verbs, adverbs, repetition and more in the current paragraph. Hover a highlight for the note.")

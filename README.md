@@ -55,6 +55,12 @@ Every scene in reading order down the side, the cast across the top, a dot where
 
 `Open story timeline`
 
+### Manuscript: the whole story on one page
+
+Every prose note of a project stitched into one read-only page in reading order, with the folder tree as its outline: `Part One/03 Chapter Three.md` reads as *Part One › Chapter Three*, sort prefixes stripped, the note's own scene headings nested underneath. Click any sentence and the note opens in the editor at that sentence. Characters, places, research and outlines stay off the page; typing in a chapter beside it redraws that chapter alone. A pane beside the page holds the clicked paragraph's `%% comments %%`, colour-coded by tag (`%% CHECK: was it a coat? %%`), with a box that writes a new one to the end of that paragraph, and every comment of the draft in reading order; hover a marked paragraph for its comments. The tag word is tinted in the editor too. Nothing is stored; **Export** writes the page as one note beside the project when you want a file to send on.
+
+`Open manuscript` or the ribbon icon · Settings → Manuscript
+
 ### Writing desk: goals, streaks, readability, scenes
 
 ![Writing desk with daily goal, heatmap and project targets](docs/public/media/desk.png)
@@ -95,7 +101,7 @@ No network requests. The only exception is the optional model assistant, which t
 
 ## FAQ
 
-**How is this different from Longform?** Longform organises scenes into a manuscript and compiles it. Creative Writer works on the prose inside the scenes and on the story as a graph. They coexist happily; Longform projects are read as ordinary folders.
+**How is this different from Longform?** Longform organises scenes into a manuscript and compiles it to a file. Creative Writer works on the prose inside the scenes and on the story as a graph; its manuscript page is for reading the draft whole, and its export is one plain note, not a build pipeline. They coexist happily; Longform projects are read as ordinary folders.
 
 **Does it work on mobile?** Not yet — Zen Mode and the editor decorations are desktop-only.
 

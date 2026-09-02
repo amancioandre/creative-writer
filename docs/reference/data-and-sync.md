@@ -9,11 +9,12 @@ What the plugin writes, where, and what travels between your machines.
 | `progress.json` | `.obsidian/plugins/creative-writer/` | The log's old home (before 0.4). Imported into the note once, then left untouched. | No — and no longer needed. |
 | `Story map.md` | Inside each project folder | Model readings per scene — relationships, references, events, and (separately, with their own hash) facts — plus the contradictions you dismissed in the threads view and where you pinned nodes by hand | **Yes** — it is a Markdown note, and every sync method carries Markdown. |
 | `Story threads.md` | Inside each project folder | The threads you draw by hand: `## heading` per thread, `- [[Note#Heading]] — note` per scene | **Yes** — and it is prose you can edit. |
+| `<Name> (manuscript).md` | Inside the project folder, only when you export | A snapshot of the [manuscript](/guide/manuscript) as one note; flagged so it is never read back | **Yes** — a Markdown note; delete it freely. |
 | Entity notes, `## Relationships` lines, `story-ignore`, `aliases`, `story-order` | Your notes | Every decision you make in the story map and threads, including nodes, relationships and threads you draw | Yes — they are your notes. |
 
 ## The principle
 
-Writer-owned facts go in notes and front matter. Machine-owned facts that cannot be recomputed go in a Markdown note beside the notes they describe. Nothing derived is stored: the story map and timeline are pure functions of the vault, so two machines with the same notes draw the same map — the layout even starts from the same deterministic positions.
+Writer-owned facts go in notes and front matter. Machine-owned facts that cannot be recomputed go in a Markdown note beside the notes they describe. Nothing derived is stored: the story map, timeline and manuscript page are pure functions of the vault, so two machines with the same notes draw the same map — the layout even starts from the same deterministic positions.
 
 ## Cross-device caveats
 

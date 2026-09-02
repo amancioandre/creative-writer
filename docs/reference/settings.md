@@ -31,6 +31,19 @@ Settings → Community plugins → Creative Writer. Everything here is stored in
 | Daily word goal | 500 | Words added per day for the streak and the desk's bar. 0 = any day you write counts. |
 | Writing log note | `Creative Writer/Writing log.md` | Vault-relative path of the note that keeps the log, so it syncs. Takes effect at the next save; reload to read from a new path. |
 
+## Manuscript
+
+| Setting | Default | What |
+|---|---|---|
+| Folder levels as headings | 2 | How many folder levels below the project folder become headings on the [manuscript](/guide/manuscript) page. 0 = no outline. |
+| Note names as headings | on | Each note's name above its text. A note whose first heading already is its name shows that heading once. |
+| Strip from names | `^\d+[\s._)-]*` | A regular expression removed from the start of folder and note names: the sort prefix in `01 - Camp`. Empty keeps names as they are. |
+| Nest the notes' own headings | on | Push a note's headings down below the outline, so a scene in a chapter in a part is level three. Off: headings keep the level they have in the note. |
+| Prose only | off | Show only paragraphs, headings, quotes and scene breaks. Also toggled at the top of the page. |
+| Comments | on | The pane beside the page: the active paragraph's `%% comments %%` with a box to add one, and every comment in reading order. Dots on marked paragraphs and the hover box show either way. Also toggled at the top of the page. |
+| Tint tags in the editor | on | Colour the tag word that opens a comment (`%% TODO: … %%`) in the editor. |
+| Tags | `TODO`, `FIX`, `CHECK`, `IDEA`, `CUT` | One per line, an uppercase word and a hex colour. See [Comments and tags](/guide/manuscript#comments-and-tags). |
+
 ## Style checks
 
 A master toggle, then one toggle per kind: Cliché, Passive voice, Filter verb, Adverb, Repetition, Nominalisation, Weak verb, Metaphor candidate. See [Style checks](/guide/style-checks).

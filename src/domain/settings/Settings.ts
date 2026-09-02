@@ -1,6 +1,8 @@
 import { RhythmScale } from "../rhythm/RhythmScale";
 import { FINDING_KINDS, type FindingKind } from "../style/Finding";
 import type { ScopeMode, ScopeSettings } from "../scope/NoteScope";
+import { DEFAULT_STRIP_PREFIX, type ManuscriptOptions } from "../manuscript/Manuscript";
+import { DEFAULT_TAGS, type TagSpec } from "../manuscript/Comments";
 
 export type LlmProvider = "off" | "ollama" | "claude";
 export type ClaudeModelId = "claude-opus-5" | "claude-haiku-4-5";
@@ -124,6 +126,60 @@ export const DEFAULT_THREADS: ThreadsSettings = {
   panelOpen: true,
 };
 
+/**
+ * How the manuscript view stitches a project — the outline it draws from
+ * folders and note names, what it leaves out — and the comment layer: whether
+ * `%% comments %%` show on the page, which tags colour them, and whether the
+ * tag word is tinted in the editor too.
+ */
+export interface ManuscriptSettings extends ManuscriptOptions {
+  readonly showComments: boolean;
+  readonly tintTags: boolean;
+  readonly tags: readonly TagSpec[];
+}
+
+export const DEFAULT_MANUSCRIPT: ManuscriptSettings = {
+  folderDepth: 2, noteTitles: true, stripPrefix: DEFAULT_STRIP_PREFIX, demoteHeadings: true, proseOnly: false,
+  showComments: true, tintTags: true, tags: DEFAULT_TAGS,
+};
+
+export function normalizeManuscript(raw: unknown): ManuscriptSettings {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const bool = (key: "noteTitles" | "demoteHeadings" | "proseOnly" | "showComments" | "tintTags") => (typeof r[key] === "boolean" ? (r[key] as boolean) : DEFAULT_MANUSCRIPT[key]);
+  return {
+    folderDepth: typeof r.folderDepth === "number" && Number.isFinite(r.folderDepth) ? clampInt(r.folderDepth, 0, 6) : DEFAULT_MANUSCRIPT.folderDepth,
+    noteTitles: bool("noteTitles"),
+    stripPrefix: typeof r.stripPrefix === "string" ? r.stripPrefix : DEFAULT_MANUSCRIPT.stripPrefix,
+    demoteHeadings: bool("demoteHeadings"),
+    proseOnly: bool("proseOnly"),
+    showComments: bool("showComments"),
+    tintTags: bool("tintTags"),
+    tags: Array.isArray(r.tags) ? normalizeTags(r.tags) : DEFAULT_MANUSCRIPT.tags,
+  };
+}
+
+const TAG_NAME = /^[A-Z][A-Z0-9_-]{1,15}$/;
+
+/** Known shape only: an uppercase name and a hex colour; the rest is dropped, duplicates keep their first colour. */
+export function normalizeTags(raw: readonly unknown[]): TagSpec[] {
+  const out: TagSpec[] = [];
+  for (const item of raw) {
+    const t = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
+    const name = typeof t.name === "string" ? t.name.trim().toUpperCase() : "";
+    if (!TAG_NAME.test(name) || out.some((o) => o.name === name)) continue;
+    out.push({ name, color: typeof t.color === "string" && HEX.test(t.color) ? t.color.toLowerCase() : "#8a8a8a" });
+  }
+  return out;
+}
+
+/** Tags as the settings box shows them: one per line, `NAME #rrggbb`. */
+export function tagsToText(tags: readonly TagSpec[]): string {
+  return tags.map((t) => `${t.name} ${t.color}`).join("\n");
+}
+export function textToTags(text: string): TagSpec[] {
+  return normalizeTags(text.split(/[\n,]/).map((line) => { const [name, color] = line.trim().split(/\s+/); return { name, color }; }));
+}
+
 export interface PluginSettings {
   /** Master switch; the "Toggle Creative Writer" command flips it. */
   readonly enabled: boolean;
@@ -149,6 +205,7 @@ export interface PluginSettings {
   readonly llm: LlmSettings;
   readonly storyMap: StoryMapSettings;
   readonly threads: ThreadsSettings;
+  readonly manuscript: ManuscriptSettings;
 }
 
 export interface GoalSettings {
@@ -185,6 +242,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   llm: DEFAULT_LLM_SETTINGS,
   storyMap: DEFAULT_STORY_MAP,
   threads: DEFAULT_THREADS,
+  manuscript: DEFAULT_MANUSCRIPT,
 };
 
 const clampInt = (v: number, min: number, max: number) => Math.min(max, Math.max(min, Math.floor(v)));
@@ -225,6 +283,7 @@ export function normalizeSettings(raw: unknown): PluginSettings {
     llm: normalizeLlm(r.llm),
     storyMap: normalizeStoryMap(r.storyMap),
     threads: normalizeThreads(r.threads),
+    manuscript: normalizeManuscript(r.manuscript),
   };
 }
 

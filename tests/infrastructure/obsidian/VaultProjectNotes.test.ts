@@ -38,6 +38,7 @@ describe("VaultProjectNotes", () => {
     expect(notes.map((n) => n.path)).toEqual(["Novel/Novel.md", "Novel/Characters/Marta.md", "Novel/Characters/Ilse.md", "Novel/One.md"]);
     const one = notes.find((n) => n.path === "Novel/One.md")!;
     expect(one.links).toEqual(["Novel/Characters/Marta.md"]);
+    expect(one.text).toBe("# Camp\nMarta and Ilse.\n");
     expect(one.bookmarkedHeadings).toEqual(["Camp"]);
     expect(one.scenes[0]!.title).toBe("Camp");
     expect(notes.find((n) => n.path === "Novel/Characters/Ilse.md")!.bookmarked).toBe(true);
@@ -59,5 +60,14 @@ describe("VaultProjectNotes", () => {
   it("copes without a bookmarks plugin", async () => {
     const notes = await new VaultProjectNotes({ ...app, internalPlugins: undefined }).notes(source.projects()[0]!);
     expect(notes.every((n) => !n.bookmarked)).toBe(true);
+  });
+});
+
+describe("VaultProjectNotes live text", () => {
+  it("prefers the text of an open editor over the disk", async () => {
+    const source = new VaultProjectNotes(app, undefined, (path) => (path === "Novel/One.md" ? "# Camp\nUnsaved." : null));
+    const notes = await source.notes(source.projects()[0]!);
+    expect(notes.find((n) => n.path === "Novel/One.md")!.text).toBe("# Camp\nUnsaved.");
+    expect(notes.find((n) => n.path === "Novel/Novel.md")!.text).toBe("# Plan");
   });
 });

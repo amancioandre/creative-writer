@@ -17,6 +17,8 @@ export interface ProjectNote {
   /** Headings bookmarked in this note. */
   readonly bookmarkedHeadings: readonly string[];
   readonly scenes: readonly Scene[];
+  /** The note's raw Markdown, for the manuscript view; the vault adapter always supplies it. */
+  readonly text?: string;
   /** Relationships written under `## Relationships` in this note; `targetPath` when the link resolved. */
   readonly relations?: readonly ProjectRelation[];
 }

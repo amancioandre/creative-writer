@@ -45,6 +45,7 @@ export function effectiveSettings(state: EditorState): PluginSettings {
       styleEnabled: false,
       readabilityEnabled: false,
       llm: { ...s.llm, provider: "off" },
+      manuscript: { ...s.manuscript, tintTags: false },
     };
     off.set(s, d);
   }

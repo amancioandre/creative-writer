@@ -1,4 +1,4 @@
-import { MarkdownView, Notice, Plugin, editorInfoField, type WorkspaceLeaf } from "obsidian";
+import { MarkdownRenderer, MarkdownView, Notice, Plugin, editorInfoField, type WorkspaceLeaf } from "obsidian";
 import { Compartment } from "@codemirror/state";
 
 import type { PluginSettings } from "./domain/settings/Settings";
@@ -22,6 +22,7 @@ import { currentLineExtension } from "./infrastructure/codemirror/currentLineExt
 import { focusFadeExtension } from "./infrastructure/codemirror/focusFadeExtension";
 import { rhythmExtension } from "./infrastructure/codemirror/rhythmExtension";
 import { styleExtension } from "./infrastructure/codemirror/styleExtension";
+import { commentTagExtension } from "./infrastructure/codemirror/commentTagExtension";
 import { findingsTooltip } from "./infrastructure/codemirror/findingsTooltip";
 import { asyncFindingsExtension, analyseNow } from "./infrastructure/codemirror/asyncFindingsExtension";
 import { ConfiguredLlmAnalyser } from "./infrastructure/llm/ConfiguredLlmAnalyser";
@@ -53,6 +54,9 @@ import { StoryThreadsNoteRepository } from "./infrastructure/obsidian/StoryThrea
 import { BuildStoryThreads } from "./application/use-cases/BuildStoryThreads";
 import { EditStoryThread } from "./application/use-cases/EditStoryThread";
 import { AnalyzeSceneFacts } from "./application/use-cases/AnalyzeSceneFacts";
+import { BuildManuscript } from "./application/use-cases/BuildManuscript";
+import { ExportManuscript } from "./application/use-cases/ExportManuscript";
+import { MANUSCRIPT_VIEW_TYPE, ManuscriptView } from "./infrastructure/obsidian/views/ManuscriptView";
 import { OllamaFactAnalyser } from "./infrastructure/llm/OllamaFactAnalyser";
 import type { EntityKind, SceneRef } from "./domain/story/StoryGraph";
 import { removeRelation, upsertRelation } from "./domain/story/Relations";
@@ -171,7 +175,8 @@ export default class CreativeZenModePlugin extends Plugin {
     this.addCommand({ id: "open-writing-desk", name: "Open writing desk", callback: () => void this.openDesk() });
 
     // Story map: rebuilt from the vault on demand; only model readings persist, in `Story map.md` inside the project.
-    const projectNotes = new VaultProjectNotes(this.app, (path) => this.scope.counts(path));
+    // Notes open in an editor are read from the editor, unsaved edits included, so the manuscript follows the typing.
+    const projectNotes = new VaultProjectNotes(this.app, (path) => this.scope.counts(path), (path) => this.editorText(path));
     const storyRepo = new StoryMapNoteRepository(notes);
     const buildStoryMap = new BuildStoryMap(projectNotes, storyRepo, { candidateMinMentions: 3, tagger: new CompromiseTagger() });
     const storySource = {
@@ -254,6 +259,53 @@ export default class CreativeZenModePlugin extends Plugin {
       name: "Read this note for facts (story threads)",
       editorCallback: () => void this.openStoryThreads(null).then(() => (this.app.workspace.getLeavesOfType(STORY_THREADS_VIEW_TYPE)[0]?.view as StoryThreadsView | undefined)?.readActiveNote()),
     });
+    // Manuscript: the project's prose stitched into one read-only page; every note keeps its element and re-renders alone.
+    const buildManuscript = new BuildManuscript(projectNotes, () => this.current.manuscript);
+    const exportManuscript = new ExportManuscript(projectNotes, notes, () => this.current.manuscript);
+    const manuscriptSegmenter = new IntlSentenceSegmenter();
+    const exportNote = async (project: ProjectSpec): Promise<string> => {
+      const { path, manuscript } = await exportManuscript.execute(project);
+      new Notice(`creative-writer: ${manuscript.notes} note${manuscript.notes === 1 ? "" : "s"}, ${manuscript.words.toLocaleString()} words → ${path}`, 6000);
+      return path;
+    };
+    this.registerView(MANUSCRIPT_VIEW_TYPE, (leaf: WorkspaceLeaf) => new ManuscriptView(leaf, {
+      projects: storySource.projects,
+      activeProject: storySource.activeProject,
+      build: (project) => buildManuscript.execute(project),
+      render: (markdown, el, sourcePath, view) => MarkdownRenderer.render(this.app, markdown, el, sourcePath, view),
+      segment: (text) => manuscriptSegmenter.segment(text),
+      reveal: (path, line, ch) => void this.revealPosition(path, line, ch),
+      openLink: (link, sourcePath) => void this.app.workspace.openLinkText(link, sourcePath, false),
+      settings: () => this.current.manuscript,
+      updateSettings: (next) => void this.updateSettings({ ...this.current, manuscript: next }),
+      exportNote,
+      appendComment: (path, line, comment) => this.appendComment(path, line, comment),
+    }));
+    this.addCommand({ id: "open-manuscript", name: "Open manuscript", callback: () => void this.openManuscript(null) });
+    this.addCommand({
+      id: "export-manuscript",
+      name: "Export manuscript to a note",
+      callback: () => {
+        const project = storySource.activeProject() ?? storySource.projects()[0];
+        if (!project) { new Notice("creative-writer: no project — put story: true or writing-target in a note's front matter."); return; }
+        void exportNote(project);
+      },
+    });
+    this.addCommand({
+      id: "insert-comment",
+      name: "Insert comment here",
+      // A selection is highlighted and the comment follows it; the cursor lands inside the comment, ready for a tag or a note.
+      editorCallback: (editor) => {
+        const selected = editor.getSelection();
+        const from = editor.posToOffset(editor.getCursor("from"));
+        const lead = selected ? `==${selected}== %% ` : "%% ";
+        editor.replaceSelection(`${lead} %%`);
+        editor.setCursor(editor.offsetToPos(from + lead.length));
+      },
+    });
+    this.addRibbonIcon("book-open", "Open manuscript", () => void this.openManuscript(null));
+    this.registerEvent(this.app.workspace.on("editor-change", (_editor, info) => { if (info.file) this.refreshManuscript(); }));
+    this.registerEvent(this.app.vault.on("modify", () => this.refreshManuscript()));
     this.registerEvent(this.app.metadataCache.on("resolved", () => { this.refreshStoryMap(); this.pushProjectScopes(); }));
     this.registerEvent(this.app.vault.on("rename", () => this.refreshStoryMap()));
     this.registerEvent(this.app.vault.on("delete", () => this.refreshStoryMap()));
@@ -294,6 +346,7 @@ export default class CreativeZenModePlugin extends Plugin {
       focusFadeExtension(),
       rhythmExtension(new AnalyzeParagraphRhythm(new IntlSentenceSegmenter())),
       styleExtension(AnalyzeParagraphStyle.withDefaultRules(new CompromiseTagger(), new BrysbaertConcreteness())),
+      commentTagExtension(),
       findingsTooltip(),
       asyncFindingsExtension(llmAnalyser, {
         onBusy: (busy) => {
@@ -397,6 +450,59 @@ export default class CreativeZenModePlugin extends Plugin {
     if (project) await view.show(project); else await view.onOpen();
   }
 
+  private async openManuscript(project: ProjectSpec | null): Promise<void> {
+    const existing = this.app.workspace.getLeavesOfType(MANUSCRIPT_VIEW_TYPE)[0];
+    const leaf = existing ?? this.app.workspace.getLeaf("split", "vertical");
+    if (!existing) await leaf.setViewState({ type: MANUSCRIPT_VIEW_TYPE, active: true });
+    await this.app.workspace.revealLeaf(leaf);
+    const view = leaf.view as ManuscriptView;
+    if (project) await view.show(project); else await view.onOpen();
+  }
+
+  private manuscriptRefreshTimer: number | null = null;
+  /** Typing fires on every keystroke; the page only needs to follow after a short pause. */
+  private refreshManuscript(): void {
+    if (this.app.workspace.getLeavesOfType(MANUSCRIPT_VIEW_TYPE).length === 0) return;
+    if (this.manuscriptRefreshTimer !== null) window.clearTimeout(this.manuscriptRefreshTimer);
+    this.manuscriptRefreshTimer = window.setTimeout(() => {
+      this.manuscriptRefreshTimer = null;
+      for (const l of this.app.workspace.getLeavesOfType(MANUSCRIPT_VIEW_TYPE)) void (l.view as ManuscriptView).refresh();
+    }, 600);
+  }
+
+  /**
+   * Appends ` %% comment %%` to the end of a line — through the editor when the note is open, so no
+   * unsaved keystroke is lost, else on disk. The manuscript page refreshes from either path.
+   */
+  private async appendComment(path: string, line: number, comment: string): Promise<void> {
+    const insert = ` %% ${comment.replace(/%%/g, "").trim()} %%`;
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+      const view = leaf.view;
+      if (view instanceof MarkdownView && view.file?.path === path) {
+        const at = Math.min(line, view.editor.lastLine());
+        view.editor.replaceRange(insert, { line: at, ch: view.editor.getLine(at).length });
+        return;
+      }
+    }
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) return;
+    await this.app.vault.process(file, (text) => {
+      const lines = text.split("\n");
+      const at = Math.min(line, lines.length - 1);
+      lines[at] = `${lines[at]}${insert}`;
+      return lines.join("\n");
+    });
+  }
+
+  /** The text of a note as an open editor has it, or null when no editor shows it. */
+  private editorText(path: string): string | null {
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+      const view = leaf.view;
+      if (view instanceof MarkdownView && view.file?.path === path) return view.editor.getValue();
+    }
+    return null;
+  }
+
   private async openStoryThreads(project: ProjectSpec | null): Promise<void> {
     const existing = this.app.workspace.getLeavesOfType(STORY_THREADS_VIEW_TYPE)[0];
     const leaf = existing ?? this.app.workspace.getLeaf("tab");
@@ -418,19 +524,34 @@ export default class CreativeZenModePlugin extends Plugin {
       for (const l of ws.getLeavesOfType(STORY_MAP_VIEW_TYPE)) void (l.view as StoryMapView).refresh();
       for (const l of ws.getLeavesOfType(STORY_TIMELINE_VIEW_TYPE)) void (l.view as StoryTimelineView).refresh();
       for (const l of ws.getLeavesOfType(STORY_THREADS_VIEW_TYPE)) void (l.view as StoryThreadsView).refresh();
+      for (const l of ws.getLeavesOfType(MANUSCRIPT_VIEW_TYPE)) void (l.view as ManuscriptView).refresh();
     }, 2000);
   }
 
   /** Opens the note and puts the cursor on a scene's heading line. */
-  private async revealScene(path: string, line: number): Promise<void> {
+  private revealScene(path: string, line: number): Promise<void> {
+    return this.revealPosition(path, line, 0);
+  }
+
+  /**
+   * Opens the note in the editor already showing it, else in the current
+   * leaf when that is an editor, else beside the caller: a click in a story
+   * view must never replace that view with the note.
+   */
+  private async revealPosition(path: string, line: number, ch: number): Promise<void> {
     const file = this.app.vault.getAbstractFileByPath(path);
     if (!(file instanceof TFile)) return;
-    const leaf = this.app.workspace.getLeaf(false);
+    let leaf = this.app.workspace.getLeavesOfType("markdown").find((l) => l.view instanceof MarkdownView && l.view.file?.path === path);
+    if (!leaf) {
+      const current = this.app.workspace.getLeaf(false);
+      const type = current.view.getViewType();
+      leaf = type === "markdown" || type === "empty" ? current : this.app.workspace.getLeaf("split", "vertical");
+    }
     await leaf.openFile(file, { active: true });
     const md = leaf.view instanceof MarkdownView ? leaf.view : null;
     if (!md) return;
-    md.editor.setCursor({ line, ch: 0 });
-    md.editor.scrollIntoView({ from: { line, ch: 0 }, to: { line, ch: 0 } }, true);
+    md.editor.setCursor({ line, ch });
+    md.editor.scrollIntoView({ from: { line, ch }, to: { line, ch } }, true);
     md.editor.focus();
   }
 
@@ -520,7 +641,9 @@ export default class CreativeZenModePlugin extends Plugin {
   }
 
   private async updateSettings(next: PluginSettings): Promise<void> {
+    const manuscriptChanged = next.manuscript !== this.current.manuscript;
     this.current = next;
+    if (manuscriptChanged) this.refreshManuscript();
     await this.settingsRepo.save(next);
     // Push the new settings into every open editor; extensions react via the facet.
     this.app.workspace.iterateAllLeaves((leaf) => {

@@ -107,6 +107,7 @@ export function setIcon(el: HTMLElement, icon: string): void { el.setAttribute("
 export class WorkspaceLeaf {}
 export interface DataAdapter { exists(p: string): Promise<boolean>; read(p: string): Promise<string>; write(p: string, d: string): Promise<void>; }
 export class ItemView {
+  containerEl: HTMLElement = document.createElement("div");
   contentEl: HTMLElement = document.createElement("div");
   constructor(public leaf: WorkspaceLeaf) {}
   getViewType(): string { return ""; }

@@ -14,11 +14,14 @@ All commands appear in the palette under **Creative Writer:**. None has a defaul
 | **Open story timeline** | Open *Who is where* beside the current tab. |
 | **Read this note with model (story map)** | Read the active note's scenes for relationships, references and events (or the whole project if no note is active). Local model only. |
 | **Open story threads** | Open the [story threads](/guide/story-threads) view in a tab: the manuscript as one line, threads and contradictions as arcs over it. |
+| **Open manuscript** | Open the [manuscript](/guide/manuscript) beside the current tab: the project's prose on one page, folders as its outline. Click a passage to edit it. |
+| **Export manuscript to a note** | Write the active project's manuscript as one note beside it, `<Name> (manuscript).md`, comments left out. Overwritten on every export. |
+| **Insert comment here** | Drop `%%  %%` at the cursor, cursor inside. A selection becomes a `==highlight==` with the comment after it. |
 | **Read this note for facts (story threads)** | Read the active note's scenes for concrete facts — eye colours, ages, places, who knows what — so scenes can be checked against each other. Local model only. |
 
 ## Ribbon
 
-Three ribbon icons: the fork opens the story map, the chart opens the story timeline, the curve opens the story threads. Obsidian lets you reorder or hide ribbon items from the ribbon's own menu.
+Four ribbon icons: the fork opens the story map, the chart opens the story timeline, the curve opens the story threads, the book opens the manuscript. Obsidian lets you reorder or hide ribbon items from the ribbon's own menu.
 
 ## Status bar
 
