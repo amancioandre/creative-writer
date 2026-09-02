@@ -321,7 +321,8 @@ export class ManuscriptView extends ItemView {
       const row = parent.createDiv({ cls: "czm-ms-cm-row", attr: { role: "button", tabindex: "-1", title: "Open the other scene" } });
       row.createSpan({ text: "clash", cls: "czm-ms-cm-badge is-conflict" });
       row.createSpan({ text: c.text, cls: "czm-ms-cm-text" });
-      row.addEventListener("click", () => this.source.reveal(c.otherPath, c.otherLine, 0, true));
+      row.addEventListener("click", () => this.goTo(c.otherPath, c.otherLine));
+      row.addEventListener("dblclick", () => this.source.reveal(c.otherPath, c.otherLine, 0, true));
     }
   }
 
@@ -335,8 +336,29 @@ export class ManuscriptView extends ItemView {
     const settings = this.source.settings();
     if (!this.project || !settings.showComments) { side.hidden = true; return; }
     side.hidden = false;
-    this.renderParagraphPane(side, settings);
+    this.renderParagraphPane(side.createDiv({ cls: "czm-ms-side-para-wrap" }), settings);
     this.renderAllPane(side, settings);
+  }
+
+  /** The paragraph pane alone, when the selection moved but the list is being used. */
+  private refreshParagraphPane(): void {
+    const wrap = this.side?.querySelector<HTMLElement>(".czm-ms-side-para-wrap");
+    if (!wrap || this.side?.hidden) return;
+    wrap.empty();
+    this.renderParagraphPane(wrap, this.source.settings());
+  }
+
+  /** Bring the page to a note's line: select the block holding it, scroll to it, let the editor follow. Focus stays where it is. */
+  private goTo(path: string, line: number, match?: (b: ManuscriptBlock) => boolean): void {
+    const blocks = [...(this.page?.querySelectorAll<HTMLElement>(`.czm-ms-note[data-path="${cssEscape(path)}"] .czm-ms-block`) ?? [])];
+    const el = (match && blocks.find((b) => { const r = this.refs.get(b); return !!r?.block && match(r.block); })) ?? this.blockAt(path, line) ?? blocks.find((b) => { const r = this.refs.get(b); return !!r?.block && r.block.from > line; }) ?? blocks[blocks.length - 1];
+    const ref = el ? this.refs.get(el) : undefined;
+    if (!el || !ref?.block) return;
+    this.active = { path: ref.path, line: ref.block.from };
+    this.markActive();
+    this.refreshParagraphPane();
+    if (typeof el.scrollIntoView === "function") el.scrollIntoView({ block: "center" });
+    this.source.reveal(ref.path, ref.block.from, 0, false);
   }
 
   private renderParagraphPane(side: HTMLElement, settings: ManuscriptSettings): void {
@@ -429,7 +451,9 @@ export class ManuscriptView extends ItemView {
       if (color) badge.style.setProperty("--czm-tag", color);
       row.createSpan({ text: a.text.length > 160 ? `${a.text.slice(0, 160)}…` : a.text, cls: "czm-ms-cm-text" });
       if (where) row.createSpan({ text: item.title, cls: "czm-ms-cm-where" });
-      row.addEventListener("click", () => this.source.reveal(item.path, a.line, a.ch, true));
+      // Click: the page goes to the paragraph and the editor follows. Double click or Shift+Enter: into the editor at the comment.
+      row.addEventListener("click", () => this.goTo(item.path, a.line, (b) => b.annotations.includes(a)));
+      row.addEventListener("dblclick", () => this.source.reveal(item.path, a.line, a.ch, true));
     });
     parent.addEventListener("keydown", (ev) => {
       const items = [...parent.querySelectorAll<HTMLElement>(".czm-ms-cm-row")];
@@ -440,6 +464,7 @@ export class ManuscriptView extends ItemView {
       else if (ev.key === "ArrowUp") { ev.preventDefault(); go(at - 1); }
       else if (ev.key === "Home") { ev.preventDefault(); go(0); }
       else if (ev.key === "End") { ev.preventDefault(); go(items.length - 1); }
+      else if ((ev.key === "Enter" || ev.key === " ") && ev.shiftKey) { ev.preventDefault(); items[at]!.dispatchEvent(new MouseEvent("dblclick")); }
       else if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); items[at]!.click(); }
       else if (ev.key === "Escape") { ev.preventDefault(); this.activeEl()?.focus(); }
     });
