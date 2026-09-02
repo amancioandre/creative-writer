@@ -2,6 +2,10 @@
 
 Release notes for every version are on the [releases page](https://github.com/amancioandre/creative-writer/releases). This file carries the same text for the versions since it was started.
 
+## Unreleased
+
+- Selecting a paragraph on the manuscript page opens the note beside the page when no editor shows it (the editor beside the page swaps its file, or a split opens), still without taking focus. 0.7.0 only followed in an editor that was already open.
+
 ## 0.7.0 — The manuscript
 
 The whole story on one page, read-only, with the folder tree as its outline, a comments pane, and the rest of the plugin folded onto it.

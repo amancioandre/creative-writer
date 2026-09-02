@@ -564,10 +564,23 @@ export default class CreativeZenModePlugin extends Plugin {
     return this.revealPosition(path, line, 0);
   }
 
-  /** An editor already showing the note follows to the position without taking focus; nothing opens otherwise. */
+  /**
+   * The editor follows a selection on the manuscript page without taking focus: the editor already showing
+   * the note, else the most recent editor in the main area (its file swapped, the way the file explorer
+   * does it), else a new split beside the page.
+   */
   private async followPosition(path: string, line: number, ch: number): Promise<void> {
-    const leaf = this.app.workspace.getLeavesOfType("markdown").find((l) => l.view instanceof MarkdownView && l.view.file?.path === path);
-    const md = leaf?.view instanceof MarkdownView ? leaf.view : null;
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) return;
+    const ws = this.app.workspace;
+    let leaf = ws.getLeavesOfType("markdown").find((l) => l.view instanceof MarkdownView && l.view.file?.path === path);
+    if (!leaf) {
+      const recent = ws.getMostRecentLeaf();
+      leaf = recent?.view instanceof MarkdownView ? recent
+        : ws.getLeavesOfType("markdown").find((l) => l.getRoot() === ws.rootSplit) ?? ws.getLeaf("split", "vertical");
+      await leaf.openFile(file, { active: false });
+    }
+    const md = leaf.view instanceof MarkdownView ? leaf.view : null;
     if (!md) return;
     md.editor.setCursor({ line, ch });
     md.editor.scrollIntoView({ from: { line, ch }, to: { line, ch } }, true);
