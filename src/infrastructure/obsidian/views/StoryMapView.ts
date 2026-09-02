@@ -103,7 +103,7 @@ export class StoryMapView extends ItemView {
   }
 
   getViewType(): string { return STORY_MAP_VIEW_TYPE; }
-  getDisplayText(): string { return this.project ? `Story map · ${this.project.name}` : "Story map"; }
+  getDisplayText(): string { return "Story map"; }
   getIcon(): string { return "git-fork"; }
 
   async onOpen(): Promise<void> {

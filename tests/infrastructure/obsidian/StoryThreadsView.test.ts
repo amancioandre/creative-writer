@@ -69,7 +69,7 @@ describe("StoryThreadsView", () => {
   it("has a stable type, an icon, and names the project", async () => {
     const { v } = await open();
     expect(v.getViewType()).toBe(STORY_THREADS_VIEW_TYPE);
-    expect(v.getDisplayText()).toBe("Story threads · Novel");
+    expect(v.getDisplayText()).toBe("Story threads");
     expect(v.getIcon()).toBe("spline");
   });
 
@@ -253,7 +253,7 @@ describe("StoryThreadsView", () => {
     expect(el.querySelector(".czm-map-card.is-open")).not.toBeNull();
     await v.show({ ...novel, scope: "Other/", name: "Other" });
     expect(el.querySelector(".czm-map-card.is-open")).toBeNull();
-    expect(v.getDisplayText()).toBe("Story threads · Other");
+    expect(v.getDisplayText()).toBe("Story threads");
   });
 
   it("names scenes the way Story threads.md does", () => {

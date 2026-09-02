@@ -89,7 +89,7 @@ export class ManuscriptView extends ItemView {
   }
 
   getViewType(): string { return MANUSCRIPT_VIEW_TYPE; }
-  getDisplayText(): string { return this.project ? `Manuscript · ${this.project.name}` : "Manuscript"; }
+  getDisplayText(): string { return "Manuscript"; }
   getIcon(): string { return "book-open"; }
 
   async onOpen(): Promise<void> {

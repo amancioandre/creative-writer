@@ -53,7 +53,7 @@ describe("ManuscriptView", () => {
     const { v } = open(notes());
     await v.onOpen();
     expect(v.getViewType()).toBe(MANUSCRIPT_VIEW_TYPE);
-    expect(v.getDisplayText()).toBe("Manuscript · Novel");
+    expect(v.getDisplayText()).toBe("Manuscript");
   });
 
   it("renders the outline as eyebrows, the notes' blocks, and counts without comment text", async () => {

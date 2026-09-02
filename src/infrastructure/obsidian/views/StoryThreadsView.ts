@@ -83,7 +83,7 @@ export class StoryThreadsView extends ItemView {
   }
 
   getViewType(): string { return STORY_THREADS_VIEW_TYPE; }
-  getDisplayText(): string { return this.project ? `Story threads · ${this.project.name}` : "Story threads"; }
+  getDisplayText(): string { return "Story threads"; }
   getIcon(): string { return "spline"; }
 
   async onOpen(): Promise<void> {

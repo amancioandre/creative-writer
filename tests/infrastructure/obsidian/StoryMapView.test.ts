@@ -81,7 +81,7 @@ describe("StoryMapView", () => {
   it("has a stable type and names the project", async () => {
     const { v } = await open();
     expect(v.getViewType()).toBe(STORY_MAP_VIEW_TYPE);
-    expect(v.getDisplayText()).toBe("Story map · Novel");
+    expect(v.getDisplayText()).toBe("Story map");
     expect(v.getIcon()).toBeTruthy();
   });
 

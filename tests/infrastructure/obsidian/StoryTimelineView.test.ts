@@ -32,7 +32,7 @@ describe("StoryTimelineView", () => {
     const { v } = open();
     await v.onOpen();
     expect(v.getViewType()).toBe(STORY_TIMELINE_VIEW_TYPE);
-    expect(v.getDisplayText()).toBe("Timeline · Novel");
+    expect(v.getDisplayText()).toBe("Story timeline");
   });
 
   it("lists scenes grouped by note with the cast across the top", async () => {

@@ -33,7 +33,7 @@ export class StoryTimelineView extends ItemView {
   }
 
   getViewType(): string { return STORY_TIMELINE_VIEW_TYPE; }
-  getDisplayText(): string { return this.project ? `Timeline · ${this.project.name}` : "Story timeline"; }
+  getDisplayText(): string { return "Story timeline"; }
   getIcon(): string { return "gantt-chart"; }
 
   async onOpen(): Promise<void> {
