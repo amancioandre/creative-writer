@@ -3,7 +3,8 @@ import type { WritingLog } from "../../domain/progress/WritingLog";
 import { entityKindOf } from "../../domain/story/EntityIndex";
 import { countWords } from "../../domain/text/Dialogue";
 import type { Board } from "../../domain/writer/Board";
-import { type StoriesRow, type StoryCard, ideasOf, linkTarget, storyCard } from "../../domain/writer/Stories";
+import { type Fingerprint, type StoriesRow, type StoryCard, ideasOf, linkTarget, storyCard } from "../../domain/writer/Stories";
+import type { ProseProfile } from "./ProfileProse";
 import { type Story, usesOf } from "../../domain/writer/Uses";
 import type { ProjectNote } from "../../domain/story/BuildGraph";
 import type { ProjectNotes } from "../ports/ProjectNotes";
@@ -22,6 +23,8 @@ export class BuildWriterStories {
     private readonly vault: WriterVault,
     private readonly log: () => WritingLog,
     private readonly storiesFolder: () => string,
+    /** Measures prose for the fingerprint; null skips it. */
+    private readonly profiler: { document(markdown: string): ProseProfile } | null = null,
   ) {}
 
   async execute(board: Board): Promise<StoriesRow> {
@@ -40,15 +43,21 @@ export class BuildWriterStories {
 
   private facts(spec: ProjectSpec, notes: readonly ProjectNote[]) {
     let words = 0, cast = 0, hasProse = false;
+    const prose: string[] = [];
     for (const n of notes) {
       words += countWords(n.text ?? "");
       const kind = entityKindOf(n);
       if (kind === "character") cast++;
-      if (kind === "note" && n.scenes.some((s) => s.prose.trim().length > 0)) hasProse = true;
+      if (kind === "note" && n.scenes.some((s) => s.prose.trim().length > 0)) { hasProse = true; prose.push(n.text ?? ""); }
+    }
+    let fingerprint: Fingerprint | null = null;
+    if (this.profiler && prose.length) {
+      const p = this.profiler.document(prose.join("\n\n"));
+      if (p.readingEase && p.wordCount > 0) fingerprint = { words: p.wordCount, ease: p.readingEase.score, grade: p.readingEase.grade, variety: p.variety?.cv ?? null, dialogue: p.dialogue.ratio };
     }
     const fm = this.vault.frontmatter(spec.notePath) ?? {};
     const linked = (key: string) => { const t = linkTarget(fm[key]); return t ? this.vault.resolve(t, spec.notePath) : null; };
-    return { spec, frontmatter: fm, words, hasProse, cast, lastWorked: lastWorkedOn(this.log(), spec), idea: linked("writing-idea"), voice: linked("writing-voice") };
+    return { spec, frontmatter: fm, words, hasProse, cast, lastWorked: lastWorkedOn(this.log(), spec), idea: linked("writing-idea"), voice: linked("writing-voice"), fingerprint };
   }
 
   /** Folders directly under the stories folder that no project declares and that hold prose. Nothing without a stories folder. */

@@ -1,5 +1,6 @@
 import { type Framework, type GroupDef, UNSORTED, groupsOf } from "./Framework";
 import { groupsFromTags } from "./Tags";
+import type { ReadingStatus } from "./Stories";
 import { type NamedEdge, type Point, type Rect, type WriterFile, colourOf, resolveFramework } from "./WriterFile";
 
 /** A note as the board reads it: path, title, its tags, the notes it links to, an excerpt for the hover card. */
@@ -13,6 +14,8 @@ export interface WriterNote {
   readonly excerpt: string;
   /** Resolved path of the note's `writer-story` link: the project an idea became. Null for most notes. */
   readonly story?: string | null;
+  /** The note's `reading:` status, for reading-list cards. */
+  readonly reading?: ReadingStatus | null;
 }
 
 /** A note on the board. The same card appears in every group its tags name. */
@@ -21,6 +24,8 @@ export interface Card {
   readonly title: string;
   /** The project note this idea became, when it did. */
   readonly story: string | null;
+  /** Reading-list status, when the note carries one. */
+  readonly reading: ReadingStatus | null;
   /** The groups it is shown in: its tags' groups, unknown ones folded to Unsorted. */
   readonly groups: readonly string[];
   /** The tags' groups as written, one per entry of `groups`, so a tag can be rewritten from what it is. */
@@ -86,7 +91,7 @@ export function buildBoard(notes: readonly WriterNote[], file: WriterFile): Boar
       if (groups.includes(shown)) continue;
       groups.push(shown); tagGroups.push(g);
     }
-    cards.push({ path: n.path, title: n.title, story: n.story ?? null, groups, tagGroups, excerpt: n.excerpt, position: file.cards[n.path] ?? null });
+    cards.push({ path: n.path, title: n.title, story: n.story ?? null, reading: n.reading ?? null, groups, tagGroups, excerpt: n.excerpt, position: file.cards[n.path] ?? null });
   }
   cards.sort((a, b) => a.title.localeCompare(b.title) || a.path.localeCompare(b.path));
   const byPath = new Map(cards.map((c) => [c.path, c]));

@@ -70,6 +70,7 @@ import { MANUSCRIPT_VIEW_TYPE, ManuscriptView } from "./infrastructure/obsidian/
 import { castFromGraph, conflictMarks, type SectionFacts } from "./domain/manuscript/StoryFacts";
 import { OllamaFactAnalyser } from "./infrastructure/llm/OllamaFactAnalyser";
 import type { EntityKind, SceneRef } from "./domain/story/StoryGraph";
+import type { Archetype } from "./domain/myth/MythReport";
 import { removeRelation, upsertRelation } from "./domain/story/Relations";
 import { setLayout } from "./domain/story/StoryMapFile";
 import { FuzzySuggestModal, TFile, TFolder, normalizePath, type App, type CachedMetadata } from "obsidian";
@@ -180,7 +181,7 @@ export default class CreativeZenModePlugin extends Plugin {
       },
     });
 
-    this.registerView(MYTH_VIEW_TYPE, (leaf: WorkspaceLeaf) => new MythView(leaf));
+    this.registerView(MYTH_VIEW_TYPE, (leaf: WorkspaceLeaf) => new MythView(leaf, { toWriter: (a) => void this.archetypeToWriter(a) }));
     this.addCommand({
       id: "analyse-myth",
       name: "Analyse selection for myth and archetype",
@@ -289,7 +290,7 @@ export default class CreativeZenModePlugin extends Plugin {
       }
     };
     const writerFiles = new VaultWriterFiles(this.app, notes, frontMatterOf);
-    const buildWriterStories = new BuildWriterStories(projectNotes, writerFiles, () => this.tracker.current, () => this.current.writer.storiesFolder);
+    const buildWriterStories = new BuildWriterStories(projectNotes, writerFiles, () => this.tracker.current, () => this.current.writer.storiesFolder, profile);
     const promoteIdea = new PromoteIdea(writerFiles);
     const writerSource: WriterSource = {
       build: async () => {
@@ -316,6 +317,15 @@ export default class CreativeZenModePlugin extends Plugin {
         else void this.openDesk();
       },
       storiesFolder: () => this.current.writer.storiesFolder,
+      setVoice: async (spec, voicePath) => {
+        const link = voicePath ? `[[${voicePath.slice(voicePath.lastIndexOf("/") + 1).replace(/\.md$/i, "")}]]` : null;
+        await writerFiles.processFrontMatter(spec.notePath, (fm) => { if (link) fm["writing-voice"] = link; else delete fm["writing-voice"]; });
+        await indexed(spec.notePath, (c) => (link ? c?.frontmatter?.["writing-voice"] === link : c?.frontmatter?.["writing-voice"] === undefined));
+      },
+      setReading: async (path, status) => {
+        await writerFiles.processFrontMatter(path, (fm) => { if (status) fm["reading"] = status; else delete fm["reading"]; });
+        await indexed(path, (c) => (status ? c?.frontmatter?.["reading"] === status : c?.frontmatter?.["reading"] === undefined));
+      },
       update: (change) => writerRepo.update(change),
       filePath: () => writerRepo.path(),
       openNote: (path) => void this.app.workspace.openLinkText(path, "", false),
@@ -359,6 +369,7 @@ export default class CreativeZenModePlugin extends Plugin {
         });
       },
     });
+    this.writer = { repo: writerRepo, board: buildWriterBoard, source: writerSource };
     this.registerView(WRITER_VIEW_TYPE, (leaf: WorkspaceLeaf) => new WriterView(leaf, writerSource));
     this.registerExtensions([WRITER_EXTENSION], WRITER_VIEW_TYPE);
     this.addCommand({ id: "open-writer", name: "Open writer", callback: () => void this.openWriter() });
@@ -611,6 +622,36 @@ export default class CreativeZenModePlugin extends Plugin {
     (leaf.view as DeskView).refresh();
   }
 
+  /**
+   * The myth analysis found an archetype: attach it to an archetype card on
+   * the writer board as a REF at the cursor, or make it a new archetype
+   * note. One-way, story to writer; the board never feeds the model.
+   */
+  private async archetypeToWriter(a: Archetype): Promise<void> {
+    const file = await this.writer!.repo.load();
+    const board = await this.writer!.board.boardFor(file);
+    const cards = board.cards.filter((c) => c.groups.includes("archetype")).map((c) => ({ path: c.path, title: c.title, groups: c.groups.join(", ") }));
+    const NEW = "\u0000new";
+    const items = [{ path: NEW, title: `New archetype note: ${a.name}`, groups: "in the stories folder, tagged" }, ...cards];
+    const chosen = await new Promise<string | null>((resolve) => new CardPicker(this.app, items, resolve).open());
+    if (!chosen) return;
+    if (chosen === NEW) {
+      const path = await this.writer!.source.createNote(a.name, "archetype");
+      const f = this.app.vault.getAbstractFileByPath(path);
+      if (f instanceof TFile) await this.app.vault.process(f, (text) => `${text}# ${a.name}\n\n${a.character ? `${a.character}, in the scene the model read.\n\n` : ""}> ${a.evidence}\n`);
+      void this.app.workspace.openLinkText(path, "", false);
+      new Notice(`creative-writer: ${a.name} is on the writer board.`);
+      return;
+    }
+    const md = this.app.workspace.getActiveViewOfType(MarkdownView);
+    const name = chosen.slice(chosen.lastIndexOf("/") + 1).replace(/\.md$/i, "");
+    if (!md) { new Notice(`creative-writer: open the scene in an editor to place the REF to ${name}.`); return; }
+    const editor = md.editor;
+    const to = editor.getCursor("to");
+    editor.replaceRange(` %% REF: [[${name}]] %%`, to);
+    new Notice(`creative-writer: REF to ${name} placed at the cursor.`);
+  }
+
   private async openWriter(): Promise<void> {
     const existing = this.app.workspace.getLeavesOfType(WRITER_VIEW_TYPE)[0];
     const leaf = existing ?? this.app.workspace.getLeaf("tab");
@@ -620,6 +661,7 @@ export default class CreativeZenModePlugin extends Plugin {
   }
 
   private writerTimer: number | null = null;
+  private writer: { repo: WriterFileRepository; board: BuildWriterBoard; source: WriterSource } | null = null;
   /** The board follows the vault: a tag added by hand shows on the next metadata pass. */
   private refreshWriter(): void {
     if (this.writerTimer !== null) window.clearTimeout(this.writerTimer);

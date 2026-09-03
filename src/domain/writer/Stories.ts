@@ -34,6 +34,42 @@ export function linkTarget(v: unknown): string | null {
   return m ? m[1]!.trim() : v.trim() || null;
 }
 
+/** Reading-list status on a `reading` card: `reading: to-read | reading | read`. */
+export const READING_STATUSES = ["to-read", "reading", "read"] as const;
+export type ReadingStatus = (typeof READING_STATUSES)[number];
+export const READING_LABEL: Record<ReadingStatus, string> = { "to-read": "To read", reading: "Reading", read: "Read" };
+
+export function parseReading(v: unknown): ReadingStatus | null {
+  if (typeof v !== "string") return null;
+  const t = v.trim().toLowerCase().replace(/\s+/g, "-");
+  return (READING_STATUSES as readonly string[]).includes(t) ? (t as ReadingStatus) : null;
+}
+
+/**
+ * The shape of a story's prose in four numbers, so a voice on the card can
+ * be checked against the voice on the page: reading ease, grade level,
+ * sentence-length variety (coefficient of variation, null under three
+ * sentences) and the share of words inside dialogue.
+ */
+export interface Fingerprint {
+  readonly words: number;
+  readonly ease: number;
+  readonly grade: number;
+  readonly variety: number | null;
+  readonly dialogue: number;
+}
+
+/** The fingerprint of several stories together, each weighted by its words; null when none has one. */
+export function blendFingerprints(prints: readonly (Fingerprint | null)[]): Fingerprint | null {
+  const real = prints.filter((p): p is Fingerprint => p !== null && p.words > 0);
+  const words = real.reduce((a, p) => a + p.words, 0);
+  if (!words) return null;
+  const avg = (pick: (p: Fingerprint) => number) => real.reduce((a, p) => a + pick(p) * p.words, 0) / words;
+  const varied = real.filter((p) => p.variety !== null);
+  const vWords = varied.reduce((a, p) => a + p.words, 0);
+  return { words, ease: avg((p) => p.ease), grade: avg((p) => p.grade), variety: vWords ? varied.reduce((a, p) => a + p.variety! * p.words, 0) / vWords : null, dialogue: avg((p) => p.dialogue) };
+}
+
 /** What the use case gathers about one project before it becomes a card. */
 export interface StoryFacts {
   readonly spec: ProjectSpec;
@@ -48,6 +84,7 @@ export interface StoryFacts {
   readonly idea: string | null;
   /** Resolved path of the `writing-voice` link, if any. */
   readonly voice: string | null;
+  readonly fingerprint: Fingerprint | null;
 }
 
 export interface StoryCard {
@@ -62,6 +99,7 @@ export interface StoryCard {
   readonly target: number;
   readonly cast: number;
   readonly lastWorked: Day | null;
+  readonly fingerprint: Fingerprint | null;
 }
 
 export function storyCard(facts: StoryFacts): StoryCard {
@@ -78,6 +116,7 @@ export function storyCard(facts: StoryFacts): StoryCard {
     target: facts.spec.targetWords,
     cast: facts.cast,
     lastWorked: facts.lastWorked,
+    fingerprint: facts.fingerprint,
   };
 }
 

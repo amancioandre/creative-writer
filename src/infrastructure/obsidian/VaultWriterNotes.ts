@@ -1,7 +1,7 @@
 import type { WriterNotes } from "../../application/ports/WriterNotes";
 import type { WriterNote } from "../../domain/writer/Board";
 import { hasWriterTag } from "../../domain/writer/Tags";
-import { linkTarget } from "../../domain/writer/Stories";
+import { linkTarget, parseReading } from "../../domain/writer/Stories";
 
 /** The slice of Obsidian's `App` this adapter touches, typed structurally so tests can fake it. */
 export interface FileLike { readonly path: string }
@@ -67,7 +67,7 @@ export class VaultWriterNotes implements WriterNotes {
       const title = f.path.slice(f.path.lastIndexOf("/") + 1).replace(/\.md$/i, "");
       const storyLink = linkTarget(cache?.frontmatter?.["writer-story"]);
       const story = storyLink ? this.app.metadataCache.getFirstLinkpathDest(storyLink, f.path)?.path ?? null : null;
-      out.push({ path: f.path, title, tags, links: [...links], excerpt: excerptOf(text), story });
+      out.push({ path: f.path, title, tags, links: [...links], excerpt: excerptOf(text), story, reading: parseReading(cache?.frontmatter?.["reading"]) });
     }
     return out;
   }

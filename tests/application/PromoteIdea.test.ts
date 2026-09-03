@@ -21,7 +21,7 @@ function fakeVault(initial: Record<string, string> = {}, fm: Record<string, Reco
   return { vault, files, folders, frontmatter };
 }
 
-const idea: Card = { path: "notes/Bear hunt premise.md", title: "Bear hunt premise", story: null, groups: ["premise"], tagGroups: ["premise"], excerpt: "A man hunts a bear to find himself. He fails first.", position: null };
+const idea: Card = { path: "notes/Bear hunt premise.md", title: "Bear hunt premise", story: null, reading: null, groups: ["premise"], tagGroups: ["premise"], excerpt: "A man hunts a bear to find himself. He fails first.", position: null };
 
 describe("PromoteIdea", () => {
   it("scaffolds the documented shape, writes the project note keys and links the idea back", async () => {

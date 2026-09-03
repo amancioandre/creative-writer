@@ -51,4 +51,10 @@ describe("BuildWriterStories", () => {
     expect(row.uses.get("voices/The Narrator.md")).toEqual(["Bear"]);
     expect(row.uses.has("notes/Other idea.md")).toBe(false);
   });
+  it("measures a fingerprint from the prose notes when given a profiler", async () => {
+    const profiler = { document: (md: string) => ({ wordCount: md.split(/\s+/).length, sentenceCount: 2, paragraphCount: 1, readingEase: { score: 70, grade: 6, band: "ok" as never }, variety: { cv: 0.3, band: "ok" as never }, dialogue: { ratio: 0.1, band: "ok" as never } }) };
+    const row = await new BuildWriterStories(projects, vault, () => log, () => "storytelling", profiler).execute(board);
+    expect(row.stories[0]!.fingerprint).toMatchObject({ ease: 70, grade: 6, variety: 0.3, dialogue: 0.1 });
+    expect(row.stories[1]!.fingerprint).toBeNull();
+  });
 });

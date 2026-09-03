@@ -18,3 +18,7 @@ The prompt is explicit that most passages are not myths and that a quiet domesti
 ## Relation to the story map
 
 The myth report is per selection and lives in the sidebar for the session. The story map's [reading](/guide/model-reading) covers something adjacent — outside *references* per scene, persisted — and both use the same rule: verbatim evidence or nothing.
+
+## Into the writer board
+
+Every archetype in the report has **Add to writer**: attach it to an archetype card on the [writer board](/guide/writer#from-the-myth-analysis) as a `%% REF: [[Card]] %%` at the cursor, or make it a new archetype note, tagged and holding the evidence. One way only; the board never reaches the model.

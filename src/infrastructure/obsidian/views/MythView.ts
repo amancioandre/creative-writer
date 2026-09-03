@@ -1,5 +1,11 @@
 import { ItemView, type WorkspaceLeaf } from "obsidian";
-import type { MythReport } from "../../../domain/myth/MythReport";
+import type { Archetype, MythReport } from "../../../domain/myth/MythReport";
+
+/** What the report can hand on: an archetype the model found, offered to the writer board. */
+export interface MythActions {
+  /** Attach the archetype to a card on the writer board, or make it a new archetype note. */
+  toWriter(archetype: Archetype): void;
+}
 
 export const MYTH_VIEW_TYPE = "creative-zen-myth";
 
@@ -8,7 +14,7 @@ export const MYTH_VIEW_TYPE = "creative-zen-myth";
  * said goes in as text nodes — never innerHTML.
  */
 export class MythView extends ItemView {
-  constructor(leaf: WorkspaceLeaf) {
+  constructor(leaf: WorkspaceLeaf, private readonly actions: MythActions | null = null) {
     super(leaf);
   }
 
@@ -64,6 +70,11 @@ export class MythView extends ItemView {
           const item = root.createDiv({ cls: "czm-myth-item" });
           item.createDiv({ text: a.character ? `${a.name} — ${a.character}` : a.name, cls: "czm-myth-name" });
           item.createEl("blockquote", { text: a.evidence });
+          if (this.actions) {
+            const btn = item.createEl("button", { text: "Add to writer", cls: "czm-myth-to-writer" });
+            btn.title = "Attach this archetype to a card on the writer board, or make it a new archetype note. One-way: the board never feeds the model.";
+            btn.addEventListener("click", () => this.actions!.toWriter(a));
+          }
         }
       }
       if (report.next) {

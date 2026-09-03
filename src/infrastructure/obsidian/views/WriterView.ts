@@ -4,7 +4,7 @@ import type { WriterSettings } from "../../../domain/settings/Settings";
 import { EMPTY_BOARD, type Board, type Card } from "../../../domain/writer/Board";
 import { FRAMEWORKS, UNSORTED, groupsOf, type GroupDef } from "../../../domain/writer/Framework";
 import { CARD_H, CARD_W, GROUP_HEAD, GROUP_PAD, MIN_GROUP_H, MIN_GROUP_W, PILL_H, STORY_H, STORY_W, type BoardLayout, type PlacedCard, type PlacedGroup, type StoriesBand, cardCentre, groupAt, layoutBoard, layoutStories, reorderedGroup, unionRect } from "../../../domain/writer/Layout";
-import { EMPTY_STORIES, SETTABLE_STAGES, STAGE_LABEL, type Stage, type StoriesRow, type StoryCard } from "../../../domain/writer/Stories";
+import { EMPTY_STORIES, READING_LABEL, READING_STATUSES, SETTABLE_STAGES, STAGE_LABEL, type Fingerprint, type ReadingStatus, type Stage, type StoriesRow, type StoryCard, blendFingerprints } from "../../../domain/writer/Stories";
 import { isRecurring } from "../../../domain/writer/Uses";
 import { EMPTY_WRITER_FILE, type NamedEdge, type Point, type Rect, type WriterFile, placeCard, placeGroup, putEdge, removeEdge, setColour, setFramework, setView } from "../../../domain/writer/WriterFile";
 import { normalizePrefix } from "../../../domain/writer/Tags";
@@ -24,6 +24,10 @@ export interface WriterSource {
   /** Declares an unfiled folder a story. */
   declare(folder: string): Promise<void>;
   openStory(view: StoryView, spec: ProjectSpec): void;
+  /** Writes `writing-voice` on the project note; null removes it. */
+  setVoice(spec: ProjectSpec, voicePath: string | null): Promise<void>;
+  /** Writes `reading` on a note; null removes it. */
+  setReading(path: string, status: ReadingStatus | null): Promise<void>;
   /** The stories folder from settings, "" for none. */
   storiesFolder(): string;
   /** Read, change, write the writer file. */
@@ -337,8 +341,15 @@ export class WriterView extends ItemView {
     body.appendChild(premise);
     const meta = document.createElement("div");
     meta.className = "czm-writer-story-meta";
-    meta.textContent = storyMeta(story);
+    meta.textContent = storyMeta(story, story.voice ? this.titleOf(story.voice) : null);
     body.appendChild(meta);
+    if (story.fingerprint) {
+      const print = document.createElement("div");
+      print.className = "czm-writer-story-print";
+      print.textContent = fingerprintLine(story.fingerprint);
+      print.title = "The shape of the prose: reading ease, grade level, sentence-length variety, share of words in dialogue.";
+      body.appendChild(print);
+    }
     fo.appendChild(body);
     g.appendChild(fo);
     const t = document.createElementNS(SVG, "title");
@@ -437,6 +448,12 @@ export class WriterView extends ItemView {
       chip.style.setProperty("--czm-group", this.colourOf(gid));
       chip.title = this.groupName(gid);
       chips.appendChild(chip);
+    }
+    if (c.reading && c.groups.includes("reading")) {
+      const status = document.createElement("span");
+      status.className = `czm-writer-reading czm-writer-reading-${c.reading}`;
+      status.textContent = READING_LABEL[c.reading];
+      chips.appendChild(status);
     }
     const uses = this.stories.uses.get(c.path) ?? [];
     if (uses.length) {
@@ -833,7 +850,16 @@ export class WriterView extends ItemView {
     inferred.value = "";
     select.value = story.declared ? story.stage : "";
     select.addEventListener("change", () => void this.source.setStage(story.spec, (select.value || null) as Stage | null).then(() => this.show(), (e: unknown) => this.flash(e instanceof Error ? e.message : String(e))));
-    this.card.createDiv({ text: storyMeta(story), cls: "czm-map-hint" });
+    this.card.createDiv({ text: storyMeta(story, null), cls: "czm-map-hint" });
+    if (story.fingerprint) this.card.createDiv({ text: fingerprintLine(story.fingerprint), cls: "czm-map-hint czm-writer-print" });
+    const voices = this.board.cards.filter((c) => c.groups.includes("voice"));
+    const voiceRow = this.card.createDiv({ cls: "czm-map-alias" });
+    voiceRow.createSpan({ text: "Voice", cls: "czm-map-hint" });
+    const voiceSelect = voiceRow.createEl("select", { cls: "dropdown czm-writer-voice-select", attr: { "aria-label": "Voice" } });
+    voiceSelect.createEl("option", { text: voices.length ? "No voice" : "No voice cards yet", attr: { value: "" } });
+    for (const v of voices) { const o = voiceSelect.createEl("option", { text: v.title }); o.value = v.path; }
+    voiceSelect.value = story.voice && voices.some((v) => v.path === story.voice) ? story.voice : "";
+    voiceSelect.addEventListener("change", () => void this.source.setVoice(story.spec, voiceSelect.value || null).then(() => this.show(), (e: unknown) => this.flash(e instanceof Error ? e.message : String(e))));
     const actions = this.card.createDiv({ cls: "czm-map-card-actions" });
     const btn = (text: string, cls: string, onClick: () => void) => { const b = actions.createEl("button", { text, cls }); b.addEventListener("click", onClick); return b; };
     btn("Map", "czm-act-story-map", () => this.source.openStory("map", story.spec));
@@ -940,6 +966,38 @@ export class WriterView extends ItemView {
       select.addEventListener("change", () => { apply.disabled = !select.value; });
       apply.addEventListener("click", () => void this.source.retag(path, null, select.value).then(() => this.show(), (e: unknown) => this.flash(e instanceof Error ? e.message : String(e))));
     }
+    if (c.groups.includes("reading")) {
+      const row = this.card.createDiv({ cls: "czm-map-alias" });
+      row.createSpan({ text: "Reading", cls: "czm-map-hint" });
+      const select = row.createEl("select", { cls: "dropdown czm-writer-reading-select", attr: { "aria-label": "Reading status" } });
+      select.createEl("option", { text: "No status", attr: { value: "" } });
+      for (const st of READING_STATUSES) { const o = select.createEl("option", { text: READING_LABEL[st] }); o.value = st; }
+      select.value = c.reading ?? "";
+      select.addEventListener("change", () => void this.source.setReading(path, (select.value || null) as ReadingStatus | null).then(() => this.show(), (e: unknown) => this.flash(e instanceof Error ? e.message : String(e))));
+      const analyses = this.board.derived.filter((e) => e.from === path || e.to === path).map((e) => (e.from === path ? e.to : e.from)).filter((p) => this.layout.cards.get(p)?.card.groups.includes("craft"));
+      if (analyses.length) {
+        this.card.createEl("h4", { text: "Analysis" });
+        const list = this.card.createDiv({ cls: "czm-map-list czm-writer-analysis" });
+        for (const p of analyses) { const r = list.createDiv({ cls: "czm-map-row", attr: { role: "button", tabindex: "0" } }); r.createSpan({ text: this.titleOf(p), cls: "czm-map-row-name" }); r.addEventListener("click", () => this.select({ kind: "card", path: p })); }
+      }
+    }
+    if (c.groups.includes("voice")) {
+      const adopters = this.stories.stories.filter((s) => s.voice === path);
+      this.card.createEl("h4", { text: adopters.length ? "Adopted by" : "Adopted by no story yet" });
+      if (adopters.length) {
+        const list = this.card.createDiv({ cls: "czm-map-list" });
+        for (const s of adopters) {
+          const r = list.createDiv({ cls: "czm-map-row czm-writer-adopter", attr: { role: "button", tabindex: "0" } });
+          r.createSpan({ text: s.spec.name, cls: "czm-map-row-name" });
+          r.createSpan({ text: s.fingerprint ? fingerprintLine(s.fingerprint) : "", cls: "czm-map-row-meta" });
+          r.addEventListener("click", () => this.select({ kind: "story", scope: s.spec.scope }));
+        }
+        const blended = blendFingerprints(adopters.map((s) => s.fingerprint));
+        if (blended) this.card.createDiv({ text: `On the page: ${fingerprintLine(blended)}`, cls: "czm-map-hint czm-writer-voice-print" });
+      } else {
+        this.card.createDiv({ text: "Pick it from a story's side card under Voice.", cls: "czm-map-hint" });
+      }
+    }
     const usedIn = this.stories.uses.get(path) ?? [];
     if (usedIn.length) {
       this.card.createEl("h4", { text: isRecurring(this.stories.uses, path) ? "Used in · recurring" : "Used in" });
@@ -1016,13 +1074,19 @@ export class WriterView extends ItemView {
   }
 }
 
-/** One line under a story: words against the target, the cast, the last day worked. */
-export function storyMeta(story: StoryCard): string {
+/** One line under a story: words against the target, the cast, the voice, the last day worked. */
+export function storyMeta(story: StoryCard, voice: string | null): string {
   const parts: string[] = [];
   parts.push(story.target > 0 ? `${story.words.toLocaleString("en")} / ${story.target.toLocaleString("en")} words` : `${story.words.toLocaleString("en")} words`);
   if (story.cast) parts.push(`${story.cast} in the cast`);
+  if (voice) parts.push(`voice ${voice}`);
   parts.push(story.lastWorked ? `worked ${story.lastWorked}` : "never logged");
   return parts.join(" · ");
+}
+
+/** The fingerprint in one line. */
+export function fingerprintLine(p: Fingerprint): string {
+  return [`ease ${Math.round(p.ease)}`, `grade ${Math.round(p.grade)}`, p.variety !== null ? `variety ${p.variety.toFixed(2)}` : null, `dialogue ${Math.round(p.dialogue * 100)}%`].filter(Boolean).join(" · ");
 }
 
 function contains(r: Rect, p: Point): boolean {

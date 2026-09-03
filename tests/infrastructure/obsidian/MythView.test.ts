@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { WorkspaceLeaf } from "obsidian";
 import { MythView, MYTH_VIEW_TYPE } from "../../../src/infrastructure/obsidian/views/MythView";
-import { validateMythReport } from "../../../src/domain/myth/MythReport";
+import { MythReport, validateMythReport } from "../../../src/domain/myth/MythReport";
 
 const text = "She went down into the cellar where her father had died.";
 const report = validateMythReport({
@@ -46,5 +46,16 @@ describe("MythView", () => {
     v.showReport(validateMythReport({ summary: "<img src=x onerror=alert(1)>", patterns: [], archetypes: [] }, text), "m");
     expect(v.contentEl.querySelector("img")).toBeNull();
     expect(v.contentEl.textContent).toContain("<img");
+  });
+  it("offers Add to writer on each archetype when given actions, and nothing without", async () => {
+    const report = MythReport.create([], [{ name: "The mentor", character: "Vitaliy", evidence: "he taught" }], "", "");
+    const bare = new MythView(new WorkspaceLeaf());
+    bare.showReport(report, "m");
+    expect(bare.contentEl.querySelector(".czm-myth-to-writer")).toBeNull();
+    const sent: string[] = [];
+    const v = new MythView(new WorkspaceLeaf(), { toWriter: (a) => { sent.push(a.name); } });
+    v.showReport(report, "m");
+    (v.contentEl.querySelector(".czm-myth-to-writer") as HTMLElement).click();
+    expect(sent).toEqual(["The mentor"]);
   });
 });

@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { type WriterNote, buildBoard } from "../../../src/domain/writer/Board";
 import { EMPTY_WRITER_FILE } from "../../../src/domain/writer/WriterFile";
-import { type StoryFacts, ideasOf, inferStage, linkTarget, parseStage, storyCard } from "../../../src/domain/writer/Stories";
+import { type StoryFacts, blendFingerprints, ideasOf, inferStage, linkTarget, parseReading, parseStage, storyCard } from "../../../src/domain/writer/Stories";
 import { STORY_W, layoutStories } from "../../../src/domain/writer/Layout";
 import type { ProjectSpec } from "../../../src/domain/progress/Project";
 import { lastWorkedOn } from "../../../src/domain/progress/Project";
 
 const spec = (name: string, target = 0): ProjectSpec => ({ name, notePath: `storytelling/${name}/${name}.md`, scope: `storytelling/${name}/`, targetWords: target, deadline: null, dailyWords: 0, ignoredNames: [] });
-const facts = (over: Partial<StoryFacts> = {}): StoryFacts => ({ spec: spec("Bear"), frontmatter: {}, words: 0, hasProse: false, cast: 0, lastWorked: null, idea: null, voice: null, ...over });
+const facts = (over: Partial<StoryFacts> = {}): StoryFacts => ({ spec: spec("Bear"), frontmatter: {}, words: 0, hasProse: false, cast: 0, lastWorked: null, idea: null, voice: null, fingerprint: null, ...over });
 
 describe("Stories", () => {
   it("parses only settable stages and infers the rest from prose and the target", () => {
@@ -48,7 +48,7 @@ describe("Stories", () => {
     expect(lastWorkedOn(log, spec("Horse"))).toBeNull();
   });
   it("lays the band out above the board: story cards in a row, pills on a line below", () => {
-    const row = { stories: [storyCard(facts({ spec: spec("Bear") })), storyCard(facts({ spec: spec("Horse") }))], ideas: [{ path: "i.md", title: "An idea", story: null, groups: ["premise"], tagGroups: ["premise"], excerpt: "", position: null }], unfiled: ["storytelling/Loose"], uses: new Map() };
+    const row = { stories: [storyCard(facts({ spec: spec("Bear") })), storyCard(facts({ spec: spec("Horse") }))], ideas: [{ path: "i.md", title: "An idea", story: null, reading: null, groups: ["premise"], tagGroups: ["premise"], excerpt: "", position: null }], unfiled: ["storytelling/Loose"], uses: new Map() };
     const band = layoutStories(row, 0);
     expect(band.rect.y + band.rect.h).toBeLessThan(0);
     expect(band.stories.map((s) => s.story.spec.name)).toEqual(["Bear", "Horse"]);
@@ -60,5 +60,13 @@ describe("Stories", () => {
     const empty = layoutStories({ stories: [], ideas: [], unfiled: [], uses: new Map() }, 0);
     expect(empty.stories).toEqual([]);
     expect(empty.rect.h).toBeGreaterThan(0);
+  });
+  it("parses reading statuses and blends fingerprints by words", () => {
+    expect(parseReading(" To Read ")).toBe("to-read");
+    expect(parseReading("READ")).toBe("read");
+    expect(parseReading("later")).toBeNull();
+    expect(blendFingerprints([null, { words: 0, ease: 1, grade: 1, variety: 1, dialogue: 1 }])).toBeNull();
+    const b = blendFingerprints([{ words: 100, ease: 80, grade: 4, variety: null, dialogue: 0.2 }, { words: 300, ease: 40, grade: 8, variety: 0.5, dialogue: 0 }, null]);
+    expect(b).toEqual({ words: 400, ease: 50, grade: 7, variety: 0.5, dialogue: 0.05 });
   });
 });

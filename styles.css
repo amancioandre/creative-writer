@@ -558,3 +558,11 @@ body.czm-zen .workspace-split.mod-root {
 .czm-writer-edge-colour { width: 20px; height: 20px; margin-left: auto; }
 .czm-writer-edge-suggest { grid-template-columns: repeat(2, 1fr); }
 .czm-act-name-line { font-size: var(--font-ui-smaller); padding: 0 6px; height: 20px; line-height: 1; margin-left: 4px; }
+/* Voices, fingerprints and the reading list. */
+.czm-writer-story-print { font-size: 10.5px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.czm-writer-print, .czm-writer-voice-print { font-variant-numeric: tabular-nums; }
+.czm-writer-reading { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; padding: 0 6px; border-radius: 8px; border: 1px solid var(--text-muted); color: var(--text-muted); white-space: nowrap; }
+.czm-writer-reading-reading { border-color: var(--text-accent); color: var(--text-accent); }
+.czm-writer-reading-read { border-color: #7a9e7e; color: #7a9e7e; }
+.czm-writer-voice-select, .czm-writer-reading-select { flex: 1; min-width: 0; }
+.czm-myth-to-writer { font-size: var(--font-ui-smaller); padding: 2px 8px; height: auto; margin-top: 4px; }

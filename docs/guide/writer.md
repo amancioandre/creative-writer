@@ -39,6 +39,20 @@ A story **uses** a card when any note in its folder links to it. A plain `[[wiki
 
 **Lines** join cards whose notes link. Click one, or *Name…* beside a linked card, and give it a name: *inspired by*, *contradicts*, *same theme*, *adopted*, or your own words, with a colour. A pair may carry several names. A line only lives between notes that link; remove the link and the line goes dashed until you restore it or remove the name. Names and colours live in the writer file.
 
+## Voices and the fingerprint
+
+A **voice** is a card in the Voices group: a narrator persona you have built. A story adopts one from its side card under *Voice*, which writes `writing-voice` into the project note. The voice's own side card lists the stories that adopted it.
+
+Every story with prose carries a **fingerprint**: reading ease, grade level, sentence-length variety and the share of words inside dialogue, measured over its prose notes. It sits on the story card and in its side card. A voice card shows the fingerprints of the stories that adopted it and the blend of them, weighted by words, so you can see whether the voice on the page matches the voice on the card.
+
+## The reading list
+
+A card in the Reading group may carry a status, `reading: to-read`, `reading` or `read`, set from its side card and shown as a chip on the board. When the note links to a card in the Craft group, the side card points at that analysis.
+
+## From the myth analysis
+
+The [myth and archetype](/guide/myth) report gains **Add to writer** on every archetype it finds: attach it to an archetype card as a `REF` at the cursor, or make it a new archetype note in the stories folder, tagged and holding the model's evidence. The flow is one way, story to writer; the board never feeds the model.
+
 ## Moving around
 
 Drag the background to pan, wheel to zoom, **Fit** in the panel to see everything. Drag a card to place it; positions are kept relative to the group, so a card travels with its group. Groups **flow**: inside a layer they sit left to right and never overlap. Drag a group by its name or its empty area to change its place in the row, and drag the small square in its corner to resize it; the neighbours move along. Order and sizes are remembered in the writer file.
@@ -62,6 +76,6 @@ The sliders icon top-right folds the panel. It holds the framework dropdown (Tru
 
 The board is the most private thing in the vault. Nothing on it is exported by the manuscript, written by the threads, logged by the desk, or put in a model prompt. It has no effect on the story map, and the story map none on it. It is read only back to you.
 
-## What comes next
+## Design
 
-Voices, the style fingerprint and the reading list follow in the next release. The [design note](/development/writer-design) has the order.
+The [design note](/development/writer-design) records the decisions and the departures from them.

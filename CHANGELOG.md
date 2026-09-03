@@ -26,6 +26,13 @@ The writer is a fourth level above the sentence, the story and the vault: what t
 - **Named lines.** Click a line between linked cards, or *Name…* beside a link, and give it a name and a colour; a pair may carry several. Names live in the writer file and go dashed when the notes stop linking.
 - A test pins the privacy rule: a REF comment never reaches the prose a model reading is built from.
 
+### Voices, fingerprints, reading
+
+- A story adopts a **voice** (a card in the Voices group) from its side card, written as `writing-voice`; the voice's side card lists its adopters.
+- Every story with prose shows a **fingerprint**: reading ease, grade, sentence variety and dialogue share over its prose notes. A voice card blends the fingerprints of the stories that adopted it, so the voice on the page can be checked against the voice on the card.
+- Reading cards carry `reading: to-read | reading | read`, set from the side card, shown as a chip; a linked craft note is offered as the analysis.
+- The myth report's archetypes gain **Add to writer**: a REF to an existing archetype card, or a new tagged archetype note with the evidence.
+
 ### The protocol
 
 - **Copy writer schema** puts the [writer protocol](docs/reference/writer-file.md) on the clipboard for your vault's framework and tag prefix: which `#writer/<group>` tags make a note a card, the project-note keys, the `%% REF: [[Card]] %%` comment, and the `Writer.writer` file format. Paste it to a person or a tool migrating a board into the vault; the plugin ships no importer on purpose.
