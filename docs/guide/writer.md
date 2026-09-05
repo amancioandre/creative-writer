@@ -51,7 +51,7 @@ A card in the Reading group may carry a status, `reading: to-read`, `reading` or
 
 ## From the myth analysis
 
-The [myth and archetype](/guide/myth) report gains **Add to writer** on every archetype it finds: attach it to an archetype card as a `REF` at the cursor, or make it a new archetype note in the stories folder, tagged and holding the model's evidence. The flow is one way, story to writer; the board never feeds the model.
+The [myth and archetype](/guide/myth) report gains **Add to writer** on every archetype it finds: attach it to an archetype card as a `REF` at the cursor, or make it a new archetype note where Obsidian puts new notes, tagged and holding the model's evidence. The flow is one way, story to writer; the board never feeds the model.
 
 ## Moving around
 
@@ -59,10 +59,34 @@ Drag the background to pan, wheel to zoom, **Fit** in the panel to see everythin
 
 **Drop a card into another group and its tag follows.** The old tag is replaced by the new one, in the front matter if it lives there, in the text if it was inline. Drop it on the background and it just stays where you put it; the tag is untouched.
 
+**Click a group and the board zooms to it**, close enough that its cards show their first lines. Click it again, click the background, or press Escape, and the whole board comes back.
+
+## The keyboard
+
+Click anywhere on the board and the keys work; press `?` for the list on the board itself. Lanes are the layers, read top to bottom, with the stories band above the first. Tab is never taken: it moves the focus as it does everywhere in Obsidian, and Ctrl and Cmd stay with Obsidian's own hotkeys.
+
+| Key | Does |
+|---|---|
+| `←` `→` `↑` `↓` | Move between groups and zoom to each. Left and right walk the row; up and down cross lanes to the nearest group. Up from the first layer reaches the stories; there, left and right walk the stories, the idea pills and the unfiled pills. |
+| `Shift` + arrows | Move between the cards inside the group, in reading order. |
+| `Alt` + `←` `→` | Move the selected card into the neighbouring group; its tag follows, as a drop would. |
+| `PgUp` `PgDn` · `1`–`9` · `s` | A lane up or down; a lane by number; the stories. |
+| `Home` `End` | The first or last group of the row. |
+| `Enter` | On a group: the new-note form. On a card or a story: open the note. |
+| `n` · `N` · `a` | New note here · New story · Add an existing note here, through the picker. |
+| `Delete` | Take the card out of this group: the tag comes off, the note stays. |
+| `f` · `z` · `+` `−` | Fit the board · Fit the selection · Zoom. |
+| `/` · `p` · `?` | Find a card · Fold the panel · The list of keys. |
+| `Esc` | Close the form, then step back from a card to its group, then clear the selection and fit the board. |
+
+In the new-note form, **Enter creates the note and stays on the board** with the new card selected, so you can keep collecting; **Ctrl+Enter** creates it and opens it. Escape returns to the group.
+
+The lane and group moves, the new note, the fit and the list are also commands (*Writer: next lane* and so on), live while the board is the active tab, so they can be given hotkeys in Settings → Hotkeys.
+
 ## Adding and removing cards
 
 - **Add note…** in the panel opens a picker over the whole vault and tags the note into the group chosen in the dropdown beside it. A group's own card has *Add note here*.
-- **New note…** creates a note with the tag already in place, in the [stories folder](/reference/settings#writer) if you set one, and opens it.
+- **New note…** creates a note with the tag already in place and selects its card; Ctrl+Enter in the form opens it too. The note goes where Obsidian puts new notes, *Settings → Files and links → Default location for new notes*, so a card is a note like any other.
 - Select a card and use **Remove** beside a group to take that tag off the note. The note itself is never touched beyond its tags.
 - Tag a note by hand and it appears on the next refresh. A tag whose suffix matches no group lands in **Unsorted**, so nothing is lost when you switch frameworks.
 

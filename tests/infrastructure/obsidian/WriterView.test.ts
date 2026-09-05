@@ -62,6 +62,8 @@ async function open(overrides: Partial<WriterSource> = {}, notes?: WriterNote[],
   const s = source(overrides, notes, initial, stories);
   const v = new WriterView(new WorkspaceLeaf(), s.src);
   await v.onOpen();
+  // Attached, so focus() works: jsdom only focuses elements in the document.
+  document.body.replaceChildren(v.contentEl);
   return { v, ...s, el: v.contentEl };
 }
 const tick = () => new Promise((r) => setTimeout(r, 0));
@@ -192,8 +194,10 @@ describe("WriterView", () => {
     (el.querySelector(".czm-act-create") as HTMLElement).click();
     await tick(); await tick();
     expect(calls.created).toEqual(["voice:The Narrator"]);
-    expect(calls.opened).toEqual(["new/The Narrator.md"]);
+    // The Create button stays on the board with the new card selected; only Ctrl+Enter opens the note.
+    expect(calls.opened).toEqual([]);
     expect(card(el, "new/The Narrator.md")).not.toBeNull();
+    expect(card(el, "new/The Narrator.md").classList.contains("is-selected")).toBe(true);
 
     (el.querySelector(".czm-writer-schema") as HTMLElement).click();
     expect(calls.schema).toBe(1);
@@ -381,5 +385,155 @@ describe("WriterView", () => {
     expect(calls.reading).toEqual(["sources/The Road.md: read"]);
     expect(card(el, "sources/The Road.md").querySelector(".czm-writer-reading")!.textContent).toBe("Read");
     expect(el.querySelector(".czm-writer-analysis .czm-map-row-name")!.textContent).toBe("the-road");
+  });
+});
+
+describe("WriterView keyboard", () => {
+  const key = (el: Element, k: string, init: KeyboardEventInit = {}) => el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...init }));
+  const root = (el: HTMLElement) => el.querySelector<HTMLElement>(".czm-writer")!;
+  const selectedGroup = (el: HTMLElement) => el.querySelector(".czm-writer-group.is-selected")?.getAttribute("data-id") ?? null;
+  const sideName = (el: HTMLElement) => el.querySelector(".czm-writer-side .czm-map-card-name")?.textContent ?? null;
+  const status = (el: HTMLElement) => el.querySelector(".czm-map-status")!.textContent;
+
+  it("moves between groups with the arrows, fits the view to the group, jumps lanes, and Escape fits the board again", async () => {
+    const { v, el } = await open();
+    const r = root(el), k0 = zoom(v);
+    expect(k0).toBeLessThan(1);
+    key(r, "ArrowRight");
+    expect(selectedGroup(el)).toBe("genre");
+    expect(sideName(el)).toBe("Genres");
+    expect(zoom(v)).toBe(1); // fitted to the group: cards readable
+    key(r, "ArrowRight"); expect(selectedGroup(el)).toBe("plot");
+    key(r, "ArrowDown"); expect(selectedGroup(el)).toBe("premise");
+    key(r, "ArrowDown"); expect(selectedGroup(el)).toBe("poem");
+    key(r, "ArrowUp"); expect(selectedGroup(el)).toBe("premise");
+    key(r, "ArrowUp"); expect(selectedGroup(el)).toBe("genre");
+    key(r, "End"); expect(selectedGroup(el)).toBe("dialogue");
+    key(r, "Home"); expect(selectedGroup(el)).toBe("genre");
+    key(r, "PageDown"); expect(selectedGroup(el)).toBe("premise");
+    key(r, "3"); expect(selectedGroup(el)).toBe("poem");
+    key(r, "1");
+    key(r, "ArrowUp"); // the band above, with no stories: nowhere to stand
+    expect(selectedGroup(el)).toBe("genre");
+    expect(status(el)).toContain("No stories yet");
+    key(r, "Escape");
+    expect(selectedGroup(el)).toBeNull();
+    expect(zoom(v)).toBeCloseTo(k0, 6);
+    key(r, "+"); expect(zoom(v)).toBeGreaterThan(k0);
+    key(r, "-"); expect(zoom(v)).toBeCloseTo(k0, 6);
+  });
+  it("walks the cards of a group with Shift+arrows, opens one with Enter, and Escape steps back to the group before clearing", async () => {
+    const { v, el, calls } = await open();
+    const r = root(el), k0 = zoom(v);
+    key(r, "3");
+    key(r, "ArrowRight", { shiftKey: true });
+    expect(card(el, "sources/Invictus.md").classList.contains("is-selected")).toBe(true);
+    expect(sideName(el)).toBe("Invictus");
+    key(r, "Enter");
+    expect(calls.opened).toEqual(["sources/Invictus.md"]);
+    key(r, "Escape");
+    expect(selectedGroup(el)).toBe("poem");
+    expect(zoom(v)).toBe(1);
+    key(r, "Escape");
+    expect(selectedGroup(el)).toBeNull();
+    expect(zoom(v)).toBeCloseTo(k0, 6);
+  });
+  it("opens the new-note form with Enter on a group; Enter creates and stays, Ctrl+Enter creates and opens, Escape returns to the group", async () => {
+    const { el, calls } = await open();
+    const r = root(el);
+    key(r, "5");
+    expect(selectedGroup(el)).toBe("voice");
+    key(r, "Enter");
+    let title = el.querySelector<HTMLInputElement>(".czm-writer-new-title")!;
+    expect(title).not.toBeNull();
+    expect(document.activeElement).toBe(title);
+    title.value = "The Narrator";
+    key(title, "Enter");
+    await tick(); await tick();
+    expect(calls.created).toEqual(["voice:The Narrator"]);
+    expect(calls.opened).toEqual([]);
+    expect(card(el, "new/The Narrator.md").classList.contains("is-selected")).toBe(true);
+    expect(document.activeElement).toBe(r);
+    key(r, "n"); // from a card: its group
+    title = el.querySelector<HTMLInputElement>(".czm-writer-new-title")!;
+    title.value = "Another";
+    key(title, "Enter", { ctrlKey: true });
+    await tick(); await tick();
+    expect(calls.created).toEqual(["voice:The Narrator", "voice:Another"]);
+    expect(calls.opened).toEqual(["new/Another.md"]);
+    key(r, "5");
+    key(r, "Enter");
+    key(el.querySelector<HTMLInputElement>(".czm-writer-new-title")!, "Escape");
+    expect(selectedGroup(el)).toBe("voice");
+    expect(sideName(el)).toBe("Voices");
+  });
+  it("carries a card into the neighbouring group with Alt+arrow and takes it out of its group with Delete", async () => {
+    const { v, el, calls, file } = await open();
+    const r = root(el);
+    key(r, "1"); key(r, "ArrowRight"); key(r, "ArrowRight");
+    expect(selectedGroup(el)).toBe("theme");
+    key(r, "ArrowRight", { shiftKey: true });
+    expect(card(el, "notes/Courage.md").classList.contains("is-selected")).toBe(true);
+    key(r, "ArrowRight", { altKey: true });
+    await tick(); await tick(); await tick();
+    expect(calls.retags).toEqual(["notes/Courage.md: theme -> archetype"]);
+    expect(card(el, "notes/Courage.md").classList.contains("is-selected")).toBe(true);
+    expect(group(el, "archetype").querySelector(".czm-writer-group-name")!.textContent).toBe("Archetypes · 1");
+    expect(file().cards["notes/Courage.md"]).toBeUndefined();
+    expect(zoom(v)).toBe(1);
+    key(r, "Delete");
+    await tick(); await tick(); await tick();
+    expect(calls.retags[1]).toBe("notes/Courage.md: archetype -> ∅");
+    expect(card(el, "notes/Courage.md")).toBeNull();
+    expect(selectedGroup(el)).toBe("archetype");
+    expect(status(el)).toContain("taken out of Archetypes");
+  });
+  it("walks the stories band: s enters it, left and right cross stories and pills, Enter opens the project note, down leaves it", async () => {
+    const idea = note("notes/Idea.md", ["#writer/premise"], [], "A man hunts a bear.");
+    const { el, calls } = await open({}, [...baseNotes, idea], undefined, { stories: [bearCard], ideas: [{ path: idea.path, title: "Idea", story: null, reading: null, groups: ["premise"], tagGroups: ["premise"], excerpt: idea.excerpt, position: null }], unfiled: ["storytelling/Loose"], uses: new Map() });
+    const r = root(el);
+    key(r, "s");
+    expect(el.querySelector(".czm-writer-story.is-selected")?.getAttribute("data-scope")).toBe(bear.scope);
+    key(r, "ArrowRight");
+    expect(el.querySelector(".czm-writer-pill-idea.is-selected")).not.toBeNull();
+    key(r, "ArrowRight");
+    expect(el.querySelector(".czm-writer-pill-unfiled.is-selected")).not.toBeNull();
+    key(r, "ArrowRight");
+    expect(el.querySelector(".czm-writer-pill-unfiled.is-selected")).not.toBeNull();
+    key(r, "ArrowLeft"); key(r, "ArrowLeft");
+    expect(el.querySelector(".czm-writer-story.is-selected")).not.toBeNull();
+    key(r, "Enter");
+    expect(calls.opened).toEqual([bear.notePath]);
+    key(r, "ArrowDown");
+    expect(selectedGroup(el)).toBe("genre");
+    key(r, "ArrowUp");
+    expect(el.querySelector(".czm-writer-story.is-selected")).not.toBeNull();
+    key(r, "N");
+    expect(el.querySelector(".czm-writer-side.is-open input")).not.toBeNull();
+  });
+  it("keeps the keys dead inside inputs and with Ctrl held, toggles the help and the panel, and / finds the search", async () => {
+    const { el, settings } = await open();
+    const r = root(el);
+    key(r, "?");
+    expect(el.querySelector(".czm-writer-help")!.classList.contains("is-open")).toBe(true);
+    expect(el.querySelectorAll(".czm-writer-help tr").length).toBeGreaterThan(8);
+    key(r, "Escape");
+    expect(el.querySelector(".czm-writer-help")!.classList.contains("is-open")).toBe(false);
+    key(r, "/");
+    const search = el.querySelector<HTMLInputElement>(".czm-map-search")!;
+    expect(document.activeElement).toBe(search);
+    key(search, "ArrowRight");
+    expect(selectedGroup(el)).toBeNull();
+    key(search, "Escape");
+    expect(document.activeElement).toBe(r);
+    key(r, "1");
+    key(r, "Escape", { ctrlKey: true });
+    expect(selectedGroup(el)).toBe("genre");
+    key(r, "p");
+    expect(settings().panelOpen).toBe(false);
+    expect(el.querySelector(".czm-writer-panel")!.classList.contains("is-open")).toBe(false);
+    key(r, "/"); // opens the panel to reach the search
+    expect(settings().panelOpen).toBe(true);
+    expect(document.activeElement).toBe(el.querySelector(".czm-map-search"));
   });
 });

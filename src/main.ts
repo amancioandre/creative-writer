@@ -55,7 +55,7 @@ import { VaultWriterTags } from "./infrastructure/obsidian/VaultWriterTags";
 import { VaultWriterFiles } from "./infrastructure/obsidian/VaultWriterFiles";
 import { BuildWriterStories } from "./application/use-cases/BuildWriterStories";
 import { PromoteIdea } from "./application/use-cases/PromoteIdea";
-import { WRITER_VIEW_TYPE, WriterView, type WriterSource } from "./infrastructure/obsidian/views/WriterView";
+import { WRITER_VIEW_TYPE, WriterView, type WriterAction, type WriterSource } from "./infrastructure/obsidian/views/WriterView";
 import { WRITER_EXTENSION, renameCard } from "./domain/writer/WriterFile";
 import { writerTag } from "./domain/writer/Tags";
 import { STORY_TIMELINE_VIEW_TYPE, StoryTimelineView } from "./infrastructure/obsidian/views/StoryTimelineView";
@@ -337,7 +337,9 @@ export default class CreativeZenModePlugin extends Plugin {
       pickNote: () => new Promise((resolve) => new NotePicker(this.app, resolve).open()),
       createNote: async (title, group) => {
         const prefix = (await writerRepo.load()).prefix;
-        const folder = this.current.writer.storiesFolder;
+        // A card is a note like any other: it goes where Obsidian puts new notes (Settings → Files and links → Default location for new notes).
+        const parent = this.app.fileManager.getNewFileParent("");
+        const folder = parent.isRoot() ? "" : parent.path;
         const base = title.replace(/[\\/:*?"<>|#^[\]]+/g, " ").replace(/\s+/g, " ").trim() || "Untitled";
         const at = (name: string) => normalizePath(folder ? `${folder}/${name}.md` : `${name}.md`);
         let path = at(base);
@@ -373,6 +375,19 @@ export default class CreativeZenModePlugin extends Plugin {
     this.registerView(WRITER_VIEW_TYPE, (leaf: WorkspaceLeaf) => new WriterView(leaf, writerSource));
     this.registerExtensions([WRITER_EXTENSION], WRITER_VIEW_TYPE);
     this.addCommand({ id: "open-writer", name: "Open writer", callback: () => void this.openWriter() });
+    // The board's keys, as commands too, so they can be rebound in Settings → Hotkeys. Live only while the board is the active view.
+    const boardActions: [string, string, WriterAction][] = [
+      ["writer-next-lane", "Writer: next lane", "next-lane"],
+      ["writer-previous-lane", "Writer: previous lane", "previous-lane"],
+      ["writer-next-group", "Writer: next group", "next-group"],
+      ["writer-previous-group", "Writer: previous group", "previous-group"],
+      ["writer-new-note", "Writer: new note in the focused group", "new-note"],
+      ["writer-fit", "Writer: fit the board", "fit"],
+      ["writer-shortcuts", "Writer: show keyboard shortcuts", "help"],
+    ];
+    for (const [id, name, action] of boardActions) {
+      this.addCommand({ id, name, checkCallback: (checking) => { const view = this.app.workspace.getActiveViewOfType(WriterView); if (!view) return false; if (!checking) view.run(action); return true; } });
+    }
     this.addRibbonIcon("layout-dashboard", "Open writer", () => void this.openWriter());
     this.registerEvent(this.app.vault.on("rename", (file, oldPath) => { if (file instanceof TFile && file.extension === "md") void writerRepo.update((f) => renameCard(f, oldPath, file.path)).then(() => this.refreshWriter()); }));
     this.addRibbonIcon("gantt-chart", "Open story timeline", () => void this.openStoryTimeline(null));

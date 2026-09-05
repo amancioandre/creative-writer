@@ -9,6 +9,7 @@ Departures from the agreed text, all deliberate:
 - `GraphCanvas` is new shared code that the writer uses; the story map still carries its own copy of the same mechanics. Migrating the map onto the base is a cleanup for later, kept out of this feature so the map's tests stay untouched.
 - Groups **flow** rather than float. After the first pass the user asked that rearranging groups never let them overlap. A saved group rectangle now means size plus order within its layer (by `x`); positions are recomputed on every draw, and dragging a group reorders the row. Card positions are stored **relative to their group** so they travel with it. The protocol page says so.
 - Promotion writes `story: true` rather than a `writing-target`, so a fresh story never shows a made-up pace on the desk; the writer adds a target when there is one. Ideas and unfiled folders are **pills** under the story cards rather than cards of their own, because an idea is already a card in the Premises group and drawing it twice would be noise.
+- **The keyboard (2026-09-05).** Selecting a group fits the view to it, so a click is also a zoom; leaving the selection fits the board again. Arrows move between groups, with lanes = layers and the stories band as lane 0; Shift+arrows walk a group's cards; Alt+arrows carry a card to the neighbouring group by rewriting its tag; Enter on a group opens the new-note form, where Enter now creates and **stays on the board** (Ctrl+Enter opens) so a collecting session never leaves the board. The user ruled out Tab for lane moves so native focus traversal stays intact; lanes use PgUp/PgDn and digits instead. Single keys only, dead inside inputs and with Ctrl/Cmd held; the moves double as Obsidian commands so they can be rebound. Pure navigation lives in `domain/writer/Navigation.ts`.
 - Derived edges (notes that link) were drawn from phase 1; named edges arrived in phase 3, created only from a derived edge (click it, or *Name…* beside a link), so the board never holds a line between notes that do not link.
 - `REF` is appended to the comment tag list on every normalisation, so it survives a hand-edited tag list; the writer may recolour it but not remove it.
 
@@ -53,7 +54,7 @@ or inline, `#writer/quote`. Rules:
 - A tag whose suffix matches no group of the active framework lands in an **Unsorted** slot so nothing is lost when frameworks change.
 - The tag has **no effect on any other feature**. It does not opt the note out of the story map or the writing count; `creative-writer: false` still does that, separately. A card inside a project folder is still that project's note.
 - Dragging a card from one group to another on the board rewrites its tag (Obsidian's `processFrontMatter` for front-matter tags; inline tags are edited in place). Dropping it outside every group removes the tag; the note is untouched otherwise.
-- Adding a card from the board opens a note picker over the whole vault plus *New note…*; the new note is created in the stories folder if one is set, else beside the writer file, with the tag written.
+- Adding a card from the board opens a note picker over the whole vault plus *New note…*; the new note is created where Obsidian puts new notes (`fileManager.getNewFileParent`, the vault's *Default location for new notes*), with the tag written. Until 2026-09-05 it went to the stories folder or the root; the user's vault keeps notes in `notes/`, and a card is a note like any other, so the vault's own setting rules.
 
 Why tags and not front matter keys or a list in the board note: one word per group, several groups per note, no note required to point at, visible in the tag pane, cheap for the plugin to rewrite.
 
@@ -167,7 +168,7 @@ A `reading` card may carry `reading: to-read | reading | read`. The board shows 
 
 ## 11. Myth roll-up
 
-The myth analysis (`MythView`) gains *Add to writer* on an archetype finding: pick an existing `archetype` card to attach a REF to the current scene, or create a new archetype note (stories folder or beside the writer file) with the tag and the finding's text. Flow is one-way, story to writer.
+The myth analysis (`MythView`) gains *Add to writer* on an archetype finding: pick an existing `archetype` card to attach a REF to the current scene, or create a new archetype note (where Obsidian puts new notes) with the tag and the finding's text. Flow is one-way, story to writer.
 
 ## 12. Privacy
 

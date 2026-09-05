@@ -6,6 +6,7 @@ import { FRAMEWORKS, UNSORTED, groupsOf, type GroupDef } from "../../../domain/w
 import { CARD_H, CARD_W, GROUP_HEAD, GROUP_PAD, MIN_GROUP_H, MIN_GROUP_W, PILL_H, STORY_H, STORY_W, type BoardLayout, type PlacedCard, type PlacedGroup, type StoriesBand, cardCentre, groupAt, layoutBoard, layoutStories, reorderedGroup, unionRect } from "../../../domain/writer/Layout";
 import { EMPTY_STORIES, READING_LABEL, READING_STATUSES, SETTABLE_STAGES, STAGE_LABEL, type Fingerprint, type ReadingStatus, type Stage, type StoriesRow, type StoryCard, blendFingerprints } from "../../../domain/writer/Stories";
 import { isRecurring } from "../../../domain/writer/Uses";
+import { type Direction, type Spot, endOfRow, lane, laneOf, step, stepCard } from "../../../domain/writer/Navigation";
 import { EMPTY_WRITER_FILE, type NamedEdge, type Point, type Rect, type WriterFile, placeCard, placeGroup, putEdge, removeEdge, setColour, setFramework, setView } from "../../../domain/writer/WriterFile";
 import { normalizePrefix } from "../../../domain/writer/Tags";
 import { GraphCanvas, f } from "./GraphCanvas";
@@ -55,6 +56,25 @@ type Selection = { kind: "card"; path: string } | { kind: "group"; id: string } 
 const EDGE_SUGGESTIONS = ["inspired by", "contradicts", "same theme", "adopted"];
 const pairKey = (a: string, b: string) => [a, b].sort().join(" ");
 
+/** What a command or a key asks the board to do; the keys map onto these and Obsidian commands reach them too. */
+export type WriterAction = "next-lane" | "previous-lane" | "next-group" | "previous-group" | "new-note" | "fit" | "help";
+
+/** The keyboard, as shown by `?`. Single keys and arrows only: Tab keeps its native meaning and Ctrl/Cmd stays with Obsidian. */
+export const KEY_HELP: readonly (readonly [string, string])[] = [
+  ["← → ↑ ↓", "Move between groups; up from the first layer reaches the stories"],
+  ["Shift + arrows", "Move between the cards of the group"],
+  ["Alt + ← →", "Move the card into the neighbouring group; its tag follows"],
+  ["PgUp PgDn · 1–9 · s", "Jump a lane; lane by number; the stories"],
+  ["Home End", "First or last group of the row"],
+  ["Enter", "Group: new note here · Card or story: open the note"],
+  ["Ctrl + Enter", "In the new-note form: create and open"],
+  ["n · N · a", "New note here · New story · Add an existing note here"],
+  ["Delete", "Take the card out of this group"],
+  ["f · z · + −", "Fit the board · Fit the selection · Zoom"],
+  ["/ · p · ?", "Find a card · Fold the panel · This list"],
+  ["Esc", "Close the form, then the selection, then fit"],
+];
+
 /**
  * The writer board: the vault's tagged notes as cards inside the groups of
  * a framework, layers stacked down the page. Fits, zooms, pans and drags
@@ -72,6 +92,10 @@ export class WriterView extends ItemView {
   private hiddenLayers = new Set<string>();
   /** The group the panel adds new cards to; follows a selected group, survives a rebuild. */
   private into: string | null = null;
+  /** The group the view was last fitted to by a selection; leaving it fits the board again. */
+  private zoomed: string | null = null;
+  /** Whether the keyboard stands in the stories band; an idea pill shares its selection with its premise card, so the selection alone cannot say. */
+  private inBand = false;
   private generation = 0;
   private fitted = false;
   private status = "";
@@ -90,6 +114,7 @@ export class WriterView extends ItemView {
   private card!: HTMLElement;
   private panel!: HTMLElement;
   private statusEl!: HTMLElement;
+  private help!: HTMLElement;
 
   constructor(leaf: WorkspaceLeaf, private readonly source: WriterSource) {
     super(leaf);
@@ -169,7 +194,12 @@ export class WriterView extends ItemView {
     this.panel = this.root.createDiv({ cls: "czm-map-panel czm-writer-panel" });
     this.card = this.root.createDiv({ cls: "czm-map-card czm-writer-side" });
     this.statusEl = this.root.createDiv({ cls: "czm-map-status" });
-    this.root.addEventListener("keydown", (e) => { if (e.key === "Escape") this.select(null); });
+    this.help = this.root.createDiv({ cls: "czm-writer-help", attr: { role: "dialog", "aria-label": "Keyboard shortcuts" } });
+    this.help.createDiv({ text: "Keyboard", cls: "czm-map-card-name" });
+    const table = this.help.createEl("table");
+    for (const [keys, what] of KEY_HELP) { const tr = table.createEl("tr"); tr.createEl("td", { text: keys, cls: "czm-writer-help-keys" }); tr.createEl("td", { text: what }); }
+    this.help.createDiv({ text: "Tab moves focus as it does everywhere; Ctrl and Cmd stay with Obsidian.", cls: "czm-map-hint" });
+    this.root.addEventListener("keydown", (e) => this.onKey(e));
     this.root.tabIndex = -1;
   }
 
@@ -184,6 +214,8 @@ export class WriterView extends ItemView {
 
   private renderGraph(): void {
     const vp = this.canvas.viewport;
+    // A redraw destroys whatever card or story held the focus; the board keeps it so the keys go on working.
+    const hadFocus = this.root.contains(document.activeElement);
     vp.replaceChildren();
     this.cardEls.clear();
     this.groupEls.clear();
@@ -267,6 +299,7 @@ export class WriterView extends ItemView {
     }
     this.applySelectionClasses();
     this.paint();
+    if (hadFocus && !this.root.contains(document.activeElement)) this.root.focus({ preventScroll: true });
   }
 
   // --- the stories band ------------------------------------------------------------
@@ -356,7 +389,12 @@ export class WriterView extends ItemView {
     t.textContent = `${story.spec.name}: ${STAGE_LABEL[story.stage]}${story.premise ? `\n${story.premise}` : ""}`;
     g.appendChild(t);
     this.canvas.attachDrag(g, { onMove: () => undefined, onEnd: (moved) => { if (!moved) this.select(this.selection?.kind === "story" && this.selection.scope === story.spec.scope ? null : { kind: "story", scope: story.spec.scope }); } });
-    g.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); ev.stopPropagation(); this.select({ kind: "story", scope: story.spec.scope }); } });
+    g.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Enter" && ev.key !== " ") return;
+      ev.preventDefault(); ev.stopPropagation();
+      if (ev.key === "Enter" && this.selection?.kind === "story" && this.selection.scope === story.spec.scope) this.source.openNote(story.spec.notePath);
+      else this.select({ kind: "story", scope: story.spec.scope });
+    });
     g.addEventListener("dblclick", (ev) => { ev.stopPropagation(); this.source.openNote(story.spec.notePath); });
     return g;
   }
@@ -474,7 +512,12 @@ export class WriterView extends ItemView {
     title.textContent = `${c.title} — ${c.groups.map((x) => this.groupName(x)).join(", ")}${c.excerpt ? `\n${c.excerpt}` : ""}`;
     g.appendChild(title);
     this.attachCardDrag(g, pc);
-    g.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); ev.stopPropagation(); this.select({ kind: "card", path: c.path }); } });
+    g.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Enter" && ev.key !== " ") return;
+      ev.preventDefault(); ev.stopPropagation();
+      if (ev.key === "Enter" && this.selection?.kind === "card" && this.selection.path === c.path) this.source.openNote(c.path);
+      else this.select({ kind: "card", path: c.path });
+    });
     g.addEventListener("dblclick", (ev) => { ev.stopPropagation(); this.source.openNote(c.path); });
     this.cardEls.set(c.path, g);
     return g;
@@ -566,10 +609,18 @@ export class WriterView extends ItemView {
     }
   }
 
+  /** Selecting a group fits the view to it; clearing the selection after that fits the board again. */
   select(sel: Selection): void {
     this.selection = sel;
+    this.inBand = false;
+    this.help.classList.remove("is-open");
     this.applySelectionClasses();
+    // Redrawing the side card may destroy the focused row; the board keeps the focus so the keys go on working.
+    const hadFocus = this.root.contains(document.activeElement);
     this.renderCard();
+    if (hadFocus && !this.root.contains(document.activeElement)) this.root.focus({ preventScroll: true });
+    if (sel?.kind === "group") { this.zoomed = sel.id; this.fitGroup(sel.id); }
+    else if (sel === null && this.zoomed !== null) { this.zoomed = null; this.fit(); }
     this.placeCard();
   }
 
@@ -637,6 +688,221 @@ export class WriterView extends ItemView {
     });
   }
 
+  // --- keyboard ------------------------------------------------------------------
+
+  /** Where the keyboard stands, read off the selection: a group, a card's group, or the band. */
+  private spot(): Spot | null {
+    const sel = this.selection;
+    if (!sel) return null;
+    if (sel.kind === "group") return { kind: "group", id: sel.id };
+    if (sel.kind === "card") {
+      if (this.inBand && this.band.ideas.some((p) => p.key === sel.path)) return { kind: "band" };
+      const pc = this.layout.cards.get(sel.path);
+      return pc ? { kind: "group", id: pc.group } : { kind: "band" };
+    }
+    if (sel.kind === "edge") { const pc = this.layout.cards.get(sel.from); return pc ? { kind: "group", id: pc.group } : null; }
+    return { kind: "band" };
+  }
+
+  /** The band's stops, left to right: stories, then idea pills, then unfiled pills. */
+  private bandStops(): Selection[] {
+    return [
+      ...this.band.stories.map((s): Selection => ({ kind: "story", scope: s.story.spec.scope })),
+      ...this.band.ideas.map((p): Selection => ({ kind: "card", path: p.key })),
+      ...this.band.unfiled.map((p): Selection => ({ kind: "unfiled", folder: p.key })),
+    ];
+  }
+
+  /** Stand on a spot: select the group, which fits to it, or enter the band on its first stop. */
+  private moveTo(spot: Spot | null): void {
+    if (!spot) return;
+    if (spot.kind === "group") { this.select({ kind: "group", id: spot.id }); return; }
+    const stops = this.bandStops();
+    if (!stops.length) { this.flash("No stories yet. N starts one."); this.canvas.fit(this.band.rect, 40, 1); return; }
+    this.selectInBand(stops[0]!);
+  }
+
+  private selectInBand(sel: Selection): void {
+    this.zoomed = null;
+    this.select(sel);
+    this.inBand = true;
+    this.fitBandStop(sel);
+  }
+
+  /** Fit the band's height around one stop, so its neighbours stay in sight. */
+  private fitBandStop(sel: Selection): void {
+    let x = this.band.rect.x, w = STORY_W;
+    if (sel?.kind === "story") { const ps = this.band.stories.find((s) => s.story.spec.scope === sel.scope); if (ps) { x = ps.x; w = STORY_W; } }
+    else if (sel?.kind === "card") { const p = this.band.ideas.find((i) => i.key === sel.path); if (p) { x = p.x; w = p.w; } }
+    else if (sel?.kind === "unfiled") { const p = this.band.unfiled.find((u) => u.key === sel.folder); if (p) { x = p.x; w = p.w; } }
+    this.canvas.fit({ x: x - 40, y: this.band.rect.y, w: w + 80, h: this.band.rect.h }, 40, 1);
+  }
+
+  private fitGroup(id: string): void {
+    const pg = this.layout.groups.find((g) => g.group.def.id === id);
+    if (pg) this.canvas.fit(this.rectOf(pg), 40, 1);
+  }
+
+  /** One step among the groups; inside the band, left and right walk the stops. Nothing selected: the first group. */
+  private moveBy(dir: Direction): void {
+    const at = this.spot();
+    if (!at) { this.moveTo(lane(this.layout, this.hiddenLayers, 1) ?? { kind: "band" }); return; }
+    if (at.kind === "band" && (dir === "left" || dir === "right")) {
+      const stops = this.bandStops();
+      const i = stops.findIndex((s) => sameSelection(s, this.selection));
+      const next = stops[i + (dir === "left" ? -1 : 1)];
+      if (i >= 0 && next) this.selectInBand(next);
+      return;
+    }
+    this.moveTo(step(this.layout, this.hiddenLayers, at, dir));
+  }
+
+  /** A whole lane up or down; the band is lane 0. */
+  private moveLane(delta: number): void {
+    const at = this.spot();
+    const n = at ? laneOf(this.layout, this.hiddenLayers, at) : delta > 0 ? 0 : 1;
+    if (n < 0) return;
+    this.moveTo(lane(this.layout, this.hiddenLayers, n + delta));
+  }
+
+  /** Shift+arrow: the cards inside the group the keyboard stands in. */
+  private moveCard(dir: Direction): void {
+    const at = this.spot();
+    if (at?.kind !== "group") return;
+    const pg = this.layout.groups.find((g) => g.group.def.id === at.id);
+    if (!pg) return;
+    const next = stepCard(pg, this.selection?.kind === "card" ? this.selection.path : null, dir);
+    if (next) this.select({ kind: "card", path: next.card.path });
+  }
+
+  /** Alt+arrow: the selected card into the neighbouring group of its row, the tag rewritten as a drop would. */
+  private async carryCard(dir: Direction): Promise<void> {
+    const sel = this.selection;
+    if (sel?.kind !== "card") return;
+    const pc = this.layout.cards.get(sel.path);
+    if (!pc) return;
+    const to = step(this.layout, this.hiddenLayers, { kind: "group", id: pc.group }, dir);
+    if (to?.kind !== "group" || to.id === UNSORTED.id) return;
+    await this.retagCard(pc, to.id);
+  }
+
+  /** Rewrite the tag of the group a card is drawn in: to another group, or with `to` null, off that group. The card's saved position goes with it. */
+  private async retagCard(pc: PlacedCard, to: string | null): Promise<void> {
+    const path = pc.card.path;
+    const from = pc.card.tagGroups[pc.card.groups.indexOf(pc.group)] ?? pc.group;
+    try { await this.source.retag(path, from, to); } catch (e) { this.flash(e instanceof Error ? e.message : String(e)); return; }
+    this.queue((file) => placeCard(file, path, null));
+    await this.flushFile();
+    if (to) {
+      this.flash(`${pc.card.title}: ${this.groupName(pc.group)} → ${this.groupName(to)}`);
+      this.selection = { kind: "card", path };
+      await this.show();
+      this.zoomed = to;
+      this.fitGroup(to);
+    } else {
+      this.flash(`${pc.card.title} taken out of ${this.groupName(pc.group)}`);
+      this.selection = { kind: "group", id: pc.group };
+      await this.show();
+    }
+  }
+
+  private zoomBy(factor: number): void {
+    const r = this.canvas.svg.getBoundingClientRect();
+    this.canvas.zoomAt(r.left + (r.width || 800) / 2, r.top + (r.height || 600) / 2, factor);
+  }
+
+  private fitSelection(): void {
+    const at = this.spot();
+    if (at?.kind === "group") this.fitGroup(at.id);
+    else if (at?.kind === "band") this.fitBandStop(this.selection);
+    else this.fit();
+  }
+
+  private focusSearch(): void {
+    if (!this.source.settings().panelOpen) { this.source.updateSettings({ ...this.source.settings(), panelOpen: true }); this.renderPanel(); }
+    this.panel.querySelector<HTMLInputElement>(".czm-map-search")?.focus();
+  }
+
+  private togglePanel(): void {
+    this.source.updateSettings({ ...this.source.settings(), panelOpen: !this.source.settings().panelOpen });
+    this.renderPanel();
+  }
+
+  /** Named actions: the keys reach them here, Obsidian commands reach them from `main`, so both can be rebound. */
+  run(action: WriterAction): void {
+    switch (action) {
+      case "next-lane": this.moveLane(1); break;
+      case "previous-lane": this.moveLane(-1); break;
+      case "next-group": this.moveBy("right"); break;
+      case "previous-group": this.moveBy("left"); break;
+      case "new-note": {
+        const at = this.spot();
+        const g = at?.kind === "group" ? at.id : this.into ?? groupsOf(this.board.framework)[0]?.id;
+        if (g && g !== UNSORTED.id) this.newNoteForm(g, this.selection);
+        break;
+      }
+      case "fit": this.fit(); break;
+      case "help": this.help.classList.toggle("is-open"); break;
+    }
+  }
+
+  /**
+   * The board's keys. Dead inside any input, select or editable; dead with
+   * Ctrl or Cmd held, which stay Obsidian's; Enter and Space on a focused
+   * button or card keep their native meaning. Tab is never touched.
+   */
+  private onKey(e: KeyboardEvent): void {
+    const t = e.target as HTMLElement | null;
+    const tag = t?.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || t?.isContentEditable) return;
+    if (e.ctrlKey || e.metaKey) return;
+    const onButton = tag === "BUTTON" || t?.getAttribute("role") === "button";
+    const sel = this.selection;
+    const arrow: Direction | null = e.key === "ArrowLeft" ? "left" : e.key === "ArrowRight" ? "right" : e.key === "ArrowUp" ? "up" : e.key === "ArrowDown" ? "down" : null;
+    let handled = true;
+    if (arrow) {
+      if (e.altKey) void this.carryCard(arrow);
+      else if (e.shiftKey) this.moveCard(arrow);
+      else this.moveBy(arrow);
+    } else if (e.altKey) handled = false;
+    else switch (e.key) {
+      case "Escape":
+        if (this.help.classList.contains("is-open")) this.help.classList.remove("is-open");
+        else if (sel?.kind === "card" && this.zoomed !== null && this.layout.cards.get(sel.path)?.group === this.zoomed) this.select({ kind: "group", id: this.zoomed });
+        else if (sel || this.card.classList.contains("is-open")) this.select(null);
+        else this.fit();
+        break;
+      case "Enter":
+        if (onButton) handled = false;
+        else if (sel?.kind === "group") { if (sel.id !== UNSORTED.id) this.newNoteForm(sel.id, sel); }
+        else if (sel?.kind === "card") this.source.openNote(sel.path);
+        else if (sel?.kind === "story") { const s = this.stories.stories.find((x) => x.spec.scope === sel.scope); if (s) this.source.openNote(s.spec.notePath); }
+        else handled = false;
+        break;
+      case " ": handled = false; break;
+      case "PageDown": this.moveLane(1); break;
+      case "PageUp": this.moveLane(-1); break;
+      case "Home": this.moveTo(endOfRow(this.layout, this.hiddenLayers, this.spot() ?? { kind: "band" }, "first")); break;
+      case "End": this.moveTo(endOfRow(this.layout, this.hiddenLayers, this.spot() ?? { kind: "band" }, "last")); break;
+      case "s": this.moveTo({ kind: "band" }); break;
+      case "n": this.run("new-note"); break;
+      case "N": this.select({ kind: "new-story" }); break;
+      case "a": { const at = this.spot(); if (at?.kind === "group" && at.id !== UNSORTED.id) void this.addNote(at.id); break; }
+      case "Delete": case "Backspace": { if (sel?.kind === "card") { const pc = this.layout.cards.get(sel.path); if (pc) void this.retagCard(pc, null); } break; }
+      case "f": this.fit(); break;
+      case "z": this.fitSelection(); break;
+      case "+": case "=": this.zoomBy(1.25); break;
+      case "-": this.zoomBy(0.8); break;
+      case "/": this.focusSearch(); break;
+      case "p": this.togglePanel(); break;
+      case "?": this.run("help"); break;
+      default:
+        if (/^[1-9]$/.test(e.key)) this.moveTo(lane(this.layout, this.hiddenLayers, Number(e.key)));
+        else handled = false;
+    }
+    if (handled) { e.preventDefault(); e.stopPropagation(); }
+  }
+
   // --- persistence ---------------------------------------------------------------
 
   /** Changes to the file are batched and written a moment later, as one read-change-write. */
@@ -700,6 +966,7 @@ export class WriterView extends ItemView {
     const search = head.createEl("input", { cls: "czm-map-search", attr: { type: "search", placeholder: "Find a card…", "aria-label": "Find a card" } });
     search.value = this.query;
     search.addEventListener("input", () => { this.query = search.value; this.applySelectionClasses(); });
+    search.addEventListener("keydown", (ev) => { if (ev.key === "Escape") { ev.stopPropagation(); this.root.focus({ preventScroll: true }); } });
 
     const actions = this.panel.createDiv({ cls: "czm-map-panel-actions" });
     const btn = (text: string, cls: string, onClick: () => void, title?: string) => { const b = actions.createEl("button", { text, cls }); if (title) b.title = title; b.addEventListener("click", onClick); return b; };
@@ -751,30 +1018,41 @@ export class WriterView extends ItemView {
     await this.show();
   }
 
-  private newNoteForm(group: string): void {
+  /**
+   * The new-note form: a title, Enter to create and stay on the board with
+   * the card selected, Ctrl+Enter to create and open the note. Escape goes
+   * back to `back`, the selection the form was opened from.
+   */
+  private newNoteForm(group: string, back: Selection = null): void {
     this.selection = null;
+    this.help.classList.remove("is-open");
     this.card.empty();
     this.card.classList.add("is-open");
     const head = this.card.createDiv({ cls: "czm-map-card-head" });
     head.createSpan({ text: `New ${this.groupName(group).toLowerCase()} note`, cls: "czm-map-card-name" });
     const form = this.card.createDiv({ cls: "czm-map-label" });
     const input = form.createEl("input", { cls: "czm-map-label-input czm-writer-new-title", attr: { type: "text", placeholder: "Title…", "aria-label": "Title of the new note" } });
-    const create = () => { const title = input.value.trim(); if (title) void this.createNote(title, group); else input.focus(); };
+    const create = (open: boolean) => { const title = input.value.trim(); if (title) void this.createNote(title, group, open); else input.focus(); };
     const ok = form.createEl("button", { text: "Create", cls: "czm-act-create" });
-    ok.addEventListener("click", create);
-    input.addEventListener("keydown", (ev) => { if (ev.key === "Enter") create(); if (ev.key === "Escape") { ev.stopPropagation(); this.select(null); } });
+    ok.addEventListener("click", () => create(false));
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") { ev.preventDefault(); create(ev.ctrlKey || ev.metaKey); }
+      if (ev.key === "Escape") { ev.stopPropagation(); this.select(back); }
+    });
     const no = form.createEl("button", { text: "Cancel", cls: "czm-act-cancel-label" });
-    no.addEventListener("click", () => this.select(null));
+    no.addEventListener("click", () => this.select(back));
+    this.card.createDiv({ text: "Enter creates · Ctrl+Enter creates and opens", cls: "czm-map-hint" });
     this.card.style.left = "50%"; this.card.style.top = "40%";
     input.focus();
   }
 
-  private async createNote(title: string, group: string): Promise<void> {
+  private async createNote(title: string, group: string, open: boolean): Promise<void> {
     let path: string;
     try { path = await this.source.createNote(title, group); } catch (e) { this.flash(e instanceof Error ? e.message : String(e)); return; }
     this.selection = { kind: "card", path };
     await this.show();
-    this.source.openNote(path);
+    this.root.focus({ preventScroll: true });
+    if (open) this.source.openNote(path);
   }
 
   // --- side card -------------------------------------------------------------------
@@ -1036,7 +1314,7 @@ export class WriterView extends ItemView {
     const n = this.board.cards.filter((c) => c.groups.includes(id)).length;
     this.card.createDiv({ text: n ? `${n} card${n === 1 ? "" : "s"}` : "Empty", cls: "czm-map-hint" });
     const actions = this.card.createDiv({ cls: "czm-map-card-actions" });
-    if (id !== UNSORTED.id) { const add = actions.createEl("button", { text: "New note here", cls: "czm-act-new-here" }); add.addEventListener("click", () => this.newNoteForm(id)); }
+    if (id !== UNSORTED.id) { const add = actions.createEl("button", { text: "New note here", cls: "czm-act-new-here" }); add.addEventListener("click", () => this.newNoteForm(id, { kind: "group", id })); }
     if (id !== UNSORTED.id) { const pick = actions.createEl("button", { text: "Add note here", cls: "czm-act-add-here" }); pick.addEventListener("click", () => void this.addNote(id)); }
     if (pg.pinned) { const reset = actions.createEl("button", { text: "Reset size", cls: "czm-act-reset-group" }); reset.addEventListener("click", () => { this.queue((file) => placeGroup(file, id, null)); void this.flushFile().then(() => this.show()); }); }
     const colour = this.card.createDiv({ cls: "czm-map-label" });
@@ -1087,6 +1365,10 @@ export function storyMeta(story: StoryCard, voice: string | null): string {
 /** The fingerprint in one line. */
 export function fingerprintLine(p: Fingerprint): string {
   return [`ease ${Math.round(p.ease)}`, `grade ${Math.round(p.grade)}`, p.variety !== null ? `variety ${p.variety.toFixed(2)}` : null, `dialogue ${Math.round(p.dialogue * 100)}%`].filter(Boolean).join(" · ");
+}
+
+function sameSelection(a: Selection, b: Selection): boolean {
+  return !!a && !!b && a.kind === b.kind && JSON.stringify(a) === JSON.stringify(b);
 }
 
 function contains(r: Rect, p: Point): boolean {

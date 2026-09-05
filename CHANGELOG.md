@@ -2,7 +2,7 @@
 
 Release notes for every version are on the [releases page](https://github.com/amancioandre/creative-writer/releases). This file carries the same text for the versions since it was started.
 
-## Unreleased — The writer
+## 0.8.0 — The writer
 
 The writer is a fourth level above the sentence, the story and the vault: what the author is made of, and which stories they are carrying. This release ships the board and its protocol. Nothing on the page changes.
 
@@ -10,7 +10,8 @@ The writer is a fourth level above the sentence, the story and the vault: what t
 
 - **Open writer** (command, the dashboard ribbon icon, or opening `Writer.writer`) shows every note tagged `#writer/<group>` as a card inside the groups of a framework, layers stacked down the board: Truby's wish list, premises, inspirations, references and voices by default, or a Generic set, or one written into the writer file. Every group is drawn, with a hint while it is empty. A note in several groups is drawn once, with a chip per group; zoom in and cards show their first lines; lines join cards whose notes link.
 - Pan, zoom, **Fit**; drag cards, move groups with their cards, resize groups from the corner. **Drop a card into another group and its tag follows**, in the front matter or inline, whichever the note uses.
-- The panel: framework, search, a group for new cards, **Add note…** (a picker over the vault), **New note…** (a tagged note in the stories folder), colours per group, layers to hide, the tag prefix. A card's side panel opens the note, removes it from a group, adds it to another, and lists the cards it links to.
+- **Click a group and the board zooms to it**; click again, click away or press Escape and the board comes back. **The keyboard:** arrows move between groups and lanes (the stories band is the lane above the first layer), Shift+arrows between the cards of a group, Alt+←/→ carry a card into the neighbouring group with its tag, PgUp/PgDn and 1–9 jump lanes, Enter on a group opens the new-note form (Enter creates and stays, Ctrl+Enter creates and opens), Enter on a card opens the note, Delete takes a card out of its group, `f` fits, `z` fits the selection, `/` finds, `p` folds the panel, `?` lists them all. Tab is never taken and Ctrl/Cmd stay with Obsidian; the moves are commands too, so they can be rebound.
+- The panel: framework, search, a group for new cards, **Add note…** (a picker over the vault), **New note…** (a tagged note, created where Obsidian puts new notes), colours per group, layers to hide, the tag prefix. A card's side panel opens the note, removes it from a group, adds it to another, and lists the cards it links to.
 - Layout, colours and the view go to one `Writer.writer` file, found by extension, created in the stories folder on first save. Obsidian Sync carries it with *Sync all other types* on; the docs say so first.
 - The board follows the vault: a tag added by hand appears on the next metadata pass, a renamed note keeps its place.
 
