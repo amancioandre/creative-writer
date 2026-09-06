@@ -28,6 +28,20 @@ describe("splitBlocks", () => {
     expect(blocks[0]!.kind).toBe("paragraph");
   });
 
+  it("keeps a paragraph whose first sentence is commented out", () => {
+    const one = splitBlocks("%%Marta woke.%% The camp was quiet.");
+    expect(one.map((b) => [b.kind, b.from, b.to])).toEqual([["paragraph", 0, 0]]);
+    const spanning = splitBlocks("%% Marta woke.\nShe stretched. %% The camp was quiet.\nSnow fell.\n\nNext.");
+    expect(spanning.map((b) => [b.kind, b.from, b.to])).toEqual([["paragraph", 0, 2], ["paragraph", 4, 4]]);
+  });
+
+  it("hides whole-line comments as blocks unless they sit inside a paragraph", () => {
+    expect(splitBlocks("%% alone %%\n\nProse.").map((b) => b.kind)).toEqual(["comment", "paragraph"]);
+    expect(splitBlocks("%% a %% %% b %%\nProse.").map((b) => [b.kind, b.from, b.to])).toEqual([["comment", 0, 0], ["paragraph", 1, 1]]);
+    expect(splitBlocks("Prose.\n%%\nlong note\n%%\nMore.").map((b) => [b.kind, b.from, b.to])).toEqual([["paragraph", 0, 0], ["comment", 1, 3], ["paragraph", 4, 4]]);
+    expect(splitBlocks("Prose.\n%% never closed\nstill hidden").map((b) => [b.kind, b.from, b.to])).toEqual([["paragraph", 0, 0], ["comment", 1, 2]]);
+  });
+
   it("returns nothing for an empty note", () => {
     expect(splitBlocks("")).toEqual([]);
     expect(splitBlocks("---\na: 1\n---\n")).toEqual([]);

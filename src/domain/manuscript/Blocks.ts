@@ -5,6 +5,8 @@
  * a click can be traced back to a line, and a changed note re-renders
  * without touching the rest of the page.
  */
+import { stripComments } from "./Comments";
+
 export type BlockKind = "paragraph" | "heading" | "quote" | "callout" | "list" | "table" | "code" | "rule" | "html" | "comment" | "other";
 
 export interface SourceBlock {
@@ -67,13 +69,28 @@ export function splitBlocks(markdown: string): SourceBlock[] {
       i = end;
       continue;
     }
-    if (raw.trim().startsWith("%%") && !raw.trim().slice(2).includes("%%")) {
-      // A block comment: everything to the closing marker is one hidden block.
-      flush(i - 1);
-      let j = i + 1;
-      while (j < lines.length && !lines[j]!.includes("%%")) j++;
-      const end = Math.min(j, lines.length - 1);
-      push("comment", i, end, lines.slice(i, end + 1));
+    if (raw.trim().startsWith("%%")) {
+      // A comment opens the line. It hides as a block only when nothing visible follows its close:
+      // a commented first sentence — `%%First.%% Second.` — is still the paragraph it opens.
+      let end = i;
+      let closed = raw.trim().slice(2).includes("%%");
+      if (!closed) {
+        let j = i + 1;
+        while (j < lines.length && !lines[j]!.includes("%%")) j++;
+        closed = j < lines.length;
+        end = Math.min(j, lines.length - 1);
+      }
+      const text = lines.slice(i, end + 1);
+      const prose = closed && stripComments(text.join("\n")).trim() !== "";
+      if (!prose && (buffer.length === 0 || end > i)) {
+        flush(i - 1);
+        push("comment", i, end, text);
+        i = end;
+        continue;
+      }
+      // Prose after the comment, or a whole-line comment inside a paragraph: part of the paragraph.
+      if (first < 0) first = i;
+      buffer.push(...text);
       i = end;
       continue;
     }
@@ -93,6 +110,6 @@ function kindOf(firstLine: string): BlockKind {
   if (LIST.test(firstLine)) return "list";
   if (TABLE.test(firstLine)) return "table";
   if (HTML.test(firstLine)) return "html";
-  if (firstLine.trim().startsWith("%%")) return "comment";
+  if (stripComments(firstLine).trim() === "") return "comment";
   return "paragraph";
 }
