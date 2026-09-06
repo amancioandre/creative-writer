@@ -2,6 +2,16 @@
 
 Release notes for every version are on the [releases page](https://github.com/amancioandre/creative-writer/releases). This file carries the same text for the versions since it was started.
 
+## 0.8.1 — The review
+
+The community directory's automated review of 0.8.0 failed on `no-static-styles-assignment` and warned on `prefer-create-el`, a deprecated caret API and two CSS lines. Nothing on the page changes.
+
+- Writer cards and story cards are built with Obsidian's DOM helpers; the new-note form is positioned through `setCssStyles`.
+- The manuscript's double-click uses `caretPositionFromPoint` only; the deprecated `caretRangeFromPoint` fallback is gone.
+- A candidate name in the cast panel draws its dashed underline as a border, which every Obsidian build supports.
+- Manuscript: a paragraph whose first sentence is commented out (`%%First.%% Second.`) stays a paragraph instead of vanishing as a comment block; a whole-line comment inside a paragraph stays with it.
+- `npm run lint` runs the directory's own rule set (eslint-plugin-obsidianmd, stylelint browser-support check) and gates CI, `release:check` and the release workflow.
+
 ## 0.8.0 — The writer
 
 The writer is a fourth level above the sentence, the story and the vault: what the author is made of, and which stories they are carrying. This release ships the board and its protocol. Nothing on the page changes.

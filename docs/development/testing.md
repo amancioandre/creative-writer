@@ -5,6 +5,7 @@ npm test              # the whole suite, ~570 tests, under 10 s
 npm run test:watch
 npm run test:coverage # thresholds: 90 % lines/functions/statements, 85 % branches
 npm run typecheck     # sources and tests
+npm run lint          # the Obsidian directory's review rules (eslint-plugin-obsidianmd) and CSS support check; warnings fail
 npm run eval          # rule scorecard on eval/corpus.ts
 npm run eval:ollama   # the same corpus through the local model (OLLAMA_LIVE=1)
 ```
@@ -20,6 +21,8 @@ Tests mirror the source tree under `tests/`. Every file under `src/` except `mai
 | `infrastructure/codemirror` | A real `EditorView` mounted in jsdom; assertions on rendered `.cm-line` classes and mark spans | `tests/infrastructure/codemirror/helpers.ts` |
 | `infrastructure/obsidian` | Real DOM; `tests/stubs/obsidian.ts` stands in for the types-only `obsidian` package (`Setting`, `ItemView`, toggles, sliders, colour pickers…) | stub |
 | `infrastructure/llm` | Recorded fixtures through a `FakeHttp`; live tests are opt-in | `tests/integration/*.live.test.ts` |
+
+`tests/setup.ts` mirrors Obsidian's DOM helpers in jsdom: `createEl`/`createDiv`/`createSpan` on `Node` (so `foreignObject` has them, as in Obsidian), `empty`/`setCssStyles`/`setCssProps`/`setText` on `HTMLElement`. When source starts using another helper, add it there and to the `declare global` block in `tests/stubs/obsidian.ts`.
 
 jsdom has no layout, so the typewriter test checks the recentring *policy* exhaustively and the *wiring* (a scroll effect is dispatched); smoothness was verified by hand in Obsidian. The story map's pan/zoom and card placement are tested through the transforms they write, not pixels.
 

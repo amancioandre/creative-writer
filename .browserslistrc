@@ -1,0 +1,4 @@
+# What the Obsidian directory's CSS review checks against: the plugin is desktop-only,
+# so Chromium as shipped by the Electron behind Obsidian 1.6.5. Anything only partially
+# supported there is an error; prefer the widely supported form (a border over a styled underline).
+Chrome >= 124

@@ -329,10 +329,7 @@ export class WriterView extends ItemView {
       fo.setAttribute("class", "czm-writer-hint");
       fo.setAttribute("x", f(band.rect.x + GROUP_PAD)); fo.setAttribute("y", f(band.rect.y + GROUP_HEAD + 4));
       fo.setAttribute("width", f(band.rect.w - 2 * GROUP_PAD)); fo.setAttribute("height", f(60));
-      const div = document.createElement("div");
-      div.className = "czm-writer-hint-text";
-      div.textContent = "No story yet. A folder becomes one with story: true or writing-target in a note's front matter; or select a premise card and make it a story.";
-      fo.appendChild(div);
+      fo.createDiv({ cls: "czm-writer-hint-text", text: "No story yet. A folder becomes one with story: true or writing-target in a note's front matter; or select a premise card and make it a story." });
       g.appendChild(fo);
     }
     for (const ps of band.stories) g.appendChild(this.storyElement(ps.story, ps.x, ps.y));
@@ -354,36 +351,15 @@ export class WriterView extends ItemView {
     g.appendChild(rect);
     const fo = document.createElementNS(SVG, "foreignObject");
     fo.setAttribute("width", f(STORY_W)); fo.setAttribute("height", f(STORY_H));
-    const body = document.createElement("div");
-    body.className = "czm-writer-card-body czm-writer-story-body";
-    const top = document.createElement("div");
-    top.className = "czm-writer-story-top";
-    const title = document.createElement("div");
-    title.className = "czm-writer-card-title";
-    title.textContent = story.spec.name;
-    top.appendChild(title);
-    const stage = document.createElement("span");
-    stage.className = `czm-writer-stage czm-writer-stage-${story.stage}`;
-    stage.textContent = STAGE_LABEL[story.stage];
-    top.appendChild(stage);
-    body.appendChild(top);
-    const premise = document.createElement("div");
-    premise.className = "czm-writer-story-premise";
-    premise.textContent = story.premise || "No premise yet: writing-premise in the project note.";
-    if (!story.premise) premise.classList.add("is-missing");
-    body.appendChild(premise);
-    const meta = document.createElement("div");
-    meta.className = "czm-writer-story-meta";
-    meta.textContent = storyMeta(story, story.voice ? this.titleOf(story.voice) : null);
-    body.appendChild(meta);
+    const body = fo.createDiv({ cls: "czm-writer-card-body czm-writer-story-body" });
+    const top = body.createDiv({ cls: "czm-writer-story-top" });
+    top.createDiv({ cls: "czm-writer-card-title", text: story.spec.name });
+    top.createSpan({ cls: `czm-writer-stage czm-writer-stage-${story.stage}`, text: STAGE_LABEL[story.stage] });
+    body.createDiv({ cls: `czm-writer-story-premise${story.premise ? "" : " is-missing"}`, text: story.premise || "No premise yet: writing-premise in the project note." });
+    body.createDiv({ cls: "czm-writer-story-meta", text: storyMeta(story, story.voice ? this.titleOf(story.voice) : null) });
     if (story.fingerprint) {
-      const print = document.createElement("div");
-      print.className = "czm-writer-story-print";
-      print.textContent = fingerprintLine(story.fingerprint);
-      print.title = "The shape of the prose: reading ease, grade level, sentence-length variety, share of words in dialogue.";
-      body.appendChild(print);
+      body.createDiv({ cls: "czm-writer-story-print", text: fingerprintLine(story.fingerprint), title: "The shape of the prose: reading ease, grade level, sentence-length variety, share of words in dialogue." });
     }
-    fo.appendChild(body);
     g.appendChild(fo);
     const t = document.createElementNS(SVG, "title");
     t.textContent = `${story.spec.name}: ${STAGE_LABEL[story.stage]}${story.premise ? `\n${story.premise}` : ""}`;
@@ -439,10 +415,7 @@ export class WriterView extends ItemView {
     if (!pg.cards.length && pg.group.def.hint) {
       const fo = document.createElementNS(SVG, "foreignObject");
       fo.setAttribute("class", "czm-writer-hint");
-      const div = document.createElement("div");
-      div.className = "czm-writer-hint-text";
-      div.textContent = pg.group.def.hint;
-      fo.appendChild(div);
+      fo.createDiv({ cls: "czm-writer-hint-text", text: pg.group.def.hint });
       g.appendChild(fo);
     }
     const handle = document.createElementNS(SVG, "rect");
@@ -472,41 +445,21 @@ export class WriterView extends ItemView {
     g.appendChild(rect);
     const fo = document.createElementNS(SVG, "foreignObject");
     fo.setAttribute("width", f(CARD_W)); fo.setAttribute("height", f(CARD_H));
-    const body = document.createElement("div");
-    body.className = "czm-writer-card-body";
-    const titleEl = document.createElement("div");
-    titleEl.className = "czm-writer-card-title";
-    titleEl.textContent = c.title;
-    body.appendChild(titleEl);
-    const chips = document.createElement("div");
-    chips.className = "czm-writer-chips";
+    const body = fo.createDiv({ cls: "czm-writer-card-body" });
+    body.createDiv({ cls: "czm-writer-card-title", text: c.title });
+    const chips = body.createDiv({ cls: "czm-writer-chips" });
     for (const gid of c.groups) {
-      const chip = document.createElement("span");
-      chip.className = "czm-writer-chip";
-      chip.style.setProperty("--czm-group", this.colourOf(gid));
-      chip.title = this.groupName(gid);
-      chips.appendChild(chip);
+      const chip = chips.createSpan({ cls: "czm-writer-chip", title: this.groupName(gid) });
+      chip.setCssProps({ "--czm-group": this.colourOf(gid) });
     }
     if (c.reading && c.groups.includes("reading")) {
-      const status = document.createElement("span");
-      status.className = `czm-writer-reading czm-writer-reading-${c.reading}`;
-      status.textContent = READING_LABEL[c.reading];
-      chips.appendChild(status);
+      chips.createSpan({ cls: `czm-writer-reading czm-writer-reading-${c.reading}`, text: READING_LABEL[c.reading] });
     }
     const uses = this.stories.uses.get(c.path) ?? [];
     if (uses.length) {
-      const badge = document.createElement("span");
-      badge.className = `czm-writer-uses${isRecurring(this.stories.uses, c.path) ? " is-recurring" : ""}`;
-      badge.textContent = uses.length === 1 ? "1 story" : `${uses.length} stories`;
-      badge.title = `Used in ${uses.join(", ")}`;
-      chips.appendChild(badge);
+      chips.createSpan({ cls: `czm-writer-uses${isRecurring(this.stories.uses, c.path) ? " is-recurring" : ""}`, text: uses.length === 1 ? "1 story" : `${uses.length} stories`, title: `Used in ${uses.join(", ")}` });
     }
-    body.appendChild(chips);
-    const excerpt = document.createElement("div");
-    excerpt.className = "czm-writer-card-excerpt";
-    excerpt.textContent = c.excerpt;
-    body.appendChild(excerpt);
-    fo.appendChild(body);
+    body.createDiv({ cls: "czm-writer-card-excerpt", text: c.excerpt });
     g.appendChild(fo);
     const title = document.createElementNS(SVG, "title");
     title.textContent = `${c.title} — ${c.groups.map((x) => this.groupName(x)).join(", ")}${c.excerpt ? `\n${c.excerpt}` : ""}`;
@@ -1042,7 +995,7 @@ export class WriterView extends ItemView {
     const no = form.createEl("button", { text: "Cancel", cls: "czm-act-cancel-label" });
     no.addEventListener("click", () => this.select(back));
     this.card.createDiv({ text: "Enter creates · Ctrl+Enter creates and opens", cls: "czm-map-hint" });
-    this.card.style.left = "50%"; this.card.style.top = "40%";
+    this.card.setCssStyles({ left: "50%", top: "40%" });
     input.focus();
   }
 
@@ -1060,7 +1013,7 @@ export class WriterView extends ItemView {
   private renderCard(): void {
     const sel = this.selection;
     this.card.empty();
-    this.card.style.left = ""; this.card.style.top = "";
+    this.card.setCssStyles({ left: "", top: "" });
     this.card.classList.toggle("is-open", sel !== null);
     if (!sel) return;
     const close = this.card.createEl("button", { cls: "czm-map-card-close clickable-icon", attr: { "aria-label": "Close" } });
@@ -1347,8 +1300,7 @@ export class WriterView extends ItemView {
     if (x < 8) x = 8;
     if (y + ch > h - 8) y = h - ch - 8;
     if (y < 8) y = 8;
-    this.card.style.left = `${Math.round(x)}px`;
-    this.card.style.top = `${Math.round(y)}px`;
+    this.card.setCssStyles({ left: `${Math.round(x)}px`, top: `${Math.round(y)}px` });
   }
 }
 

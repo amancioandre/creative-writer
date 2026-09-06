@@ -702,20 +702,14 @@ function cssEscape(s: string): string {
   return typeof CSS !== "undefined" && typeof CSS.escape === "function" ? CSS.escape(s) : s.replace(/["\\]/g, "\\$&");
 }
 
-/** Character offset of a point inside an element's text, as `textContent` counts it; 0 when the platform cannot say. */
+/**
+ * Character offset of a point inside an element's text, as `textContent` counts it; 0 when the platform cannot say.
+ * Only the standard `caretPositionFromPoint` is used: `caretRangeFromPoint` is deprecated and the directory review flags it.
+ */
 function caretOffset(el: HTMLElement, x: number, y: number): number {
-  const doc = document as Document & {
-    caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
-    caretRangeFromPoint?: (x: number, y: number) => Range | null;
-  };
-  let node: Node | null = null, offset = 0;
-  if (typeof doc.caretPositionFromPoint === "function") {
-    const p = doc.caretPositionFromPoint(x, y);
-    if (p) { node = p.offsetNode; offset = p.offset; }
-  } else if (typeof doc.caretRangeFromPoint === "function") {
-    const r = doc.caretRangeFromPoint(x, y);
-    if (r) { node = r.startContainer; offset = r.startOffset; }
-  }
+  const doc = document as Document & { caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null };
+  const p = typeof doc.caretPositionFromPoint === "function" ? doc.caretPositionFromPoint(x, y) : null;
+  const node = p?.offsetNode ?? null, offset = p?.offset ?? 0;
   if (!node || !el.contains(node) || node.nodeType !== Node.TEXT_NODE) return 0;
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
   let sum = 0;

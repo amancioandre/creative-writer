@@ -152,12 +152,12 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
     }
     if (key === "manuscript.tagsText") {
       const c = this.port.current();
-      await this.port.update({ ...c, manuscript: { ...c.manuscript, tags: textToTags(String(value ?? "")) } });
+      await this.port.update({ ...c, manuscript: { ...c.manuscript, tags: textToTags(asText(value)) } });
       return;
     }
     if (key === "scope.foldersText") {
       const c = this.port.current();
-      await this.port.update({ ...c, scope: { ...c.scope, folders: textToFolders(String(value ?? "")) } });
+      await this.port.update({ ...c, scope: { ...c.scope, folders: textToFolders(asText(value)) } });
       return;
     }
     await this.port.update(setPath(this.port.current(), key.split("."), value));
@@ -271,6 +271,11 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
 }
 
 /** Immutable deep set along a key path. */
+/** The value of a text control, or "" when something else arrived. */
+function asText(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
 function setPath<T>(obj: T, path: string[], value: unknown): T {
   if (path.length === 0) return value as T;
   const [head, ...rest] = path;

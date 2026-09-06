@@ -131,16 +131,20 @@ export class ItemView {
 }
 
 declare global {
+  // Obsidian puts the create* helpers on Node, so SVG elements (foreignObject) get them too.
+  interface Node {
+    createEl<K extends keyof HTMLElementTagNameMap>(tag: K, o?: DomOpts): HTMLElementTagNameMap[K];
+    createDiv(o?: DomOpts): HTMLDivElement;
+    createSpan(o?: DomOpts): HTMLSpanElement;
+  }
   interface HTMLElement {
     addClass(cls: string): void;
     empty(): void;
     setText(text: string): void;
-    createEl<K extends keyof HTMLElementTagNameMap>(tag: K, o?: DomOpts): HTMLElementTagNameMap[K];
-    createDiv(o?: DomOpts): HTMLElement;
-    createSpan(o?: DomOpts): HTMLElement;
     setCssStyles(styles: Partial<CSSStyleDeclaration>): void;
+    setCssProps(props: Record<string, string>): void;
   }
-  type DomOpts = { text?: string; cls?: string; attr?: Record<string, string> };
+  type DomOpts = { text?: string; cls?: string; attr?: Record<string, string>; title?: string };
   function createEl<K extends keyof HTMLElementTagNameMap>(tag: K, o?: DomOpts): HTMLElementTagNameMap[K];
   function createDiv(o?: DomOpts): HTMLElement;
   function createSpan(o?: DomOpts): HTMLElement;

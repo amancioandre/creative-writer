@@ -81,10 +81,10 @@ describe("ManuscriptView", () => {
     expect(blocks[0]!.tabIndex).toBe(-1);
     expect(calls.revealed).toEqual([["Novel/Part One/01 Chapter One.md", 4, 0, false]]);
     const text = blocks[3]!.querySelector("p")!.firstChild as Text;
-    const original = document.caretRangeFromPoint;
-    document.caretRangeFromPoint = () => { const r = document.createRange(); r.setStart(text, text.data.indexOf("stayed")); return r; };
+    const original = document.caretPositionFromPoint;
+    document.caretPositionFromPoint = (() => ({ offsetNode: text, offset: text.data.indexOf("stayed") })) as unknown as typeof original;
     blocks[3]!.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true }));
-    document.caretRangeFromPoint = original;
+    document.caretPositionFromPoint = original;
     expect(calls.revealed.at(-1)).toEqual(["Novel/Part One/01 Chapter One.md", 4, "Ilse found the creek. ".length, true]);
     click(v.contentEl.querySelector<HTMLElement>(".czm-ms-title")!);
     expect(calls.revealed.at(-1)).toEqual(["Novel/Part One/02 Chapter Two.md", 0, 0, true]);
