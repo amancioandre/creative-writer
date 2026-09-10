@@ -4,7 +4,7 @@ Four features that change how the page looks while you write. All are toggles in
 
 ## Zen Mode
 
-**Toggle Zen Mode** hides the ribbon, the tab headers, both sidebars, the status bar and the title bar, and stretches the editor to the window. Toggle again to bring everything back. The plugin adds one class to `<body>` and removes it on unload, so a crash or a reload never leaves you stuck without chrome.
+**Toggle Zen Mode** hides the ribbon, the tab headers, both sidebars, the status bar and the title bar, and stretches the editor to the window. Inside the note it also hides the properties block and the backlinks footer, and fades the note title (it returns to full strength while you edit it). Toggle again to bring everything back. The plugin adds one class to `<body>` and removes it on unload, so a crash or a reload never leaves you stuck without chrome.
 
 **Fullscreen in Zen Mode** (off by default) also asks the window to go fullscreen when Zen Mode turns on.
 

@@ -18,6 +18,28 @@ body.czm-zen .workspace-split.mod-root {
   width: 100%;
 }
 
+/* The note itself is only its title and its text: no properties block above,
+   no backlinks footer below. The title stays as a faint reminder of where you
+   are and comes back to full strength while it is being edited.
+   The properties selectors repeat Obsidian's own "show-properties" ones
+   (".markdown-source-view.is-live-preview.show-properties .metadata-container:not(.mod-error)")
+   so that, with the body class in front, they outrank them. */
+body.czm-zen.czm-zen .markdown-source-view.is-live-preview.show-properties .metadata-container:not(.mod-error),
+body.czm-zen.czm-zen .markdown-preview-view.show-properties .metadata-container,
+body.czm-zen.czm-zen .markdown-source-view .embedded-backlinks,
+body.czm-zen.czm-zen .markdown-preview-view .embedded-backlinks {
+  display: none;
+}
+
+body.czm-zen.czm-zen .inline-title {
+  opacity: 0.35;
+  transition: opacity 120ms ease-out;
+}
+body.czm-zen.czm-zen .inline-title:focus,
+body.czm-zen.czm-zen .inline-title:hover {
+  opacity: 1;
+}
+
 /* --- Typewriter: room for the first/last lines to reach the centre ------ */
 .czm-typewriter.cm-editor .cm-scroller .cm-content {
   padding-top: 45vh;

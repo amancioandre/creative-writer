@@ -2,6 +2,10 @@
 
 Release notes for every version are on the [releases page](https://github.com/amancioandre/creative-writer/releases). This file carries the same text for the versions since it was started.
 
+## 0.8.2 — The page
+
+- Zen Mode hides the note's properties block and backlinks footer and fades the note title, so the page is only the title and the text. The hide rule repeats Obsidian's own show-properties selectors, so it wins in Live Preview and Reading view.
+
 ## 0.8.1 — The review
 
 The community directory's automated review of 0.8.0 failed on `no-static-styles-assignment` and warned on `prefer-create-el`, a deprecated caret API and two CSS lines. Nothing on the page changes.
