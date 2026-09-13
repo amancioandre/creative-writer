@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { castFromGraph, conflictMarks, easeLevel } from "../../../src/domain/manuscript/StoryFacts";
+import { castFromGraph, conflictMarks, easeLevel, echoMarks, threadMarks } from "../../../src/domain/manuscript/StoryFacts";
+import type { Thread } from "../../../src/domain/threads/Thread";
 import type { StoryGraph } from "../../../src/domain/story/StoryGraph";
 import type { Contradiction } from "../../../src/domain/threads/Thread";
 
@@ -30,11 +31,44 @@ describe("conflictMarks", () => {
   it("marks both scenes of a live contradiction and skips dismissed ones", () => {
     const ref = (path: string, line: number, value: string) => ({ scene: { path, title: "", line }, index: 0, note: "", value });
     const live: Contradiction = { key: "k", threadId: "t", subject: "Marta", attribute: "eye colour", a: ref("Novel/One.md", 0, "blue"), b: ref("Novel/Two.md", 3, "grey"), dismissed: false, stale: false };
-    const marks = conflictMarks([live, { ...live, key: "d", dismissed: true }]);
+    const marks = conflictMarks([live, { ...live, key: "d", dismissed: true }, { ...live, key: "e", explainedBy: "writer:x" }]);
     expect(marks).toEqual([
-      { path: "Novel/One.md", line: 0, text: "Marta · eye colour: blue vs grey", otherPath: "Novel/Two.md", otherLine: 3 },
-      { path: "Novel/Two.md", line: 3, text: "Marta · eye colour: blue vs grey", otherPath: "Novel/One.md", otherLine: 0 },
+      { kind: "conflict", path: "Novel/One.md", line: 0, text: "Marta · eye colour: blue vs grey", otherPath: "Novel/Two.md", otherLine: 3 },
+      { kind: "conflict", path: "Novel/Two.md", line: 3, text: "Marta · eye colour: blue vs grey", otherPath: "Novel/One.md", otherLine: 0 },
     ]);
+  });
+});
+
+describe("threadMarks", () => {
+  const stop = (path: string, title: string, index: number, role: "plant" | "touch" | "payoff" | "reversal", anchor: { line: number; ch: number } | null | undefined) => ({ scene: { path, title, line: 2 }, index, note: "", role, quote: "q", anchor });
+  const thread = (refs: Thread["refs"], directed = true): Thread => ({ id: "writer:t", kind: "writer", source: "writer", label: "The letter", refs, stale: false, directed, dangling: refs.filter((r) => r.role === "plant" && !refs.some((o) => (o.role === "payoff" || o.role === "reversal") && o.index > r.index)) });
+
+  it("marks anchored plants and payoffs at their sentence, each pointing at the other", () => {
+    const marks = threadMarks([thread([stop("One.md", "Station", 0, "plant", { line: 7, ch: 3 }), stop("Two.md", "Dinner", 1, "touch", { line: 1, ch: 0 }), stop("Nine.md", "Reading", 5, "reversal", { line: 12, ch: 0 })])]);
+    expect(marks).toEqual([
+      { kind: "plant", path: "One.md", line: 7, text: "The letter · plant, reversed in Reading", otherPath: "Nine.md", otherLine: 12 },
+      { kind: "reversal", path: "Nine.md", line: 12, text: "The letter · reversal, planted in Station", otherPath: "One.md", otherLine: 7 },
+    ]);
+  });
+
+  it("says when a plant has no payoff, skips unanchored stops and undirected threads", () => {
+    expect(threadMarks([thread([stop("One.md", "Station", 0, "plant", { line: 7, ch: 3 })])])).toEqual([
+      { kind: "plant", path: "One.md", line: 7, text: "The letter · plant, no payoff yet", otherPath: "One.md", otherLine: 7 },
+    ]);
+    expect(threadMarks([thread([stop("One.md", "Station", 0, "plant", null), stop("Two.md", "Dinner", 1, "payoff", undefined)])])).toEqual([]);
+    expect(threadMarks([thread([stop("One.md", "Station", 0, "touch", { line: 1, ch: 0 })], false)])).toEqual([]);
+  });
+});
+
+describe("echoMarks", () => {
+  it("marks every anchored occurrence, pointing at the nearest other one, and skips unanchored stops", () => {
+    const ref = (path: string, title: string, index: number, anchor: { line: number; ch: number } | null) => ({ scene: { path, title, line: 1 }, index, note: "", quote: "salt on the wind", anchor });
+    const echo: Thread = { id: "echo:x", kind: "echo", source: "extracted", label: "salt on the wind", refs: [ref("One.md", "Harbour", 0, { line: 4, ch: 2 }), ref("Two.md", "Crossing", 1, { line: 9, ch: 0 }), ref("Nine.md", "House", 8, null)], stale: false, directed: false, dangling: [] };
+    expect(echoMarks([echo])).toEqual([
+      { kind: "echo", path: "One.md", line: 4, text: "“salt on the wind” · also in Crossing", otherPath: "Two.md", otherLine: 9 },
+      { kind: "echo", path: "Two.md", line: 9, text: "“salt on the wind” · also in Harbour", otherPath: "One.md", otherLine: 4 },
+    ]);
+    expect(echoMarks([{ ...echo, kind: "writer" }])).toEqual([]);
   });
 });
 

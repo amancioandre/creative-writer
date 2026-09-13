@@ -1,4 +1,4 @@
-import { quoteAppears } from "../style/llm/validateFindings";
+import { quoteAppears } from "../text/LocateQuote";
 import { NameLookup, normalise } from "../story/EntityIndex";
 import { sceneKey, type SceneRef } from "../story/StoryGraph";
 import type { FactReading, ModelFact } from "../story/StoryMapFile";
@@ -87,7 +87,7 @@ export function factThreads(input: FactThreadsInput): { threads: Thread[]; contr
     const stops = [...g.stops].sort((a, b) => a.index - b.index || a.value.localeCompare(b.value));
     const id = `fact:${gk}`;
     const stale = stops.some((s) => input.stale.has(s.key));
-    threads.push({ id, kind: "fact", source: "model", label: `${g.subject} · ${g.attribute}`, refs: stops.map(({ key: _k, ...ref }) => ref), stale });
+    threads.push({ id, kind: "fact", source: "model", label: `${g.subject} · ${g.attribute}`, refs: stops.map(({ key: _k, ...ref }) => ref), stale, directed: false, dangling: [] });
     if (isAccumulative(g.attribute)) continue; // a list grows; it does not contradict itself
     const seen = new Set<string>();
     for (let i = 0; i < stops.length; i++) for (let j = i + 1; j < stops.length; j++) {

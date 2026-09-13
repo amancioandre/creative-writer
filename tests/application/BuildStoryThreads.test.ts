@@ -6,6 +6,7 @@ import type { ProjectSpec } from "../../src/domain/progress/Project";
 import { splitScenes } from "../../src/domain/text/Scenes";
 import { textHash } from "../../src/domain/story/StoryGraph";
 import { EMPTY_STORY_MAP_FILE, putFactReading, type StoryMapFile } from "../../src/domain/story/StoryMapFile";
+import { IntlSentenceSegmenter } from "../../src/infrastructure/segmentation/IntlSentenceSegmenter";
 
 const novel: ProjectSpec = { name: "Novel", scope: "Novel/", targetWords: 100, deadline: null, dailyWords: 0, notePath: "Novel/Project.md", ignoredNames: [] };
 const one = `# Camp\nMarta woke before Ilse at the gate. Her green eyes were open.\n\n# Creek\nIlse found the creek alone.\n`;
@@ -54,6 +55,27 @@ describe("BuildStoryThreads", () => {
     await uc.undismiss(novel, model.contradictions[0]!.key);
     expect((await uc.execute(novel)).contradictions[0]!.dismissed).toBe(false);
     expect(story.file.readings).toEqual([]);
+  });
+
+  it("hears echoes across the project with names left out, at the sensitivity asked for, and only recomputes when the prose changes", async () => {
+    const echoing = `# Camp\nMarta woke before Ilse. There was salt on the wind and the gulls were quarrelling.\n\n# Creek\nIlse found the creek alone. There was salt on the wind and the gulls were quarrelling.\n`;
+    let calls = 0;
+    const src = { projects: () => [novel], notes: async () => { calls++; return [{ path: "Novel/Characters/Ilse.md", frontmatter: {}, links: [], bookmarked: false, bookmarkedHeadings: [], scenes: [] }, { path: "Novel/One.md", frontmatter: {}, links: [], bookmarked: false, bookmarkedHeadings: [], scenes: splitScenes(echoing), text: echoing }]; } };
+    const story = storyRepo(EMPTY_STORY_MAP_FILE);
+    let sensitivity: "low" | "medium" | "high" = "medium";
+    const uc = new BuildStoryThreads(new BuildStoryMap(src, story), src, story, threadsRepo(), undefined, { segmenter: new IntlSentenceSegmenter("en"), sensitivity: () => sensitivity });
+    const model = await uc.execute(novel);
+    const echoes = model.threads.filter((t) => t.kind === "echo");
+    expect(echoes.map((t) => t.label)).toEqual(["There was salt on the wind and the gulls were quarrelling"]);
+    expect(echoes[0]!.refs.map((r) => [r.index, r.anchor?.line])).toEqual([[0, 1], [1, 4]]);
+    expect(model.echoes.groups[0]!.stops.every((s) => !s.text.includes("Ilse"))).toBe(true);
+    const again = await uc.execute(novel);
+    expect(again.echoes.groups).toBe(model.echoes.groups);
+    sensitivity = "low";
+    expect((await uc.execute(novel)).echoes.groups).not.toBe(model.echoes.groups);
+    expect(calls).toBe(3);
+    const bare = new BuildStoryThreads(new BuildStoryMap(src, story), src, story, threadsRepo());
+    expect((await bare.execute(novel)).threads.some((t) => t.kind === "echo")).toBe(false);
   });
 
   it("edits the writer's note through the repository, ignoring empty names", async () => {

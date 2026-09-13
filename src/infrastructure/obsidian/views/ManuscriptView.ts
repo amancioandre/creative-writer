@@ -2,11 +2,12 @@ import { ItemView, Menu, setIcon, type WorkspaceLeaf } from "obsidian";
 import type { ProjectSpec } from "../../../domain/progress/Project";
 import { EMPTY_MANUSCRIPT, type Manuscript, type ManuscriptBlock, type NoteItem } from "../../../domain/manuscript/Manuscript";
 import { locateInBlock } from "../../../domain/manuscript/Locate";
+import { formatReadingTime } from "../../../domain/manuscript/ReadingTime";
 import { colorOf, splitTag, type Annotation, type TagSpec } from "../../../domain/manuscript/Comments";
 import { stripInlineMarkup } from "../../../domain/text/ProseParagraphs";
 import type { Sentence } from "../../../domain/rhythm/Sentence";
 import type { ManuscriptSettings } from "../../../domain/settings/Settings";
-import { EMPTY_FACTS, NO_SECTION, easeLevel, type CastMember, type ConflictMark, type StoryFacts } from "../../../domain/manuscript/StoryFacts";
+import { EMPTY_FACTS, NO_SECTION, easeLevel, type CastMember, type GutterMark, type StoryFacts } from "../../../domain/manuscript/StoryFacts";
 import type { EntityKind } from "../../../domain/story/StoryGraph";
 
 export const MANUSCRIPT_VIEW_TYPE = "creative-writer-manuscript";
@@ -31,7 +32,7 @@ export interface ManuscriptSource {
   /** Appends ` %% comment %%` to the end of a line of the note, through its open editor when there is one. */
   appendComment(path: string, line: number, comment: string): Promise<void>;
   /** Readability, today's words, and — with `story` — cast and contradictions for these notes. */
-  facts(project: ProjectSpec, paths: readonly string[], story: boolean): Promise<StoryFacts>;
+  facts(project: ProjectSpec, paths: readonly string[], story: boolean, echoes?: boolean): Promise<StoryFacts>;
   storyColors(): Readonly<Record<EntityKind, string>>;
   /** A candidate becomes a typed note in the project's folder for that kind; resolves to its path. */
   promote(project: ProjectSpec, name: string, kind: EntityKind): Promise<string>;
@@ -131,7 +132,7 @@ export class ManuscriptView extends ItemView {
     if (generation !== this.generation) return;
     const s = this.source.settings();
     const paths = manuscript.items.filter((i): i is NoteItem => i.kind === "note").map((i) => i.path);
-    const facts = s.showRuler || s.showStory ? await this.source.facts(project, paths, s.showStory) : EMPTY_FACTS;
+    const facts = s.showRuler || s.showStory || s.showEchoes ? await this.source.facts(project, paths, s.showStory, s.showEchoes) : EMPTY_FACTS;
     if (generation !== this.generation) return;
     this.manuscript = manuscript;
     this.facts = facts;
@@ -205,8 +206,12 @@ export class ManuscriptView extends ItemView {
     if (!this.project) { head.createSpan({ text: "No project yet — put story: true (or writing-target: 50000) in a note's front matter and its folder becomes one.", cls: "czm-map-hint" }); return; }
     const m = this.manuscript;
     const count = this.annotations().length;
-    head.createSpan({ text: `${m.notes} section${m.notes === 1 ? "" : "s"} · ${m.words.toLocaleString()} words${count ? ` · ${count} comment${count === 1 ? "" : "s"}` : ""}`, cls: "czm-map-hint czm-ms-count" });
     const settings = this.source.settings();
+    const time = formatReadingTime(m.words, settings.readingSpeed);
+    const speed = `Estimated at ${settings.readingSpeed} words a minute; set the speed in Settings → Manuscript`;
+    const line = head.createSpan({ text: `${m.notes} section${m.notes === 1 ? "" : "s"} · ${m.words.toLocaleString()} words`, cls: "czm-map-hint czm-ms-count" });
+    if (time) line.createSpan({ text: ` · ${time} to read`, cls: "czm-ms-time", attr: { title: speed, "aria-label": `${time} to read. ${speed}` } });
+    if (count) line.createSpan({ text: ` · ${count} comment${count === 1 ? "" : "s"}` });
     const tools = head.createDiv({ cls: "czm-ms-tools" });
     const toggle = (icon: string, label: string, on: boolean, apply: (v: boolean) => ManuscriptSettings) => {
       const btn = tools.createEl("button", { cls: `clickable-icon czm-ms-tool${on ? " is-active" : ""}`, attr: { "aria-label": label, "aria-pressed": String(on), title: label } });
@@ -218,6 +223,7 @@ export class ManuscriptView extends ItemView {
     toggle("message-square", "Comments pane: this paragraph's comments and a field to add one; every comment below", settings.showComments, (v) => ({ ...this.source.settings(), showComments: v }));
     toggle("ruler", "Ruler: one segment per section, wide by words, coloured by readability, marked when it changed today", settings.showRuler, (v) => ({ ...this.source.settings(), showRuler: v }));
     toggle("users", "Story: who is in each section and scene, and the model's contradictions in the gutter", settings.showStory, (v) => ({ ...this.source.settings(), showStory: v }));
+    toggle("repeat", "Echoes: repeated phrases marked in the gutter, each naming another place the words occur", settings.showEchoes, (v) => ({ ...this.source.settings(), showEchoes: v }));
     const project = this.project;
     const exportBtn = tools.createEl("button", { cls: "clickable-icon czm-ms-tool czm-ms-export", attr: { "aria-label": "Export as one note beside the project (comments left out)", title: "Export as one note beside the project (comments left out)" } });
     setIcon(exportBtn, "file-output");
@@ -277,20 +283,23 @@ export class ManuscriptView extends ItemView {
   private decorate(settings: ManuscriptSettings): void {
     const page = this.page;
     if (!page) return;
-    for (const old of page.querySelectorAll(".czm-ms-cast, .czm-ms-mark.is-conflict")) old.remove();
-    if (!settings.showStory) return;
+    for (const old of page.querySelectorAll(".czm-ms-cast, .czm-ms-mark.is-story")) old.remove();
+    if (!settings.showStory && !settings.showEchoes) return;
     for (const noteEl of page.querySelectorAll<HTMLElement>(".czm-ms-note")) {
+      if (!settings.showStory) break;
       const f = this.facts.sections.get(noteEl.dataset.path ?? "");
       if (!f || f.cast.length === 0) continue;
       const line = this.castLine(f.cast, noteEl.dataset.path ?? "", "");
       const title = noteEl.querySelector(".czm-ms-title");
       if (title) title.after(line); else noteEl.prepend(line);
     }
-    for (const c of this.facts.conflicts) {
+    for (const c of this.facts.marks) {
       const el = this.blockAt(c.path, c.line);
       if (!el) continue;
       const marks = el.querySelector<HTMLElement>(".czm-ms-marks") ?? el.createSpan({ cls: "czm-ms-marks" });
-      marks.createSpan({ cls: "czm-ms-mark is-conflict", attr: { title: c.text, "aria-label": c.text } });
+      const mark = marks.createSpan({ cls: `czm-ms-mark is-story is-${c.kind}`, attr: { title: c.text, "aria-label": c.text, role: "button", tabindex: "-1" } });
+      // The mark is the way to the other end: a click takes the page there, the editor following.
+      mark.addEventListener("click", (ev) => { ev.stopPropagation(); this.goTo(c.otherPath, c.otherLine); });
     }
   }
 
@@ -333,14 +342,14 @@ export class ManuscriptView extends ItemView {
     return null;
   }
 
-  private conflictsFor(path: string, block: ManuscriptBlock): ConflictMark[] {
-    return this.facts.conflicts.filter((c) => c.path === path && c.line >= block.from && c.line <= block.to);
+  private conflictsFor(path: string, block: ManuscriptBlock): GutterMark[] {
+    return this.facts.marks.filter((c) => c.path === path && c.line >= block.from && c.line <= block.to);
   }
 
-  private renderConflicts(parent: HTMLElement, conflicts: readonly ConflictMark[]): void {
-    for (const c of conflicts) {
+  private renderConflicts(parent: HTMLElement, marks: readonly GutterMark[]): void {
+    for (const c of marks) {
       const row = parent.createDiv({ cls: "czm-ms-cm-row", attr: { role: "button", tabindex: "-1", title: "Open the other scene" } });
-      row.createSpan({ text: "clash", cls: "czm-ms-cm-badge is-conflict" });
+      row.createSpan({ text: c.kind === "conflict" ? "clash" : c.kind, cls: `czm-ms-cm-badge is-${c.kind}` });
       row.createSpan({ text: c.text, cls: "czm-ms-cm-text" });
       row.addEventListener("click", () => this.goTo(c.otherPath, c.otherLine));
       row.addEventListener("dblclick", () => this.source.reveal(c.otherPath, c.otherLine, 0, true));
@@ -502,7 +511,7 @@ export class ManuscriptView extends ItemView {
       return;
     }
     const settings = this.source.settings();
-    const variant = settings.tags.map((t) => `${t.name}${t.color}`).join(",");
+    const variant = `${settings.readingSpeed}|${settings.tags.map((t) => `${t.name}${t.color}`).join(",")}`;
     const order: HTMLElement[] = [];
     const keep = new Set<string>();
     for (const item of this.manuscript.items) {
@@ -531,7 +540,8 @@ export class ManuscriptView extends ItemView {
     const el = createDiv({ cls: "czm-ms-note", attr: { "data-path": item.path } });
     if (item.showTitle) {
       const h = el.createEl(`h${item.level}` as "h1", { cls: "czm-ms-title", text: item.title });
-      h.createSpan({ text: `${item.words.toLocaleString()} words`, cls: "czm-ms-meta" });
+      const time = formatReadingTime(item.words, settings.readingSpeed);
+      h.createSpan({ text: `${item.words.toLocaleString()} words${time ? ` · ${time}` : ""}`, cls: "czm-ms-meta" });
       this.refs.set(h, { path: item.path, block: null, title: item.title });
     }
     for (const block of item.blocks) {

@@ -23,6 +23,8 @@ All commands appear in the palette under **Creative Writer:**. None has a defaul
 | **Reference a writer card** | Pick a card from the [writer board](/guide/writer) and drop `%% REF: [[Card]] %%` at the cursor: a link the manuscript page and any export hide, counted by the board as a use. |
 | **Copy writer schema** | Put the [writer protocol](/reference/writer-file) on the clipboard, for your vault's framework and tag prefix: the tags, the front matter keys, the REF comment and the writer file format. Paste it to a person or a tool that is preparing or migrating your board. |
 | **Read this note for facts (story threads)** | Read the active note's scenes for concrete facts — eye colours, ages, places, who knows what — so scenes can be checked against each other. Local model only. |
+| **Read contradictions for intent (story threads)** | Ask the local model what each open contradiction means — a reversal the story intends, an error, or the same thing said twice. The verdict is a proposal on the card. |
+| **Read project for echoes (story threads)** | Embed every sentence with the local model and keep the pairs that say the same thing in different words, as echoes in the threads view. |
 
 ## Ribbon
 

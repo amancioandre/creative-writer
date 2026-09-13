@@ -1,3 +1,5 @@
+import type { SemanticEcho } from "../echoes/Semantic";
+import type { IntentReading } from "../threads/Intent";
 import type { SceneRef } from "./StoryGraph";
 
 /**
@@ -11,8 +13,12 @@ import type { SceneRef } from "./StoryGraph";
  * readings (kept in their own list, not on the relation reading, because
  * they come from a separate prompt and must go stale separately), and the
  * contradictions the writer has looked at and waved away.
+ *
+ * Version 3 adds the model's reading of what each contradiction means
+ * (by the contradiction's key) and the echo finder's semantic pairs —
+ * the pairs only, never the vectors, each with the hash of its scenes.
  */
-export const STORY_MAP_VERSION = 2;
+export const STORY_MAP_VERSION = 3;
 export const STORY_MAP_NOTE = "Story map.md";
 export const STORY_MAP_FLAG = "creative-writer-storymap";
 
@@ -88,9 +94,13 @@ export interface StoryMapFile {
   readonly dismissed: readonly string[];
   /** Node id → hand-placed position. */
   readonly layout: Layout;
+  /** The model's verdict per contradiction key: reversal, error or the same thing. A proposal, never applied by itself. */
+  readonly intents: readonly IntentReading[];
+  /** Sentence pairs the embedding model found alike, with the hash of each scene's prose when read. */
+  readonly echoes: readonly SemanticEcho[];
 }
 
-export const EMPTY_STORY_MAP_FILE: StoryMapFile = { version: STORY_MAP_VERSION, readings: [], facts: [], dismissed: [], layout: {} };
+export const EMPTY_STORY_MAP_FILE: StoryMapFile = { version: STORY_MAP_VERSION, readings: [], facts: [], dismissed: [], layout: {}, intents: [], echoes: [] };
 
 export function normalizeStoryMapFile(raw: unknown): StoryMapFile {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
@@ -126,7 +136,23 @@ export function normalizeStoryMapFile(raw: unknown): StoryMapFile {
     });
   }
   const dismissed = [...new Set((Array.isArray(r.dismissed) ? (r.dismissed as unknown[]) : []).filter((x): x is string => typeof x === "string" && x.length > 0))];
-  return { version: STORY_MAP_VERSION, readings, facts, dismissed, layout };
+  const intents: IntentReading[] = [];
+  const seenIntent = new Set<string>();
+  for (const o of list(r.intents)) {
+    const key = str(o.key), verdict = str(o.verdict);
+    if (!key || seenIntent.has(key) || (verdict !== "reversal" && verdict !== "error" && verdict !== "same")) continue;
+    seenIntent.add(key);
+    const c = typeof o.confidence === "number" && Number.isFinite(o.confidence) ? Math.min(1, Math.max(0, o.confidence)) : 0.5;
+    intents.push({ key, verdict, reason: str(o.reason), confidence: c, model: str(o.model), rulebook: str(o.rulebook) });
+  }
+  const echoes: SemanticEcho[] = [];
+  for (const o of list(r.echoes)) {
+    const a = sceneOf({ scene: o.a }), b = sceneOf({ scene: o.b });
+    const score = typeof o.score === "number" && Number.isFinite(o.score) ? o.score : 0;
+    if (!a || !b || !str(o.quoteA) || !str(o.quoteB)) continue;
+    echoes.push({ a, b, hashA: str(o.hashA), hashB: str(o.hashB), quoteA: str(o.quoteA), quoteB: str(o.quoteB), score, model: str(o.model) });
+  }
+  return { version: STORY_MAP_VERSION, readings, facts, dismissed, layout, intents, echoes };
 }
 
 const key = (s: SceneRef) => `${s.path}#${s.title}`;
@@ -141,6 +167,16 @@ export function putReading(file: StoryMapFile, reading: SceneReading): StoryMapF
 export function putFactReading(file: StoryMapFile, reading: FactReading): StoryMapFile {
   const rest = file.facts.filter((r) => key(r.scene) !== key(reading.scene));
   return { ...file, version: STORY_MAP_VERSION, facts: [...rest, reading] };
+}
+
+/** Replaces any earlier verdict on the same contradiction. */
+export function putIntent(file: StoryMapFile, reading: IntentReading): StoryMapFile {
+  return { ...file, version: STORY_MAP_VERSION, intents: [...file.intents.filter((r) => r.key !== reading.key), reading] };
+}
+
+/** One run of the semantic tier replaces the last: the whole project was read. */
+export function putSemanticEchoes(file: StoryMapFile, echoes: readonly SemanticEcho[]): StoryMapFile {
+  return { ...file, version: STORY_MAP_VERSION, echoes: [...echoes] };
 }
 
 export function dismissContradiction(file: StoryMapFile, contradictionKey: string): StoryMapFile {
@@ -162,11 +198,13 @@ export function setLayout(file: StoryMapFile, layout: Layout): StoryMapFile {
 
 export function renameReadings(file: StoryMapFile, from: string, to: string): StoryMapFile {
   const movesLayout = from in file.layout, movesReadings = file.readings.some((r) => r.scene.path === from), movesFacts = file.facts.some((r) => r.scene.path === from);
-  if (!movesLayout && !movesReadings && !movesFacts) return file;
+  const movesEchoes = file.echoes.some((e) => e.a.path === from || e.b.path === from);
+  if (!movesLayout && !movesReadings && !movesFacts && !movesEchoes) return file;
   const layout = { ...file.layout };
   if (movesLayout) { layout[to] = layout[from]!; delete layout[from]; }
   const move = <T extends { scene: SceneRef }>(r: T): T => (r.scene.path === from ? { ...r, scene: { ...r.scene, path: to } } : r);
-  return { ...file, layout, readings: file.readings.map(move), facts: file.facts.map(move) };
+  const ref = (s: SceneRef): SceneRef => (s.path === from ? { ...s, path: to } : s);
+  return { ...file, layout, readings: file.readings.map(move), facts: file.facts.map(move), echoes: file.echoes.map((e) => ({ ...e, a: ref(e.a), b: ref(e.b) })) };
 }
 
 /** The note's body: a short explanation for a human who opens it, then the data. */
@@ -176,7 +214,7 @@ export function serializeStoryMapNote(file: StoryMapFile, project: string): stri
     "creative-writer: false",
     `${STORY_MAP_FLAG}: ${STORY_MAP_VERSION}`,
     "---",
-    `Story map data for **${project}**. Creative Writer rebuilds the map from your notes; this file only keeps what the model inferred (relationships, references, events and facts per scene) and where you pinned nodes by hand, plus the contradictions you dismissed in the story threads view, so all of it follows the project across devices. Relationships and threads you draw yourself live in your own notes, not here. Safe to sync, safe to delete — you would just re-run the readings and re-place pinned nodes.`,
+    `Story map data for **${project}**. Creative Writer rebuilds the map from your notes; this file only keeps what the model inferred (relationships, references, events and facts per scene, what each contradiction means, sentence pairs that echo) and where you pinned nodes by hand, plus the contradictions you dismissed in the story threads view, so all of it follows the project across devices. Relationships and threads you draw yourself live in your own notes, not here. Safe to sync, safe to delete — you would just re-run the readings and re-place pinned nodes.`,
     "",
     "```json",
     JSON.stringify(file, null, 2),

@@ -51,7 +51,9 @@ Settings → Community plugins → Creative Writer. Everything here is stored in
 | Tint tags in the editor | on | Colour the tag word that opens a comment (`%% TODO: … %%`) in the editor. |
 | Tags | `TODO`, `FIX`, `CHECK`, `IDEA`, `CUT` | One per line, an uppercase word and a hex colour. See [Comments and tags](/guide/manuscript#comments-and-tags). |
 | Ruler | on | The strip at the top of the page: a segment per section, wide by words, coloured by readability, marked when changed today. |
-| Story on the page | off | Cast lines and scene cast in the map's colours, and the model's contradictions in the gutter. Builds the story map on each refresh. |
+| Story on the page | off | Cast lines and scene cast in the map's colours, the model's contradictions and the anchored stops of directed threads in the gutter. Builds the story map on each refresh. |
+| Echoes on the page | off | The echo finder's repeated phrases as marks in the gutter, each naming another place the words occur. Builds the story threads on each refresh. |
+| Reading speed | 250 | Words per minute behind the reading time at the top of the page and beside each section. 100 to 600. |
 
 ## Style checks
 
@@ -66,6 +68,7 @@ A master toggle, then one toggle per kind: Cliché, Passive voice, Filter verb, 
 | Pause before analysing | 1500 ms | Quiet time before the model is called (500–10000). |
 | Ollama URL | `http://localhost:11434` | |
 | Ollama model | `qwen2.5:7b` | Any chat model you have pulled. |
+| Ollama embedding model | `nomic-embed-text` | An embedding model you have pulled, for the [echo finder](/guide/story-threads#echoes)'s sentence pairs. |
 | Claude model | Opus 5 | Opus 5 or Haiku 4.5. |
 | Anthropic API key | — | Stored in plain text in `data.json`. |
 | Daily spending cap (USD) | 1 | Claude calls stop at this; 0 = no cap. Shows today's spend. |
@@ -90,9 +93,15 @@ Likewise in the view's own panel, persisted under `threads`:
 
 | Group | Settings | Default |
 |---|---|---|
-| Threads | Names / Facts / Yours | off / on / on |
+| Threads | Names / Facts / Yours / Echoes | off / on / on / off |
 | Contradictions | Only contradictions; Show dismissed | off; off |
 | Strips | One toggle per strip | all on |
 | Panel | Open or closed | open |
 
-Which entity is being followed and the zoom are not persisted — they are for the session.
+Which entity or echo is being followed and the zoom are not persisted — they are for the session.
+
+In the settings tab itself, under **Story threads**:
+
+| Setting | What | Default |
+|---|---|---|
+| Echo sensitivity | How many [echoes](/guide/story-threads#echoes) the view hears: *Low* reports only the plainest repeats (four-word phrases, near-identical sentences), *Medium* three-word phrases and sentences six content words long that are 60% alike, *High* shorter phrases and looser sentences. One choice instead of a knob per threshold. | Medium |

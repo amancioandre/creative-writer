@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DEFAULT_LAYOUT, STRIP_LABEL_HEIGHT, arcPath, layoutArcs, layoutSlots, layoutStrips } from "../../../src/domain/threads/ArcLayout";
+import { DEFAULT_LAYOUT, STRIP_LABEL_HEIGHT, STUB_RADIUS, arcPath, layoutArcs, layoutSlots, layoutStrips } from "../../../src/domain/threads/ArcLayout";
 import type { Contradiction, SceneSlot, Thread } from "../../../src/domain/threads/Thread";
 
 const slot = (index: number, words: number, note = "a.md"): SceneSlot => ({ ref: { path: note, title: `S${index}`, line: 0 }, index, words, start: 0, note, bookmarked: false });
@@ -47,7 +47,7 @@ describe("arcPath", () => {
 });
 
 const ref = (index: number, value?: string) => ({ scene: { path: "a.md", title: `S${index}`, line: 0 }, index, note: value ?? "", value });
-const thread = (id: string, kind: Thread["kind"], idx: number[]): Thread => ({ id, kind, source: "structure", label: id, refs: idx.map((i) => ref(i)), stale: false });
+const thread = (id: string, kind: Thread["kind"], idx: number[]): Thread => ({ id, kind, source: "structure", label: id, refs: idx.map((i) => ref(i)), stale: false, directed: false, dangling: [] });
 
 describe("layoutArcs", () => {
   const { slots, baseY } = layoutSlots([slot(0, 1), slot(1, 1), slot(2, 1), slot(3, 1)], o);
@@ -65,6 +65,20 @@ describe("layoutArcs", () => {
 
   it("skips a contradiction whose scene is gone", () => {
     expect(layoutArcs([], [{ ...clash, b: ref(9, "grey") }], slots, baseY, o)).toEqual([]);
+  });
+
+  it("gives a directed thread's arcs a direction, a dangling plant a stub, and leaves an explained contradiction undrawn", () => {
+    const plant = { ...ref(0), role: "plant" as const }, touch = { ...ref(1), role: "touch" as const }, kept = { ...ref(3), role: "reversal" as const };
+    const directed: Thread = { ...thread("d", "writer", []), refs: [plant, touch, kept], directed: true, dangling: [] };
+    const loose: Thread = { ...thread("l", "writer", []), refs: [{ ...ref(2), role: "plant" }], directed: true, dangling: [{ ...ref(2), role: "plant" }] };
+    const arcs = layoutArcs([directed, loose, thread("w", "writer", [0, 1])], [{ ...clash, explainedBy: "d" }], slots, baseY, o);
+    expect(arcs.map((a) => [a.threadId, a.from, a.to, a.direction, a.dangling])).toEqual([
+      ["d", 1, 3, "forward", false], ["d", 0, 1, "forward", false], ["w", 0, 1, null, false], ["l", 2, 2, "forward", true],
+    ]);
+    const stub = arcs[3]!;
+    expect(stub.d).toBe(`M${slots[2]!.cx.toFixed(1)},${baseY.toFixed(1)} A${STUB_RADIUS.toFixed(1)},${STUB_RADIUS.toFixed(1)} 0 0,1 ${(slots[2]!.cx + STUB_RADIUS).toFixed(1)},${(baseY - STUB_RADIUS).toFixed(1)}`);
+    expect(stub.apex).toEqual({ x: slots[2]!.cx + STUB_RADIUS, y: baseY - STUB_RADIUS });
+    expect(arcs.some((a) => a.contradiction)).toBe(false);
   });
 });
 

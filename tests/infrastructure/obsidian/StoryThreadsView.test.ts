@@ -3,7 +3,8 @@ import { WorkspaceLeaf, Setting } from "obsidian";
 import { STORY_THREADS_VIEW_TYPE, StoryThreadsView, sceneLink, type StoryThreadsSource } from "../../../src/infrastructure/obsidian/views/StoryThreadsView";
 import type { ProjectSpec } from "../../../src/domain/progress/Project";
 import { DEFAULT_STORY_COLORS, DEFAULT_THREADS, type ThreadsSettings } from "../../../src/domain/settings/Settings";
-import type { Contradiction, SceneSlot, Thread, ThreadModel } from "../../../src/domain/threads/Thread";
+import { echoThreadId, type Contradiction, type SceneSlot, type Thread, type ThreadModel } from "../../../src/domain/threads/Thread";
+import { EMPTY_ECHOES } from "../../../src/domain/echoes/Echoes";
 import { computeStrips } from "../../../src/domain/threads/Strips";
 
 const novel: ProjectSpec = { name: "Novel", scope: "Novel/", targetWords: 1, deadline: null, dailyWords: 0, notePath: "Novel/Project.md", ignoredNames: [] };
@@ -15,20 +16,20 @@ const scenes: SceneSlot[] = [
   { ref: ref("Novel/Two.md", "Night", 30), index: 3, words: 200, start: 1800, note: "Novel/Two.md", bookmarked: false },
 ];
 const stop = (i: number, note = "", extra: Partial<Thread["refs"][number]> = {}) => ({ scene: scenes[i]!.ref, index: i, note, ...extra });
-const ilse: Thread = { id: "entity:Novel/Characters/Ilse.md", kind: "entity", source: "structure", label: "Ilse", entityId: "Novel/Characters/Ilse.md", entityKind: "character", refs: [stop(0), stop(1), stop(3)], stale: false };
-const eyes: Thread = { id: "fact:ilse|eye colour", kind: "fact", source: "model", label: "Ilse · eye colour", refs: [stop(1, "green", { value: "green", evidence: "her green eyes" }), stop(3, "grey", { value: "grey", evidence: "grey eyes now" })], stale: false };
-const letter: Thread = { id: "writer:the letter", kind: "writer", source: "writer", label: "The letter", refs: [stop(0, "planted"), stop(2, "paid off"), { scene: ref("Nine", "Nowhere"), index: -1, note: "?", unresolved: "Nine#Nowhere" }], stale: false };
+const ilse: Thread = { id: "entity:Novel/Characters/Ilse.md", kind: "entity", source: "structure", label: "Ilse", entityId: "Novel/Characters/Ilse.md", entityKind: "character", refs: [stop(0), stop(1), stop(3)], stale: false, directed: false, dangling: [] };
+const eyes: Thread = { id: "fact:ilse|eye colour", kind: "fact", source: "model", label: "Ilse · eye colour", refs: [stop(1, "green", { value: "green", evidence: "her green eyes" }), stop(3, "grey", { value: "grey", evidence: "grey eyes now" })], stale: false, directed: false, dangling: [] };
+const letter: Thread = { id: "writer:the letter", kind: "writer", source: "writer", label: "The letter", refs: [stop(0, "planted"), stop(2, "paid off"), { scene: ref("Nine", "Nowhere"), index: -1, note: "?", unresolved: "Nine#Nowhere" }], stale: false, directed: false, dangling: [] };
 const clash: Contradiction = { key: "K", threadId: eyes.id, subject: "Ilse", attribute: "eye colour", a: eyes.refs[0]!, b: eyes.refs[1]!, dismissed: false, stale: false };
 
 function model(overrides: Partial<ThreadModel> = {}): ThreadModel {
   const threads = overrides.threads ?? [ilse, eyes, letter];
   const contradictions = overrides.contradictions ?? [clash];
   const timeline = scenes.map((s) => ({ scene: s.ref, words: s.words, bookmarked: s.bookmarked, present: [] as string[], events: [] as string[] }));
-  return { project: "Novel", scenes, threads, contradictions, strips: computeStrips(scenes, timeline, threads, contradictions), factsRead: 2, ...overrides };
+  return { project: "Novel", scenes, threads, contradictions, strips: computeStrips(scenes, timeline, threads, contradictions), factsRead: 2, echoes: EMPTY_ECHOES, semantic: { stored: 0, stale: 0 }, ...overrides };
 }
 
 function source(overrides: Partial<StoryThreadsSource> = {}, m: ThreadModel = model()) {
-  const calls = { opened: [] as string[], revealed: [] as string[], dismissed: [] as string[], undismissed: [] as string[], added: [] as string[], removed: [] as string[], read: [] as (string | null)[], map: 0 };
+  const calls = { opened: [] as string[], revealed: [] as string[], dismissed: [] as string[], undismissed: [] as string[], added: [] as string[], stops: [] as string[], roles: [] as string[], removed: [] as string[], read: [] as (string | null)[], intent: [] as string[], echoes: 0, map: 0 };
   let current = m;
   let settings: ThreadsSettings = DEFAULT_THREADS;
   const src: StoryThreadsSource = {
@@ -39,9 +40,13 @@ function source(overrides: Partial<StoryThreadsSource> = {}, m: ThreadModel = mo
     openNote: (p) => { calls.opened.push(p); },
     reveal: (r) => { calls.revealed.push(`${r.title}@${r.line}`); },
     readFacts: async (_p, path) => { calls.read.push(path); return 1; },
+    readIntent: async (_p, cs) => { calls.intent.push(...cs.map((c) => c.key)); return cs.length; },
+    readEchoes: async () => { calls.echoes++; return 3; },
     dismiss: async (_p, key) => { calls.dismissed.push(key); current = { ...current, contradictions: current.contradictions.map((c) => (c.key === key ? { ...c, dismissed: true } : c)) }; },
     undismiss: async (_p, key) => { calls.undismissed.push(key); current = { ...current, contradictions: current.contradictions.map((c) => (c.key === key ? { ...c, dismissed: false } : c)) }; },
     addToThread: async (_p, thread, link, note) => { calls.added.push(`${thread} <- ${link}${note ? ` (${note})` : ""}`); },
+    addStops: async (_p, thread, stops) => { calls.stops.push(`${thread}: ${stops.map((s) => `${s.role ?? "touch"} ${s.link} “${s.quote ?? ""}”`).join(" | ")}`); },
+    setStopRole: async (_p, thread, link, role) => { calls.roles.push(`${thread} ${link} = ${role}`); },
     removeFromThread: async (_p, thread, link) => { calls.removed.push(`${thread} -x ${link}`); },
     threadsNotePath: () => "Novel/Story threads.md",
     storyColors: () => DEFAULT_STORY_COLORS,
@@ -168,6 +173,91 @@ describe("StoryThreadsView", () => {
     click(el.querySelector('.czm-th-bar[data-index="0"]')!);
     click(el.querySelector(".czm-map-card .czm-map-row")!);
     expect(el.querySelector(".czm-arc.is-selected")!.classList.contains("czm-arc-writer")).toBe(true);
+  });
+
+  it("turns a contradiction into a reversal thread, anchored to both quotes", async () => {
+    const { el, calls } = await open();
+    click(el.querySelector(".czm-arc.is-contradiction")!);
+    click(el.querySelector(".czm-act-reversal")!);
+    await tick(); await tick();
+    expect(calls.stops).toEqual(["Ilse's eye colour: plant One#Creek “her green eyes” | reversal Two#Night “grey eyes now”"]);
+    expect(calls.dismissed).toEqual([]);
+    expect(el.querySelector(".czm-map-status")!.textContent).toContain("is a reversal now");
+  });
+
+  it("hides an explained contradiction, draws its thread with an arrow and a stub for a loose plant, and offers the roles on the card", async () => {
+    const plant = { ...stop(1, "", { role: "plant" as const, quote: "her green eyes", anchor: { line: 4, ch: 0 } }) };
+    const reversal = { ...stop(3, "", { role: "reversal" as const, quote: "grey eyes now", anchor: null }) };
+    const kept: Thread = { id: "writer:ilse's eye colour", kind: "writer", source: "writer", label: "Ilse's eye colour", refs: [plant, reversal], stale: false, directed: true, dangling: [] };
+    const loose: Thread = { id: "writer:the gate", kind: "writer", source: "writer", label: "The gate", refs: [stop(0, "", { role: "plant" })], stale: false, directed: true, dangling: [stop(0, "", { role: "plant" })] };
+    const { el, calls } = await open({}, model({ threads: [ilse, eyes, kept, loose], contradictions: [{ ...clash, explainedBy: kept.id }] }));
+    expect(el.querySelector(".czm-arc.is-contradiction")).toBeNull();
+    expect(el.querySelector(".czm-th-badge")!.textContent).toBe("No contradictions · 2 scenes read");
+    expect(el.querySelector(".czm-th-clash-count")!.textContent).toBe("0 open, 0 dismissed, 1 reversal, in 2 scenes read.");
+    expect(el.querySelector("marker#czm-th-arrow")).not.toBeNull();
+    const directed = arcs(el).filter((a) => a.classList.contains("czm-arc-directed"));
+    expect(directed.map((a) => a.classList.contains("is-dangling"))).toEqual([false, true]);
+    expect(el.querySelector(".czm-th-unanchored")!.textContent).toBe("Ilse's eye colour: “grey eyes now” is no longer in Night.");
+    expect(el.querySelector(".czm-th-dangling")!.textContent).toBe("The gate: planted in Camp, no payoff yet.");
+    click(directed[0]!);
+    const card = el.querySelector(".czm-map-card.is-open")!;
+    expect([...card.querySelectorAll(".czm-th-role")].map((r) => r.textContent)).toEqual(["plant", "reversal"]);
+    expect(card.querySelector(".czm-th-role-warn")!.textContent).toBe("quote not found");
+    click(card.querySelector(".czm-act-payoff")!);
+    await tick(); await tick();
+    expect(calls.roles).toEqual(["Ilse's eye colour One#Creek = payoff"]);
+    click(directed[1]!);
+    const stubCard = el.querySelector(".czm-map-card.is-open")!;
+    expect(stubCard.querySelector(".czm-th-dangling-note")).not.toBeNull();
+    expect(stubCard.querySelector(".czm-act-payoff")).toBeNull();
+  });
+
+  it("draws echoes only when asked, follows one, explains it on the card, and keeps it as a motif", async () => {
+    const salt = { key: "surface:salt on the wind", tier: "surface" as const, text: "salt on the wind", scenes: 2, nearest: 1, score: 2,
+      stops: [{ scene: scenes[0]!.ref, index: 0, paragraph: 0, from: 10, to: 26, text: "salt on the wind", sentence: "There was salt on the wind." }, { scene: scenes[1]!.ref, index: 1, paragraph: 0, from: 4, to: 20, text: "salt on the wind", sentence: "Salt on the wind again." }] };
+    const echo: Thread = { id: echoThreadId(salt.key), kind: "echo", source: "extracted", label: salt.text, refs: [stop(0, salt.stops[0]!.sentence, { quote: salt.text }), stop(1, salt.stops[1]!.sentence, { quote: salt.text })], stale: false, directed: false, dangling: [] };
+    const { el, calls } = await open({}, model({ threads: [ilse, eyes, letter, echo], echoes: { groups: [salt], pairs: [] } }));
+    expect(arcs(el).some((a) => a.classList.contains("czm-arc-echo"))).toBe(false);
+    setting("czm-set-thread-echo").toggle!.onChangeCb(true);
+    const drawn = arcs(el).filter((a) => a.classList.contains("czm-arc-echo"));
+    expect(drawn).toHaveLength(1);
+    expect(el.querySelector(".czm-th-badge")!.textContent).toBe("1 contradiction");
+    click(drawn[0]!);
+    const card = el.querySelector(".czm-map-card.is-open")!;
+    expect(card.querySelector(".czm-map-kind")!.textContent).toBe("Echo");
+    expect(card.querySelector(".czm-th-echo-verdict")!.textContent).toBe("A tic: “salt on the wind” 2 times, 1 scene apart.");
+    expect([...card.querySelectorAll(".czm-th-quote.is-echo")].map((q) => q.textContent)).toEqual(["Camp: There was salt on the wind.", "Creek: Salt on the wind again."]);
+    click(card.querySelector(".czm-act-motif")!);
+    await tick(); await tick();
+    expect(calls.stops).toEqual(["salt on the wind: touch One#Camp “salt on the wind” | touch One#Creek “salt on the wind”"]);
+    // Follow one echo from the picker even with the kind off.
+    setting("czm-set-thread-echo").toggle!.onChangeCb(false);
+    const pick = el.querySelector(".czm-th-echo") as HTMLSelectElement;
+    pick.value = echo.id;
+    pick.dispatchEvent(new Event("change"));
+    expect(arcs(el).filter((a) => a.classList.contains("czm-arc-echo"))).toHaveLength(1);
+  });
+
+  it("reads open contradictions for intent and the project for echoes from the panel, and shows the verdict on the card as a proposal", async () => {
+    const { el, calls } = await open({}, model({ contradictions: [{ ...clash, intent: { verdict: "reversal", reason: "the dye is named", confidence: 0.8, model: "ollama:q" } }], semantic: { stored: 4, stale: 1 } }));
+    click(el.querySelector(".czm-arc.is-contradiction")!);
+    const card = el.querySelector(".czm-map-card.is-open")!;
+    expect(card.querySelector(".czm-th-intent")!.textContent).toBe("The model reads this as a reversal: the dye is named (80%)");
+    expect(card.querySelector(".czm-th-intent")!.classList.contains("is-reversal")).toBe(true);
+    expect(card.querySelector(".czm-act-reversal")!.textContent).toBe("Accept as a reversal");
+    expect(el.querySelector(".czm-th-semantic")!.textContent).toBe("4 sentence pairs from the model, 1 stale — read again.");
+    click(el.querySelector(".czm-th-read-intent")!);
+    await tick(); await tick();
+    expect(calls.intent).toEqual(["K"]);
+    expect(el.querySelector(".czm-map-status")!.textContent).toBe("Read 1 contradiction.");
+    click(el.querySelector(".czm-th-read-echoes")!);
+    await tick(); await tick();
+    expect(calls.echoes).toBe(1);
+    expect(el.querySelector(".czm-map-status")!.textContent).toBe("Found 3 sentence pairs that say the same thing.");
+    const { el: none } = await open({}, model({ contradictions: [] }));
+    click(none.querySelector(".czm-th-read-intent")!);
+    await tick();
+    expect(none.querySelector(".czm-map-status")!.textContent).toBe("No open contradictions to read.");
   });
 
   it("removes a stop from a hand-drawn thread and opens the note", async () => {

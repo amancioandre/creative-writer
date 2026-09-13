@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseStoryThreads, removeThreadItem, renameThread, resolveThreadRef, sameLink, serializeStoryThreadsNote, upsertThreadItem } from "../../../src/domain/threads/StoryThreadsNote";
+import { appendThreadItems, formatThreadItem, parseStopText, parseStoryThreads, removeThreadItem, renameThread, resolveThreadRef, sameLink, serializeStoryThreadsNote, upsertThreadItem } from "../../../src/domain/threads/StoryThreadsNote";
 
 const note = `---
 creative-writer: false
@@ -27,12 +27,46 @@ describe("Story threads note", () => {
     const threads = parseStoryThreads(note);
     expect(threads.map((t) => t.name)).toEqual(["The letter", "Empty"]);
     expect(threads[0]!.items).toEqual([
-      { link: "Chapter 3#The station", note: "Anna pockets it", line: 9 },
-      { link: "Chapter 12#Dinner", note: "first mentioned aloud", line: 10 },
-      { link: "Chapter 41#The reading", note: "payoff", line: 11 },
-      { link: "Chapter 50", note: "", line: 12 },
+      { link: "Chapter 3#The station", note: "Anna pockets it", line: 9, role: "touch", quote: null },
+      { link: "Chapter 12#Dinner", note: "first mentioned aloud", line: 10, role: "touch", quote: null },
+      { link: "Chapter 41#The reading", note: "payoff", line: 11, role: "touch", quote: null },
+      { link: "Chapter 50", note: "", line: 12, role: "touch", quote: null },
     ]);
     expect(threads[1]!.items).toEqual([]);
+  });
+
+  it("reads a role and a quoted anchor off a line; a line without them is a touch", () => {
+    const md = `## The letter
+- [[Chapter 3#The station]] — plant: "she pocketed the letter without reading it"
+- [[Chapter 12#Dinner]] — Touch: first mentioned aloud
+- [[Chapter 41#The reading]] — payoff: “addressed to her mother” the reveal
+- [[Chapter 2#Harbour]] — "salt on the wind"
+- [[Chapter 9#Rain]] — reversal:
+`;
+    expect(parseStoryThreads(md)[0]!.items.map((i) => [i.role, i.quote, i.note])).toEqual([
+      ["plant", "she pocketed the letter without reading it", ""],
+      ["touch", null, "first mentioned aloud"],
+      ["payoff", "addressed to her mother", "the reveal"],
+      ["touch", "salt on the wind", ""],
+      ["reversal", null, ""],
+    ]);
+    expect(parseStopText("payoff is not a role here")).toEqual({ role: "touch", quote: null, note: "payoff is not a role here" });
+  });
+
+  it("writes a stop line in a fixed order and reads it back the same", () => {
+    expect(formatThreadItem("One#Quay", "Anna", { role: "plant", quote: "she pocketed it" })).toBe('- [[One#Quay]] — plant: "she pocketed it" Anna');
+    expect(formatThreadItem("One#Quay", "", { role: "touch", quote: null })).toBe("- [[One#Quay]]");
+    expect(formatThreadItem("One#Quay", "", { quote: 'he said "no"' })).toBe(`- [[One#Quay]] — "he said 'no'"`);
+    const line = formatThreadItem("One#Quay", "note", { role: "reversal", quote: "her mother" });
+    expect(parseStoryThreads(`## T\n${line}`)[0]!.items[0]).toMatchObject({ role: "reversal", quote: "her mother", note: "note" });
+  });
+
+  it("keeps a stop's role and quote when only its note changes, and replaces them when given", () => {
+    const md = '## T\n- [[One#Quay]] — plant: "she pocketed it" first\n';
+    expect(upsertThreadItem(md, "T", "One#Quay", "second")).toBe('## T\n- [[One#Quay]] — plant: "she pocketed it" second\n');
+    expect(upsertThreadItem(md, "T", "One#Quay", "", { role: "payoff", quote: null })).toBe("## T\n- [[One#Quay]] — payoff:\n");
+    expect(appendThreadItems("", "Salt", [{ link: "One#Quay", note: "", quote: "salt on the wind" }, { link: "Two#Return", note: "", quote: "salt on the wind" }]))
+      .toBe('## Salt\n- [[One#Quay]] — "salt on the wind"\n- [[Two#Return]] — "salt on the wind"\n');
   });
 
   it("adds a stop to an existing thread, updates the note of an existing stop, or starts a new thread", () => {
@@ -74,9 +108,9 @@ describe("Story threads note", () => {
       { scene: { path: "Novel/Chapter 3.md", title: "Platform", line: 40 }, index: 3 },
       { scene: { path: "Novel/Chapter 12.md", title: "Dinner", line: 0 }, index: 7 },
     ];
-    expect(resolveThreadRef({ link: "Chapter 3#the STATION", note: "n", line: 1 }, scenes)).toEqual({ scene: scenes[0]!.scene, index: 2, note: "n", line: 1 });
-    expect(resolveThreadRef({ link: "Chapter 3", note: "", line: 2 }, scenes).index).toBe(2);
-    const broken = resolveThreadRef({ link: "Chapter 99#Nowhere", note: "?", line: 3 }, scenes);
+    expect(resolveThreadRef({ link: "Chapter 3#the STATION", note: "n", line: 1, role: "touch", quote: null }, scenes)).toEqual({ scene: scenes[0]!.scene, index: 2, note: "n", line: 1, role: "touch" });
+    expect(resolveThreadRef({ link: "Chapter 3", note: "", line: 2, role: "plant", quote: "q" }, scenes)).toMatchObject({ index: 2, role: "plant", quote: "q" });
+    const broken = resolveThreadRef({ link: "Chapter 99#Nowhere", note: "?", line: 3, role: "touch", quote: null }, scenes);
     expect(broken.index).toBe(-1);
     expect(broken.unresolved).toBe("Chapter 99#Nowhere");
     expect(broken.scene).toEqual({ path: "Chapter 99", title: "Nowhere", line: 0 });

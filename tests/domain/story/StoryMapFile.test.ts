@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { EMPTY_STORY_MAP_FILE, dismissContradiction, normalizeStoryMapFile, parseStoryMapNote, putFactReading, putReading, renameReadings, serializeStoryMapNote, setLayout, undismissContradiction, type FactReading, type SceneReading } from "../../../src/domain/story/StoryMapFile";
+import { EMPTY_STORY_MAP_FILE, dismissContradiction, normalizeStoryMapFile, parseStoryMapNote, putFactReading, putReading, renameReadings, serializeStoryMapNote, setLayout, undismissContradiction, type FactReading, type SceneReading, putIntent, putSemanticEchoes } from "../../../src/domain/story/StoryMapFile";
 
 const reading: SceneReading = {
   scene: { path: "Chapters/One.md", title: "Camp", line: 3 },
@@ -14,7 +14,7 @@ describe("StoryMapFile", () => {
   it("round-trips through the markdown note", () => {
     const file = putReading(EMPTY_STORY_MAP_FILE, reading);
     const md = serializeStoryMapNote(file, "Novel");
-    expect(md.startsWith("---\ncreative-writer: false\ncreative-writer-storymap: 2\n---")).toBe(true);
+    expect(md.startsWith("---\ncreative-writer: false\ncreative-writer-storymap: 3\n---")).toBe(true);
     expect(md).toContain("Story map data for **Novel**");
     expect(parseStoryMapNote(md)).toEqual(file);
   });
@@ -57,13 +57,32 @@ describe("StoryMapFile", () => {
     expect(parseStoryMapNote(serializeStoryMapNote(c, "Novel"))).toEqual(c);
   });
 
-  it("loads a version 1 note as version 2 with nothing dismissed and no facts", () => {
+  it("loads a version 1 note as version 3 with nothing dismissed, no facts, no intents and no echoes", () => {
     const v1 = { version: 1, readings: [reading], layout: {} };
     const f = normalizeStoryMapFile(v1);
-    expect(f.version).toBe(2);
+    expect(f.version).toBe(3);
     expect(f.readings).toEqual([reading]);
     expect(f.facts).toEqual([]);
     expect(f.dismissed).toEqual([]);
+    expect(f.intents).toEqual([]);
+    expect(f.echoes).toEqual([]);
+  });
+
+  it("keeps intent verdicts by key and semantic echo pairs, round-trips them, replaces on re-read, drops junk, and follows a rename", () => {
+    const intent = { key: "k1", verdict: "reversal" as const, reason: "dyed", confidence: 0.8, model: "m", rulebook: "r" };
+    const echo = { a: { path: "One.md", title: "Camp", line: 0 }, b: { path: "Two.md", title: "Return", line: 0 }, hashA: "h1", hashB: "h2", quoteA: "The lamp guttered.", quoteB: "The lamp failed.", score: 0.91, model: "e" };
+    let f = putSemanticEchoes(putIntent(EMPTY_STORY_MAP_FILE, intent), [echo]);
+    expect(parseStoryMapNote(serializeStoryMapNote(f, "Novel"))).toEqual(f);
+    f = putIntent(f, { ...intent, verdict: "same" });
+    expect(f.intents).toEqual([{ ...intent, verdict: "same" }]);
+    f = putSemanticEchoes(f, []);
+    expect(f.echoes).toEqual([]);
+    const junk = normalizeStoryMapFile({ intents: [{ key: "a", verdict: "maybe" }, { key: "b", verdict: "error", confidence: 7 }, { key: "b", verdict: "same" }, { verdict: "same" }], echoes: [{ a: { path: "x.md" }, b: { path: "y.md" }, quoteA: "q", quoteB: "" }, { a: { path: "x.md" }, b: { path: "y.md" }, quoteA: "q", quoteB: "r", score: "high" }] });
+    expect(junk.intents).toEqual([{ key: "b", verdict: "error", reason: "", confidence: 1, model: "", rulebook: "" }]);
+    expect(junk.echoes).toEqual([{ a: { path: "x.md", title: "", line: 0 }, b: { path: "y.md", title: "", line: 0 }, hashA: "", hashB: "", quoteA: "q", quoteB: "r", score: 0, model: "" }]);
+    const moved = renameReadings(putSemanticEchoes(EMPTY_STORY_MAP_FILE, [echo]), "Two.md", "Three.md");
+    expect(moved.echoes[0]!.b.path).toBe("Three.md");
+    expect(moved.echoes[0]!.a.path).toBe("One.md");
   });
 
   it("dismisses and restores a contradiction idempotently, dropping junk keys on load", () => {

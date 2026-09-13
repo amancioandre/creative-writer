@@ -46,7 +46,14 @@ export interface ArcPath {
   /** Apex, for anchoring a card. */
   readonly apex: { readonly x: number; readonly y: number };
   readonly contradiction: Contradiction | null;
+  /** Set on every arc of a directed thread: the arrow points the way the promise travels. */
+  readonly direction: "forward" | null;
+  /** A plant with nothing keeping it: a stub rising from its scene and ending in the air. `from === to`. */
+  readonly dangling: boolean;
 }
+
+/** How far a dangling plant's stub reaches, in pixels. */
+export const STUB_RADIUS = 22;
 
 export interface StripRow {
   readonly id: string;
@@ -94,9 +101,17 @@ export function arcPath(a: SlotBox, b: SlotBox, baseY: number, bandHeight: numbe
   return { d: `M${f(l.cx)},${f(baseY)} A${f(rx)},${f(ry)} 0 0,1 ${f(r.cx)},${f(baseY)}`, apex: { x: l.cx + rx, y: baseY - ry } };
 }
 
+/** A quarter circle up and to the right of a scene, for a promise with no payoff yet. */
+export function stubPath(a: SlotBox, baseY: number): { d: string; apex: { x: number; y: number } } {
+  const r = STUB_RADIUS;
+  return { d: `M${f(a.cx)},${f(baseY)} A${f(r)},${f(r)} 0 0,1 ${f(a.cx + r)},${f(baseY - r)}`, apex: { x: a.cx + r, y: baseY - r } };
+}
+
 /**
  * One arc per consecutive pair of stops in each thread, plus one per
- * contradiction on top. Paint order: entity threads first (the densest,
+ * contradiction on top. A directed thread's arcs carry the direction
+ * and each of its dangling plants a stub; a contradiction the writer has
+ * explained as a reversal is not drawn — its thread's own arc is. Paint order: entity threads first (the densest,
  * the least important), then facts, then the writer's own, then
  * contradictions last so red is never buried; within a kind, long arcs
  * first so short ones stay clickable on top of them.
@@ -110,16 +125,23 @@ export function layoutArcs(threads: readonly Thread[], contradictions: readonly 
       const a = byIndex.get(stops[i]!.index), b = byIndex.get(stops[i + 1]!.index);
       if (!a || !b || a.index === b.index) continue;
       const { d, apex } = arcPath(a, b, baseY, o.bandHeight, o.pad);
-      arcs.push({ threadId: t.id, kind: t.kind, from: a.index, to: b.index, d, span: Math.abs(b.index - a.index), apex, contradiction: null });
+      arcs.push({ threadId: t.id, kind: t.kind, from: a.index, to: b.index, d, span: Math.abs(b.index - a.index), apex, contradiction: null, direction: t.directed ? "forward" : null, dangling: false });
+    }
+    for (const p of t.dangling) {
+      const a = byIndex.get(p.index);
+      if (!a) continue;
+      const { d, apex } = stubPath(a, baseY);
+      arcs.push({ threadId: t.id, kind: t.kind, from: a.index, to: a.index, d, span: 0, apex, contradiction: null, direction: "forward", dangling: true });
     }
   }
-  const rank: Record<ThreadKind, number> = { entity: 0, fact: 1, writer: 2 };
+  const rank: Record<ThreadKind, number> = { entity: 0, echo: 1, fact: 2, writer: 3 };
   arcs.sort((x, y) => rank[x.kind] - rank[y.kind] || y.span - x.span);
   for (const c of contradictions) {
+    if (c.explainedBy) continue;
     const a = byIndex.get(c.a.index), b = byIndex.get(c.b.index);
     if (!a || !b || a.index === b.index) continue;
     const { d, apex } = arcPath(a, b, baseY, o.bandHeight, o.pad);
-    arcs.push({ threadId: c.threadId, kind: "fact", from: Math.min(a.index, b.index), to: Math.max(a.index, b.index), d, span: Math.abs(b.index - a.index), apex, contradiction: c });
+    arcs.push({ threadId: c.threadId, kind: "fact", from: Math.min(a.index, b.index), to: Math.max(a.index, b.index), d, span: Math.abs(b.index - a.index), apex, contradiction: c, direction: null, dangling: false });
   }
   return arcs;
 }

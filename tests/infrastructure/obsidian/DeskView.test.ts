@@ -6,7 +6,7 @@ import { IntlSentenceSegmenter } from "../../../src/infrastructure/segmentation/
 import { EMPTY_LOG } from "../../../src/domain/progress/WritingLog";
 
 const profile = new ProfileProse(new IntlSentenceSegmenter("en"));
-const progress = { log: () => EMPTY_LOG, today: () => "2026-08-24", dailyGoal: () => 500, projects: async () => [], scenes: () => [], revealLine: () => undefined };
+const progress = { log: () => EMPTY_LOG, today: () => "2026-08-24", dailyGoal: () => 500, projects: async () => [], scenes: () => [], revealLine: () => undefined, echoes: async () => null, revealScene: () => undefined };
 
 describe("DeskView", () => {
   it("has a stable view type and title", () => {
@@ -135,5 +135,28 @@ describe("DeskView scenes and revision days", () => {
     expect(v.contentEl.textContent).toContain("Revision day: 600 cut");
     expect(v.contentEl.querySelectorAll(".czm-desk-cell.is-revising")).toHaveLength(1);
     expect(v.contentEl.querySelectorAll(".czm-desk-cell.czm-level-4")).toHaveLength(1);
+  });
+
+  it("lists the project's echoes, habits first, and opens the first occurrence", async () => {
+    const stop = (title: string, index: number) => ({ scene: { path: `Novel/${title}.md`, title, line: 3 }, index, paragraph: 0, from: 0, to: 4, text: "x", sentence: "x" });
+    const groups = [
+      { key: "a", tier: "surface" as const, text: "salt on the wind", stops: [stop("Harbour", 0), stop("Crossing", 1)], scenes: 2, nearest: 1, score: 2 },
+      { key: "b", tier: "surface" as const, text: "a wet coat", stops: [stop("Harbour", 0), stop("Crossing", 1), stop("House", 4)], scenes: 3, nearest: 1, score: 3 },
+    ];
+    const revealed: string[] = [];
+    const v = new DeskView(new WorkspaceLeaf(), { activeProfile: () => null, ...progress, echoes: async () => ({ project: "Novel", groups }), revealScene: (ref) => { revealed.push(ref.title); } });
+    await v.onOpen();
+    await new Promise((r) => setTimeout(r, 0));
+    const rows = [...v.contentEl.querySelectorAll<HTMLElement>(".czm-desk-echo")];
+    expect(rows.map((r) => r.querySelector(".czm-desk-echo-text")!.textContent)).toEqual(["a wet coat", "salt on the wind"]);
+    expect(rows[0]!.classList.contains("is-habit")).toBe(true);
+    expect(rows[0]!.textContent).toContain("3 scenes");
+    expect(rows[1]!.textContent).toContain("a tic");
+    rows[1]!.click();
+    expect(revealed).toEqual(["Harbour"]);
+    const none = new DeskView(new WorkspaceLeaf(), { activeProfile: () => null, ...progress, echoes: async () => ({ project: "Novel", groups: [] }) });
+    await none.onOpen();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(none.contentEl.textContent).toContain("No repeated phrases heard in Novel");
   });
 });

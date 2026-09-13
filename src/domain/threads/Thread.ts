@@ -1,4 +1,6 @@
+import { EMPTY_ECHOES, type Echoes } from "../echoes/Echoes";
 import type { EdgeSource, EntityKind, SceneRef } from "../story/StoryGraph";
+import type { IntentReading } from "./Intent";
 
 /**
  * Story threads: the things that recur across scenes and can therefore
@@ -14,8 +16,27 @@ import type { EdgeSource, EntityKind, SceneRef } from "../story/StoryGraph";
  *   age, who knows what). Contradictions between facts are found by code,
  *   never by the model.
  * - `writer`: threads drawn by hand in `Story threads.md`.
+ * - `echo`: a phrase or a sentence that recurs across the book, found
+ *   offline by the echo finder. Off by default; never red.
  */
-export type ThreadKind = "entity" | "fact" | "writer";
+export type ThreadKind = "entity" | "fact" | "writer" | "echo";
+
+/**
+ * What a stop is in a hand-drawn thread. A `plant` is a promise to the
+ * reader, a `payoff` or `reversal` keeps it (the reversal being the case
+ * where the later scene deliberately overturns the earlier one), a
+ * `touch` is any other scene the thread passes through. A line with no
+ * role is a touch, so every thread ever written is still a thread.
+ */
+export type StopRole = "plant" | "touch" | "payoff" | "reversal";
+export const STOP_ROLES: readonly StopRole[] = ["plant", "touch", "payoff", "reversal"];
+
+/** A stop's position inside its note, when its quote was found. */
+export interface Anchor {
+  /** 0-based line in the note. */
+  readonly line: number;
+  readonly ch: number;
+}
 
 export interface ThreadRef {
   readonly scene: SceneRef;
@@ -29,6 +50,12 @@ export interface ThreadRef {
   readonly unresolved?: string;
   /** 0-based line of the writer's list item. */
   readonly line?: number;
+  /** A hand-drawn stop's role; absent on entity and fact stops. */
+  readonly role?: StopRole;
+  /** The quote the writer anchored the stop with, as written. */
+  readonly quote?: string;
+  /** Where the quote was found in the note; null when it was written but no longer matches — a broken anchor. */
+  readonly anchor?: Anchor | null;
 }
 
 export interface Thread {
@@ -42,6 +69,10 @@ export interface Thread {
   readonly refs: readonly ThreadRef[];
   /** Some scene changed since the model read it. */
   readonly stale: boolean;
+  /** A hand-drawn thread with at least one plant: its plant → payoff arcs carry a direction. */
+  readonly directed: boolean;
+  /** Plants with no payoff or reversal after them — the promises the reader is still carrying. */
+  readonly dangling: readonly ThreadRef[];
 }
 
 /** Two scenes state a different value for the same fact. */
@@ -54,6 +85,15 @@ export interface Contradiction {
   readonly b: ThreadRef;
   readonly dismissed: boolean;
   readonly stale: boolean;
+  /** The directed thread whose plant and reversal are these two scenes: the story means the change. Leaves the count without a dismissal. */
+  readonly explainedBy?: string;
+  /** The model's reading of what the difference means — a proposal for the card, nothing more. */
+  readonly intent?: Pick<IntentReading, "verdict" | "reason" | "confidence" | "model">;
+}
+
+/** A contradiction the writer has neither dismissed nor explained as a reversal. */
+export function isLiveContradiction(c: Contradiction): boolean {
+  return !c.dismissed && !c.explainedBy;
 }
 
 /** One scene on the axis. */
@@ -85,6 +125,13 @@ export interface ThreadModel {
   readonly strips: readonly Strip[];
   /** Scenes with a facts reading, so the view can tell "nothing found" from "never read". */
   readonly factsRead: number;
+  /** The echo finder's result, after the writer's motifs are taken out; the echo threads are drawn from it. */
+  readonly echoes: Echoes;
+  /** The semantic tier's state: pairs stored by the last reading, and how many of them no longer match their scenes. */
+  readonly semantic: { readonly stored: number; readonly stale: number };
 }
 
-export const EMPTY_THREAD_MODEL: ThreadModel = { project: "", scenes: [], threads: [], contradictions: [], strips: [], factsRead: 0 };
+export const EMPTY_THREAD_MODEL: ThreadModel = { project: "", scenes: [], threads: [], contradictions: [], strips: [], factsRead: 0, echoes: EMPTY_ECHOES, semantic: { stored: 0, stale: 0 } };
+
+/** Thread ids for the echo finder's findings, so a card can look the finding up. */
+export const echoThreadId = (key: string): string => `echo:${key}`;

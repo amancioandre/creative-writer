@@ -1,6 +1,7 @@
 import { type App, type Plugin, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
 import { RhythmScale } from "../../domain/rhythm/RhythmScale";
-import { DEFAULT_GOALS, DEFAULT_MANUSCRIPT, foldersToText, normalizeFolderPath, normalizeNotePath, tagsToText, textToFolders, textToTags, type ClaudeModelId, type LlmProvider, type PluginSettings } from "../../domain/settings/Settings";
+import { MAX_READING_SPEED, MIN_READING_SPEED } from "../../domain/manuscript/ReadingTime";
+import { DEFAULT_GOALS, DEFAULT_MANUSCRIPT, ECHO_SENSITIVITIES, foldersToText, normalizeFolderPath, normalizeNotePath, tagsToText, textToFolders, textToTags, type ClaudeModelId, type EchoSensitivity, type LlmProvider, type PluginSettings } from "../../domain/settings/Settings";
 import type { ScopeMode } from "../../domain/scope/NoteScope";
 import type { FindingKind } from "../../domain/style/Finding";
 
@@ -104,6 +105,7 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
           { name: "Tags", desc: "One per line: an uppercase word and a hex colour, e.g. CHECK #4a8fe2. A comment that opens with the word and a colon takes the colour, on the page and in the editor.", control: { type: "text", key: "manuscript.tagsText", placeholder: "TODO #d9a621" } },
           { name: "Ruler", desc: "A strip at the top of the manuscript page: one segment per section, wide by words, coloured by readability, marked when it changed today. Click a segment to go there.", control: { type: "toggle", key: "manuscript.showRuler" } },
           { name: "Story on the page", desc: "Who is in each section and scene, in the story map's colours, and the model's contradictions as red marks in the gutter. Builds the story map each refresh, so it is off by default.", control: { type: "toggle", key: "manuscript.showStory" } },
+          { name: "Reading speed", desc: "Words per minute behind the reading time at the top of the manuscript page and beside each section. Adults read prose at about 250; set your own pace.", control: { type: "slider", key: "manuscript.readingSpeed", min: MIN_READING_SPEED, max: MAX_READING_SPEED, step: 10 } },
         ],
       },
       {
@@ -123,6 +125,7 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
           { name: "Pause before analysing", desc: "Milliseconds of quiet before the model is called.", control: { type: "slider", key: "llm.idleMs", min: 500, max: 10000, step: 250 } },
           { name: "Ollama URL", control: { type: "text", key: "llm.ollamaUrl", placeholder: "http://localhost:11434" } },
           { name: "Ollama model", desc: "Any chat model you have pulled. qwen2.5:7b and llama3.1:8b follow the JSON format well; reasoning models (deepseek-r1) are slower but better at the myth analysis.", control: { type: "text", key: "llm.ollamaModel", placeholder: "qwen2.5:7b" } },
+          { name: "Ollama embedding model", desc: "An embedding model you have pulled, for the echo finder's sentence pairs. nomic-embed-text is small and good.", control: { type: "text", key: "llm.ollamaEmbedModel", placeholder: "nomic-embed-text" } },
           { name: "Claude model", desc: "Opus 5 ($5 / $25 per million tokens) reads prose far more carefully; Haiku 4.5 ($1 / $5) is the budget option. A paragraph costs roughly a cent on Opus with the rulebook cached.", control: { type: "dropdown", key: "llm.claudeModel", options: { "claude-opus-5": "Claude Opus 5", "claude-haiku-4-5": "Claude Haiku 4.5" } } },
           { name: "Anthropic API key", desc: this.keyWarning(), control: { type: "text", key: "llm.claudeApiKey", placeholder: "sk-ant-…" } },
           { name: "Daily spending cap (USD)", desc: `Claude calls stop when today's spend reaches this. 0 = no cap. Spent today: $${s.llm.spend.usd.toFixed(3)}.`, control: { type: "slider", key: "llm.dailyCapUsd", min: 0, max: 20, step: 0.5 } },
@@ -237,6 +240,14 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
       .addToggle((t) => t.setValue(s.manuscript.showRuler).onChange((v) => ms({ showRuler: v })));
     new Setting(containerEl).setName("Story on the page").setDesc("Who is in each section and scene, and the model's contradictions in the gutter. Builds the story map each refresh.")
       .addToggle((t) => t.setValue(s.manuscript.showStory).onChange((v) => ms({ showStory: v })));
+    new Setting(containerEl).setName("Echoes on the page").setDesc("The echo finder's repeated phrases as marks in the gutter, each naming another place the words occur. Builds the story threads on each refresh.")
+      .addToggle((t) => t.setValue(s.manuscript.showEchoes).onChange((v) => ms({ showEchoes: v })));
+    new Setting(containerEl).setName("Reading speed").setDesc("Words per minute behind the reading time on the manuscript page. Adults read prose at about 250.")
+      .addSlider((sl) => sl.setLimits(MIN_READING_SPEED, MAX_READING_SPEED, 10).setValue(s.manuscript.readingSpeed).onChange((v) => ms({ readingSpeed: v })));
+
+    new Setting(containerEl).setName("Story threads").setHeading();
+    new Setting(containerEl).setName("Echo sensitivity").setDesc("How many echoes the threads view hears: repeated phrases and near-identical sentences across the book. Low reports only the plainest repeats; high hears shorter phrases and looser sentences.")
+      .addDropdown((d) => d.addOptions({ low: "Low", medium: "Medium", high: "High" }).setValue(s.threads.echoSensitivity).onChange((v) => set({ threads: { ...this.port.current().threads, echoSensitivity: ECHO_SENSITIVITIES.includes(v as EchoSensitivity) ? (v as EchoSensitivity) : "medium" } })));
 
     new Setting(containerEl).setName("Style checks").setHeading();
     new Setting(containerEl).setName("Style checks").setDesc("Highlight clichés, passive voice, filter verbs, adverbs, repetition and more in the current paragraph. Hover a highlight for the note.")
@@ -257,6 +268,8 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
       .addText((t) => t.setPlaceholder("http://localhost:11434").setValue(s.llm.ollamaUrl).onChange((v) => llm({ ollamaUrl: v })));
     new Setting(containerEl).setName("Ollama model").setDesc("Any chat model you have pulled.")
       .addText((t) => t.setPlaceholder("qwen2.5:7b").setValue(s.llm.ollamaModel).onChange((v) => llm({ ollamaModel: v })));
+    new Setting(containerEl).setName("Ollama embedding model").setDesc("An embedding model you have pulled, for the echo finder's sentence pairs (Read project for echoes in the story threads view). nomic-embed-text is small and good.")
+      .addText((t) => t.setPlaceholder("nomic-embed-text").setValue(s.llm.ollamaEmbedModel).onChange((v) => llm({ ollamaEmbedModel: v })));
     new Setting(containerEl).setName("Claude model")
       .addDropdown((d) => d.addOptions({ "claude-opus-5": "Claude Opus 5", "claude-haiku-4-5": "Claude Haiku 4.5" }).setValue(s.llm.claudeModel).onChange((v) => llm({ claudeModel: v as ClaudeModelId })));
     new Setting(containerEl).setName("Anthropic API key").setDesc(this.keyWarning())

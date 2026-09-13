@@ -23,6 +23,10 @@ This means:
 - the log is per file, so [projects](/guide/projects) can sum only their own folder;
 - the desk reads the log through the scope, so changing *Where it runs* re-derives the totals and the streak without touching the log.
 
+## Echoes
+
+When the active note is in a project, the phrases the [echo finder](/guide/story-threads#echoes) hears across that project, ten at most: the phrase, how many times, how many scenes, how close its nearest two occurrences are, and whether it is a *habit* (spread over three scenes or more), a *tic* (heard within a couple of scenes) or just an echo. Habits come first. Click one to open the first place it occurs. The list is read from the project at most every twenty seconds; the story threads view draws the same pairs and is where a motif is kept.
+
 ## Readability of the note
 
 The active note's word, sentence and paragraph counts, then its reading-ease, sentence-rhythm and dialogue bands with hints — see [Readability](/guide/readability) for the bands.

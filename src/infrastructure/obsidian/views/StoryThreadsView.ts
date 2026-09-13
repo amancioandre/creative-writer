@@ -4,8 +4,11 @@ import { THREAD_KINDS, type StoryEntityKind, type ThreadKind, type ThreadsSettin
 import { basenameOf } from "../../../domain/story/EntityIndex";
 import type { SceneRef } from "../../../domain/story/StoryGraph";
 import { DEFAULT_LAYOUT, STRIP_LABEL_HEIGHT, layoutArcs, layoutSlots, layoutStrips, type ArcPath, type LayoutOptions, type SlotBox } from "../../../domain/threads/ArcLayout";
-import { EMPTY_THREAD_MODEL, type Contradiction, type SceneSlot, type Thread, type ThreadModel, type ThreadRef } from "../../../domain/threads/Thread";
+import { EMPTY_THREAD_MODEL, echoThreadId, isLiveContradiction, type Contradiction, type SceneSlot, type StopRole, type Thread, type ThreadModel, type ThreadRef } from "../../../domain/threads/Thread";
+import { echoVerdict } from "../../../domain/echoes/Echoes";
+import { intentLine } from "../../../domain/threads/Intent";
 import type { AnalyzeProgress } from "../../../application/use-cases/AnalyzeSceneRelations";
+import type { StopToAdd } from "../../../application/use-cases/EditStoryThread";
 import { KIND_LABEL } from "./StoryMapView";
 
 export const STORY_THREADS_VIEW_TYPE = "creative-writer-story-threads";
@@ -19,10 +22,17 @@ export interface StoryThreadsSource {
   reveal(ref: SceneRef): void;
   /** Runs the fact-reading model over one note's scenes, or the project's when `notePath` is null. Throws with a human message when no local model is configured. */
   readFacts(project: ProjectSpec, notePath: string | null, signal: AbortSignal, onProgress: (p: AnalyzeProgress) => void): Promise<number>;
+  /** Asks the local model what each open contradiction means; verdicts land in Story map.md as proposals for the card. */
+  readIntent(project: ProjectSpec, contradictions: readonly Contradiction[], signal: AbortSignal, onProgress: (p: AnalyzeProgress) => void): Promise<number>;
+  /** The echo finder's semantic tier: embeds every sentence with the local model and stores the pairs that say the same thing. */
+  readEchoes(project: ProjectSpec, signal: AbortSignal, onProgress: (p: AnalyzeProgress) => void): Promise<number>;
   dismiss(project: ProjectSpec, key: string): Promise<void>;
   undismiss(project: ProjectSpec, key: string): Promise<void>;
   /** Adds a scene to a hand-drawn thread, starting it if new; `link` is "Note#Heading". */
   addToThread(project: ProjectSpec, thread: string, link: string, note: string): Promise<void>;
+  /** Several stops at once, with roles and quotes: a plant and its reversal, a motif's occurrences. */
+  addStops(project: ProjectSpec, thread: string, stops: readonly StopToAdd[]): Promise<void>;
+  setStopRole(project: ProjectSpec, thread: string, link: string, role: StopRole): Promise<void>;
   removeFromThread(project: ProjectSpec, thread: string, link: string): Promise<void>;
   /** Vault path of the project's `Story threads.md`, whether or not it exists yet. */
   threadsNotePath(project: ProjectSpec): string;
@@ -34,7 +44,8 @@ export interface StoryThreadsSource {
 }
 
 const SVG = "http://www.w3.org/2000/svg";
-const KIND_TITLE: Record<ThreadKind, string> = { entity: "Where names appear", fact: "Facts the model read", writer: "Threads you drew" };
+const KIND_TITLE: Record<ThreadKind, string> = { entity: "Where names appear", fact: "Facts the model read", writer: "Threads you drew", echo: "Echoes across the book" };
+const KIND_CHIP: Record<ThreadKind, string> = { entity: "Name", fact: "Fact", writer: "Yours", echo: "Echo" };
 const MIN_ZOOM = 1, MAX_ZOOM = 8;
 const AXIS_GAP = 6;
 const BOTTOM_PAD = 8;
@@ -55,6 +66,7 @@ export class StoryThreadsView extends ItemView {
   private model: ThreadModel = EMPTY_THREAD_MODEL;
   private selection: Selection = null;
   private entityFilter: string | null = null;
+  private echoFilter: string | null = null;
   private query = "";
   private generation = 0;
   private running: AbortController | null = null;
@@ -100,7 +112,7 @@ export class StoryThreadsView extends ItemView {
 
   async show(project: ProjectSpec | null, keepSelection = false): Promise<void> {
     const generation = ++this.generation;
-    if (this.project?.scope !== project?.scope) { this.selection = null; this.entityFilter = null; this.zoomX = 1; }
+    if (this.project?.scope !== project?.scope) { this.selection = null; this.entityFilter = null; this.echoFilter = null; this.zoomX = 1; }
     this.project = project;
     if (!project) { this.model = EMPTY_THREAD_MODEL; this.render(); return; }
     const model = await this.source.build(project);
@@ -125,6 +137,14 @@ export class StoryThreadsView extends ItemView {
     this.svg.setAttribute("class", "czm-th-svg");
     this.svg.setAttribute("role", "img");
     this.scroller.appendChild(this.svg);
+    // The arrowhead a directed arc ends in; one definition, referenced from the stylesheet.
+    const defs = document.createElementNS(SVG, "defs");
+    const marker = document.createElementNS(SVG, "marker");
+    marker.setAttribute("id", "czm-th-arrow"); marker.setAttribute("class", "czm-th-arrow");
+    marker.setAttribute("viewBox", "0 0 8 8"); marker.setAttribute("refX", "6"); marker.setAttribute("refY", "4");
+    marker.setAttribute("markerWidth", "6"); marker.setAttribute("markerHeight", "6"); marker.setAttribute("orient", "auto-start-reverse");
+    const head = document.createElementNS(SVG, "path"); head.setAttribute("d", "M0,0 L8,4 L0,8 z");
+    marker.appendChild(head); defs.appendChild(marker); this.svg.appendChild(defs);
     this.axisG = document.createElementNS(SVG, "g"); this.axisG.setAttribute("class", "czm-th-axis");
     this.arcsG = document.createElementNS(SVG, "g"); this.arcsG.setAttribute("class", "czm-th-arcs");
     this.stripsG = document.createElementNS(SVG, "g"); this.stripsG.setAttribute("class", "czm-th-strips");
@@ -172,8 +192,9 @@ export class StoryThreadsView extends ItemView {
     const q = this.query.trim().toLowerCase();
     return this.model.threads.filter((t) => {
       if (t.kind === "entity") { if (this.entityFilter ? t.entityId !== this.entityFilter : !s.kinds.entity) return false; }
+      else if (t.kind === "echo") { if (this.echoFilter ? t.id !== this.echoFilter : !s.kinds.echo) return false; }
       else if (!s.kinds[t.kind]) return false;
-      if (s.contradictionsOnly && !this.model.contradictions.some((c) => c.threadId === t.id && (s.showDismissed || !c.dismissed))) return false;
+      if (s.contradictionsOnly && !this.model.contradictions.some((c) => c.threadId === t.id && !c.explainedBy && (s.showDismissed || !c.dismissed))) return false;
       if (q && !t.label.toLowerCase().includes(q)) return false;
       return true;
     });
@@ -181,7 +202,7 @@ export class StoryThreadsView extends ItemView {
 
   private visibleContradictions(threads: readonly Thread[]): Contradiction[] {
     const ids = new Set(threads.map((t) => t.id));
-    return this.model.contradictions.filter((c) => ids.has(c.threadId) && (this.settings.showDismissed || !c.dismissed));
+    return this.model.contradictions.filter((c) => ids.has(c.threadId) && !c.explainedBy && (this.settings.showDismissed || !c.dismissed));
   }
 
   private layoutOptions(): LayoutOptions {
@@ -237,7 +258,7 @@ export class StoryThreadsView extends ItemView {
       const thread = byId.get(arc.threadId);
       const path = document.createElementNS(SVG, "path");
       const c = arc.contradiction;
-      path.setAttribute("class", `czm-arc czm-arc-${arc.kind}${c ? " is-contradiction" : ""}${c?.dismissed ? " is-dismissed" : ""}${(c ? c.stale : thread?.stale) ? " is-stale" : ""}`);
+      path.setAttribute("class", `czm-arc czm-arc-${arc.kind}${c ? " is-contradiction" : ""}${c?.dismissed ? " is-dismissed" : ""}${(c ? c.stale : thread?.stale) ? " is-stale" : ""}${arc.direction ? " czm-arc-directed" : ""}${arc.dangling ? " is-dangling" : ""}`);
       path.setAttribute("d", arc.d);
       path.setAttribute("data-thread", arc.threadId);
       path.setAttribute("data-from", String(arc.from)); path.setAttribute("data-to", String(arc.to));
@@ -384,6 +405,8 @@ export class StoryThreadsView extends ItemView {
     };
     if (this.project) {
       btn(this.running ? "Stop" : "Read project for facts", "czm-map-analyse czm-th-read", () => void this.toggleRead(null), "Asks the local model (Ollama) for the concrete facts each scene states — eye colours, ages, places, who knows what — so scenes can be checked against each other. Unchanged scenes are skipped.");
+      btn(this.running ? "Stop" : "Read contradictions for intent", "czm-map-analyse czm-th-read-intent", () => void this.toggleIntent(), "Asks the local model what each open contradiction means — a reversal the story intends, an error, or the same thing said twice. A verdict is a proposal on the card; accepting it is your click.");
+      btn(this.running ? "Stop" : "Read project for echoes", "czm-map-analyse czm-th-read-echoes", () => void this.toggleEchoes(), "Embeds every sentence with the local model and keeps the pairs that say the same thing in different words. Only the pairs are stored, in Story map.md.");
       btn("Story map", "czm-th-map-btn", () => this.source.openMap(this.project!), "Open the story map for this project.");
       btn("Threads note", "czm-th-note-btn", () => this.source.openNote(this.source.threadsNotePath(this.project!)), "Open Story threads.md, where hand-drawn threads live.");
     }
@@ -409,12 +432,30 @@ export class StoryThreadsView extends ItemView {
       for (const t of entities) { const o = pick.createEl("option", { text: `${t.label} · ${t.refs.length}` }); o.value = t.entityId!; if (this.entityFilter === t.entityId) o.selected = true; }
       pick.addEventListener("change", () => { this.entityFilter = pick.value || null; this.renderChart(); this.renderCard(); });
     }
+    const echoes = this.model.threads.filter((t) => t.kind === "echo");
+    if (echoes.length) {
+      const row = threads.createDiv({ cls: "czm-th-entity-row" });
+      const pick = row.createEl("select", { cls: "dropdown czm-th-echo", attr: { "aria-label": "Follow one echo" } });
+      pick.createEl("option", { text: "Follow one echo…", attr: { value: "" } });
+      for (const t of echoes) { const o = pick.createEl("option", { text: `${t.label} · ${t.refs.length}` }); o.value = t.id; if (this.echoFilter === t.id) o.selected = true; }
+      pick.addEventListener("change", () => { this.echoFilter = pick.value || null; this.renderChart(); this.renderCard(); });
+    } else if (s.kinds.echo) {
+      threads.createDiv({ text: "No echoes heard in this project.", cls: "czm-map-hint czm-th-no-echoes" });
+    }
+    if (this.model.semantic.stored) {
+      const { stored, stale } = this.model.semantic;
+      threads.createDiv({ text: `${stored} sentence pair${stored === 1 ? "" : "s"} from the model${stale ? `, ${stale} stale — read again` : ""}.`, cls: `czm-map-hint czm-th-semantic${stale ? " is-stale" : ""}` });
+    }
     const broken = this.model.threads.filter((t) => t.kind === "writer").flatMap((t) => t.refs.filter((r) => r.unresolved).map((r) => ({ thread: t.label, link: r.unresolved! })));
     for (const b of broken) threads.createDiv({ text: `${b.thread}: “${b.link}” points at no scene.`, cls: "czm-map-warn czm-th-broken" });
+    const unanchored = this.model.threads.filter((t) => t.kind === "writer").flatMap((t) => t.refs.filter((r) => r.anchor === null).map((r) => ({ thread: t.label, quote: r.quote ?? "", scene: r.scene.title || basenameOf(r.scene.path) })));
+    for (const u of unanchored) threads.createDiv({ text: `${u.thread}: “${u.quote}” is no longer in ${u.scene}.`, cls: "czm-map-warn czm-th-broken czm-th-unanchored" });
+    const dangling = this.model.threads.filter((t) => t.kind === "writer").flatMap((t) => t.dangling.map((r) => ({ thread: t.label, scene: r.scene.title || basenameOf(r.scene.path) })));
+    for (const d of dangling) threads.createDiv({ text: `${d.thread}: planted in ${d.scene}, no payoff yet.`, cls: "czm-map-hint czm-th-dangling" });
 
     const clashes = section("Contradictions", "contradictions");
-    const live = this.model.contradictions.filter((c) => !c.dismissed).length, dismissed = this.model.contradictions.length - live;
-    clashes.createDiv({ text: this.model.factsRead === 0 ? "No facts read yet." : `${live} open, ${dismissed} dismissed, in ${this.model.factsRead} scene${this.model.factsRead === 1 ? "" : "s"} read.`, cls: "czm-map-hint czm-th-clash-count" });
+    const live = this.model.contradictions.filter(isLiveContradiction).length, explained = this.model.contradictions.filter((c) => c.explainedBy).length, dismissed = this.model.contradictions.length - live - explained;
+    clashes.createDiv({ text: this.model.factsRead === 0 ? "No facts read yet." : `${live} open, ${dismissed} dismissed${explained ? `, ${explained} reversal${explained === 1 ? "" : "s"}` : ""}, in ${this.model.factsRead} scene${this.model.factsRead === 1 ? "" : "s"} read.`, cls: "czm-map-hint czm-th-clash-count" });
     new Setting(clashes).setName("Only contradictions").setClass("czm-set-contradictions-only").addToggle((t) => t.setValue(s.contradictionsOnly).onChange((v) => { this.saveSettings({ ...this.settings, contradictionsOnly: v }); this.renderChart(); this.renderCard(); }));
     new Setting(clashes).setName("Show dismissed").setClass("czm-set-show-dismissed").addToggle((t) => t.setValue(s.showDismissed).onChange((v) => { this.saveSettings({ ...this.settings, showDismissed: v }); this.renderChart(); this.renderCard(); }));
 
@@ -425,7 +466,7 @@ export class StoryThreadsView extends ItemView {
   }
 
   private renderBadge(): void {
-    const live = this.model.contradictions.filter((c) => !c.dismissed).length, dismissed = this.model.contradictions.length - live;
+    const live = this.model.contradictions.filter(isLiveContradiction).length, dismissed = this.model.contradictions.filter((c) => c.dismissed).length;
     const show = this.project !== null && this.model.factsRead > 0;
     this.badge.classList.toggle("is-open", show);
     this.badge.classList.toggle("is-alert", live > 0);
@@ -465,12 +506,13 @@ export class StoryThreadsView extends ItemView {
     if (!thread) return;
     const head = this.card.createDiv({ cls: "czm-map-card-head" });
     head.createSpan({ text: thread.label, cls: "czm-map-card-name" });
-    const kind = head.createSpan({ text: thread.kind === "entity" && thread.entityKind ? KIND_LABEL[thread.entityKind] : thread.kind === "writer" ? "Yours" : "Fact", cls: `czm-map-kind czm-th-kind-${thread.kind}` });
+    const kind = head.createSpan({ text: thread.kind === "entity" && thread.entityKind ? KIND_LABEL[thread.entityKind] : KIND_CHIP[thread.kind], cls: `czm-map-kind czm-th-kind-${thread.kind}` });
     if (thread.entityKind) kind.style.color = this.source.storyColors()[thread.entityKind];
     if (thread.stale && !arc.contradiction) this.card.createEl("p", { text: "A scene changed since the model read it — read again to refresh.", cls: "czm-map-warn" });
 
     const c = arc.contradiction;
     if (c) this.renderContradiction(c);
+    if (thread.kind === "echo") this.renderEcho(thread, arc);
 
     const from = thread.refs.find((r) => r.index === arc.from), to = thread.refs.find((r) => r.index === arc.to);
     this.card.createEl("h4", { text: c ? "Between" : thread.kind === "entity" ? "Consecutive appearances" : "Between" });
@@ -479,18 +521,52 @@ export class StoryThreadsView extends ItemView {
     const actions = this.card.createDiv({ cls: "czm-map-card-actions" });
     const btn = (text: string, cls: string, onClick: () => void, title?: string) => { const b = actions.createEl("button", { text, cls }); if (title) b.title = title; b.addEventListener("click", onClick); return b; };
     if (c && this.project) {
-      btn(c.dismissed ? "Restore" : "Dismiss", c.dismissed ? "czm-act-undismiss" : "czm-act-dismiss", () => void this.toggleDismiss(c), c.dismissed ? "Show this pair as a contradiction again." : "Not a contradiction — a change the story means, or two ways of saying one thing. Remembered in Story map.md.");
+      if (!c.dismissed) btn(c.intent?.verdict === "reversal" ? "Accept as a reversal" : "This is a reversal", "czm-act-reversal", () => void this.addReversal(c), "The story means this change: the earlier scene plants it, the later one reverses it. Written to Story threads.md as a directed thread, anchored to both quotes.");
+      btn(c.dismissed ? "Restore" : "Dismiss", c.dismissed ? "czm-act-undismiss" : "czm-act-dismiss", () => void this.toggleDismiss(c), c.dismissed ? "Show this pair as a contradiction again." : "Not a contradiction — two ways of saying one thing. Remembered in Story map.md.");
     }
     if (thread.kind === "entity" && thread.entityId) btn(this.entityFilter === thread.entityId ? "Show all names" : "Follow", "czm-act-follow", () => { this.entityFilter = this.entityFilter === thread.entityId ? null : thread.entityId!; this.renderPanel(); this.renderChart(); this.renderCard(); });
     if (thread.kind === "writer" && this.project) {
-      for (const r of [from, to]) if (r) btn(`Remove ${r.scene.title || basenameOf(r.scene.path)}`, "czm-act-remove-stop", () => void this.removeStop(thread, r), "Take this scene out of the thread (edits Story threads.md).");
+      if (arc.dangling) this.card.createEl("p", { text: "Planted here, and nothing keeps the promise yet.", cls: "czm-map-hint czm-th-dangling-note" });
+      const stops = arc.dangling ? [from] : [from, to];
+      for (const r of stops) {
+        if (!r) continue;
+        const name = r.scene.title || basenameOf(r.scene.path);
+        if (r.role !== "plant") btn(`Promise: ${name}`, "czm-act-plant", () => void this.setRole(thread, r, "plant"), "Mark this stop as the plant — a promise to the reader.");
+        if (r.role !== "payoff" && !arc.dangling) btn(`Pays off: ${name}`, "czm-act-payoff", () => void this.setRole(thread, r, "payoff"), "Mark this stop as the payoff that keeps the promise.");
+      }
+      for (const r of stops) if (r) btn(`Remove ${r.scene.title || basenameOf(r.scene.path)}`, "czm-act-remove-stop", () => void this.removeStop(thread, r), "Take this scene out of the thread (edits Story threads.md).");
       btn("Open note", "czm-act-open-threads", () => this.source.openNote(this.source.threadsNotePath(this.project!)));
     }
     if (thread.kind === "fact" && !c && this.project) btn(this.running ? "Stop" : "Read again", "czm-act-read-facts", () => void this.toggleRead(null));
+    if (thread.kind === "echo") {
+      btn(this.echoFilter === thread.id ? "Show all echoes" : "Follow", "czm-act-follow-echo", () => { this.echoFilter = this.echoFilter === thread.id ? null : thread.id; this.renderPanel(); this.renderChart(); this.renderCard(); });
+      if (this.project) btn("Keep as a motif", "czm-act-motif", () => void this.keepMotif(thread), "This repetition is yours on purpose. Written to Story threads.md as a thread with a stop at every occurrence; it stops being an echo.");
+    }
 
     if (thread.refs.length > 2) {
       this.card.createEl("h4", { text: `All ${thread.refs.length} stops` });
       this.stopList(thread.refs, thread);
+    }
+  }
+
+  /** What the echo finder heard: the words, where, how close, and whether it is a tic or a habit. */
+  private renderEcho(thread: Thread, arc: ArcPath): void {
+    const group = this.model.echoes.groups.find((g) => echoThreadId(g.key) === thread.id);
+    const pair = this.model.echoes.pairs.find((p) => echoThreadId(p.key) === thread.id);
+    const box = this.card.createDiv({ cls: "czm-map-conflict czm-th-echo-box" });
+    if (group) {
+      const verdict = echoVerdict(group);
+      const line = verdict === "habit" ? `A habit: “${group.text}” in ${group.scenes} scenes, ${group.stops.length} times.` : verdict === "tic" ? `A tic: “${group.text}” ${group.stops.length} times, ${group.nearest === 0 ? "twice in one scene" : `${group.nearest} scene${group.nearest === 1 ? "" : "s"} apart`}.` : `“${group.text}” ${group.stops.length} times, ${group.nearest} scenes apart.`;
+      box.createDiv({ text: line, cls: "czm-map-conflict-text czm-th-echo-verdict" });
+    } else if (pair) {
+      box.createDiv({ text: `Two sentences ${Math.round(pair.similarity * 100)}% alike (${pair.tier}), ${pair.distance === 0 ? "in the same scene" : `${pair.distance} scene${pair.distance === 1 ? "" : "s"} apart`}.`, cls: "czm-map-conflict-text czm-th-echo-verdict" });
+    }
+    const from = thread.refs.find((r) => r.index === arc.from), to = thread.refs.find((r) => r.index === arc.to && r !== from);
+    for (const r of [from, to]) {
+      if (!r) continue;
+      const q = box.createEl("blockquote", { cls: "czm-th-quote is-echo" });
+      q.createSpan({ text: `${r.scene.title || basenameOf(r.scene.path)}: `, cls: "czm-map-row-meta" });
+      q.createSpan({ text: r.note || r.quote || "" });
     }
   }
 
@@ -504,6 +580,7 @@ export class StoryThreadsView extends ItemView {
       q.createSpan({ text: r.evidence ?? "" });
     }
     if (c.stale) box.createDiv({ text: "One of these scenes changed since it was read; the quote may be gone.", cls: "czm-map-hint" });
+    if (c.intent) box.createDiv({ text: intentLine(c.intent), cls: `czm-th-intent is-${c.intent.verdict}`, attr: { title: `Read by ${c.intent.model}. A proposal: nothing changes until you click.` } });
   }
 
   private renderSceneCard(index: number): void {
@@ -564,7 +641,9 @@ export class StoryThreadsView extends ItemView {
     for (const r of refs) {
       const row = list.createDiv({ cls: `czm-map-row${r.unresolved ? " is-broken" : ""}`, attr: { role: "button", tabindex: "0" } });
       row.createSpan({ text: r.unresolved ? `“${r.unresolved}” — not found` : r.scene.title || "(opening)", cls: "czm-map-row-name" });
-      row.createSpan({ text: r.unresolved ? "" : thread.kind === "fact" ? r.value ?? "" : r.note || basenameOf(r.scene.path), cls: "czm-map-row-meta" });
+      if (r.role && r.role !== "touch") row.createSpan({ text: r.role, cls: `czm-th-role is-${r.role}` });
+      row.createSpan({ text: r.unresolved ? "" : thread.kind === "fact" ? r.value ?? "" : r.note || (r.quote ? `“${r.quote}”` : basenameOf(r.scene.path)), cls: "czm-map-row-meta" });
+      if (r.anchor === null) row.createSpan({ text: "quote not found", cls: "czm-map-warn czm-th-role-warn" });
       if (!r.unresolved) {
         row.addEventListener("click", () => this.source.reveal(r.scene));
         row.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") this.source.reveal(r.scene); });
@@ -630,6 +709,47 @@ export class StoryThreadsView extends ItemView {
     }
   }
 
+  /** One model run at a time: the same controller, status line and rebuild for facts, intent and echoes. */
+  private async runReading(work: (signal: AbortSignal) => Promise<string>): Promise<void> {
+    if (this.running) { this.running.abort(); return; }
+    const project = this.project;
+    if (!project) return;
+    this.running = new AbortController();
+    this.status = "Reading…";
+    this.renderStatus(); this.renderPanel(); this.renderCard();
+    try {
+      this.status = await work(this.running.signal);
+    } catch (e) {
+      this.status = e instanceof Error ? e.message : String(e);
+    } finally {
+      this.running = null;
+      await this.show(project, true);
+    }
+  }
+
+  async readIntent(): Promise<void> { await this.toggleIntent(); }
+  async readEchoes(): Promise<void> { await this.toggleEchoes(); }
+
+  private async toggleIntent(): Promise<void> {
+    const project = this.project;
+    if (!project) return;
+    const open = this.model.contradictions.filter(isLiveContradiction);
+    if (!this.running && open.length === 0) { this.flash("No open contradictions to read."); return; }
+    await this.runReading(async (signal) => {
+      const n = await this.source.readIntent(project, open, signal, (p) => { this.status = `${p.skipped ? "Already read" : "Read"} ${p.done}/${p.total}: ${p.scene.title || basenameOf(p.scene.path)}`; this.renderStatus(); });
+      return n === 0 ? "Nothing new to read — every open contradiction already has a verdict." : `Read ${n} contradiction${n === 1 ? "" : "s"}.`;
+    });
+  }
+
+  private async toggleEchoes(): Promise<void> {
+    const project = this.project;
+    if (!project) return;
+    await this.runReading(async (signal) => {
+      const n = await this.source.readEchoes(project, signal, (p) => { this.status = `Embedded ${p.done}/${p.total} sentences…`; this.renderStatus(); });
+      return n === 0 ? "No sentence pairs found alike." : `Found ${n} sentence pair${n === 1 ? "" : "s"} that say the same thing.`;
+    });
+  }
+
   private async toggleDismiss(c: Contradiction): Promise<void> {
     if (!this.project) return;
     try {
@@ -642,6 +762,43 @@ export class StoryThreadsView extends ItemView {
       const again = this.arcs.find((a) => a.contradiction?.key === c.key);
       this.select(again ? { kind: "arc", arc: again } : null);
     }
+  }
+
+  /** A contradiction the story means becomes a directed thread: plant in the earlier scene, reversal in the later, both quotes as anchors. */
+  private async addReversal(c: Contradiction): Promise<void> {
+    if (!this.project) return;
+    const [plant, reversal] = c.a.index <= c.b.index ? [c.a, c.b] : [c.b, c.a];
+    const name = `${c.subject}'s ${c.attribute}`;
+    try {
+      await this.source.addStops(this.project, name, [
+        { link: sceneLink(plant.scene), note: plant.value ?? "", role: "plant", quote: plant.evidence ?? null },
+        { link: sceneLink(reversal.scene), note: reversal.value ?? "", role: "reversal", quote: reversal.evidence ?? null },
+      ]);
+    } catch (e) { this.flash(e instanceof Error ? e.message : String(e)); return; }
+    this.flash(`“${name}” is a reversal now — drawn as your thread.`);
+    this.selection = null;
+    await this.show(this.project, true);
+  }
+
+  /** The writer claims an echo: a thread named after it, one stop per occurrence, each anchored to the words. */
+  private async keepMotif(thread: Thread): Promise<void> {
+    if (!this.project) return;
+    const stops = thread.refs.filter((r) => r.index >= 0).map((r) => ({ link: sceneLink(r.scene), note: "", quote: r.quote ?? null }));
+    try {
+      await this.source.addStops(this.project, thread.label, stops);
+    } catch (e) { this.flash(e instanceof Error ? e.message : String(e)); return; }
+    this.flash(`“${thread.label}” is a motif now — drawn as your thread.`);
+    this.selection = null;
+    if (this.echoFilter === thread.id) this.echoFilter = null;
+    await this.show(this.project, true);
+  }
+
+  private async setRole(thread: Thread, ref: ThreadRef, role: StopRole): Promise<void> {
+    if (!this.project) return;
+    try {
+      await this.source.setStopRole(this.project, thread.label, ref.unresolved ?? sceneLink(ref.scene), role);
+    } catch (e) { this.flash(e instanceof Error ? e.message : String(e)); return; }
+    await this.show(this.project, true);
   }
 
   private async addStop(thread: string, scene: SceneSlot, note: string): Promise<void> {

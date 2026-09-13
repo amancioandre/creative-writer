@@ -2,6 +2,20 @@
 
 Release notes for every version are on the [releases page](https://github.com/amancioandre/creative-writer/releases). This file carries the same text for the versions since it was started.
 
+## 0.9.0 — The threads
+
+The story threads view learns three things a reader feels before they can name them: a promise and where it is kept, a phrase reached for once too often, and a contradiction the story means. Everything offline unless you ask the local model.
+
+- Story threads: **directed threads**. A stop line in `Story threads.md` may start with `plant:`, `touch:`, `payoff:` or `reversal:` and carry one `"quoted sentence"` that anchors the stop to that sentence; every thread written before reads the same. Directed arcs end in an arrow; a plant with no payoff draws a stub and is listed in the panel; a quote that no longer matches is reported like a dead link. **Promise** and **Pays off** on an arc's card set the roles.
+- Story threads: **This is a reversal** on a contradiction's card. The change the story means becomes a directed thread of yours, plant and reversal anchored to the model's quotes, and the pair leaves the red count without a dismissal. *Dismiss* is now only for two ways of saying one thing.
+- Story threads: the **echo finder**. A fourth thread kind, off by default, hears what recurs across the whole project, offline: a run of words that comes back in different paragraphs, reported whole, and two sentences that say nearly the same thing in different words. Names and dialogue tags never make one; a repeat inside one paragraph stays the editor's. The card shows both ends, the distance, and whether it is a tic (close) or a habit (spread over the book); near pairs rank first. **Keep as a motif** writes the echo into `Story threads.md` as a thread of yours and it stops being a finding; so does any phrase you quote in a thread. *Follow one echo…* in the panel, an *Echoes* strip, and **Settings → Story threads → Echo sensitivity** (low, medium, high).
+- Story threads: **Read contradictions for intent**. The local model reads each open contradiction — both quotes with their paragraphs, in order — and says whether it is a reversal the story intends, an error, or the same thing said twice, with a reason. The verdict is a line on the card and a proposal only: **Accept as a reversal** writes the directed thread, nothing is explained or dismissed on the model's say-so. Kept in `Story map.md` by the contradiction's key.
+- Story threads: **Read project for echoes**, the echo finder's semantic tier. Every sentence of eight words or more is embedded by the local model (Settings → Model assistant → Ollama embedding model, `nomic-embed-text` by default) and the pairs that say the same thing in unrelated words join the echoes. Only the pairs are stored, with each scene's hash; stale pairs are counted and left out until the next read. `Story map.md` is version 3.
+- Writing desk: an **Echoes** list for the active note's project, habits first, a click opening the first occurrence.
+- Manuscript: an **Echoes** toggle (Settings → Manuscript → Echoes on the page) marks every sentence holding a repeated phrase with a purple dot in the gutter, naming the nearest other place the words occur; a click takes the page there.
+- Manuscript: with *Story* on, an anchored plant is an orange mark in the gutter at its sentence, a payoff or reversal a green one, each naming the other end; a click takes the page there.
+- Manuscript: a reading-time estimate next to the word count at the top of the page (*4 h 5 min to read*) and beside each section's title, at 250 words a minute by default. Settings → Manuscript → Reading speed sets the pace.
+
 ## 0.8.2 — The page
 
 - Zen Mode hides the note's properties block and backlinks footer and fades the note title, so the page is only the title and the text. The hide rule repeats Obsidian's own show-properties selectors, so it wins in Live Preview and Reading view.

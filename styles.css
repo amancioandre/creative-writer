@@ -195,6 +195,11 @@ body.czm-zen.czm-zen .inline-title:hover {
 .czm-desk-project.is-stalled .czm-desk-bar-fill { background: var(--text-muted); }
 
 .czm-desk-cell.is-revising { background: var(--color-purple); }
+.czm-desk-echoes { display: flex; flex-direction: column; gap: 6px; }
+.czm-desk-echo { padding: 4px 6px; border-radius: 4px; cursor: pointer; border-left: 2px solid var(--color-purple); }
+.czm-desk-echo:hover, .czm-desk-echo:focus-visible { background: var(--background-modifier-hover); outline: none; }
+.czm-desk-echo.is-habit { border-left-color: var(--color-orange); }
+.czm-desk-echo-text { font-style: italic; }
 .czm-desk-scenes { display: flex; flex-direction: column; gap: 6px; }
 .czm-desk-scene { padding: 4px 6px; border-radius: 4px; cursor: pointer; }
 .czm-desk-scene:hover, .czm-desk-scene:focus-visible { background: var(--background-modifier-hover); outline: none; }
@@ -329,10 +334,20 @@ body.czm-zen.czm-zen .inline-title:hover {
 .czm-arc { fill: none; stroke: var(--text-muted); stroke-width: 1.2; opacity: 0.55; cursor: pointer; transition: opacity 120ms; }
 .czm-arc-entity { stroke: var(--czm-kind, var(--text-muted)); opacity: 0.35; }
 .czm-arc-fact { stroke: var(--interactive-accent); }
+.czm-arc-echo { stroke: var(--color-purple); opacity: 0.6; }
 .czm-arc-writer { stroke: var(--color-orange); stroke-width: 1.8; opacity: 0.85; }
 .czm-arc.is-contradiction { stroke: var(--color-red); stroke-width: 2.2; opacity: 0.9; }
 .czm-arc.is-contradiction.is-dismissed { opacity: 0.25; stroke-dasharray: 2 4; }
 .czm-arc.is-stale { stroke-dasharray: 4 3; }
+/* A directed thread ends in an arrowhead; a plant nothing keeps yet is a stub that ends in the air. */
+.czm-arc-directed { marker-end: url("#czm-th-arrow"); }
+.czm-th-arrow { fill: var(--color-orange); }
+.czm-arc.is-dangling { stroke-dasharray: 3 3; opacity: 0.95; }
+.czm-th-role { margin-left: 6px; padding: 0 5px; border-radius: 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; background: var(--background-modifier-border); color: var(--text-muted); }
+.czm-th-role.is-plant { background: color-mix(in srgb, var(--color-orange) 25%, transparent); color: var(--color-orange); }
+.czm-th-role.is-payoff, .czm-th-role.is-reversal { background: color-mix(in srgb, var(--color-green) 25%, transparent); color: var(--color-green); }
+.czm-th-role-warn { margin-left: 6px; font-size: var(--font-ui-smaller); }
+.czm-th-dangling { color: var(--color-orange); }
 .czm-th-arcs.has-hover .czm-arc:not(.is-lifted):not(.is-kin):not(.is-selected) { opacity: 0.07; }
 .czm-th-arcs.has-selection .czm-arc:not(.is-selected):not(.is-lifted):not(.is-kin) { opacity: 0.12; }
 .czm-arc.is-kin { opacity: 0.9; }
@@ -349,6 +364,15 @@ body.czm-zen.czm-zen .inline-title:hover {
 .czm-th-badge.is-alert { color: var(--color-red); border-color: var(--color-red); font-weight: 600; }
 .czm-th-kind-writer { color: var(--color-orange); }
 .czm-th-kind-fact { color: var(--interactive-accent); }
+.czm-th-kind-echo { color: var(--color-purple); }
+.czm-map-row.czm-th-row-echo { border-left-color: var(--color-purple); }
+.czm-th-quote.is-echo { border-left-color: var(--color-purple); }
+.czm-th-echo-box { border-left-color: var(--color-purple); }
+.czm-th-intent { margin-top: 6px; padding: 4px 6px; border-radius: 4px; font-size: var(--font-ui-smaller); background: var(--background-secondary); }
+.czm-th-intent.is-reversal { border-left: 2px solid var(--color-orange); }
+.czm-th-intent.is-error { border-left: 2px solid var(--color-red); }
+.czm-th-intent.is-same { border-left: 2px solid var(--text-faint); }
+.czm-th-semantic.is-stale { color: var(--color-orange); }
 .czm-map-row.czm-th-row-writer { border-left-color: var(--color-orange); }
 .czm-map-row.czm-th-row-fact { border-left-color: var(--interactive-accent); }
 .czm-map-row.is-broken { color: var(--color-red); cursor: default; }
@@ -470,7 +494,16 @@ body.czm-zen.czm-zen .inline-title:hover {
 .czm-ms-cast-name.is-link:hover { text-decoration: underline; }
 /* A candidate: a name the map found with no note yet. Dashed, like its node on the map; a click offers to make it one. */
 .czm-ms-cast-name.is-candidate { cursor: pointer; text-decoration: none; border-bottom: 1px dashed var(--text-faint); padding-bottom: 1px; }
+.czm-ms-mark.is-story { cursor: pointer; }
 .czm-ms-mark.is-conflict { border-radius: 1px; background: var(--color-red); transform: rotate(45deg) scale(0.85); }
+/* A plant is an orange triangle pointing on; a payoff or reversal a green one pointing back. */
+.czm-ms-mark.is-plant, .czm-ms-mark.is-payoff, .czm-ms-mark.is-reversal { width: 0; height: 0; border-radius: 0; background: none; border-top: 4px solid transparent; border-bottom: 4px solid transparent; }
+.czm-ms-mark.is-plant { border-left: 7px solid var(--color-orange); }
+.czm-ms-mark.is-payoff, .czm-ms-mark.is-reversal { border-right: 7px solid var(--color-green); }
+.czm-ms-mark.is-echo { background: var(--color-purple); }
+.czm-ms-cm-badge.is-echo { background: color-mix(in srgb, var(--color-purple) 20%, transparent); color: color-mix(in srgb, var(--color-purple) 70%, var(--text-normal)); }
+.czm-ms-cm-badge.is-plant { background: color-mix(in srgb, var(--color-orange) 20%, transparent); color: color-mix(in srgb, var(--color-orange) 70%, var(--text-normal)); }
+.czm-ms-cm-badge.is-payoff, .czm-ms-cm-badge.is-reversal { background: color-mix(in srgb, var(--color-green) 20%, transparent); color: color-mix(in srgb, var(--color-green) 70%, var(--text-normal)); }
 .czm-ms-cm-badge.is-conflict { background: color-mix(in srgb, var(--color-red) 20%, transparent); color: color-mix(in srgb, var(--color-red) 70%, var(--text-normal)); }
 
 /* The comments pane: this paragraph and its composer, then every comment. A drawer under the page when narrow. */

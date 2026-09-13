@@ -54,11 +54,11 @@ aliases: []
 ```yaml
 ---
 creative-writer: false
-creative-writer-storymap: 2
+creative-writer-storymap: 3
 ---
 ```
 
-followed by a short explanation and one ```` ```json ```` block: relation readings and fact readings per scene, contradictions you dismissed, and pinned node positions. The flag keeps the plugin from reading its own note as a chapter; a version-1 note (before facts existed) loads as is. Safe to delete — you would re-run the readings.
+followed by a short explanation and one ```` ```json ```` block: relation readings and fact readings per scene, the model's verdict per contradiction, sentence pairs the embedding model found alike, contradictions you dismissed, and pinned node positions. The flag keeps the plugin from reading its own note as a chapter; a version-1 or version-2 note (before facts, or before intents and echoes, existed) loads as is. Safe to delete — you would re-run the readings.
 
 ## Manuscript export note
 
@@ -75,7 +75,7 @@ creative-writer-threads: 1
 ---
 ```
 
-and adds one `## heading` per thread and one `- [[Note#Heading]] — note` line per scene. Edit it freely, or write it from scratch without the front matter — a note named `Story threads` is never read as a chapter either way.
+and adds one `## heading` per thread and one `- [[Note#Heading]] — note` line per scene. A line may start with `plant:`, `touch:`, `payoff:` or `reversal:` and carry one `"quoted sentence"` as its anchor ([directed threads](/guide/story-threads#directed-threads)). Edit it freely, or write it from scratch without the front matter — a note named `Story threads` is never read as a chapter either way.
 
 ## Writer
 

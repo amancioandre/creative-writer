@@ -5,6 +5,17 @@ import { addDays, type Day, weekday } from "../../../domain/progress/Dates";
 import { heatmap, sessionKind, streak, summarizeDay, totals } from "../../../domain/progress/ProgressSummary";
 import type { Scene } from "../../../domain/text/Scenes";
 import type { ProjectStatus } from "../../../domain/progress/Project";
+import { echoVerdict, type EchoGroup } from "../../../domain/echoes/Echoes";
+import type { SceneRef } from "../../../domain/story/StoryGraph";
+
+/** The active project's echoes, for the list on the desk. */
+export interface DeskEchoes {
+  readonly project: string;
+  readonly groups: readonly EchoGroup[];
+}
+
+/** How many echoes the desk lists. */
+export const DESK_ECHOES = 10;
 
 export const DESK_VIEW_TYPE = "creative-writer-desk";
 const HEATMAP_WEEKS = 12;
@@ -21,6 +32,10 @@ export interface DeskSource {
   scenes(): { scene: Scene; profile: ProseProfile }[];
   /** Puts the cursor on a line of the active note. */
   revealLine(line: number): void;
+  /** The echo finder's phrases for the project the active note is in; null when it is in none. Async: reads the project. */
+  echoes(): Promise<DeskEchoes | null>;
+  /** Opens a scene of the project in the editor. */
+  revealScene(ref: SceneRef): void;
 }
 
 /**
@@ -64,6 +79,12 @@ export class DeskView extends ItemView {
       renderProjects(projects, list);
     });
 
+    const echoes = root.createDiv();
+    void this.source.echoes().then((found) => {
+      if (generation !== this.generation || !found) return;
+      renderEchoes(echoes, found, (ref) => this.source.revealScene(ref));
+    });
+
     root.createEl("h4", { text: "Readability" });
     const active = this.source.activeProfile();
     if (!active) {
@@ -100,6 +121,35 @@ export function renderScenes(root: HTMLElement, scenes: readonly { scene: Scene;
     if (profile.wordCount > 0) meta.push(`${Math.round(profile.dialogue.ratio * 100)}% dialogue`);
     if (meta.length) row.createDiv({ text: meta.join(" · "), cls: "czm-desk-band-detail" });
   }
+}
+
+/**
+ * What the writer overuses, ranked the way it matters: a phrase spread
+ * over many scenes before one used often in a single place. The list
+ * is a view over the threads model's echoes; the threads view draws the
+ * same pairs and is where a motif is kept.
+ */
+export function renderEchoes(root: HTMLElement, found: DeskEchoes, reveal: (ref: SceneRef) => void): void {
+  root.empty();
+  root.createEl("h4", { text: "Echoes" });
+  if (found.groups.length === 0) {
+    root.createEl("p", { text: `No repeated phrases heard in ${found.project}.`, cls: "czm-desk-hint" });
+    return;
+  }
+  const ranked = [...found.groups].sort((a, b) => b.scenes - a.scenes || b.stops.length - a.stops.length || a.nearest - b.nearest || a.text.localeCompare(b.text)).slice(0, DESK_ECHOES);
+  const list = root.createDiv({ cls: "czm-desk-echoes" });
+  for (const g of ranked) {
+    const row = list.createDiv({ cls: `czm-desk-echo is-${echoVerdict(g)}`, attr: { role: "button", tabindex: "0", title: `“${g.text}” — ${g.stops.map((s) => s.scene.title || s.scene.path).join(", ")}` } });
+    const go = () => reveal(g.stops[0]!.scene);
+    row.addEventListener("click", go);
+    row.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") go(); });
+    const head = row.createDiv({ cls: "czm-desk-band-head" });
+    head.createSpan({ text: g.text, cls: "czm-desk-echo-text" });
+    head.createSpan({ text: `${g.stops.length}×`, cls: "czm-desk-band-name" });
+    const verdict = echoVerdict(g);
+    row.createDiv({ text: `${g.scenes} scene${g.scenes === 1 ? "" : "s"} · ${g.nearest === 0 ? "twice in one scene" : `nearest ${g.nearest} apart`} · ${verdict === "habit" ? "a habit" : verdict === "tic" ? "a tic" : "an echo"}`, cls: "czm-desk-band-detail" });
+  }
+  if (found.groups.length > ranked.length) root.createDiv({ text: `+${found.groups.length - ranked.length} more in the story threads view`, cls: "czm-desk-hint" });
 }
 
 export function renderProgress(root: HTMLElement, log: WritingLog, today: Day, goal: number): void {

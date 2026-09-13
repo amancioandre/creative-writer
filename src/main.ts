@@ -33,6 +33,10 @@ import { RequestUrlHttpClient } from "./infrastructure/obsidian/RequestUrlHttpCl
 import { ProfileProse } from "./application/use-cases/ProfileProse";
 import { readabilityStatusExtension, statusLabel } from "./infrastructure/codemirror/readabilityStatusExtension";
 import { DeskView, DESK_VIEW_TYPE } from "./infrastructure/obsidian/views/DeskView";
+import type { EchoGroup } from "./domain/echoes/Echoes";
+
+/** How long the desk keeps its echo list before reading the project again. */
+const DESK_ECHOES_TTL_MS = 20_000;
 import { TrackWriting } from "./application/use-cases/TrackWriting";
 import { AdapterProgressRepository } from "./infrastructure/obsidian/AdapterProgressRepository";
 import { NoteProgressRepository } from "./infrastructure/obsidian/NoteProgressRepository";
@@ -67,8 +71,12 @@ import { AnalyzeSceneFacts } from "./application/use-cases/AnalyzeSceneFacts";
 import { BuildManuscript } from "./application/use-cases/BuildManuscript";
 import { ExportManuscript } from "./application/use-cases/ExportManuscript";
 import { MANUSCRIPT_VIEW_TYPE, ManuscriptView } from "./infrastructure/obsidian/views/ManuscriptView";
-import { castFromGraph, conflictMarks, type SectionFacts } from "./domain/manuscript/StoryFacts";
+import { castFromGraph, conflictMarks, echoMarks, threadMarks, type SectionFacts } from "./domain/manuscript/StoryFacts";
 import { OllamaFactAnalyser } from "./infrastructure/llm/OllamaFactAnalyser";
+import { OllamaIntentAnalyser } from "./infrastructure/llm/OllamaIntentAnalyser";
+import { OllamaEmbedder } from "./infrastructure/llm/OllamaEmbedder";
+import { AnalyzeContradictionIntent } from "./application/use-cases/AnalyzeContradictionIntent";
+import { AnalyzeProjectEchoes } from "./application/use-cases/AnalyzeProjectEchoes";
 import type { EntityKind, SceneRef } from "./domain/story/StoryGraph";
 import type { Archetype } from "./domain/myth/MythReport";
 import { removeRelation, upsertRelation } from "./domain/story/Relations";
@@ -199,6 +207,7 @@ export default class CreativeZenModePlugin extends Plugin {
       new NoteProgressRepository(notes, () => this.current.goals.logNote, legacyProgress),
       { timers: { set: (fn, ms) => window.setTimeout(fn, ms), clear: (id) => window.clearTimeout(id) }, today: () => toDay(new Date()), debounceMs: 800, saveMs: 10_000, onChange: () => this.refreshDesk() },
     );
+    let deskEchoes: { scope: string; at: number; found: { project: string; groups: readonly EchoGroup[] } } | null = null;
     this.registerView(DESK_VIEW_TYPE, (leaf: WorkspaceLeaf) => new DeskView(leaf, {
       activeProfile: () => {
         const md = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -219,6 +228,20 @@ export default class CreativeZenModePlugin extends Plugin {
         md.editor.scrollIntoView({ from: { line, ch: 0 }, to: { line, ch: 0 } }, true);
         md.editor.focus();
       },
+      // The desk refreshes on every pause in typing; the echoes are a view over the threads model, which reads the whole
+      // project, so the list is kept for a short while rather than rebuilt each time.
+      echoes: async () => {
+        const path = this.app.workspace.getActiveViewOfType(MarkdownView)?.file?.path;
+        const project = path ? buildStoryMap.projectFor(path) : null;
+        if (!project) return null;
+        const cached = deskEchoes;
+        if (cached && cached.scope === project.scope && Date.now() - cached.at < DESK_ECHOES_TTL_MS) return cached.found;
+        const model = await buildThreads.execute(project);
+        const found = { project: project.name, groups: model.echoes.groups };
+        deskEchoes = { scope: project.scope, at: Date.now(), found };
+        return found;
+      },
+      revealScene: (ref) => void this.revealScene(ref.path, ref.line),
     }));
     this.addCommand({ id: "open-writing-desk", name: "Open writing desk", callback: () => void this.openDesk() });
 
@@ -398,7 +421,7 @@ export default class CreativeZenModePlugin extends Plugin {
     });
     // Story threads: the same graph laid out as one line, with facts read per scene and hand-drawn threads from `Story threads.md`.
     const threadsRepo = new StoryThreadsNoteRepository(notes);
-    const buildThreads = new BuildStoryThreads(buildStoryMap, projectNotes, storyRepo, threadsRepo);
+    const buildThreads = new BuildStoryThreads(buildStoryMap, projectNotes, storyRepo, threadsRepo, undefined, { segmenter: new IntlSentenceSegmenter(), sensitivity: () => this.current.threads.echoSensitivity });
     const editThread = new EditStoryThread(threadsRepo);
     this.registerView(STORY_THREADS_VIEW_TYPE, (leaf: WorkspaceLeaf) => new StoryThreadsView(leaf, {
       projects: storySource.projects,
@@ -414,9 +437,24 @@ export default class CreativeZenModePlugin extends Plugin {
         const graph = await buildStoryMap.execute(project);
         return new AnalyzeSceneFacts(projectNotes, storyRepo, analyser).execute(project, notePath, graph, signal, onProgress);
       },
+      readIntent: async (project, contradictions, signal, onProgress) => {
+        const cfg = this.current.llm;
+        if (cfg.provider !== "ollama") throw new Error("Reading for intent needs a local model — set Model to Local (Ollama) in Creative Writer settings.");
+        const analyser = new OllamaIntentAnalyser(new RequestUrlHttpClient(), { baseUrl: cfg.ollamaUrl, model: cfg.ollamaModel });
+        return new AnalyzeContradictionIntent(projectNotes, storyRepo, analyser).execute(project, contradictions, signal, onProgress);
+      },
+      readEchoes: async (project, signal, onProgress) => {
+        const cfg = this.current.llm;
+        if (cfg.provider !== "ollama") throw new Error("Reading for echoes needs a local model — set Model to Local (Ollama) in Creative Writer settings.");
+        const embedder = new OllamaEmbedder(new RequestUrlHttpClient(), { baseUrl: cfg.ollamaUrl, model: cfg.ollamaEmbedModel });
+        const graph = await buildStoryMap.execute(project);
+        return new AnalyzeProjectEchoes(projectNotes, storyRepo, embedder, new IntlSentenceSegmenter()).execute(project, graph, signal, onProgress);
+      },
       dismiss: (project, key) => buildThreads.dismiss(project, key),
       undismiss: (project, key) => buildThreads.undismiss(project, key),
       addToThread: (project, thread, link, note) => editThread.addRef(project, thread, link, note),
+      addStops: (project, thread, stops) => editThread.addStops(project, thread, stops),
+      setStopRole: (project, thread, link, role) => editThread.setRole(project, thread, link, role),
       removeFromThread: (project, thread, link) => editThread.removeRef(project, thread, link),
       threadsNotePath: (project) => StoryThreadsNoteRepository.pathFor(project),
       storyColors: () => this.current.storyMap.colors,
@@ -430,6 +468,16 @@ export default class CreativeZenModePlugin extends Plugin {
       id: "read-note-for-story-threads",
       name: "Read this note for facts (story threads)",
       editorCallback: () => void this.openStoryThreads(null).then(() => (this.app.workspace.getLeavesOfType(STORY_THREADS_VIEW_TYPE)[0]?.view as StoryThreadsView | undefined)?.readActiveNote()),
+    });
+    this.addCommand({
+      id: "read-contradictions-for-intent",
+      name: "Read contradictions for intent (story threads)",
+      callback: () => void this.openStoryThreads(null).then(() => (this.app.workspace.getLeavesOfType(STORY_THREADS_VIEW_TYPE)[0]?.view as StoryThreadsView | undefined)?.readIntent()),
+    });
+    this.addCommand({
+      id: "read-project-for-echoes",
+      name: "Read project for echoes (story threads)",
+      callback: () => void this.openStoryThreads(null).then(() => (this.app.workspace.getLeavesOfType(STORY_THREADS_VIEW_TYPE)[0]?.view as StoryThreadsView | undefined)?.readEchoes()),
     });
     // Manuscript: the project's prose stitched into one read-only page; every note keeps its element and re-renders alone.
     const buildManuscript = new BuildManuscript(projectNotes, () => this.current.manuscript);
@@ -453,7 +501,7 @@ export default class CreativeZenModePlugin extends Plugin {
       exportNote,
       appendComment: (path, line, comment) => this.appendComment(path, line, comment),
       // Readability from the same profiler as the desk, today's words from the log, cast and contradictions from the map and threads.
-      facts: async (project, paths, story) => {
+      facts: async (project, paths, story, echoes = false) => {
         const texts = new Map((await projectNotes.notes(project)).map((n) => [n.path, n.text ?? ""]));
         const log = countedLog();
         const today = log.days[toDay(new Date())];
@@ -465,8 +513,9 @@ export default class CreativeZenModePlugin extends Plugin {
           const c = cast.get(path);
           sections.set(path, { readability: ease ? { label: ease.band.label, score: ease.score } : null, today: { added: delta?.added ?? 0, removed: delta?.removed ?? 0 }, cast: c?.cast ?? [], scenes: c?.scenes ?? [] });
         }
-        const conflicts = story ? conflictMarks((await buildThreads.execute(project)).contradictions) : [];
-        return { sections, conflicts };
+        const threads = story || echoes ? await buildThreads.execute(project) : null;
+        const marks = threads ? [...(story ? [...conflictMarks(threads.contradictions), ...threadMarks(threads.threads)] : []), ...(echoes ? echoMarks(threads.threads) : [])] : [];
+        return { sections, marks };
       },
       storyColors: () => this.current.storyMap.colors,
       promote: (project, name, kind) => this.createEntityNote(project.scope, name, kind),

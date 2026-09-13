@@ -42,7 +42,7 @@ describe("style settings", () => {
 describe("llm settings", () => {
   it("defaults to off with sensible Ollama values", () => {
     const s = normalizeSettings(undefined);
-    expect(s.llm).toEqual({ provider: "off", onIdle: false, idleMs: 1500, ollamaUrl: "http://localhost:11434", ollamaModel: "qwen2.5:7b", claudeModel: "claude-opus-5", claudeApiKey: "", dailyCapUsd: 1, spend: { day: "", usd: 0 } });
+    expect(s.llm).toEqual({ provider: "off", onIdle: false, idleMs: 1500, ollamaUrl: "http://localhost:11434", ollamaModel: "qwen2.5:7b", ollamaEmbedModel: "nomic-embed-text", claudeModel: "claude-opus-5", claudeApiKey: "", dailyCapUsd: 1, spend: { day: "", usd: 0 } });
   });
   it("accepts valid providers and rejects junk", () => {
     expect(normalizeSettings({ llm: { provider: "ollama" } }).llm.provider).toBe("ollama");
@@ -91,14 +91,17 @@ describe("normalizeSettings — story map", () => {
     expect(normalizeSettings({}).storyMap).toEqual(DEFAULT_SETTINGS.storyMap);
     expect(normalizeSettings({}).threads).toEqual(DEFAULT_SETTINGS.threads);
     const t = normalizeSettings({ threads: { kinds: { entity: true, bogus: 1 }, strips: { cast: false, "": true, x: "no" }, showDismissed: true, contradictionsOnly: "yes", panelOpen: false } }).threads;
-    expect(t).toEqual({ kinds: { entity: true, fact: true, writer: true }, strips: { cast: false }, showDismissed: true, contradictionsOnly: false, panelOpen: false });
+    expect(t).toEqual({ kinds: { entity: true, fact: true, writer: true, echo: false }, echoSensitivity: "medium", strips: { cast: false }, showDismissed: true, contradictionsOnly: false, panelOpen: false });
+    expect(normalizeSettings({ threads: { echoSensitivity: "high" } }).threads.echoSensitivity).toBe("high");
+    expect(normalizeSettings({ threads: { echoSensitivity: "loud" } }).threads.echoSensitivity).toBe("medium");
   });
 });
 
 describe("manuscript settings", () => {
   it("defaults to two folder levels, titles on, the numeric prefix pattern, demotion on and everything shown", () => {
     const m = normalizeSettings(undefined).manuscript;
-    expect(m).toMatchObject({ folderDepth: 2, noteTitles: true, stripPrefix: "^\\d+[\\s._)-]*", demoteHeadings: true, proseOnly: false, showComments: true, tintTags: true, showRuler: true, showStory: false });
+    expect(m).toMatchObject({ folderDepth: 2, noteTitles: true, stripPrefix: "^\\d+[\\s._)-]*", demoteHeadings: true, proseOnly: false, showComments: true, tintTags: true, showRuler: true, showStory: false, readingSpeed: 250, showEchoes: false });
+    expect(normalizeSettings({ manuscript: { showEchoes: true } }).manuscript.showEchoes).toBe(true);
     expect(normalizeSettings({ manuscript: { showStory: true, showRuler: "no" } }).manuscript).toMatchObject({ showStory: true, showRuler: true });
     expect(m.tags.map((t) => t.name)).toEqual(["TODO", "FIX", "CHECK", "IDEA", "CUT", "REF"]);
   });
@@ -109,6 +112,12 @@ describe("manuscript settings", () => {
     expect(m.noteTitles).toBe(true);
     expect(m.proseOnly).toBe(true);
     expect(normalizeSettings({ manuscript: { folderDepth: -3 } }).manuscript.folderDepth).toBe(0);
+  });
+  it("keeps the reading speed between 100 and 600 words a minute", () => {
+    expect(normalizeSettings({ manuscript: { readingSpeed: 300 } }).manuscript.readingSpeed).toBe(300);
+    expect(normalizeSettings({ manuscript: { readingSpeed: 5 } }).manuscript.readingSpeed).toBe(100);
+    expect(normalizeSettings({ manuscript: { readingSpeed: 9000 } }).manuscript.readingSpeed).toBe(600);
+    expect(normalizeSettings({ manuscript: { readingSpeed: "fast" } }).manuscript.readingSpeed).toBe(250);
   });
   it("normalises tags: uppercase names, hex colours, no duplicates, a text round trip", () => {
     const tags = normalizeSettings({ manuscript: { tags: [{ name: "todo", color: "#ABCDEF" }, { name: "x" }, { name: "TODO", color: "#000000" }, { name: "NOTE", color: "red" }, 3] } }).manuscript.tags;

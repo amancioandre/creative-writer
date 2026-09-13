@@ -1,6 +1,6 @@
 import { sameTarget } from "../story/Relations";
 import type { SceneRef } from "../story/StoryGraph";
-import type { ThreadRef } from "./Thread";
+import { STOP_ROLES, type StopRole, type ThreadRef } from "./Thread";
 
 /**
  * Threads the writer draws by hand live in `Story threads.md` in the
@@ -8,11 +8,14 @@ import type { ThreadRef } from "./Thread";
  * line per scene it touches:
  *
  *     ## The letter
- *     - [[Chapter 3#The station]] — Anna pockets it
+ *     - [[Chapter 3#The station]] — plant: "she pocketed the letter" Anna pockets it
  *     - [[Chapter 12#Dinner]] — first mentioned aloud
- *     - [[Chapter 41#The reading]] — payoff
+ *     - [[Chapter 41#The reading]] — payoff: "addressed to her mother"
  *
- * Markdown, not JSON, so it reads as an outline, can be edited by hand,
+ * After the link and a separator, a line may name the stop's role
+ * (`plant:`, `touch:`, `payoff:`, `reversal:`; none means touch) and
+ * anchor it to a sentence with one quoted string; whatever is left is
+ * the note. Markdown, not JSON, so it reads as an outline, can be edited by hand,
  * syncs everywhere, and Obsidian keeps the links current on rename. The
  * view writes lines here; it never owns them.
  */
@@ -26,6 +29,16 @@ export interface WriterThreadItem {
   readonly note: string;
   /** 0-based line of the list item. */
   readonly line: number;
+  /** `touch` when the line names no role. */
+  readonly role: StopRole;
+  /** The quoted anchor, without its quotes; null when the line has none. */
+  readonly quote: string | null;
+}
+
+/** What a stop line says besides its link. */
+export interface StopText {
+  readonly role?: StopRole;
+  readonly quote?: string | null;
 }
 
 export interface WriterThread {
@@ -41,6 +54,8 @@ const ITEM = /^\s*[-*+]\s+(.+?)\s*$/;
 const LINK = /^\[\[([^\]|]+?)(?:\|[^\]]*)?\]\]\s*(.*)$/;
 const MD_LINK = /^\[[^\]]*\]\(([^)]+?)\)\s*(.*)$/;
 const SEP = /^(?:[—–:-]|--)\s*/;
+const ROLE = new RegExp(`^(${STOP_ROLES.join("|")})\\s*:\\s*`, "i");
+const QUOTE = /"([^"]+)"|“([^”]+)”/;
 
 export function parseStoryThreads(markdown: string): WriterThread[] {
   const lines = markdown.split("\n");
@@ -58,7 +73,7 @@ export function parseStoryThreads(markdown: string): WriterThread[] {
     const item = ITEM.exec(line);
     if (!item) continue;
     const parsed = parseItem(item[1]!);
-    if (parsed) current.items.push({ ...parsed, line: i });
+    if (parsed) current.items.push({ ...parsed, ...parseStopText(parsed.note), line: i });
   }
   return out;
 }
@@ -74,9 +89,26 @@ function parseItem(text: string): { link: string; note: string } | null {
   return text.trim() ? { link: text.trim(), note: "" } : null;
 }
 
-export function formatThreadItem(link: string, note: string): string {
+/** "plant: \"she pocketed it\" Anna" → role plant, quote "she pocketed it", note "Anna". No role means touch. */
+export function parseStopText(text: string): { role: StopRole; quote: string | null; note: string } {
+  let rest = text.trim();
+  let role: StopRole = "touch";
+  const r = ROLE.exec(rest);
+  if (r) { role = r[1]!.toLowerCase() as StopRole; rest = rest.slice(r[0].length); }
+  let quote: string | null = null;
+  const q = QUOTE.exec(rest);
+  if (q) { quote = (q[1] ?? q[2] ?? "").trim() || null; rest = (rest.slice(0, q.index) + " " + rest.slice(q.index + q[0].length)); }
+  return { role, quote, note: rest.replace(/\s+/g, " ").trim() };
+}
+
+/** The line for a stop: link, then the role when it is not the default, the quote, the note. */
+export function formatThreadItem(link: string, note: string, stop: StopText = {}): string {
   const target = link.startsWith("[[") || link.startsWith("[") ? link : `[[${link}]]`;
-  return note ? `- ${target} — ${note}` : `- ${target}`;
+  const parts: string[] = [];
+  if (stop.role && stop.role !== "touch") parts.push(`${stop.role}:`);
+  if (stop.quote) parts.push(`"${stop.quote.replace(/"/g, "'").trim()}"`);
+  if (note.trim()) parts.push(note.trim());
+  return parts.length ? `- ${target} — ${parts.join(" ")}` : `- ${target}`;
 }
 
 /** Splits "Chapter 3#The station" into its note and heading parts. */
@@ -103,23 +135,38 @@ function linkTarget(link: string): string {
 const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 /**
- * Adds a stop to a thread, or updates the note on the line that already
- * points at the same scene. A thread that does not exist yet is started
- * at the end of the note.
+ * Adds a stop to a thread, or updates the line that already points at the
+ * same scene: the note is replaced, the role and quote only when given.
+ * A thread that does not exist yet is started at the end of the note.
  */
-export function upsertThreadItem(markdown: string, thread: string, link: string, note: string): string {
+export function upsertThreadItem(markdown: string, thread: string, link: string, note: string, stop: StopText = {}): string {
   const lines = markdown.split("\n");
   const existing = parseStoryThreads(markdown).find((t) => sameName(t.name, thread));
   if (existing) {
     const hit = existing.items.find((i) => sameLink(i.link, link));
-    // The line already points at that scene: keep the link as the writer wrote it, change only the note.
-    if (hit) { lines[hit.line] = formatThreadItem(hit.link, note); return lines.join("\n"); }
+    // The line already points at that scene: keep the link as the writer wrote it, change only what was given.
+    if (hit) { lines[hit.line] = formatThreadItem(hit.link, note, { role: stop.role ?? hit.role, quote: stop.quote === undefined ? hit.quote : stop.quote }); return lines.join("\n"); }
     const end = sectionEnd(lines, existing.line);
-    lines.splice(end, 0, formatThreadItem(link, note));
+    lines.splice(end, 0, formatThreadItem(link, note, stop));
     return lines.join("\n");
   }
   const body = markdown.replace(/\s*$/, "");
-  return `${body}${body ? "\n\n" : ""}## ${thread.trim()}\n${formatThreadItem(link, note)}\n`;
+  return `${body}${body ? "\n\n" : ""}## ${thread.trim()}\n${formatThreadItem(link, note, stop)}\n`;
+}
+
+/** Changes a stop's role, keeping its note and quote; nothing happens when the thread or the stop is not there. */
+export function setStopRole(markdown: string, thread: string, link: string, role: StopRole): string {
+  const lines = markdown.split("\n");
+  const existing = parseStoryThreads(markdown).find((t) => sameName(t.name, thread));
+  const hit = existing?.items.find((i) => sameLink(i.link, link));
+  if (!hit) return markdown;
+  lines[hit.line] = formatThreadItem(hit.link, hit.note, { role, quote: hit.quote });
+  return lines.join("\n");
+}
+
+/** Appends several stops to one thread in one pass — a motif's occurrences, or a plant and its reversal. */
+export function appendThreadItems(markdown: string, thread: string, stops: readonly { link: string; note: string; role?: StopRole; quote?: string | null }[]): string {
+  return stops.reduce((md, s) => upsertThreadItem(md, thread, s.link, s.note, { role: s.role, quote: s.quote }), markdown);
 }
 
 export function removeThreadItem(markdown: string, thread: string, link: string): string {
@@ -162,7 +209,7 @@ export function serializeStoryThreadsNote(project: string): string {
     "creative-writer: false",
     `${STORY_THREADS_FLAG}: ${STORY_THREADS_VERSION}`,
     "---",
-    `Story threads for **${project}** — clues, motifs and set-ups you are tracking by hand. One \`## heading\` per thread, one \`- [[Note#Scene]] — note\` line per scene it touches. The story threads view draws each as arcs across the manuscript and adds lines here when you ask it to; edit freely.`,
+    `Story threads for **${project}** — clues, motifs and set-ups you are tracking by hand. One \`## heading\` per thread, one \`- [[Note#Scene]] — note\` line per scene it touches; a line may start with \`plant:\`, \`payoff:\` or \`reversal:\` and carry one "quoted sentence" as its anchor. The story threads view draws each as arcs across the manuscript and adds lines here when you ask it to; edit freely.`,
     "",
   ].join("\n");
 }
@@ -177,8 +224,9 @@ export function resolveThreadRef(item: WriterThreadItem, scenes: readonly { scen
   const { note, heading } = splitLink(item.link);
   const inNote = scenes.filter((s) => sameTarget(s.scene.path, note));
   const hit = heading ? inNote.find((s) => sameHeading(s.scene.title, heading)) : [...inNote].sort((a, b) => a.index - b.index)[0];
-  if (hit) return { scene: hit.scene, index: hit.index, note: item.note, line: item.line };
-  return { scene: { path: note, title: heading, line: 0 }, index: -1, note: item.note, unresolved: item.link, line: item.line };
+  const stop = { note: item.note, line: item.line, role: item.role, ...(item.quote ? { quote: item.quote } : {}) };
+  if (hit) return { scene: hit.scene, index: hit.index, ...stop };
+  return { scene: { path: note, title: heading, line: 0 }, index: -1, unresolved: item.link, ...stop };
 }
 
 function safeDecode(s: string): string {

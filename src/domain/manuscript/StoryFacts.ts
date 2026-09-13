@@ -1,5 +1,5 @@
 import type { EntityKind, StoryGraph } from "../story/StoryGraph";
-import type { Contradiction } from "../threads/Thread";
+import { isLiveContradiction, type Contradiction, type StopRole, type Thread } from "../threads/Thread";
 
 /**
  * What the rest of the plugin knows about each section of the manuscript,
@@ -29,8 +29,17 @@ export interface SectionFacts {
   readonly scenes: readonly SceneCast[];
 }
 
-/** Two scenes the model read differently on the same point: marked on both. */
-export interface ConflictMark {
+export type GutterMarkKind = "conflict" | StopRole | "echo";
+
+/**
+ * A mark in the page's gutter that points at another place in the book:
+ * a contradiction (on both scenes, each pointing at the other), a stop
+ * of a directed thread the writer anchored to a sentence, pointing at
+ * the stop that answers it, or an echo, pointing at the nearest other
+ * place the same words occur.
+ */
+export interface GutterMark {
+  readonly kind: GutterMarkKind;
   readonly path: string;
   readonly line: number;
   readonly text: string;
@@ -38,12 +47,15 @@ export interface ConflictMark {
   readonly otherLine: number;
 }
 
+/** @deprecated Use `GutterMark`; kept for the name's readers. */
+export type ConflictMark = GutterMark;
+
 export interface StoryFacts {
   readonly sections: ReadonlyMap<string, SectionFacts>;
-  readonly conflicts: readonly ConflictMark[];
+  readonly marks: readonly GutterMark[];
 }
 
-export const EMPTY_FACTS: StoryFacts = { sections: new Map(), conflicts: [] };
+export const EMPTY_FACTS: StoryFacts = { sections: new Map(), marks: [] };
 export const NO_SECTION: SectionFacts = { readability: null, today: { added: 0, removed: 0 }, cast: [], scenes: [] };
 
 const CAST_KINDS: ReadonlySet<EntityKind> = new Set<EntityKind>(["character", "location", "item", "faction", "event", "candidate"]);
@@ -76,14 +88,63 @@ function byMentions(a: CastMember, b: CastMember): number {
 const KIND_ORDER: Record<EntityKind, number> = { character: 0, candidate: 1, faction: 2, location: 3, item: 4, event: 5, note: 6, reference: 7 };
 function kindOrder(k: EntityKind): number { return KIND_ORDER[k]; }
 
-/** Live contradictions as marks on both scenes, each pointing at the other. */
-export function conflictMarks(contradictions: readonly Contradiction[]): ConflictMark[] {
-  const out: ConflictMark[] = [];
+/** Live contradictions as marks on both scenes, each pointing at the other. Dismissed and explained pairs are not marks. */
+export function conflictMarks(contradictions: readonly Contradiction[]): GutterMark[] {
+  const out: GutterMark[] = [];
   for (const c of contradictions) {
-    if (c.dismissed) continue;
+    if (!isLiveContradiction(c)) continue;
     const text = `${c.subject} · ${c.attribute}: ${c.a.value ?? c.a.note} vs ${c.b.value ?? c.b.note}`;
-    out.push({ path: c.a.scene.path, line: c.a.scene.line, text, otherPath: c.b.scene.path, otherLine: c.b.scene.line });
-    out.push({ path: c.b.scene.path, line: c.b.scene.line, text, otherPath: c.a.scene.path, otherLine: c.a.scene.line });
+    out.push({ kind: "conflict", path: c.a.scene.path, line: c.a.scene.line, text, otherPath: c.b.scene.path, otherLine: c.b.scene.line });
+    out.push({ kind: "conflict", path: c.b.scene.path, line: c.b.scene.line, text, otherPath: c.a.scene.path, otherLine: c.a.scene.line });
+  }
+  return out;
+}
+
+/**
+ * The anchored stops of directed threads as marks at their sentence: a
+ * plant points at the next payoff or reversal, a payoff or reversal
+ * back at the plant before it. A plant with nothing keeping it points at
+ * itself and says so. Stops without an anchor mark nothing — a heading
+ * is too coarse a place for a promise.
+ */
+export function threadMarks(threads: readonly Thread[]): GutterMark[] {
+  const out: GutterMark[] = [];
+  const where = (r: { scene: { path: string; line: number }; anchor?: { line: number } | null }) => ({ path: r.scene.path, line: r.anchor?.line ?? r.scene.line });
+  const name = (r: { scene: { path: string; title: string } }) => r.scene.title || r.scene.path.slice(r.scene.path.lastIndexOf("/") + 1).replace(/\.md$/i, "");
+  for (const t of threads) {
+    if (t.kind !== "writer" || !t.directed) continue;
+    const stops = t.refs.filter((r) => r.index >= 0);
+    for (const r of stops) {
+      if (!r.anchor || !r.role || r.role === "touch") continue;
+      const here = where(r);
+      if (r.role === "plant") {
+        const kept = stops.find((o) => (o.role === "payoff" || o.role === "reversal") && o.index > r.index);
+        const other = kept ? where(kept) : here;
+        out.push({ kind: "plant", ...here, text: kept ? `${t.label} · plant, ${kept.role === "reversal" ? "reversed" : "paid off"} in ${name(kept)}` : `${t.label} · plant, no payoff yet`, otherPath: other.path, otherLine: other.line });
+      } else {
+        const planted = [...stops].reverse().find((o) => o.role === "plant" && o.index < r.index);
+        const other = planted ? where(planted) : here;
+        out.push({ kind: r.role, ...here, text: planted ? `${t.label} · ${r.role}, planted in ${name(planted)}` : `${t.label} · ${r.role}, no plant before it`, otherPath: other.path, otherLine: other.line });
+      }
+    }
+  }
+  return out;
+}
+
+/** The echo finder's findings as marks at their sentence, each pointing at the nearest other occurrence. */
+export function echoMarks(threads: readonly Thread[]): GutterMark[] {
+  const out: GutterMark[] = [];
+  const name = (r: { scene: { path: string; title: string } }) => r.scene.title || r.scene.path.slice(r.scene.path.lastIndexOf("/") + 1).replace(/\.md$/i, "");
+  for (const t of threads) {
+    if (t.kind !== "echo") continue;
+    const stops = t.refs.filter((r) => r.index >= 0 && r.anchor);
+    for (const r of stops) {
+      const others = stops.filter((o) => o !== r);
+      if (others.length === 0) continue;
+      const nearest = others.reduce((best, o) => (Math.abs(o.index - r.index) < Math.abs(best.index - r.index) ? o : best));
+      const where = nearest.index === r.index ? `again in ${name(nearest)}` : `also in ${name(nearest)}`;
+      out.push({ kind: "echo", path: r.scene.path, line: r.anchor!.line, text: `“${r.quote ?? t.label}” · ${where}${others.length > 1 ? ` and ${others.length - 1} more` : ""}`, otherPath: nearest.scene.path, otherLine: nearest.anchor?.line ?? nearest.scene.line });
+    }
   }
   return out;
 }

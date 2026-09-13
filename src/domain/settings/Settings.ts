@@ -3,6 +3,7 @@ import { FINDING_KINDS, type FindingKind } from "../style/Finding";
 import type { ScopeMode, ScopeSettings } from "../scope/NoteScope";
 import { DEFAULT_STRIP_PREFIX, type ManuscriptOptions } from "../manuscript/Manuscript";
 import { DEFAULT_TAGS, REF_TAG_SPEC, type TagSpec } from "../manuscript/Comments";
+import { DEFAULT_READING_SPEED, MAX_READING_SPEED, MIN_READING_SPEED } from "../manuscript/ReadingTime";
 
 export type LlmProvider = "off" | "ollama" | "claude";
 export type ClaudeModelId = "claude-opus-5" | "claude-haiku-4-5";
@@ -14,6 +15,8 @@ export interface LlmSettings {
   readonly idleMs: number;
   readonly ollamaUrl: string;
   readonly ollamaModel: string;
+  /** The embedding model behind the echo finder's semantic tier. */
+  readonly ollamaEmbedModel: string;
   readonly claudeModel: ClaudeModelId;
   /** Stored in plaintext in data.json inside the vault. The settings tab says so. */
   readonly claudeApiKey: string;
@@ -28,6 +31,7 @@ export const DEFAULT_LLM_SETTINGS: LlmSettings = {
   idleMs: 1500,
   ollamaUrl: "http://localhost:11434",
   ollamaModel: "qwen2.5:7b",
+  ollamaEmbedModel: "nomic-embed-text",
   claudeModel: "claude-opus-5",
   claudeApiKey: "",
   dailyCapUsd: 1,
@@ -104,12 +108,18 @@ export const DEFAULT_STORY_MAP: StoryMapSettings = {
   panelOpen: true,
 };
 
-export type ThreadKind = "entity" | "fact" | "writer";
-export const THREAD_KINDS: readonly ThreadKind[] = ["entity", "fact", "writer"];
+export type ThreadKind = "entity" | "fact" | "writer" | "echo";
+export const THREAD_KINDS: readonly ThreadKind[] = ["entity", "fact", "writer", "echo"];
+
+/** How many echoes the writer wants to hear about; the presets live with the echo finder. */
+export { ECHO_SENSITIVITIES, type EchoSensitivity } from "../echoes/Echoes";
+import { ECHO_SENSITIVITIES, type EchoSensitivity } from "../echoes/Echoes";
 
 /** The story threads view's own preferences — filters and strips, edited from its panel. */
 export interface ThreadsSettings {
   readonly kinds: Readonly<Record<ThreadKind, boolean>>;
+  /** One choice instead of a knob per threshold. */
+  readonly echoSensitivity: EchoSensitivity;
   /** Strip id → shown; strips not listed are shown. */
   readonly strips: Readonly<Record<string, boolean>>;
   readonly showDismissed: boolean;
@@ -119,7 +129,8 @@ export interface ThreadsSettings {
 
 /** Entity threads are the densest and the least surprising, so they start off; a picked entity turns its own on. */
 export const DEFAULT_THREADS: ThreadsSettings = {
-  kinds: { entity: false, fact: true, writer: true },
+  kinds: { entity: false, fact: true, writer: true, echo: false },
+  echoSensitivity: "medium",
   strips: {},
   showDismissed: false,
   contradictionsOnly: false,
@@ -140,16 +151,20 @@ export interface ManuscriptSettings extends ManuscriptOptions {
   readonly showRuler: boolean;
   /** The story on the page: who is in each section and scene, and the model's contradictions in the gutter. Costs a map build. */
   readonly showStory: boolean;
+  /** Words per minute behind the reading-time estimate at the top of the page and beside each section. */
+  readonly readingSpeed: number;
+  /** The echo finder's phrases as marks in the gutter, each naming another place the words occur. Costs a threads build. */
+  readonly showEchoes: boolean;
 }
 
 export const DEFAULT_MANUSCRIPT: ManuscriptSettings = {
   folderDepth: 2, noteTitles: true, stripPrefix: DEFAULT_STRIP_PREFIX, demoteHeadings: true, proseOnly: false,
-  showComments: true, tintTags: true, tags: DEFAULT_TAGS, showRuler: true, showStory: false,
+  showComments: true, tintTags: true, tags: DEFAULT_TAGS, showRuler: true, showStory: false, readingSpeed: DEFAULT_READING_SPEED, showEchoes: false,
 };
 
 export function normalizeManuscript(raw: unknown): ManuscriptSettings {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  const bool = (key: "noteTitles" | "demoteHeadings" | "proseOnly" | "showComments" | "tintTags" | "showRuler" | "showStory") => (typeof r[key] === "boolean" ? r[key] : DEFAULT_MANUSCRIPT[key]);
+  const bool = (key: "noteTitles" | "demoteHeadings" | "proseOnly" | "showComments" | "tintTags" | "showRuler" | "showStory" | "showEchoes") => (typeof r[key] === "boolean" ? r[key] : DEFAULT_MANUSCRIPT[key]);
   return {
     folderDepth: typeof r.folderDepth === "number" && Number.isFinite(r.folderDepth) ? clampInt(r.folderDepth, 0, 6) : DEFAULT_MANUSCRIPT.folderDepth,
     noteTitles: bool("noteTitles"),
@@ -161,6 +176,8 @@ export function normalizeManuscript(raw: unknown): ManuscriptSettings {
     tags: Array.isArray(r.tags) ? normalizeTags(r.tags) : DEFAULT_MANUSCRIPT.tags,
     showRuler: bool("showRuler"),
     showStory: bool("showStory"),
+    showEchoes: bool("showEchoes"),
+    readingSpeed: typeof r.readingSpeed === "number" && Number.isFinite(r.readingSpeed) ? clampInt(r.readingSpeed, MIN_READING_SPEED, MAX_READING_SPEED) : DEFAULT_MANUSCRIPT.readingSpeed,
   };
 }
 
@@ -340,6 +357,7 @@ export function normalizeThreads(raw: unknown): ThreadsSettings {
   for (const [id, v] of Object.entries(s)) if (typeof v === "boolean" && id) strips[id] = v;
   return {
     kinds: flags(r.kinds, THREAD_KINDS, DEFAULT_THREADS.kinds),
+    echoSensitivity: ECHO_SENSITIVITIES.includes(r.echoSensitivity as EchoSensitivity) ? (r.echoSensitivity as EchoSensitivity) : DEFAULT_THREADS.echoSensitivity,
     strips,
     showDismissed: typeof r.showDismissed === "boolean" ? r.showDismissed : DEFAULT_THREADS.showDismissed,
     contradictionsOnly: typeof r.contradictionsOnly === "boolean" ? r.contradictionsOnly : DEFAULT_THREADS.contradictionsOnly,
@@ -421,6 +439,7 @@ function normalizeLlm(raw: unknown): LlmSettings {
     idleMs: typeof r.idleMs === "number" && Number.isFinite(r.idleMs) ? clampInt(r.idleMs, 500, 10000) : DEFAULT_LLM_SETTINGS.idleMs,
     ollamaUrl: str("ollamaUrl"),
     ollamaModel: str("ollamaModel"),
+    ollamaEmbedModel: str("ollamaEmbedModel"),
     claudeModel: CLAUDE_MODELS.includes(r.claudeModel as ClaudeModelId) ? (r.claudeModel as ClaudeModelId) : DEFAULT_LLM_SETTINGS.claudeModel,
     claudeApiKey: typeof r.claudeApiKey === "string" ? r.claudeApiKey.trim() : "",
     dailyCapUsd: typeof r.dailyCapUsd === "number" && Number.isFinite(r.dailyCapUsd) ? Math.min(100, Math.max(0, r.dailyCapUsd)) : DEFAULT_LLM_SETTINGS.dailyCapUsd,
