@@ -62,6 +62,8 @@ export class Setting {
   addExtraButton(cb: (b: ButtonComponent) => unknown) { cb(new ButtonComponent(this.settingEl)); return this; }
   addDropdown(cb: (d: DropdownComponent) => unknown) { this.dropdown = new DropdownComponent(); cb(this.dropdown); return this; }
   addText(cb: (t: TextComponent) => unknown) { this.text = new TextComponent(); cb(this.text); return this; }
+  textarea?: TextAreaComponent;
+  addTextArea(cb: (t: TextAreaComponent) => unknown) { this.textarea = new TextAreaComponent(); cb(this.textarea); return this; }
 }
 export async function requestUrl(_req: unknown): Promise<{ status: number; json: unknown }> {
   return { status: 200, json: {} };
@@ -87,6 +89,7 @@ export class TextComponent {
   setValue(v: string) { this.value = v; return this; }
   onChange(cb: TextCb) { this.onChangeCb = cb; return this; }
 }
+export class TextAreaComponent extends TextComponent {}
 export class ColorComponent {
   value = "";
   onChangeCb: TextCb = () => undefined;

@@ -2,6 +2,16 @@
 
 Release notes for every version are on the [releases page](https://github.com/amancioandre/creative-writer/releases). This file carries the same text for the versions since it was started.
 
+## 0.9.1 — The tint
+
+The first slice of the UX audit of 2026-09-13: rhythm stops competing for the underline, and four things the audit caught are fixed.
+
+- Paragraph rhythm: each sentence of the cursor paragraph sits on a **faint tint** instead of a 2 px underline. Underlines are left to spellcheck, Harper and links; style-check tints stack on top of the rhythm wash.
+- Zen Mode: rhythm leaves the text for a **meter in the margin**, one bar per sentence stacked from the top of the paragraph, wide by tier. The page stays plain.
+- Writing desk: a project whose deadline has passed and had nothing added this week says so ("Deadline Mon 7 Sept has passed with 2,768 words to go") instead of promising a daily count that "would still make" a date already gone. Dates in the desk read as *Mon 7 Sept*, never `2026-09-07`.
+- Settings: **Folders** and **Tags** are multi-line fields, as their "one per line" descriptions always said. **Writing log note**, **Echoes on the page** and **Echo sensitivity** are on the settings page on Obsidian 1.13 too, not only on older builds. The Enabled description names the command that exists, *Toggle everywhere*.
+- Writer: a card dropped into a group whose note cannot be retagged snaps back and keeps the error on screen, instead of the success line overwriting it a moment later.
+
 ## 0.9.0 — The threads
 
 The story threads view learns three things a reader feels before they can name them: a promise and where it is kept, a phrase reached for once too often, and a contradiction the story means. Everything offline unless you ask the local model.

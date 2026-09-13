@@ -221,21 +221,31 @@ export function renderProjects(root: HTMLElement, projects: readonly ProjectStat
   }
 }
 
-export function paceLine(p: ProjectStatus): string {
-  const n = (v: number) => Math.round(v).toLocaleString();
+/** A day for a sentence, "Mon, 7 Sept" in the app's locale (with the year once it is another year), never the raw ISO string. */
+export function prettyDay(day: Day, locale?: string, thisYear = new Date().getFullYear()): string {
+  const [y, m, d] = day.split("-").map(Number);
+  if (!y || !m || !d) return day;
+  return new Date(y, m - 1, d).toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short", ...(y === thisYear ? {} : { year: "numeric" }) });
+}
+
+export function paceLine(p: ProjectStatus, locale?: string): string {
+  const n = (v: number) => Math.round(v).toLocaleString(locale);
+  const when = (day: Day) => prettyDay(day, locale);
+  const passed = p.daysLeft !== null && p.daysLeft <= 0;
   switch (p.verdict) {
     case "done":
       return "Target reached.";
     case "stalled":
-      return p.neededPerDay !== null ? `Nothing added this week. ${n(p.neededPerDay)} words a day would still make ${p.spec.deadline}.` : "Nothing added this week.";
+      if (passed) return `Deadline ${when(p.spec.deadline!)} has passed with ${n(p.remaining)} words to go. Nothing added this week.`;
+      return p.neededPerDay !== null ? `Nothing added this week. ${n(p.neededPerDay)} words a day would still make ${when(p.spec.deadline!)}.` : "Nothing added this week.";
     case "no-deadline":
-      return `Writing ${n(p.recentPerDay)} a day; at this pace done around ${p.projectedDay}.`;
+      return `Writing ${n(p.recentPerDay)} a day; at this pace done around ${when(p.projectedDay!)}.`;
     case "on-track":
-      return `${n(p.neededPerDay!)} a day needed, writing ${n(p.recentPerDay)}. On track: done around ${p.projectedDay}, deadline ${p.spec.deadline}.`;
+      return `${n(p.neededPerDay!)} a day needed, writing ${n(p.recentPerDay)}. On track: done around ${when(p.projectedDay!)}, deadline ${when(p.spec.deadline!)}.`;
     case "behind":
-      return p.daysLeft! <= 0
-        ? `Deadline ${p.spec.deadline} has passed with ${n(p.remaining)} words to go; writing ${n(p.recentPerDay)} a day.`
-        : `${n(p.neededPerDay!)} a day needed, writing ${n(p.recentPerDay)}. At this pace done around ${p.projectedDay}, after the ${p.spec.deadline} deadline.`;
+      return passed
+        ? `Deadline ${when(p.spec.deadline!)} has passed with ${n(p.remaining)} words to go; writing ${n(p.recentPerDay)} a day.`
+        : `${n(p.neededPerDay!)} a day needed, writing ${n(p.recentPerDay)}. At this pace done around ${when(p.projectedDay!)}, after the ${when(p.spec.deadline!)} deadline.`;
   }
 }
 

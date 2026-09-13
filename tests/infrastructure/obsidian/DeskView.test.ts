@@ -88,7 +88,8 @@ describe("DeskView projects", () => {
     expect(t).toContain("Projects");
     expect(t).toContain("7,000 / 10,000 · 70%");
     expect(t).toContain("On track");
-    expect(t).toContain("after the 2026-09-03 deadline");
+    expect(t).toMatch(/after the \S+ 3 Sep deadline|after the \S+ Sep 3 deadline/);
+    expect(t).not.toContain("2026-09-03");
     expect(v.contentEl.querySelectorAll(".czm-desk-project.is-behind")).toHaveLength(1);
     expect(v.contentEl.querySelectorAll(".czm-desk-project-daily")).toHaveLength(1);
     expect(t).toContain("Today 500 of 400");
@@ -158,5 +159,36 @@ describe("DeskView scenes and revision days", () => {
     await none.onOpen();
     await new Promise((r) => setTimeout(r, 0));
     expect(none.contentEl.textContent).toContain("No repeated phrases heard in Novel");
+  });
+});
+
+import { paceLine, prettyDay } from "../../../src/infrastructure/obsidian/views/DeskView";
+import { projectStatus } from "../../../src/domain/progress/Project";
+
+describe("paceLine", () => {
+  const spec = { name: "Camp", scope: "Camp/", targetWords: 3000, deadline: "2026-09-07", dailyWords: 100, notePath: "Camp/Project.md", ignoredNames: [] };
+
+  it("names dates for a reader, never as ISO strings", () => {
+    expect(prettyDay("2026-09-07", "en-GB", 2026)).toBe("Mon, 7 Sept");
+    expect(prettyDay("2027-06-05", "en-GB", 2026)).toBe("Sat, 5 Jun 2027");
+    expect(prettyDay("not-a-day", "en-GB")).toBe("not-a-day");
+  });
+
+  it("says a deadline has passed when nothing was added this week, instead of promising to make it", () => {
+    const stalled = projectStatus(spec, 232, [0, 0, 0, 0, 0, 0, 0], "2026-09-13");
+    expect(stalled.verdict).toBe("stalled");
+    expect(paceLine(stalled, "en-GB")).toBe("Deadline Mon, 7 Sept has passed with 2,768 words to go. Nothing added this week.");
+  });
+
+  it("still projects a stalled project whose deadline is ahead", () => {
+    const stalled = projectStatus(spec, 232, [0, 0, 0, 0, 0, 0, 0], "2026-09-01");
+    expect(paceLine(stalled, "en-GB")).toBe("Nothing added this week. 461 words a day would still make Mon, 7 Sept.");
+  });
+
+  it("names the projected day and the deadline on the other verdicts", () => {
+    const behind = projectStatus(spec, 232, [10], "2026-09-01");
+    expect(paceLine(behind, "en-GB")).toContain("after the Mon, 7 Sept deadline");
+    const noDeadline = projectStatus({ ...spec, deadline: null }, 232, [100], "2026-09-01");
+    expect(paceLine(noDeadline, "en-GB")).toBe("Writing 100 a day; at this pace done around Tue, 29 Sept.");
   });
 });

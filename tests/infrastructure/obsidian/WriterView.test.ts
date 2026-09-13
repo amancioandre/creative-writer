@@ -130,6 +130,23 @@ describe("WriterView", () => {
     expect(file().cards["sources/Invictus.md"]).toBeTruthy();
     expect(card(el, "sources/Invictus.md").classList.contains("is-pinned")).toBe(true);
   });
+  it("keeps the error on screen and snaps the card back when the note cannot be retagged", async () => {
+    const { v, el, file } = await open({ retag: async () => { throw new Error("note is read-only"); } });
+    const layout = layoutBoard(buildBoard(baseNotes, EMPTY_WRITER_FILE));
+    const from = layout.cards.get("notes/Courage.md")!;
+    const target = layout.groups.find((g) => g.group.def.id === "world")!;
+    const c = card(el, "notes/Courage.md");
+    const k = zoom(v);
+    const dx = (target.rect.x + GROUP_PAD - from.x) * k, dy = (target.rect.y + GROUP_HEAD + GROUP_PAD - from.y) * k;
+    press(c, 0, 0); move(c, dx, dy); release(c, dx, dy);
+    await tick(); await tick();
+    const status = el.querySelector(".czm-map-status")!.textContent!;
+    expect(status).toContain("note is read-only");
+    expect(status).toContain("stays in");
+    expect(status).not.toContain("→");
+    expect(file().cards["notes/Courage.md"]).toBeUndefined();
+    expect(group(el, "world").querySelector(".czm-writer-group-name")!.textContent).toBe("Worlds");
+  });
   it("rewrites the tag from what it is when the card sits in Unsorted", async () => {
     const { v, el, calls } = await open();
     const layout = layoutBoard(buildBoard(baseNotes, EMPTY_WRITER_FILE));

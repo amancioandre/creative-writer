@@ -27,6 +27,14 @@ const SCOPE_DESC = "One rule for everything: the notes the editor tools run in a
 
 const WRITER_FOLDER_DESC = "Vault-relative folder where your stories live. A promoted idea is scaffolded there, a new writer card goes there, the writer file is created there, and folders under it with prose but no project declaration are listed as unfiled on the writer board. Empty = the vault root, and no unfiled row.";
 
+const LOG_NOTE_DESC = "Vault-relative path of the note that keeps the log (words added and cut per day), so streaks sync with the vault. Takes effect at the next save; reload to read from a new path.";
+
+const ECHOES_DESC = "The echo finder's repeated phrases as marks in the gutter, each naming another place the words occur. Builds the story threads on each refresh.";
+
+const ECHO_SENSITIVITY_DESC = "How many echoes the threads view hears: repeated phrases and near-identical sentences across the book. Low reports only the plainest repeats; high hears shorter phrases and looser sentences.";
+
+const ECHO_OPTIONS: Record<EchoSensitivity, string> = { low: "Low", medium: "Medium", high: "High" };
+
 const STRIP_PRESETS: Record<string, string> = { numbers: "Numbers and separators (01 -, 3., 2))", none: "Nothing", custom: "Custom pattern" };
 
 /** Which preset a pattern is; anything but the default and empty is custom. */
@@ -62,9 +70,9 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
         type: "group",
         heading: "Where it runs",
         items: [
-          { name: "Enabled", desc: "Master switch. The \"Toggle Creative Writer (everywhere)\" command flips it.", control: { type: "toggle", key: "enabled" } },
+          { name: "Enabled", desc: "Master switch. The \"Toggle everywhere\" command flips it.", control: { type: "toggle", key: "enabled" } },
           { name: "Notes", desc: `${SCOPE_DESC} ${this.scopeLine()}`, control: { type: "dropdown", key: "scope.mode", options: SCOPE_OPTIONS } },
-          { name: "Folders", desc: "One vault-relative folder per line, e.g. storytelling/novel.", control: { type: "text", key: "scope.foldersText", placeholder: "storytelling" } },
+          { name: "Folders", desc: "One vault-relative folder per line, e.g. storytelling/novel.", control: { type: "textarea", key: "scope.foldersText", placeholder: "storytelling", rows: 3 } },
         ],
       },
       { name: "Typewriter scrolling", desc: "Keep the line you are writing vertically centred.", control: { type: "toggle", key: "typewriterEnabled" } },
@@ -88,6 +96,7 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
         heading: "Goals",
         items: [
           { name: "Daily word goal", desc: "Words added per day, in the notes the scope above takes in, for the streak and the progress bar in the writing desk. 0 = any day you write counts.", control: { type: "slider", key: "goals.dailyWords", min: 0, max: 5000, step: 50 } },
+          { name: "Writing log note", desc: LOG_NOTE_DESC, control: { type: "text", key: "goals.logNote", placeholder: DEFAULT_GOALS.logNote } },
         ],
       },
       {
@@ -102,10 +111,18 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
           { name: "Prose only", desc: "Show only paragraphs, headings, quotes and scene breaks: no lists, tables, code or callouts. Also toggled at the top of the view.", control: { type: "toggle", key: "manuscript.proseOnly" } },
           { name: "Comments pane", desc: "A pane beside the manuscript page: the active paragraph's %% comments %% with a box to add one, and every comment in reading order. Also toggled at the top of the view.", control: { type: "toggle", key: "manuscript.showComments" } },
           { name: "Tint tags in the editor", desc: "Colour the tag word that opens a comment, %% TODO: … %%, in the editor. Only inside comments; a TODO in dialogue is left alone.", control: { type: "toggle", key: "manuscript.tintTags" } },
-          { name: "Tags", desc: "One per line: an uppercase word and a hex colour, e.g. CHECK #4a8fe2. A comment that opens with the word and a colon takes the colour, on the page and in the editor.", control: { type: "text", key: "manuscript.tagsText", placeholder: "TODO #d9a621" } },
+          { name: "Tags", desc: "One per line: an uppercase word and a hex colour, e.g. CHECK #4a8fe2. A comment that opens with the word and a colon takes the colour, on the page and in the editor.", control: { type: "textarea", key: "manuscript.tagsText", placeholder: "TODO #d9a621", rows: 4 } },
           { name: "Ruler", desc: "A strip at the top of the manuscript page: one segment per section, wide by words, coloured by readability, marked when it changed today. Click a segment to go there.", control: { type: "toggle", key: "manuscript.showRuler" } },
           { name: "Story on the page", desc: "Who is in each section and scene, in the story map's colours, and the model's contradictions as red marks in the gutter. Builds the story map each refresh, so it is off by default.", control: { type: "toggle", key: "manuscript.showStory" } },
+          { name: "Echoes on the page", desc: ECHOES_DESC, control: { type: "toggle", key: "manuscript.showEchoes" } },
           { name: "Reading speed", desc: "Words per minute behind the reading time at the top of the manuscript page and beside each section. Adults read prose at about 250; set your own pace.", control: { type: "slider", key: "manuscript.readingSpeed", min: MIN_READING_SPEED, max: MAX_READING_SPEED, step: 10 } },
+        ],
+      },
+      {
+        type: "group",
+        heading: "Story threads",
+        items: [
+          { name: "Echo sensitivity", desc: ECHO_SENSITIVITY_DESC, control: { type: "dropdown", key: "threads.echoSensitivity", options: ECHO_OPTIONS } },
         ],
       },
       {
@@ -163,6 +180,20 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
       await this.port.update({ ...c, scope: { ...c.scope, folders: textToFolders(asText(value)) } });
       return;
     }
+    if (key === "goals.logNote") {
+      // An empty or invalid path is ignored: the log must always have somewhere to live.
+      const p = normalizeNotePath(value);
+      if (!p) return;
+      const c = this.port.current();
+      await this.port.update({ ...c, goals: { ...c.goals, logNote: p } });
+      return;
+    }
+    if (key === "threads.echoSensitivity") {
+      const c = this.port.current();
+      const v = ECHO_SENSITIVITIES.includes(value as EchoSensitivity) ? (value as EchoSensitivity) : "medium";
+      await this.port.update({ ...c, threads: { ...c.threads, echoSensitivity: v } });
+      return;
+    }
     await this.port.update(setPath(this.port.current(), key.split("."), value));
   }
 
@@ -186,7 +217,7 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
     new Setting(containerEl).setName("Notes").setDesc(`${SCOPE_DESC} ${this.scopeLine()}`)
       .addDropdown((d) => d.addOptions(SCOPE_OPTIONS).setValue(s.scope.mode).onChange((v) => set({ scope: { ...this.port.current().scope, mode: v as ScopeMode } })));
     new Setting(containerEl).setName("Folders").setDesc("One vault-relative folder per line.")
-      .addText((t) => t.setPlaceholder("storytelling").setValue(foldersToText(s.scope.folders)).onChange((v) => set({ scope: { ...this.port.current().scope, folders: textToFolders(v) } })));
+      .addTextArea((t) => t.setPlaceholder("storytelling").setValue(foldersToText(s.scope.folders)).onChange((v) => set({ scope: { ...this.port.current().scope, folders: textToFolders(v) } })));
     new Setting(containerEl).setName("Typewriter scrolling").setDesc("Keep the line you are writing vertically centred.")
       .addToggle((t) => t.setValue(s.typewriterEnabled).onChange((v) => set({ typewriterEnabled: v })));
     new Setting(containerEl).setName("Current line").setDesc("A faint band across the editor behind the line you are writing, so it stands out inside its paragraph.")
@@ -213,7 +244,7 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
     new Setting(containerEl).setName("Goals").setHeading();
     new Setting(containerEl).setName("Daily word goal").setDesc("Words added per day, in the notes the scope takes in, for the streak and the progress bar in the writing desk. 0 = any day you write counts.")
       .addSlider((sl) => sl.setLimits(0, 5000, 50).setValue(s.goals.dailyWords).onChange((v) => set({ goals: { ...this.port.current().goals, dailyWords: v } })));
-    new Setting(containerEl).setName("Writing log note").setDesc("Vault-relative path of the note that keeps the log (words added and cut per day), so streaks sync with the vault. Takes effect at the next save; reload to read from a new path.")
+    new Setting(containerEl).setName("Writing log note").setDesc(LOG_NOTE_DESC)
       .addText((t) => t.setPlaceholder(DEFAULT_GOALS.logNote).setValue(s.goals.logNote).onChange((v) => { const p = normalizeNotePath(v); if (p) void set({ goals: { ...this.port.current().goals, logNote: p } }); }));
 
     new Setting(containerEl).setName("Manuscript").setHeading();
@@ -235,19 +266,19 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
     new Setting(containerEl).setName("Tint tags in the editor").setDesc("Colour the tag word that opens a comment, %% TODO: … %%, in the editor.")
       .addToggle((t) => t.setValue(s.manuscript.tintTags).onChange((v) => ms({ tintTags: v })));
     new Setting(containerEl).setName("Tags").setDesc("One per line: an uppercase word and a hex colour, e.g. CHECK #4a8fe2.")
-      .addText((t) => t.setPlaceholder("TODO #d9a621").setValue(tagsToText(s.manuscript.tags)).onChange((v) => ms({ tags: textToTags(v) })));
+      .addTextArea((t) => t.setPlaceholder("TODO #d9a621").setValue(tagsToText(s.manuscript.tags)).onChange((v) => ms({ tags: textToTags(v) })));
     new Setting(containerEl).setName("Ruler").setDesc("A strip at the top of the manuscript page: one segment per section, wide by words, coloured by readability.")
       .addToggle((t) => t.setValue(s.manuscript.showRuler).onChange((v) => ms({ showRuler: v })));
     new Setting(containerEl).setName("Story on the page").setDesc("Who is in each section and scene, and the model's contradictions in the gutter. Builds the story map each refresh.")
       .addToggle((t) => t.setValue(s.manuscript.showStory).onChange((v) => ms({ showStory: v })));
-    new Setting(containerEl).setName("Echoes on the page").setDesc("The echo finder's repeated phrases as marks in the gutter, each naming another place the words occur. Builds the story threads on each refresh.")
+    new Setting(containerEl).setName("Echoes on the page").setDesc(ECHOES_DESC)
       .addToggle((t) => t.setValue(s.manuscript.showEchoes).onChange((v) => ms({ showEchoes: v })));
     new Setting(containerEl).setName("Reading speed").setDesc("Words per minute behind the reading time on the manuscript page. Adults read prose at about 250.")
       .addSlider((sl) => sl.setLimits(MIN_READING_SPEED, MAX_READING_SPEED, 10).setValue(s.manuscript.readingSpeed).onChange((v) => ms({ readingSpeed: v })));
 
     new Setting(containerEl).setName("Story threads").setHeading();
-    new Setting(containerEl).setName("Echo sensitivity").setDesc("How many echoes the threads view hears: repeated phrases and near-identical sentences across the book. Low reports only the plainest repeats; high hears shorter phrases and looser sentences.")
-      .addDropdown((d) => d.addOptions({ low: "Low", medium: "Medium", high: "High" }).setValue(s.threads.echoSensitivity).onChange((v) => set({ threads: { ...this.port.current().threads, echoSensitivity: ECHO_SENSITIVITIES.includes(v as EchoSensitivity) ? (v as EchoSensitivity) : "medium" } })));
+    new Setting(containerEl).setName("Echo sensitivity").setDesc(ECHO_SENSITIVITY_DESC)
+      .addDropdown((d) => d.addOptions(ECHO_OPTIONS).setValue(s.threads.echoSensitivity).onChange((v) => set({ threads: { ...this.port.current().threads, echoSensitivity: ECHO_SENSITIVITIES.includes(v as EchoSensitivity) ? (v as EchoSensitivity) : "medium" } })));
 
     new Setting(containerEl).setName("Style checks").setHeading();
     new Setting(containerEl).setName("Style checks").setDesc("Highlight clichés, passive voice, filter verbs, adverbs, repetition and more in the current paragraph. Hover a highlight for the note.")

@@ -596,13 +596,22 @@ export class WriterView extends ItemView {
     const path = pc.card.path;
     const target = groupAt(this.layout, cardCentre(at));
     const home = this.layout.groups.find((g) => g.group.def.id === pc.group);
+    const moving = target !== null && target !== undefined && target.group.def.id !== pc.group;
+    if (moving) {
+      // Retag first: if the note cannot be rewritten, the card snaps back and the error stays on screen.
+      const from = pc.card.tagGroups[pc.card.groups.indexOf(pc.group)] ?? pc.group;
+      try {
+        await this.source.retag(path, from, target.group.def.id);
+      } catch (e) {
+        this.flash(`${pc.card.title} stays in ${this.groupName(pc.group)}: ${e instanceof Error ? e.message : String(e)}`);
+        this.cardOverride.delete(path);
+        await this.show();
+        return;
+      }
+    }
     const origin = (target ?? home)?.rect ?? { x: 0, y: 0 };
     this.queue((file) => placeCard(file, path, { x: at.x - origin.x, y: at.y - origin.y }));
-    if (target && target.group.def.id !== pc.group) {
-      const from = pc.card.tagGroups[pc.card.groups.indexOf(pc.group)] ?? pc.group;
-      try { await this.source.retag(path, from, target.group.def.id); } catch (e) { this.flash(e instanceof Error ? e.message : String(e)); }
-      this.flash(`${pc.card.title}: ${this.groupName(pc.group)} → ${target.group.def.name}`);
-    }
+    if (moving) this.flash(`${pc.card.title}: ${this.groupName(pc.group)} → ${target.group.def.name}`);
     await this.flushFile();
     this.cardOverride.delete(path);
     await this.show();

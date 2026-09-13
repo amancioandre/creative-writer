@@ -76,7 +76,9 @@ body.czm-zen.czm-zen .inline-title:hover {
 
 /* --- Paragraph rhythm ------------------------------------------------------
    Tier 1 = shortest/lightest sentence, tier 6 = longest/heaviest.
-   Colours are subtle underlines so they coexist with theme text colours. */
+   A faint tint behind each sentence: the underline channel is left to
+   spellcheck, Harper and links, and the style-check tints (nested spans,
+   stronger alpha) stack on top of it. */
 :root {
   --czm-rhythm-1: rgba(99, 179, 237, 0.85);
   --czm-rhythm-2: rgba(72, 187, 170, 0.85);
@@ -84,15 +86,30 @@ body.czm-zen.czm-zen .inline-title:hover {
   --czm-rhythm-4: rgba(236, 201, 75, 0.85);
   --czm-rhythm-5: rgba(237, 137, 54, 0.85);
   --czm-rhythm-6: rgba(229, 83, 83, 0.85);
+  --czm-rhythm-tint: 16%;
 }
 
-/* A 2px rule drawn with a gradient background: works everywhere, sits below descenders, and stacks with style tints. */
 .cm-line [class*="czm-rhythm-"] {
-  background-image: linear-gradient(var(--czm-rhythm-color, transparent), var(--czm-rhythm-color, transparent));
-  background-repeat: no-repeat;
-  background-size: 100% 2px;
-  background-position: 0 calc(100% - 1px);
-  padding-bottom: 2px;
+  background-color: color-mix(in srgb, var(--czm-rhythm-color, transparent) var(--czm-rhythm-tint), transparent);
+  border-radius: 2px;
+}
+
+/* In Zen Mode the text stays plain and rhythm moves to the margin: a
+   CodeMirror layer under the text draws one bar per sentence, stacked from
+   the top of the cursor paragraph, wide by tier. */
+body.czm-zen .cm-line [class*="czm-rhythm-"] {
+  background-color: transparent;
+}
+.cm-layer.czm-rhythm-gutter-layer {
+  display: none;
+}
+body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
+  display: block;
+}
+.cm-layer.czm-rhythm-gutter-layer .czm-rhythm-tick {
+  background-color: var(--czm-rhythm-color, transparent);
+  border-radius: 1px;
+  pointer-events: none;
 }
 .czm-rhythm-1 { --czm-rhythm-color: var(--czm-rhythm-1); }
 .czm-rhythm-2 { --czm-rhythm-color: var(--czm-rhythm-2); }

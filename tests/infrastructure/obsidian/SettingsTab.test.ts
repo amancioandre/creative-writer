@@ -40,7 +40,33 @@ describe("CreativeZenSettingsTab", () => {
         "Enabled", "Notes", "Folders", "Typewriter scrolling", "Current line", "Focus fade", "Paragraph strength", "Far text strength", "Paragraph rhythm", "Rhythm tiers", "Fullscreen in Zen Mode",
         "Style checks", "Clichés", "Passive voice", "Filter verbs", "Adverbs", "Repetition", "Nominalisations", "Weak verbs", "Metaphor candidates",
         "Model", "Analyse automatically", "Ollama URL", "Ollama model", "Claude model", "Anthropic API key", "Daily spending cap (USD)",
+        "Writing log note", "Echoes on the page", "Echo sensitivity",
       ]));
+    });
+
+    it("gives the one-per-line settings a multi-line control", () => {
+      type Item = { name?: string; control?: { type?: string }; items?: Item[] };
+      const flat = (tab.getSettingDefinitions() as Item[]).flatMap((d) => d.items ?? [d]);
+      expect(flat.find((d) => d.name === "Folders")!.control!.type).toBe("textarea");
+      expect(flat.find((d) => d.name === "Tags")!.control!.type).toBe("textarea");
+    });
+
+    it("names the command that actually exists in the Enabled description", () => {
+      const def = JSON.stringify(tab.getSettingDefinitions());
+      expect(def).toContain("\\\"Toggle everywhere\\\"");
+      expect(def).not.toContain("Toggle Creative Writer (everywhere)");
+    });
+
+    it("keeps the writing log note on a usable path and the echo sensitivity on a known level", async () => {
+      await tab.setControlValue("goals.logNote", "Journal/Log");
+      expect(saved[0]!.goals.logNote).toBe("Journal/Log.md");
+      await tab.setControlValue("goals.logNote", "   ");
+      expect(saved).toHaveLength(1);
+      await tab.setControlValue("threads.echoSensitivity", "high");
+      expect(saved[1]!.threads.echoSensitivity).toBe("high");
+      await tab.setControlValue("threads.echoSensitivity", "loud");
+      expect(saved[2]!.threads.echoSensitivity).toBe("medium");
+      expect(tab.getControlValue("goals.logNote")).toBe("Journal/Log.md");
     });
 
     it("reads values through dotted keys", () => {
@@ -73,7 +99,9 @@ describe("CreativeZenSettingsTab", () => {
 
     it("renders a control for every setting", () => {
       const created = Setting.created.map((s) => s.name).filter(Boolean);
-      expect(created).toEqual(expect.arrayContaining(["Typewriter scrolling", "Rhythm tiers", "Passive voice", "Model", "Anthropic API key"]));
+      expect(created).toEqual(expect.arrayContaining(["Typewriter scrolling", "Rhythm tiers", "Passive voice", "Model", "Anthropic API key", "Writing log note"]));
+      expect(Setting.created.find((s) => s.name === "Folders")!.textarea).toBeDefined();
+      expect(Setting.created.find((s) => s.name === "Tags")!.textarea).toBeDefined();
     });
 
     it("seeds controls and persists changes", async () => {

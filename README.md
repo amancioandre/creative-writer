@@ -25,7 +25,7 @@ One command hides the ribbon, tabs, sidebars and status bar (optionally fullscre
 
 ### Paragraph rhythm and offline style checks
 
-Each sentence of the current paragraph is underlined cool → warm by its felt length, so you *see* monotony before you hear it. Style checks tint clichés, passive voice, filter verbs, adverbs, repetition, nominalisations, weak verbs and metaphor candidates; hover for the note. Rules, a part-of-speech tagger and concreteness norms — no network, no model required.
+Each sentence of the current paragraph sits on a faint tint, cool → warm by its felt length, so you *see* monotony before you hear it; in Zen Mode the tint leaves the text for a meter in the margin. Style checks tint clichés, passive voice, filter verbs, adverbs, repetition, nominalisations, weak verbs and metaphor candidates; hover for the note. Rules, a part-of-speech tagger and concreteness norms — no network, no model required.
 
 Settings → Paragraph rhythm / Style checks (every kind toggles individually)
 
