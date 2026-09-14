@@ -241,11 +241,11 @@ export class ManuscriptView extends ItemView {
     const time = formatReadingTime(m.words, settings.readingSpeed);
     const speed = `Estimated at ${settings.readingSpeed} words a minute; set the speed in Settings → Manuscript`;
     const line = head.createSpan({ text: `${m.notes} section${m.notes === 1 ? "" : "s"} · ${m.words.toLocaleString()} words`, cls: "czm-map-hint czm-ms-count" });
-    if (time) line.createSpan({ text: ` · ${time} to read`, cls: "czm-ms-time", attr: { title: speed, "aria-label": `${time} to read. ${speed}` } });
+    if (time) line.createSpan({ text: ` · ${time} to read`, cls: "czm-ms-time", attr: { "aria-label": `${time} to read. ${speed}` } });
     if (count) line.createSpan({ text: ` · ${count} comment${count === 1 ? "" : "s"}` });
     const tools = head.createDiv({ cls: "czm-ms-tools" });
     const toggle = (icon: string, label: string, on: boolean, action: ManuscriptAction) => {
-      const btn = tools.createEl("button", { cls: `clickable-icon czm-ms-tool${on ? " is-active" : ""}`, attr: { "aria-label": label, "aria-pressed": String(on), title: label } });
+      const btn = tools.createEl("button", { cls: `clickable-icon czm-ms-tool${on ? " is-active" : ""}`, attr: { "aria-label": label, "aria-pressed": String(on) } });
       setIcon(btn, icon);
       btn.addEventListener("click", () => this.run(action));
       return btn;
@@ -256,7 +256,7 @@ export class ManuscriptView extends ItemView {
     toggle("users", "Story: who is in each section and scene, and the model's contradictions in the gutter", settings.showStory, "story");
     toggle("repeat", "Echoes: repeated phrases marked in the gutter, each naming another place the words occur", settings.showEchoes, "echoes");
     toggle("quote", "Voices: speech tinted by who is speaking, grey when nobody is sure. Hover a sentence, or press v, to pin", settings.showVoices, "voices");
-    const exportBtn = tools.createEl("button", { cls: "clickable-icon czm-ms-tool czm-ms-export", attr: { "aria-label": "Export as one note beside the project (comments left out)", title: "Export as one note beside the project (comments left out)" } });
+    const exportBtn = tools.createEl("button", { cls: "clickable-icon czm-ms-tool czm-ms-export", attr: { "aria-label": "Export as one note beside the project (comments left out)" } });
     setIcon(exportBtn, "file-output");
     exportBtn.addEventListener("click", () => this.run("export"));
     overflowButton(tools, () => this.menuEntries());
@@ -318,7 +318,7 @@ export class ManuscriptView extends ItemView {
       const today = f.today.added || f.today.removed ? ` · today +${f.today.added.toLocaleString()} −${f.today.removed.toLocaleString()}` : "";
       const comments = n.annotations.length ? ` · ${n.annotations.length} comment${n.annotations.length === 1 ? "" : "s"}` : "";
       const label = `${n.title} · ${n.words.toLocaleString()} words${f.readability ? ` · ${f.readability.label}` : ""}${today}${comments}`;
-      const seg = ruler.createEl("button", { cls: `czm-ms-ruler-seg${today ? " is-today" : ""}`, attr: { title: label, "aria-label": label, tabindex: i === 0 ? "0" : "-1" } });
+      const seg = ruler.createEl("button", { cls: `czm-ms-ruler-seg${today ? " is-today" : ""}`, attr: { "aria-label": label, tabindex: i === 0 ? "0" : "-1" } });
       seg.style.flexGrow = String(Math.max(1, n.words));
       const level = easeLevel(f.readability?.label);
       if (level) seg.classList.add(`czm-ease-${level}`);
@@ -365,7 +365,7 @@ export class ManuscriptView extends ItemView {
       const el = this.blockAt(c.path, c.line);
       if (!el) continue;
       const marks = el.querySelector<HTMLElement>(".czm-ms-marks") ?? el.createSpan({ cls: "czm-ms-marks" });
-      const mark = marks.createSpan({ cls: `czm-ms-mark is-story is-${c.kind}`, attr: { title: c.text, "aria-label": c.text, role: "button", tabindex: "0" } });
+      const mark = marks.createSpan({ cls: `czm-ms-mark is-story is-${c.kind}`, attr: { "aria-label": c.text, role: "button", tabindex: "0" } });
       // The mark is the way to the other end: a click or Enter takes the page there, the editor following.
       onActivate(mark, (ev) => { ev.stopPropagation(); this.goTo(c.otherPath, c.otherLine); });
     }
@@ -672,7 +672,7 @@ export class ManuscriptView extends ItemView {
       const anchor = "block" in rows[i]! ? this.anchorText((rows[i] as { block: ManuscriptBlock | null }).block) : "";
       if (a.kind === "comment") {
         // Resolve is a trailing check mark inside the comment; one more click takes it out again.
-        const done = row.createEl("button", { cls: "czm-ms-cm-resolve", text: "✓", attr: { type: "button", tabindex: "-1", "aria-label": a.resolved ? "Reopen" : "Resolve", title: a.resolved ? "Reopen: take the check mark out of the comment" : "Resolve: a check mark at the end of the comment", "aria-pressed": a.resolved ? "true" : "false" } });
+        const done = row.createEl("button", { cls: "czm-ms-cm-resolve", text: "✓", attr: { type: "button", tabindex: "-1", "aria-label": a.resolved ? "Reopen: take the check mark out of the comment" : "Resolve: a check mark at the end of the comment", "aria-pressed": a.resolved ? "true" : "false" } });
         done.addEventListener("click", (ev) => {
           ev.stopPropagation();
           void this.source.toggleResolved(item.path, a.line, a.ch).then(
@@ -760,7 +760,7 @@ export class ManuscriptView extends ItemView {
         const marks = b.createSpan({ cls: "czm-ms-marks" });
         for (const a of block.annotations) {
           const label = `${a.kind === "highlight" ? `Highlight: ${a.text}` : `${a.tag ? `${a.tag}: ` : ""}${a.text}`}${a.resolved ? " (resolved)" : ""}`;
-          const dot = marks.createSpan({ cls: `czm-ms-mark${a.kind === "highlight" ? " is-highlight" : ""}${a.resolved ? " is-resolved" : ""}`, attr: { title: label, "aria-label": label } });
+          const dot = marks.createSpan({ cls: `czm-ms-mark${a.kind === "highlight" ? " is-highlight" : ""}${a.resolved ? " is-resolved" : ""}`, attr: { "aria-label": label } });
           const color = colorOf(a.tag, settings.tags);
           if (color) dot.style.setProperty("--czm-tag", color);
         }

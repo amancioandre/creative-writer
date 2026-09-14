@@ -583,7 +583,7 @@ export class PlotGridView extends ItemView {
       for (const e of cast) {
         const on = present.has(e.id);
         const td = tr.createEl("td", { cls: `czm-pg-cast-dot${on ? " is-on" : ""}` });
-        if (on) { td.setCssProps({ "--czm-kind": settings.colors[e.kind] }); td.setAttribute("aria-label", `${e.name} in ${row.scene.title || basenameOf(row.scene.path)}`); td.title = `${e.name} · ${row.scene.title || basenameOf(row.scene.path)}`; }
+        if (on) { td.setCssProps({ "--czm-kind": settings.colors[e.kind] }); td.setAttribute("aria-label", `${e.name} in ${row.scene.title || basenameOf(row.scene.path)}`); }
       }
       if (cast.length === 0) tr.createEl("td");
     } else {
@@ -926,7 +926,7 @@ export class PlotGridView extends ItemView {
       row.createSpan({ text: `${c.filled} of ${this.rows.length}${c.readings ? ` · ${c.readings} to answer` : ""}`, cls: "czm-map-row-meta" });
       if (c.special) row.createSpan({ text: SPECIAL_LABEL[c.special].toLowerCase(), cls: "czm-pg-side-job" });
       if (this.hidden.includes(c.heading.heading)) { row.addClass("is-hidden"); const show = row.createEl("button", { cls: "clickable-icon czm-pg-col-show", attr: { "aria-label": `Show column ${c.heading.name}` } }); setIcon(show, "eye-off"); show.addEventListener("click", (ev) => { ev.stopPropagation(); this.setHidden(this.hidden.filter((h) => h !== c.heading.heading)); this.renderTable(); }); }
-      const del = row.createEl("button", { cls: "clickable-icon czm-pg-col-delete", attr: { "aria-label": `Delete column ${c.heading.name}`, title: "Delete the column and every stop under it", "data-heading": c.heading.heading } });
+      const del = row.createEl("button", { cls: "clickable-icon czm-pg-col-delete", attr: { "aria-label": `Delete column ${c.heading.name} and every stop under it`, "data-heading": c.heading.heading } });
       setIcon(del, "x");
       // Two clicks: the first arms, the second deletes. A whole column is the one thing here that is not undone by a line.
       del.addEventListener("click", (ev) => {

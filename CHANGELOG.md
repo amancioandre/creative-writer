@@ -2,6 +2,10 @@
 
 Release notes for every version are on the [releases page](https://github.com/amancioandre/creative-writer/releases). This file carries the same text for the versions since it was started.
 
+## 0.10.1 — One tooltip
+
+- **One tooltip per control.** Obsidian draws a tooltip from a control's `aria-label`, and the browser draws its own from `title`; controls carrying both showed the two on top of each other. Every such control keeps only the label: the manuscript toolbar, reading-time span, ruler segments and gutter marks, the comments pane's resolve button (now "Resolve: a check mark at the end of the comment" / "Reopen: take the check mark out of the comment"), the panel shell's jump, tool, ⋯ and toggle buttons, the plot grid's cast dots and column delete ("Delete column X and every stop under it"), and the status-bar readability item, whose label now carries the band hint.
+
 ## 0.10.0 — The plot grid and the reading lenses
 
 Three revision passes from the way Maxwell Alexander Drake edits, designed on 2026-09-14 as *lenses*: one reading pass at a time, everywhere, so a tint always means one thing. The settings tab was reworked first to give them a home.

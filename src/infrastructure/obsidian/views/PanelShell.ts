@@ -33,7 +33,7 @@ export function renderJumps(parent: HTMLElement, current: PanelId, jump: (to: Pa
   parent.setAttribute("aria-label", "Other panels");
   for (const p of PANELS) {
     const here = p.id === current;
-    const b = parent.createEl("button", { cls: `clickable-icon czm-shell-jump${here ? " is-current" : ""}`, attr: { "aria-label": here ? `${p.label} (this panel)` : p.label, title: p.label, "data-panel": p.id } });
+    const b = parent.createEl("button", { cls: `clickable-icon czm-shell-jump${here ? " is-current" : ""}`, attr: { "aria-label": here ? `${p.label} (this panel)` : p.label, "data-panel": p.id } });
     if (here) b.setAttribute("aria-current", "page");
     setIcon(b, p.icon);
     if (here) b.disabled = true;
@@ -98,7 +98,7 @@ export function buildMenu(entries: readonly (MenuEntry | "-")[]): Menu {
 
 /** The ⋯ button: built once, the rows built at each click, so they follow the panel's state. */
 export function overflowButton(parent: HTMLElement, build: () => readonly (MenuEntry | "-")[]): HTMLButtonElement {
-  const b = parent.createEl("button", { cls: "clickable-icon czm-shell-tool czm-shell-more", attr: { "aria-label": "More actions", title: "More actions", "aria-haspopup": "menu" } });
+  const b = parent.createEl("button", { cls: "clickable-icon czm-shell-tool czm-shell-more", attr: { "aria-label": "More actions", "aria-haspopup": "menu" } });
   setIcon(b, "more-horizontal");
   b.addEventListener("click", (ev) => showOverflow(ev, build()));
   return b;
@@ -135,7 +135,7 @@ export class PanelShell {
     this.side = this.body.createDiv({ cls: "czm-shell-side czm-map-panel" });
     if (opts.side) {
       const side = opts.side;
-      this.sideToggle = this.fixed.createEl("button", { cls: "clickable-icon czm-shell-tool czm-shell-side-toggle", attr: { "aria-label": "Toggle panel", title: "Toggle panel" } });
+      this.sideToggle = this.fixed.createEl("button", { cls: "clickable-icon czm-shell-tool czm-shell-side-toggle", attr: { "aria-label": "Toggle panel" } });
       setIcon(this.sideToggle, "sliders-horizontal");
       this.sideToggle.addEventListener("click", () => { side.onToggle(); this.setSideOpen(side.isOpen()); });
       this.setSideOpen(side.isOpen());
@@ -158,7 +158,7 @@ export class PanelShell {
 
   /** An icon button in the head. `pressed` marks a toggle's state. */
   tool(icon: string, label: string, onClick: (ev: MouseEvent) => void, pressed?: boolean): HTMLButtonElement {
-    const b = this.tools.createEl("button", { cls: `clickable-icon czm-shell-tool${pressed ? " is-active" : ""}`, attr: { "aria-label": label, title: label } });
+    const b = this.tools.createEl("button", { cls: `clickable-icon czm-shell-tool${pressed ? " is-active" : ""}`, attr: { "aria-label": label } });
     if (pressed !== undefined) b.setAttribute("aria-pressed", String(pressed));
     setIcon(b, icon);
     b.addEventListener("click", onClick);

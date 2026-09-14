@@ -266,7 +266,7 @@ describe("PlotGridView", () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(note()).toContain("## Theme: Salt");
     expect([...el.querySelectorAll(".czm-pg-col-thread .czm-pg-col-title")].map((s) => s.textContent)).toEqual(["Ilse", "Salt", "The gate"]);
-    const del = el.querySelector<HTMLElement>('.czm-pg-col-delete[aria-label="Delete column Ilse"]')!;
+    const del = el.querySelector<HTMLElement>('.czm-pg-col-delete[aria-label^="Delete column Ilse"]')!;
     del.click();
     expect(del.textContent).toBe("Delete?");
     del.click();

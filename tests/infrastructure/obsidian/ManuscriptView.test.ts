@@ -66,7 +66,7 @@ describe("ManuscriptView", () => {
     await v.onOpen();
     const el = v.contentEl;
     expect(el.querySelector(".czm-ms-count")?.textContent).toBe("3 sections · 15 words · under a minute to read · 1 comment");
-    expect(el.querySelector(".czm-ms-time")?.getAttribute("title")).toBe("Estimated at 250 words a minute; set the speed in Settings → Manuscript");
+    expect(el.querySelector(".czm-ms-time")?.getAttribute("aria-label")).toBe("under a minute to read. Estimated at 250 words a minute; set the speed in Settings → Manuscript");
     expect([...el.querySelectorAll(".czm-ms-page > *")].map((n) => `${n.tagName}.${n.className.split(" ")[0]}`)).toEqual(["H1.czm-ms-folder", "DIV.czm-ms-note", "DIV.czm-ms-note", "DIV.czm-ms-note"]);
     expect(el.querySelector(".czm-ms-folder")?.textContent).toBe("Part One");
     const one = el.querySelector(".czm-ms-note")!;
@@ -188,7 +188,7 @@ describe("ManuscriptView", () => {
     const el = v.contentEl;
     const blocks = el.querySelectorAll<HTMLElement>(".czm-ms-block");
     expect([...blocks].map((b) => b.querySelectorAll(".czm-ms-mark").length)).toEqual([3, 1]);
-    expect(blocks[0]!.querySelector<HTMLElement>(".czm-ms-mark")!.title).toBe("CHECK: the coat");
+    expect(blocks[0]!.querySelector<HTMLElement>(".czm-ms-mark")!.getAttribute("aria-label")).toBe("CHECK: the coat");
     const side = el.querySelector<HTMLElement>(".czm-ms-side")!;
     const field = () => side.querySelector<HTMLTextAreaElement>(".czm-ms-compose-text")!;
     expect(field().disabled).toBe(true);
@@ -248,7 +248,7 @@ describe("ManuscriptView", () => {
     expect(calls.revealed.at(-1)).toEqual(["Novel/One.md", 2, 0, false]);
     expect(document.activeElement).toBe(rows()[2]);
     // Resolve is a check mark on the row; a highlight has none; r on the focused row presses it.
-    expect(rows().map((r) => r.querySelector(".czm-ms-cm-resolve")?.getAttribute("aria-label") ?? null)).toEqual(["Resolve", null, "Resolve"]);
+    expect(rows().map((r) => r.querySelector(".czm-ms-cm-resolve")?.getAttribute("aria-label") ?? null)).toEqual(["Resolve: a check mark at the end of the comment", null, "Resolve: a check mark at the end of the comment"]);
     key(rows()[2]!, "r");
     expect(calls.resolved).toEqual([["Novel/One.md", 2, 5]]);
     expect(v.contentEl.querySelector(".czm-ms-side-para")?.textContent).toContain("End.");
@@ -295,8 +295,8 @@ describe("ManuscriptView", () => {
     expect(segs).toHaveLength(2);
     expect(segs[0]!.classList.contains("czm-ease-2")).toBe(true);
     expect(segs[0]!.classList.contains("is-today")).toBe(true);
-    expect(segs[0]!.title).toBe("Chapter One · 13 words · Easy · today +40 −3");
-    expect(segs[1]!.title).toBe("Chapter Two · 1 words");
+    expect(segs[0]!.getAttribute("aria-label")).toBe("Chapter One · 13 words · Easy · today +40 −3");
+    expect(segs[1]!.getAttribute("aria-label")).toBe("Chapter Two · 1 words");
     expect(Number(segs[0]!.style.flexGrow)).toBeGreaterThan(Number(segs[1]!.style.flexGrow));
     click(segs[1]!);
     expect(calls.revealed.at(-1)).toEqual(["Novel/Part One/02 Chapter Two.md", 0, 0, false]);
@@ -331,7 +331,7 @@ describe("ManuscriptView", () => {
     click(cast.querySelector<HTMLElement>(".czm-ms-cast-name.is-link")!);
     expect(calls.links).toEqual(["Novel/Characters/Marta.md"]);
     const blocks = v.contentEl.querySelectorAll<HTMLElement>(".czm-ms-block");
-    expect(blocks[2]!.querySelector(".czm-ms-mark.is-conflict")?.getAttribute("title")).toBe("Ilse · age: nine vs twelve");
+    expect(blocks[2]!.querySelector(".czm-ms-mark.is-conflict")?.getAttribute("aria-label")).toBe("Ilse · age: nine vs twelve");
     click(blocks[3]!);
     const para = v.contentEl.querySelector<HTMLElement>(".czm-ms-side-para")!;
     expect([...para.querySelectorAll(".czm-ms-cast-name")].map((n) => n.textContent)).toEqual(["Lisbon"]);
@@ -347,7 +347,7 @@ describe("ManuscriptView", () => {
     expect(v.contentEl.querySelector<HTMLElement>(".czm-ms-pop")!.hidden).toBe(false);
     // A directed thread's plant is a mark of its own kind; clicking it takes the page to the other end.
     const plant = blocks[4]!.querySelector<HTMLElement>(".czm-ms-mark.is-plant")!;
-    expect(plant.getAttribute("title")).toBe("The letter · plant, paid off in Creek");
+    expect(plant.getAttribute("aria-label")).toBe("The letter · plant, paid off in Creek");
     click(plant);
     expect(calls.revealed.at(-1)).toEqual(["Novel/Part One/01 Chapter One.md", 3, 0, false]);
     expect(blocks[2]!.classList.contains("is-active")).toBe(true);
@@ -365,7 +365,7 @@ describe("ManuscriptView", () => {
     await tick();
     expect(asked).toEqual([false, true]);
     const mark = v.contentEl.querySelector<HTMLElement>(".czm-ms-mark.is-echo")!;
-    expect(mark.getAttribute("title")).toBe("“salt on the wind” · also in Chapter Two");
+    expect(mark.getAttribute("aria-label")).toBe("“salt on the wind” · also in Chapter Two");
     expect(v.contentEl.querySelector(".czm-ms-cast")).toBeNull();
     click(mark);
     expect(calls.revealed.at(-1)).toEqual(["Novel/Part One/02 Chapter Two.md", 0, 0, false]);
@@ -422,7 +422,7 @@ describe("resolved comments", () => {
     const rows = [...all.querySelectorAll<HTMLElement>(".czm-ms-cm-row")];
     expect(rows[0]!.classList.contains("is-resolved")).toBe(true);
     expect(rows[0]!.querySelector(".czm-ms-cm-text")!.textContent).toBe("the coat");
-    expect(rows[0]!.querySelector(".czm-ms-cm-resolve")!.getAttribute("aria-label")).toBe("Reopen");
+    expect(rows[0]!.querySelector(".czm-ms-cm-resolve")!.getAttribute("aria-label")).toBe("Reopen: take the check mark out of the comment");
     expect(rows[1]!.classList.contains("is-resolved")).toBe(false);
     expect(v.contentEl.querySelector(".czm-ms-mark.is-resolved")).not.toBeNull();
   });

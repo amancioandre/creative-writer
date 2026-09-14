@@ -767,7 +767,7 @@ export default class CreativeZenModePlugin extends Plugin {
       wordsExtension((state) => state.field(editorInfoField, false)?.file?.path ?? null, { removeTerm: (path, term) => void this.editNote(path, (text) => removeTerm(text, term)) }),
       readabilityStatusExtension(profile, (p) => {
         readability.setText(statusLabel(p));
-        readability.title = p?.readingEase ? `${p.readingEase.band.hint}${p.variety ? `\n${p.variety.band.hint}` : ""}` : "";
+        readability.setAttribute("aria-label", `${p?.readingEase ? `${p.readingEase.band.hint}${p.variety ? ` ${p.variety.band.hint}` : ""} ` : ""}Readability of the current paragraph. Click for the whole note.`);
       }),
       typewriterExtension(),
       currentLineExtension(),
