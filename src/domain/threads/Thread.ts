@@ -28,8 +28,18 @@ export type ThreadKind = "entity" | "fact" | "writer" | "echo";
  * `touch` is any other scene the thread passes through. A line with no
  * role is a touch, so every thread ever written is still a thread.
  */
-export type StopRole = "plant" | "touch" | "payoff" | "reversal";
-export const STOP_ROLES: readonly StopRole[] = ["plant", "touch", "payoff", "reversal"];
+export type StopRole = "plant" | "touch" | "payoff" | "reversal" | ArcRole;
+/**
+ * A character's arc has its own four words, because a want and a lie are
+ * opposites and one mark cannot carry both: the `want` (or the lie the
+ * character tells themselves), the `lie` acted on, the `turn` where it
+ * fails, the `truth` arrived at. Read only under an `Arc:` heading in the
+ * threads note; anywhere else the word is note text.
+ */
+export type ArcRole = "want" | "lie" | "turn" | "truth";
+export const ARC_ROLES: readonly ArcRole[] = ["want", "lie", "turn", "truth"];
+export const THREAD_ROLES: readonly StopRole[] = ["plant", "touch", "payoff", "reversal"];
+export const STOP_ROLES: readonly StopRole[] = [...THREAD_ROLES, ...ARC_ROLES];
 
 /** A stop's position inside its note, when its quote was found. */
 export interface Anchor {

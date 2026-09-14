@@ -223,8 +223,9 @@ export function buildStoryGraph(project: string, notes: readonly ProjectNote[], 
       events: eventsByScene.get(sceneKey(s.ref)) ?? [],
     }))
     .filter((row) => row.words > 0);
+  const headings = sceneMentions.map((s) => s.ref);
 
-  return { project, entities, edges: markConflicts([...edges.values()]), timeline };
+  return { project, entities, edges: markConflicts([...edges.values()]), timeline, headings };
 }
 
 /** The heading an authored relationship's evidence points at. */

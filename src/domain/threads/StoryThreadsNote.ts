@@ -1,6 +1,6 @@
 import { sameTarget } from "../story/Relations";
 import type { SceneRef } from "../story/StoryGraph";
-import { STOP_ROLES, type StopRole, type ThreadRef } from "./Thread";
+import { STOP_ROLES, THREAD_ROLES, type StopRole, type ThreadRef } from "./Thread";
 
 /**
  * Threads the writer draws by hand live in `Story threads.md` in the
@@ -55,6 +55,47 @@ const LINK = /^\[\[([^\]|]+?)(?:\|[^\]]*)?\]\]\s*(.*)$/;
 const MD_LINK = /^\[[^\]]*\]\(([^)]+?)\)\s*(.*)$/;
 const SEP = /^(?:[—–:-]|--)\s*/;
 const ROLE = new RegExp(`^(${STOP_ROLES.join("|")})\\s*:\\s*`, "i");
+const COLUMN_PREFIX = /^(arc|theme|subplot)\s*:\s*(.+)$/i;
+const UNKNOWN_PREFIX = /^([a-z][a-z-]{1,15})\s*:\s*\S/i;
+
+/** What a thread column tracks: a character's arc, an argument the book makes, a line of events, or nothing in particular. */
+export type ColumnKind = "arc" | "theme" | "subplot" | "free";
+export const COLUMN_KINDS: readonly ColumnKind[] = ["arc", "theme", "subplot", "free"];
+
+export interface ColumnHeading {
+  readonly kind: ColumnKind;
+  /** The heading as written, kind prefix included: the thread's name in the note. */
+  readonly heading: string;
+  /** What the column is called: the heading without its prefix, and without link brackets. */
+  readonly name: string;
+  /** An arc heading's `[[link]]` target, or the bare name, so the column can be bound to the character. */
+  readonly link: string | null;
+  /** A prefix that looks like a kind but is not one ("Arcs:", "Sub-plot:"), so the grid can say so instead of reading a free thread. */
+  readonly unknownPrefix: string | null;
+}
+
+/**
+ * `## Arc: [[Anna]]`, `## Theme: What we owe the dead`, `## Subplot: The letter`;
+ * a heading with no prefix is a free thread, so every existing note still parses.
+ */
+export function parseColumnHeading(heading: string): ColumnHeading {
+  const text = heading.trim();
+  const m = COLUMN_PREFIX.exec(text);
+  if (!m) {
+    const u = UNKNOWN_PREFIX.exec(text);
+    return { kind: "free", heading: text, name: text, link: null, unknownPrefix: u && !/^https?$/i.test(u[1]!) ? u[1]! : null };
+  }
+  const kind = m[1]!.toLowerCase() as ColumnKind;
+  const rest = m[2]!.trim();
+  const wiki = /^\[\[([^\]|]+?)(?:\|([^\]]*))?\]\]$/.exec(rest);
+  const name = wiki ? (wiki[2]?.trim() || wiki[1]!.trim()) : rest;
+  return { kind, heading: text, name, link: kind === "arc" ? (wiki ? wiki[1]!.trim() : rest) : null, unknownPrefix: null };
+}
+
+/** The role words a stop line may open with under this heading: arcs read all eight, other threads only their four. */
+export function rolesFor(heading: string): readonly StopRole[] {
+  return parseColumnHeading(heading).kind === "arc" ? STOP_ROLES : THREAD_ROLES;
+}
 const QUOTE = /"([^"]+)"|“([^”]+)”/;
 
 export function parseStoryThreads(markdown: string): WriterThread[] {
@@ -73,7 +114,7 @@ export function parseStoryThreads(markdown: string): WriterThread[] {
     const item = ITEM.exec(line);
     if (!item) continue;
     const parsed = parseItem(item[1]!);
-    if (parsed) current.items.push({ ...parsed, ...parseStopText(parsed.note), line: i });
+    if (parsed) current.items.push({ ...parsed, ...parseStopText(parsed.note, rolesFor(current.name)), line: i });
   }
   return out;
 }
@@ -90,11 +131,11 @@ function parseItem(text: string): { link: string; note: string } | null {
 }
 
 /** "plant: \"she pocketed it\" Anna" → role plant, quote "she pocketed it", note "Anna". No role means touch. */
-export function parseStopText(text: string): { role: StopRole; quote: string | null; note: string } {
+export function parseStopText(text: string, roles: readonly StopRole[] = STOP_ROLES): { role: StopRole; quote: string | null; note: string } {
   let rest = text.trim();
   let role: StopRole = "touch";
   const r = ROLE.exec(rest);
-  if (r) { role = r[1]!.toLowerCase() as StopRole; rest = rest.slice(r[0].length); }
+  if (r && roles.includes(r[1]!.toLowerCase() as StopRole)) { role = r[1]!.toLowerCase() as StopRole; rest = rest.slice(r[0].length); }
   let quote: string | null = null;
   const q = QUOTE.exec(rest);
   if (q) { quote = (q[1] ?? q[2] ?? "").trim() || null; rest = (rest.slice(0, q.index) + " " + rest.slice(q.index + q[0].length)); }
