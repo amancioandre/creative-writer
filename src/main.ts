@@ -67,6 +67,7 @@ import { PLOT_GRID_VIEW_TYPE, PlotGridView } from "./infrastructure/obsidian/vie
 import { BuildPlotGrid } from "./application/use-cases/BuildPlotGrid";
 import { SnapshotPlotGrid } from "./application/use-cases/SnapshotPlotGrid";
 import { ReadColumn } from "./application/use-cases/ReadColumn";
+import { ProposeColumns } from "./application/use-cases/ProposeColumns";
 import { OllamaColumnAnalyser } from "./infrastructure/llm/OllamaColumnAnalyser";
 import { ClaudeColumnAnalyser } from "./infrastructure/llm/ClaudeColumnAnalyser";
 import { dismissColumnReadings, setGridReadingState } from "./domain/story/StoryMapFile";
@@ -476,6 +477,17 @@ export default class CreativeZenModePlugin extends Plugin {
         const { graph } = await buildPlotGrid.executeWithGraph(project);
         return new ReadColumn(projectNotes, storyRepo, this.columnAnalyser()).check(project, column, graph, signal, onProgress);
       },
+      proposeColumns: async (project, signal) => {
+        const { grid, graph } = await buildPlotGrid.executeWithGraph(project);
+        return new ProposeColumns(storyRepo, this.columnAnalyser()).execute(project, grid, graph, signal);
+      },
+      readProject: async (project, signal, onProgress) => {
+        const cfg = this.current.llm;
+        if (cfg.provider !== "ollama") throw new Error("Reading the project needs a local model — set Model to Local (Ollama) in Creative Writer settings.");
+        const analyser = new OllamaRelationAnalyser(new RequestUrlHttpClient(), { baseUrl: cfg.ollamaUrl, model: cfg.ollamaModel });
+        const graph = await buildStoryMap.execute(project);
+        return new AnalyzeSceneRelations(projectNotes, storyRepo, analyser).execute(project, null, graph, signal, onProgress);
+      },
       dismissReading: async (project, scene, column) => { await storyRepo.update(project, (f) => setGridReadingState(f, scene, column, "dismissed")); },
       dismissColumnReadings: async (project, column) => { await storyRepo.update(project, (f) => dismissColumnReadings(f, column)); },
       modelLabel: () => { const cfg = this.current.llm; return cfg.provider === "ollama" ? `Ollama · ${cfg.ollamaModel}` : cfg.provider === "claude" ? `Claude · ${cfg.claudeModel}` : ""; },
@@ -486,7 +498,7 @@ export default class CreativeZenModePlugin extends Plugin {
       ["plot-grid-fold-arcs", "fold-arcs"], ["plot-grid-fold-themes", "fold-themes"], ["plot-grid-fold-subplots", "fold-subplots"], ["plot-grid-fold-threads", "fold-threads"],
       ["plot-grid-hide-column", "hide-column"], ["plot-grid-show-hidden", "show-hidden"], ["plot-grid-toggle-unmoved", "toggle-unmoved"], ["plot-grid-focus-search", "focus-search"], ["plot-grid-help", "help"],
       ["plot-grid-audit", "audit"], ["plot-grid-snapshot", "snapshot"], ["plot-grid-next-issue", "next-issue"], ["plot-grid-previous-issue", "previous-issue"], ["plot-grid-anchor", "anchor"],
-      ["plot-grid-read-all", "read-all"], ["plot-grid-read-column", "read-column"], ["plot-grid-check-column", "check-column"], ["plot-grid-dismiss-reading", "dismiss-reading"],
+      ["plot-grid-read-all", "read-all"], ["plot-grid-read-column", "read-column"], ["plot-grid-check-column", "check-column"], ["plot-grid-dismiss-reading", "dismiss-reading"], ["plot-grid-propose-columns", "propose-columns"],
     ]);
     this.registerView(STORY_THREADS_VIEW_TYPE, (leaf: WorkspaceLeaf) => new StoryThreadsView(leaf, {
       projects: storySource.projects,
@@ -1018,6 +1030,7 @@ export default class CreativeZenModePlugin extends Plugin {
       rulebook: claude.rulebook,
       read: (text, present, column, signal) => priced(() => claude.read(text, present, column, signal)),
       check: (text, plan, column, signal) => priced(() => claude.check(text, plan, column, signal)),
+      propose: (brief, signal) => priced(() => claude.propose(brief, signal)),
     };
   }
 

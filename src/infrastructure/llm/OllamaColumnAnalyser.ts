@@ -1,6 +1,7 @@
 import type { HttpClient } from "../../application/ports/HttpClient";
 import type { ColumnAnalyser, ColumnBrief } from "../../application/ports/ColumnAnalyser";
-import { CHECK_RULEBOOK, CHECK_SCHEMA, GRID_RULEBOOK, GRID_RULEBOOK_VERSION, GRID_SCHEMA, checkUserMessage, gridUserMessage } from "./prompts/gridRulebook";
+import { CHECK_RULEBOOK, CHECK_SCHEMA, GRID_RULEBOOK, GRID_RULEBOOK_VERSION, GRID_SCHEMA, PROPOSE_RULEBOOK, PROPOSE_SCHEMA, checkUserMessage, gridUserMessage, proposeUserMessage } from "./prompts/gridRulebook";
+import type { ProposalBrief } from "../../domain/plot/Proposals";
 import { extractJson } from "./extractJson";
 import type { OllamaConfig } from "./OllamaAnalyser";
 
@@ -19,6 +20,10 @@ export class OllamaColumnAnalyser implements ColumnAnalyser {
 
   check(text: string, plan: { readonly note: string; readonly role: string | null }, column: ColumnBrief, signal: AbortSignal): Promise<unknown> {
     return this.ask(CHECK_RULEBOOK, checkUserMessage(text, plan, column), CHECK_SCHEMA, signal);
+  }
+
+  propose(brief: ProposalBrief, signal: AbortSignal): Promise<unknown> {
+    return this.ask(PROPOSE_RULEBOOK, proposeUserMessage(brief), PROPOSE_SCHEMA, signal);
   }
 
   private async ask(system: string, user: string, schema: unknown, signal: AbortSignal): Promise<unknown> {

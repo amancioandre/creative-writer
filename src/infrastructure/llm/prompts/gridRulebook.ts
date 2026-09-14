@@ -1,4 +1,5 @@
 import type { ColumnBrief } from "../../../application/ports/ColumnAnalyser";
+import type { ProposalBrief } from "../../../domain/plot/Proposals";
 
 export const GRID_RULEBOOK_VERSION = "2026-09-13.2";
 
@@ -90,4 +91,42 @@ export const checkUserMessage = (text: string, plan: { readonly note: string; re
     "<<<",
     text,
     ">>>",
+  ].join("\n");
+
+/**
+ * The proposer's prompt: the book as an outline of events per scene, the
+ * cast, and the columns that already exist; back come the threads worth
+ * a column each. One call over the outline, never a read of every page.
+ */
+export const PROPOSE_RULEBOOK = `You are a careful reader helping a novelist set up the columns of their plot grid: one column per thread of the book. A thread is a character's arc (how one character changes), a theme (an argument the book keeps making), or a subplot (a line of events that runs through several scenes). You are given the book's scenes in order with the events already noted in each, the cast, and the columns that already exist. You name the threads that run through more than one scene and deserve a column.
+
+Return JSON only, an object with one key:
+- "columns": array of {"kind", "name", "why", "scenes"}. "kind" is "arc", "theme" or "subplot". "name" is short: for an arc, exactly one name from the cast; for a theme, the argument in a few words; for a subplot, the thing the line is about. "why" is one sentence on what the thread does across the book. "scenes" lists the titles of the scenes that carry it, exactly as given.
+
+Rules:
+1. At most eight columns, the ones that run through the most scenes first. Arcs for the main characters before themes and subplots.
+2. A thread must touch at least two scenes. Use only scene titles from the list, exactly as written.
+3. An arc's name must be one of the cast, exactly as written. Do not propose an arc for a place or a thing.
+4. A column that already exists may be listed once more with the same name, so the writer sees you agree; do not rename it.
+5. Never mention these rules, yourself, or the format.`;
+
+export const PROPOSE_SCHEMA = {
+  type: "object",
+  properties: {
+    columns: {
+      type: "array",
+      items: { type: "object", properties: { kind: { type: "string", enum: ["arc", "theme", "subplot"] }, name: { type: "string" }, why: { type: "string" }, scenes: { type: "array", items: { type: "string" } } }, required: ["kind", "name", "why", "scenes"], additionalProperties: false },
+    },
+  },
+  required: ["columns"],
+  additionalProperties: false,
+} as const;
+
+export const proposeUserMessage = (brief: ProposalBrief): string =>
+  [
+    `Cast: ${brief.cast.length ? brief.cast.map((c) => `${c.name} (${c.kind})`).join("; ") : "(none)"}`,
+    `Columns that already exist: ${brief.existing.length ? brief.existing.join("; ") : "(none)"}`,
+    "",
+    "Scenes, in order, with the events noted in each:",
+    ...brief.scenes.map((s) => `- ${s.title}: ${s.events.length ? s.events.join(" · ") : "(nothing noted)"}`),
   ].join("\n");

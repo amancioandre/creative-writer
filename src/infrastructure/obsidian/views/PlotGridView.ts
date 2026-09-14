@@ -11,6 +11,8 @@ import { PanelShell, showOverflow, type MenuEntry, type PanelId } from "./PanelS
 import { COLUMN_KINDS } from "../../../domain/threads/StoryThreadsNote";
 import { rankSentences } from "../../../domain/plot/Snapshot";
 import type { AnalyzeProgress } from "../../../application/use-cases/AnalyzeSceneRelations";
+import type { ProposalsResult } from "../../../application/use-cases/ProposeColumns";
+import type { ColumnProposal } from "../../../domain/plot/Proposals";
 import { StatusLine, couldNot } from "./StatusLine";
 import { inField, onActivate } from "./keys";
 
@@ -55,6 +57,10 @@ export interface PlotGridSource {
   dismissColumnReadings(project: ProjectSpec, column: string): Promise<void>;
   /** What the model is, for the head: "Ollama · qwen2.5:7b", "Claude · claude-haiku-4-5", or "" when off. */
   modelLabel(): string;
+  /** The model's suggestion of which threads deserve a column, from the events the map holds. */
+  proposeColumns(project: ProjectSpec, signal: AbortSignal): Promise<ProposalsResult>;
+  /** The relation reading over the project, so there are events to propose from. */
+  readProject(project: ProjectSpec, signal: AbortSignal, onProgress: (p: AnalyzeProgress) => void): Promise<number>;
   /** Opens a sibling panel, for the same project where the panel takes one. */
   jumpTo(to: PanelId, project: ProjectSpec | null): void;
 }
@@ -72,7 +78,7 @@ export function sceneLink(ref: SceneRef): string {
 
 interface Selection { readonly col: number; readonly row: number }
 
-export type PlotGridAction = "clear-search" | "toggle-cast" | "open-note" | "toggle-panel" | "new-column" | "fold-arcs" | "fold-themes" | "fold-subplots" | "fold-threads" | "hide-column" | "show-hidden" | "focus-search" | "help" | "toggle-unmoved" | "audit" | "snapshot" | "next-issue" | "previous-issue" | "anchor" | "read-column" | "check-column" | "read-all" | "dismiss-reading" | "stop-reading";
+export type PlotGridAction = "clear-search" | "toggle-cast" | "open-note" | "toggle-panel" | "new-column" | "fold-arcs" | "fold-themes" | "fold-subplots" | "fold-threads" | "hide-column" | "show-hidden" | "focus-search" | "help" | "toggle-unmoved" | "audit" | "snapshot" | "next-issue" | "previous-issue" | "anchor" | "read-column" | "check-column" | "read-all" | "dismiss-reading" | "stop-reading" | "propose-columns";
 
 /** The keys of the grid, as `?` lists them: the loop a writer runs all day. Folds, hiding and the search are commands, bindable in Settings → Hotkeys. */
 export const KEY_HELP: readonly (readonly [string, string])[] = [
@@ -118,6 +124,8 @@ export class PlotGridView extends ItemView {
   private picker: { key: string; sentences: string[] } | null = null;
   /** A model pass in flight, with the column it reads and what to call it. */
   private running: { controller: AbortController; column: GridColumn | null; what: string } | null = null;
+  /** The model's proposals, with the writer's ticks, until they are added or put away. */
+  private proposals: { list: ColumnProposal[]; picked: Set<string> } | null = null;
   private editing = false;
   private generation = 0;
   private shell: PanelShell | null = null;
@@ -235,6 +243,7 @@ export class PlotGridView extends ItemView {
       { label: "Snapshot the grid", icon: "camera", command: "plot-grid-snapshot", disabled: !this.project, onClick: () => this.run("snapshot") },
       "-",
       { label: this.running ? `Stop ${this.running.what}` : "Read every column with the model…", icon: "sparkles", command: "plot-grid-read-all", disabled: !this.project, onClick: () => this.run(this.running ? "stop-reading" : "read-all") },
+      { label: "Propose columns…", icon: "list-plus", command: "plot-grid-propose-columns", disabled: !this.project || !!this.running, onClick: () => this.run("propose-columns") },
       { label: "Read this column with the model…", command: "plot-grid-read-column", disabled: !this.current() || !!this.running, onClick: () => this.run("read-column") },
       { label: "Check this column against the draft…", command: "plot-grid-check-column", disabled: !this.current() || !!this.running, onClick: () => this.run("check-column") },
       { label: "Dismiss the reading", command: "plot-grid-dismiss-reading", disabled: !this.selected?.cell.reading, onClick: () => this.run("dismiss-reading") },
@@ -276,7 +285,61 @@ export class PlotGridView extends ItemView {
       case "read-all": void this.readColumns(this.grid.columns.filter((c) => c.special !== "pov" && c.special !== "time"), "reading"); break;
       case "dismiss-reading": void this.dismissReading(); break;
       case "stop-reading": this.running?.controller.abort(); break;
+      case "propose-columns": void this.proposeColumns(); break;
     }
+  }
+
+  /** One call over the outline: the proposals land in the side column with a tick each; nothing is written until Add. */
+  private async proposeColumns(): Promise<void> {
+    const project = this.project;
+    if (!project || this.running) return;
+    if (!this.source.modelLabel()) { this.status?.fail("Proposing columns needs a model: set Model to Local (Ollama) or Claude in Creative Writer settings."); return; }
+    const controller = new AbortController();
+    this.running = { controller, column: null, what: "proposing" };
+    this.renderTools();
+    this.status?.hold("Asking the model which threads run through the book…");
+    let result: ProposalsResult;
+    try { result = await this.source.proposeColumns(project, controller.signal); }
+    catch (e) { this.running = null; this.renderTools(); this.status?.fail(couldNot("propose columns", e)); return; }
+    this.running = null;
+    this.renderTools();
+    if ("needsReading" in result) {
+      this.status?.action("Nothing to propose from yet: no scene has been read for its events.", "Read the project", () => void this.readProject());
+      return;
+    }
+    this.proposals = { list: [...result.proposals], picked: new Set(result.proposals.filter((p) => !p.existing).map((p) => p.heading)) };
+    this.save({ panelOpen: true }); this.shell?.setSideOpen(true);
+    this.renderSide();
+    this.status?.say(result.proposals.length ? `${plural(result.proposals.length, "column")} proposed from ${plural(result.scenesRead, "scene")} read. Tick the ones to add.` : `The model proposed nothing from ${plural(result.scenesRead, "scene")} read.`);
+    this.shell?.side.querySelector<HTMLElement>(".czm-pg-proposal input")?.focus();
+  }
+
+  /** The relation reading, so the events exist to propose from; then the proposal itself. */
+  private async readProject(): Promise<void> {
+    const project = this.project;
+    if (!project || this.running) return;
+    const controller = new AbortController();
+    this.running = { controller, column: null, what: "reading the project" };
+    this.renderTools();
+    try {
+      const n = await this.source.readProject(project, controller.signal, (p) => this.status?.hold(`Reading scene ${p.done} of ${p.total} for events…`));
+      this.running = null;
+      this.renderTools();
+      this.status?.say(`Read ${plural(n, "scene")} for events.`);
+      if (!controller.signal.aborted) await this.proposeColumns();
+    } catch (e) { this.running = null; this.renderTools(); this.status?.fail(couldNot("read the project", e)); }
+  }
+
+  private async addProposals(): Promise<void> {
+    const project = this.project, ps = this.proposals;
+    if (!project || !ps) return;
+    const chosen = ps.list.filter((p) => ps.picked.has(p.heading) && !p.existing);
+    if (!chosen.length) return;
+    try { for (const p of chosen) await this.source.addThread(project, p.heading); }
+    catch (e) { this.status?.fail(couldNot("add the columns", e)); return; }
+    this.proposals = null;
+    await this.show(project, true);
+    this.status?.undoable(`${plural(chosen.length, "column")} written to Story threads.md: ${chosen.map((p) => p.name).join(", ")}`, async () => { for (const p of chosen) await this.source.removeThread(project, p.heading); await this.show(project, true); });
   }
 
   /** One pass over the given columns: the state line counts scenes, Stop aborts, and nothing is lost on stop. */
@@ -408,7 +471,7 @@ export class PlotGridView extends ItemView {
     if (rows.length === 0) { shell.empty("No scenes yet — headings become scenes, with prose under them or not."); return; }
     this.renderKey(cast);
     if (columns.length === 0 && grid.columns.length === 0) {
-      shell.empty("No columns yet. Name one — Arc: [[Anna]], Theme: what we owe the dead, Subplot: the letter — and its stops become cells.", [{ label: "New column", cls: "czm-pg-fix-new", onClick: () => this.run("new-column") }, { label: "Open Story threads.md", cls: "czm-pg-fix-note", onClick: () => this.run("open-note") }]);
+      shell.empty("No columns yet. Name one — Arc: [[Anna]], Theme: what we owe the dead, Subplot: the letter — or let the model propose some from the events it has read.", [{ label: "New column", cls: "czm-pg-fix-new", onClick: () => this.run("new-column") }, { label: "Propose columns…", cls: "czm-pg-fix-propose", onClick: () => this.run("propose-columns") }, { label: "Open Story threads.md", cls: "czm-pg-fix-note", onClick: () => this.run("open-note") }]);
     } else if (columns.length === 0 && cast.length === 0) {
       shell.empty(`Nothing matches “${this.query.trim()}”.`, [{ label: "Clear search", cls: "czm-pg-clear", onClick: () => { this.clearSearch(); } }]);
     }
@@ -847,6 +910,40 @@ export class PlotGridView extends ItemView {
     const submit = () => { const name = input.value.trim(); if (!name) return; button.disabled = true; void this.addColumn(name).finally(() => { button.disabled = false; }); };
     button.addEventListener("click", submit);
     input.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); submit(); } });
+    const propose = colSection.createDiv({ cls: "czm-map-panel-actions czm-pg-propose-row" });
+    const proposeBtn = propose.createEl("button", { text: "Propose columns…", cls: "czm-pg-propose", attr: { title: "Ask the model which threads run through the book, from the events it has read" } });
+    proposeBtn.disabled = !!this.running;
+    proposeBtn.addEventListener("click", () => this.run("propose-columns"));
+    if (this.proposals) this.renderProposals(shell.section("Proposed columns", `${this.proposals.picked.size} of ${this.proposals.list.length} ticked`, "pg-proposals", true));
+  }
+
+  /** The model's proposals: a tick each, the sentence, the scenes; Add writes the ticked ones as empty headings. */
+  private renderProposals(section: HTMLElement): void {
+    const ps = this.proposals;
+    if (!ps) return;
+    section.createDiv({ text: "Threads the model found running through more than one scene. Nothing is added until you say so.", cls: "czm-map-absent" });
+    const list = section.createDiv({ cls: "czm-pg-proposals", attr: { role: "group", "aria-label": "Proposed columns" } });
+    for (const p of ps.list) {
+      const row = list.createEl("label", { cls: `czm-pg-proposal${p.existing ? " is-existing" : ""}` });
+      const box = row.createEl("input", { attr: { type: "checkbox", "aria-label": p.heading } });
+      box.checked = ps.picked.has(p.heading);
+      box.disabled = p.existing;
+      box.addEventListener("change", () => { if (box.checked) ps.picked.add(p.heading); else ps.picked.delete(p.heading); const v = this.shell?.side.querySelector(".czm-map-section-pg-proposals .czm-map-section-value"); if (v) v.textContent = `${ps.picked.size} of ${ps.list.length} ticked`; const addBtn = this.shell?.side.querySelector<HTMLButtonElement>(".czm-pg-proposals-add"); if (addBtn) { addBtn.textContent = `Add ${plural(ps.picked.size, "column")}`; addBtn.disabled = ps.picked.size === 0; } });
+      const text = row.createDiv({ cls: "czm-pg-proposal-text" });
+      const head = text.createDiv({ cls: "czm-pg-proposal-head" });
+      head.createSpan({ text: p.name, cls: "czm-pg-proposal-name" });
+      head.createSpan({ text: p.existing ? `${p.kind} · already a column` : `${p.kind} · ${plural(p.scenes.length, "scene")}`, cls: "czm-map-row-meta" });
+      if (p.why) text.createDiv({ text: p.why, cls: "czm-pg-proposal-why" });
+      text.createDiv({ text: p.scenes.join(" · "), cls: "czm-pg-proposal-scenes" });
+    }
+    if (!ps.list.length) list.createDiv({ text: "Nothing proposed.", cls: "czm-map-absent" });
+    const foot = section.createDiv({ cls: "czm-pg-proposals-foot" });
+    foot.createSpan({ text: this.source.modelLabel(), cls: "czm-map-row-meta" });
+    const cancel = foot.createEl("button", { text: "Put away", cls: "czm-pg-proposals-cancel" });
+    cancel.addEventListener("click", () => { this.proposals = null; this.renderSide(); });
+    const add = foot.createEl("button", { text: `Add ${plural(ps.picked.size, "column")}`, cls: "czm-pg-proposals-add mod-cta" });
+    add.disabled = ps.picked.size === 0;
+    add.addEventListener("click", () => { add.disabled = true; void this.addProposals(); });
   }
 
   /** The picked column: its heading to rename, its kind, its job, and its count. */

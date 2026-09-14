@@ -42,6 +42,7 @@ export const COMMANDS = {
   "plot-grid-read-column": "Plot grid: read this column with the model",
   "plot-grid-check-column": "Plot grid: check this column against the draft",
   "plot-grid-dismiss-reading": "Plot grid: dismiss the reading",
+  "plot-grid-propose-columns": "Plot grid: propose columns with the model",
   "open-writer": "Open writer",
   "writer-next-lane": "Writer: next lane",
   "writer-previous-lane": "Writer: previous lane",

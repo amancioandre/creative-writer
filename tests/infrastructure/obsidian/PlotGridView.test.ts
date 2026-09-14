@@ -62,6 +62,8 @@ function open(overrides: Partial<PlotGridSource> = {}, threads = threadsNote) {
     dismissReading: async (_p, scene, column) => { calls.writes.push(`dismiss ${column} at ${scene.title}`); map = { ...map, grid: map.grid.map((r) => (r.scene.title === scene.title && r.column === column ? { ...r, state: "dismissed" } : r)) }; },
     dismissColumnReadings: async () => undefined,
     modelLabel: () => "Ollama · test",
+    proposeColumns: async () => { calls.writes.push("propose"); return calls.writes.includes("readProject") || !overrides.readProject ? { scenesRead: 3, proposals: [{ kind: "arc", name: "Marta Kovács", why: "The elder sister.", scenes: ["Camp", "Return"], heading: "Arc: [[Marta Kovács]]", existing: false }, { kind: "subplot", name: "The gate", why: "", scenes: ["Camp"], heading: "Subplot: The gate", existing: true }, { kind: "theme", name: "Salt", why: "Pressure.", scenes: ["Creek"], heading: "Theme: Salt", existing: false }] } : { needsReading: true }; },
+    readProject: async () => { calls.writes.push("readProject"); return 3; },
     renameThread: async (_p, from, to) => { calls.writes.push(`rename ${from} → ${to}`); md = renameThread(md, from, to); },
     setProjectKey: async (_p, key, value) => { calls.writes.push(`${key}=${value ?? ""}`); const k = key === "plot-pov" ? "plotPov" : key === "plot-time" ? "plotTime" : "plotTheme"; spec = { ...spec, [k]: value ?? undefined }; },
     gridSettings: () => prefs,
@@ -453,6 +455,46 @@ describe("PlotGridView", () => {
     void p;
     expect(el.querySelector(".czm-pg-stop")).toBeNull();
     expect(el.querySelector(".czm-map-status")?.textContent).toContain("Stopped after");
+  });
+
+  it("proposes columns into the side column with a tick each, adds the ticked ones as headings, and undoes", async () => {
+    const { v, calls, note } = open();
+    await v.onOpen();
+    const el = v.contentEl;
+    v.run("propose-columns");
+    await new Promise((r) => setTimeout(r, 20));
+    expect(calls.writes).toContain("propose");
+    const rows = [...el.querySelectorAll(".czm-pg-proposal")];
+    expect(rows.map((r) => r.querySelector(".czm-pg-proposal-name")?.textContent)).toEqual(["Marta Kovács", "The gate", "Salt"]);
+    expect(rows[1]!.classList.contains("is-existing")).toBe(true);
+    expect((rows[1]!.querySelector("input") as HTMLInputElement).disabled).toBe(true);
+    expect(el.querySelector(".czm-pg-proposals-add")?.textContent).toBe("Add 2 columns");
+    const salt = rows[2]!.querySelector("input") as HTMLInputElement;
+    salt.checked = false; salt.dispatchEvent(new Event("change"));
+    expect(el.querySelector(".czm-pg-proposals-add")?.textContent).toBe("Add 1 column");
+    (el.querySelector(".czm-pg-proposals-add") as HTMLElement).click();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(note()).toContain("## Arc: [[Marta Kovács]]");
+    expect(note()).not.toContain("## Theme: Salt");
+    expect(el.querySelector(".czm-pg-proposal")).toBeNull();
+    expect(el.querySelector(".czm-map-status")?.textContent).toContain("1 column written to Story threads.md: Marta Kovács");
+    (el.querySelector(".czm-map-status button") as HTMLElement).click();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(note()).not.toContain("## Arc: [[Marta Kovács]]");
+  });
+
+  it("with nothing read yet, proposing offers to read the project first, then proposes", async () => {
+    const { v, calls } = open({ readProject: async () => { calls.writes.push("readProject"); return 3; } });
+    await v.onOpen();
+    const el = v.contentEl;
+    v.run("propose-columns");
+    await new Promise((r) => setTimeout(r, 20));
+    expect(el.querySelector(".czm-map-status")?.textContent).toContain("no scene has been read");
+    (el.querySelector(".czm-status-action") as HTMLElement).click();
+    await new Promise((r) => setTimeout(r, 40));
+    expect(calls.writes.filter((w) => w === "propose")).toHaveLength(2);
+    expect(calls.writes).toContain("readProject");
+    expect(el.querySelectorAll(".czm-pg-proposal")).toHaveLength(3);
   });
 
   it("lists its keys behind ? and closes the list again", async () => {

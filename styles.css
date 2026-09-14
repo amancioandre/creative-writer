@@ -639,6 +639,21 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-pg-reading-anchor { grid-column: 1 / -1; }
 .czm-pg-key-role.is-reading::before { content: "✦"; }
 .czm-pg-stop { color: var(--text-error); }
+/* Proposed columns: a tick each, the sentence, the scenes; one that exists already is greyed. */
+.czm-pg-propose-row { grid-template-columns: 1fr; margin-top: 0; }
+.czm-pg-proposals { display: flex; flex-direction: column; gap: 2px; margin: 4px 4px 6px; }
+.czm-pg-proposal { display: flex; gap: 8px; align-items: flex-start; padding: 6px 6px; border-top: 1px solid var(--background-modifier-border); cursor: pointer; }
+.czm-pg-proposal:first-child { border-top: 0; }
+.czm-pg-proposal input { margin: 3px 0 0; flex: 0 0 auto; }
+.czm-pg-proposal.is-existing { opacity: 0.55; }
+.czm-pg-proposal-text { flex: 1 1 auto; min-width: 0; }
+.czm-pg-proposal-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.czm-pg-proposal-name { font-weight: 600; }
+.czm-pg-proposal-why { font-size: var(--font-ui-smaller); color: var(--text-muted); margin-top: 1px; }
+.czm-pg-proposal-scenes { font-size: 11px; font-family: var(--font-monospace); color: var(--text-faint); margin-top: 2px; }
+.czm-pg-proposals-foot { display: flex; align-items: center; gap: 6px; margin: 4px 8px 6px; }
+.czm-pg-proposals-foot .czm-map-row-meta { flex: 1 1 auto; }
+.czm-pg-proposals-foot button { font-size: var(--font-ui-smaller); padding: 3px 8px; height: auto; }
 /* The key names the roles by their glyph, not a dot. */
 .czm-pg-key-role::before { width: auto; height: auto; border-radius: 0; background: none; color: var(--text-accent); font-size: 10px; }
 .czm-pg-key-role.is-plant::before { content: "▶"; }

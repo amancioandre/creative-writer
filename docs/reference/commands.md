@@ -38,6 +38,7 @@ All commands appear in the palette under **Creative Writer:**. None has a defaul
 | **Plot grid: snapshot the grid** | Live while the grid is the active tab. Writes `Plot grid · <date>.md` beside the project. |
 | **Plot grid: read every column with the model** / **read this column with the model** / **check this column against the draft** | Live while the grid is the active tab. The model leaves readings; you answer them. |
 | **Plot grid: dismiss the reading** | Live while the grid is the active tab, with a cell that has a reading selected. |
+| **Plot grid: propose columns with the model** | Live while the grid is the active tab. One call over the events the map holds; the proposals wait in the side column for a tick. |
 | **Manuscript: toggle prose only** / **toggle the comments pane** / **toggle the ruler** / **toggle story marks** / **toggle echoes** | The [manuscript's](/guide/manuscript) toolbar switches as commands, live while the manuscript is the active tab. |
 
 Every panel's head ends in a **⋯** menu that repeats these actions as rows; each row names the command it is, so what you find in the menu you can find in Settings → Hotkeys.

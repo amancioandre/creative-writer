@@ -2,7 +2,8 @@ import type { HttpClient } from "../../application/ports/HttpClient";
 import type { ColumnAnalyser, ColumnBrief } from "../../application/ports/ColumnAnalyser";
 import type { Usage } from "../../domain/style/llm/CostLedger";
 import type { ClaudeConfig } from "./ClaudeAnalyser";
-import { CHECK_RULEBOOK, CHECK_SCHEMA, GRID_RULEBOOK, GRID_RULEBOOK_VERSION, GRID_SCHEMA, checkUserMessage, gridUserMessage } from "./prompts/gridRulebook";
+import { CHECK_RULEBOOK, CHECK_SCHEMA, GRID_RULEBOOK, GRID_RULEBOOK_VERSION, GRID_SCHEMA, PROPOSE_RULEBOOK, PROPOSE_SCHEMA, checkUserMessage, gridUserMessage, proposeUserMessage } from "./prompts/gridRulebook";
+import type { ProposalBrief } from "../../domain/plot/Proposals";
 import { extractJson } from "./extractJson";
 
 interface MessagesResponse {
@@ -35,12 +36,16 @@ export class ClaudeColumnAnalyser implements ColumnAnalyser {
     return this.ask(CHECK_RULEBOOK, checkUserMessage(text, plan, column), CHECK_SCHEMA, signal);
   }
 
+  propose(brief: ProposalBrief, signal: AbortSignal): Promise<unknown> {
+    return this.ask(PROPOSE_RULEBOOK, proposeUserMessage(brief), PROPOSE_SCHEMA, signal);
+  }
+
   private async ask(system: string, user: string, schema: unknown, signal: AbortSignal): Promise<unknown> {
     if (!this.config.apiKey.trim()) throw new Error("Claude: no API key configured (Settings → creative-writer → Model assistant).");
     const opus = this.config.model === "claude-opus-5";
     const body: Record<string, unknown> = {
       model: this.config.model,
-      max_tokens: 512,
+      max_tokens: 1024,
       system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: user }],
       output_config: opus ? { format: { type: "json_schema", schema }, effort: "low" } : { format: { type: "json_schema", schema } },

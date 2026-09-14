@@ -27,7 +27,7 @@ describe("ReadColumn", () => {
     const analyser: ColumnAnalyser = {
       name: "fake", rulebook: "v1",
       read: async (text, present, column) => { asked.push(`${column.name}|${column.kind}|${present.join(",")}|${column.examples.join(";")}`); return text.includes("soup") ? { reading: { text: "asked after, lied about", role: "touch", evidence: "said it was a bill" } } : { reading: { text: "bad quote", role: "", evidence: "not there" } }; },
-      check: async () => ({ found: false, evidence: "" }),
+      check: async () => ({ found: false, evidence: "" }), propose: async () => ({}),
     };
     const r = repo();
     const grid = buildPlotGrid(graph, buildThreads(graph, EMPTY_STORY_MAP_FILE, threads, new Set(), undefined, () => one));
@@ -45,7 +45,7 @@ describe("ReadColumn", () => {
   });
 
   it("a reading the model returns without a locatable quote is kept as a no, so the scene is not asked again; stopping keeps what landed", async () => {
-    const analyser: ColumnAnalyser = { name: "fake", rulebook: "v1", read: async () => ({ reading: { text: "x", role: "", evidence: "nowhere" } }), check: async () => ({}) };
+    const analyser: ColumnAnalyser = { name: "fake", rulebook: "v1", read: async () => ({ reading: { text: "x", role: "", evidence: "nowhere" } }), check: async () => ({}), propose: async () => ({}) };
     const r = repo();
     const grid = buildPlotGrid(graph, buildThreads(graph, EMPTY_STORY_MAP_FILE, threads, new Set(), undefined, () => one));
     const use = new ReadColumn({ projects: () => [novel], notes: async () => notes }, r, analyser);
@@ -57,7 +57,7 @@ describe("ReadColumn", () => {
   });
 
   it("checks the column's plans against the draft: a found plan carries its quote, a missing one says so", async () => {
-    const analyser: ColumnAnalyser = { name: "fake", rulebook: "v1", read: async () => ({ reading: null }), check: async (text, plan) => ({ found: plan.note === "pockets it", evidence: text.includes("pocketed") ? "pocketed the letter" : "" }) };
+    const analyser: ColumnAnalyser = { name: "fake", rulebook: "v1", read: async () => ({ reading: null }), check: async (text, plan) => ({ found: plan.note === "pockets it", evidence: text.includes("pocketed") ? "pocketed the letter" : "" }), propose: async () => ({}) };
     const r = repo();
     const grid = buildPlotGrid(graph, buildThreads(graph, EMPTY_STORY_MAP_FILE, threads, new Set(), undefined, () => one));
     const use = new ReadColumn({ projects: () => [novel], notes: async () => notes }, r, analyser);
