@@ -28,7 +28,7 @@ The note whose front matter declares a [project](/guide/projects). Any note in t
 | `bad-words` | `[[Bad words]]` or a path | The project's own word list for the [words lens](/guide/lenses#words): notes inside the project use it instead of the vault-wide note. |
 | `dialogue` | `double`, `single`, `dash`, `none` | How speech is written in this project, for the [dialogue lens](/guide/lenses#dialogue); `quotes` and `travessão` are read too. Absent, the vault-wide setting. |
 | `thoughts` | `italic-paragraph`, `italic-any`, `single-quotes`, `none`, or a regular expression | How thought is written in this project. Anything that is not a preset is taken as a pattern: every match in a paragraph is a thought. |
-| `speakers` | list or comma string, e.g. `[Mara, Tomas #c8773a]` | The cast the [dialogue lens](/guide/lenses#who-is-speaking) attributes speech to, in this order; a name with no note is a speaker too; `#hex` pins a colour. Absent, every character note the project can see. |
+| `speakers` | list or comma string, e.g. `[Mara, Tomas #c8773a]` | The cast the [dialogue lens](/guide/lenses#who-is-speaking) attributes speech to, in this order; a name with no note is a speaker too; `#hex` pins a colour. Absent, every character note inside the project. |
 
 ## Entity notes
 

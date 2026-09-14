@@ -890,12 +890,11 @@ export default class CreativeZenModePlugin extends Plugin {
     return out;
   }
 
-  /** The cast per project, and the vault-wide cast under "" for notes outside every project, for the dialogue lens. */
+  /** The cast per project, its own character notes only, for the dialogue lens. */
   private projectRosters(specs: readonly ProjectSpec[] = this.projectSpecs()): RostersByScope {
     const notes: EntityNote[] = this.app.vault.getMarkdownFiles().map((f) => ({ path: f.path, frontmatter: this.app.metadataCache.getFileCache(f)?.frontmatter }));
-    const scopes = specs.map((s) => s.scope);
-    const out: Record<string, ReturnType<typeof buildRoster>> = { "": buildRoster(notes, null, scopes) };
-    for (const s of specs) out[s.scope] = buildRoster(notes, s.scope, scopes, s.speakers);
+    const out: Record<string, ReturnType<typeof buildRoster>> = {};
+    for (const s of specs) out[s.scope] = buildRoster(notes, s.scope, s.speakers);
     return out;
   }
 

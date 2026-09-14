@@ -17,7 +17,7 @@ export const conventionsFacet = Facet.define<ConventionsByScope, ConventionsBySc
   combine: (values) => values[values.length - 1] ?? {},
 });
 
-/** Project scope → its cast; the empty key is the vault-wide cast for notes outside every project. */
+/** Project scope → its cast. A note outside every project has none, and speaks in one colour. */
 export type RostersByScope = Readonly<Record<string, readonly Speaker[]>>;
 
 export const rostersFacet = Facet.define<RostersByScope, RostersByScope>({
@@ -50,10 +50,10 @@ export function conventionsFor(settings: PluginSettings, byScope: ConventionsByS
   return resolveConventions(settings.dialogue, best === null ? undefined : byScope[best]);
 }
 
-/** The cast the note can hear: its project's, else the vault-wide one. */
+/** The cast the note can hear: its project's; none outside a project. */
 export function rosterFor(byScope: RostersByScope, path: string | null): readonly Speaker[] {
   const best = mostSpecific(Object.keys(byScope), path);
-  return (best === null ? byScope[""] : byScope[best]) ?? [];
+  return best === null ? [] : byScope[best] ?? [];
 }
 
 const narrationMark = Decoration.mark({ class: NARRATION_CLASS });

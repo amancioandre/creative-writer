@@ -10,19 +10,21 @@ const notes = [
   { path: "Places/Roarth.md", frontmatter: {} },
   { path: "Novel/Chapter 1.md", frontmatter: {} },
 ];
-const scopes = ["Novel/", "Other/"];
 
 describe("buildRoster", () => {
-  it("takes character notes in the project and outside every project, colour from the note or the palette in order", () => {
-    const r = buildRoster(notes, "Novel/", scopes);
-    expect(r.map((s) => s.name)).toEqual(["Mara", "Tomas", "Ilse"]);
+  it("takes the character notes inside the project only, colour from the note or the palette in order", () => {
+    const r = buildRoster(notes, "Novel/");
+    expect(r.map((s) => s.name)).toEqual(["Ilse"]);
     expect(r[0]!.colour).toBe(SPEAKER_PALETTE[0]);
-    expect(r[1]!.colour).toBe("#c8773a");
-    expect(r[2]!.colour).toBe(SPEAKER_PALETTE[2]);
-    expect(r[1]!.aliases).toEqual(["the Roarthian"]);
-    expect(r[1]!.accent).toEqual(["aye", "ye'll"]);
-    expect(r[1]!.accentNever).toEqual(["my", "yes", "no"]);
-    expect(r[0]!.accent).toEqual([]);
+    const all = buildRoster(notes, "");
+    expect(all.map((s) => s.name)).toEqual(["Mara", "Tomas", "Ilse", "Nobody"]);
+    expect(all[0]!.colour).toBe(SPEAKER_PALETTE[0]);
+    expect(all[1]!.colour).toBe("#c8773a");
+    expect(all[2]!.colour).toBe(SPEAKER_PALETTE[2]);
+    expect(all[1]!.aliases).toEqual(["the Roarthian"]);
+    expect(all[1]!.accent).toEqual(["aye", "ye'll"]);
+    expect(all[1]!.accentNever).toEqual(["my", "yes", "no"]);
+    expect(all[0]!.accent).toEqual([]);
   });
   it("never hands out a palette colour a note has pinned", () => {
     const pinned = [
@@ -31,15 +33,12 @@ describe("buildRoster", () => {
       { path: "Characters/C.md", frontmatter: { colour: SPEAKER_PALETTE[2] } },
       { path: "Characters/D.md", frontmatter: {} },
     ];
-    const r = buildRoster(pinned, null, []);
+    const r = buildRoster(pinned, "Characters/");
     expect(r.map((s) => s.colour)).toEqual([SPEAKER_PALETTE[0], SPEAKER_PALETTE[1], SPEAKER_PALETTE[2], SPEAKER_PALETTE[3]]);
     expect(new Set(r.map((s) => s.colour)).size).toBe(4);
   });
-  it("with no scope, every character note in the vault", () => {
-    expect(buildRoster(notes, null, scopes).map((s) => s.name)).toEqual(["Mara", "Tomas", "Ilse", "Nobody"]);
-  });
   it("a speakers list narrows and orders the cast, adds unknown names and pins colours", () => {
-    const r = buildRoster(notes, "Novel/", scopes, ["the Roarthian", "Mara #123456", "The Keeper #abcdef", "Mara"]);
+    const r = buildRoster(notes, "", ["the Roarthian", "Mara #123456", "The Keeper #abcdef", "Mara"]);
     expect(r.map((s) => [s.name, s.colour])).toEqual([["Tomas", "#c8773a"], ["Mara", "#123456"], ["The Keeper", "#abcdef"]]);
   });
 });

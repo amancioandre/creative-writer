@@ -48,17 +48,15 @@ function colourOf(frontmatter: unknown): string | null {
 }
 
 /**
- * The cast a note can hear: character notes inside the project's scope,
- * plus those outside every project (a shared `Characters/` folder). With
- * no scope, every character note in the vault. A `speakers:` list narrows
- * and orders the cast, adds names with no note, and can pin a colour
- * (`Mara #4a8fe2`).
+ * The cast a project can hear: the character notes inside its own scope,
+ * its story folder, and nothing from elsewhere in the vault. A `speakers:`
+ * list narrows and orders the cast, adds names with no note, and can pin
+ * a colour (`Mara #4a8fe2`).
  */
-export function buildRoster(notes: readonly EntityNote[], scope: string | null, allScopes: readonly string[], speakers?: readonly string[]): Speaker[] {
-  const inCast = (path: string) => scope === null || pathInScope(path, scope) || !allScopes.some((s) => pathInScope(path, s));
+export function buildRoster(notes: readonly EntityNote[], scope: string, speakers?: readonly string[]): Speaker[] {
   const cast: Speaker[] = [];
   for (const n of notes) {
-    if (entityKindOf(n) !== "character" || !inCast(n.path)) continue;
+    if (entityKindOf(n) !== "character" || !pathInScope(n.path, scope)) continue;
     const name = basenameOf(n.path);
     cast.push({ id: n.path, name, aliases: aliasesOf(n.frontmatter).filter((a) => a !== name), colour: colourOf(n.frontmatter) ?? "", accent: wordsOf(n.frontmatter, "accent"), accentNever: wordsOf(n.frontmatter, "accent-never") });
   }

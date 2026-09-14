@@ -32,7 +32,7 @@ Under the default, italics inside a sentence are emphasis and never a thought: `
 
 ### Who is speaking
 
-With a cast, each paragraph of speech is tinted in its speaker's colour, and the hover says who and how that was decided. The cast is the project's character notes (a `type: character` or a `Characters/` folder, as for the [story map](/guide/story-map)), their names and `aliases`, plus character notes outside every project, a shared cast folder say. A note's `colour: "#c8773a"` is its speaker colour; the rest take one from a palette of eight in cast order. A project note can narrow and order the cast with `speakers: [Mara, Tomas #c8773a]`, names with no note included, a colour pinned with `#hex`.
+With a cast, each paragraph of speech is tinted in its speaker's colour, and the hover says who and how that was decided. The cast is the project's own character notes, inside its story folder (a `type: character` or a `Characters/` folder, as for the [story map](/guide/story-map)), their names and `aliases`. Nothing from elsewhere in the vault; a note outside every project has no cast and speaks in one colour. A note's `colour: "#c8773a"` is its speaker colour; the rest take one from a palette of eight in cast order. A project note can narrow and order the cast with `speakers: [Mara, Tomas #c8773a]`, names with no note included, a colour pinned with `#hex`.
 
 The page colours only what it is sure of, and leaves the rest to you:
 

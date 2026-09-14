@@ -4,8 +4,8 @@ import { pinChange, tagSpeaker, type BoxParagraph } from "../../../src/infrastru
 import { DEFAULT_SETTINGS } from "../../../src/domain/settings/Settings";
 import { mount, type Harness } from "./helpers";
 
-const ROSTER = { "": [{ id: "m", name: "Mara", aliases: [], colour: "#111111", accent: [], accentNever: [] }, { id: "t", name: "Tomas", aliases: [], colour: "#222222", accent: [], accentNever: [] }] };
-const ext = () => [conventionsFacet.of({}), rostersFacet.of(ROSTER), dialogueExtension(() => "ch1.md")];
+const ROSTER = { "book/": [{ id: "m", name: "Mara", aliases: [], colour: "#111111", accent: [], accentNever: [] }, { id: "t", name: "Tomas", aliases: [], colour: "#222222", accent: [], accentNever: [] }] };
+const ext = () => [conventionsFacet.of({}), rostersFacet.of(ROSTER), dialogueExtension(() => "book/ch1.md")];
 const DOC = "Mara stepped in.\n\n“You came alone?” Tomas did not look up.\n\n“Yes.”";
 const box = (h: Harness) => h.view.dom.querySelector<HTMLElement>(".czm-speaker-box");
 const chips = (h: Harness) => Array.from(box(h)?.querySelectorAll<HTMLElement>(".czm-speaker-chip") ?? []).map((c) => c.textContent);
