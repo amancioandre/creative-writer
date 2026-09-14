@@ -36,7 +36,7 @@ describe("styleExtension", () => {
   });
 
   it("does nothing when the feature is off", () => {
-    h = mount(DOC, ext(), { styleEnabled: false });
+    h = mount(DOC, ext(), { lens: "none" });
     h.moveCursor(1);
     expect(marks(h)).toHaveLength(0);
   });

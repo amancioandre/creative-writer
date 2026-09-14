@@ -1,7 +1,8 @@
 import { type App, type Plugin, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
 import { RhythmScale } from "../../domain/rhythm/RhythmScale";
 import { MAX_READING_SPEED, MIN_READING_SPEED } from "../../domain/manuscript/ReadingTime";
-import { DEFAULT_GOALS, DEFAULT_MANUSCRIPT, ECHO_SENSITIVITIES, foldersToText, normalizeNotePath, tagsToText, textToFolders, textToTags, type EchoSensitivity, type PluginSettings } from "../../domain/settings/Settings";
+import { DEFAULT_GOALS, DEFAULT_MANUSCRIPT, DEFAULT_WORDS, ECHO_SENSITIVITIES, foldersToText, normalizeNotePath, tagsToText, textToFolders, textToTags, type EchoSensitivity, type PluginSettings } from "../../domain/settings/Settings";
+import { LENSES, LENS_LABELS, type Lens } from "../../domain/lens/Lens";
 import type { ScopeMode } from "../../domain/scope/NoteScope";
 import type { FindingKind } from "../../domain/style/Finding";
 
@@ -23,6 +24,8 @@ const SCOPE_OPTIONS: Record<ScopeMode, string> = {
 };
 
 const ECHO_OPTIONS: Record<EchoSensitivity, string> = { low: "Low", medium: "Medium", high: "High" };
+
+const LENS_OPTIONS: Record<Lens, string> = Object.fromEntries(LENSES.map((l) => [l, LENS_LABELS[l]])) as Record<Lens, string>;
 
 const STRIP_PRESETS: Record<string, string> = { numbers: "Numbers and separators (01 -, 3., 2))", none: "Nothing", custom: "Custom pattern" };
 
@@ -61,7 +64,7 @@ type Row = ControlRow | RenderRow;
 interface Group { type: "group"; heading: string; items: Row[] }
 
 /** Keys whose value decides whether other rows are shown; a change to one re-renders the tab. */
-const PARENT_KEYS: ReadonlySet<string> = new Set(["scope.mode", "focusFadeEnabled", "rhythmEnabled", "styleEnabled", "manuscript.stripPreset", "llm.provider", "llm.onIdle"]);
+const PARENT_KEYS: ReadonlySet<string> = new Set(["scope.mode", "focusFadeEnabled", "rhythmEnabled", "lens", "manuscript.stripPreset", "llm.provider", "llm.onIdle"]);
 
 /**
  * Settings are described once as definitions (Obsidian 1.13+: rendered by
@@ -111,8 +114,10 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
         { name: "Readability in the status bar", desc: "The paragraph's reading ease. Click it for the whole note.", control: toggle("readabilityEnabled") },
       ]),
       group("Lenses", [
-        { name: "Style checks", desc: "Tint clichés, passive voice, filter verbs and more in the paragraph. Hover a tint for the note.", control: toggle("styleEnabled") },
-        { name: "Kinds", desc: "Which checks the lens shows.", render: (setting) => this.renderKindChips(setting), visible: () => s().styleEnabled },
+        { name: "Lens", desc: "A reading pass that colours every note one way at a time. Each lens is a command: type \"lens\" in the palette.", control: dropdown("lens", LENS_OPTIONS) },
+        { name: "Rhythm tint underneath", desc: "Keep the faint sentence tint under the lens.", control: toggle("rhythmUnderLens"), visible: () => s().lens !== "none" },
+        { name: "Kinds", desc: "Which style checks the lens shows. Hover a tint for the note.", render: (setting) => this.renderKindChips(setting), visible: () => s().lens === "style" },
+        { name: "Bad words note", desc: "Your own overused words, one heading per category. A project note can name its own with bad-words.", control: text("words.note", DEFAULT_WORDS.note) },
       ]),
       group("Manuscript outline", [
         { name: "Folder levels as headings", desc: "Folder levels below the project folder that become headings. 0 = no outline.", control: slider("manuscript.folderDepth", 0, 6, 1) },
@@ -191,6 +196,13 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
       if (!p) return;
       const c = this.port.current();
       await this.port.update({ ...c, goals: { ...c.goals, logNote: p } });
+      return;
+    }
+    if (key === "words.note") {
+      const p = normalizeNotePath(value);
+      if (!p) return;
+      const c = this.port.current();
+      await this.port.update({ ...c, words: { ...c.words, note: p } });
       return;
     }
     if (key === "threads.echoSensitivity") {

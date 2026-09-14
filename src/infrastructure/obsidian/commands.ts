@@ -3,6 +3,10 @@
  * them by it, so a row in a menu and a row in Settings → Hotkeys read the same words.
  */
 export const COMMANDS = {
+  "lens-style": "Lens: style checks",
+  "lens-words": "Lens: words",
+  "lens-next": "Lens: next",
+  "lens-off": "Lens: off",
   "open-story-map": "Open story map",
   "story-map-add-node": "Story map: add a node",
   "story-map-fit": "Story map: fit the map",

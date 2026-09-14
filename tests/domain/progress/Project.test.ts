@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { inScope, parseProjectFrontmatter, projectStatus, recentAdded } from "../../../src/domain/progress/Project";
+import { inScope, linkTarget, parseProjectFrontmatter, projectStatus, recentAdded } from "../../../src/domain/progress/Project";
 import { EMPTY_LOG, baselineWordCount, recordWordCount } from "../../../src/domain/progress/WritingLog";
 
 describe("parseProjectFrontmatter — story-ignore", () => {
@@ -111,5 +111,18 @@ describe("projectStreak", () => {
     const { parseProjectFrontmatter } = await import("../../../src/domain/progress/Project");
     expect(parseProjectFrontmatter({ story: true, "plot-pov": " POV ", "plot-time": "Time", "plot-theme": "Theme: Debt" }, "Novel/Novel.md")).toMatchObject({ plotPov: "POV", plotTime: "Time", plotTheme: "Theme: Debt" });
     expect(parseProjectFrontmatter({ story: true, "plot-pov": "" }, "Novel/Novel.md")).not.toHaveProperty("plotPov");
+  });
+});
+
+describe("parseProjectFrontmatter — bad-words", () => {
+  it("reads the project's own word list as a link target, alias and heading dropped", () => {
+    expect(parseProjectFrontmatter({ story: true, "bad-words": "[[Bad words|my list]]" }, "Novel/Novel.md")!.wordsNote).toBe("Bad words");
+    expect(parseProjectFrontmatter({ story: true, "bad-words": "Lists/Words.md" }, "Novel/Novel.md")!.wordsNote).toBe("Lists/Words.md");
+    expect(parseProjectFrontmatter({ story: true }, "Novel/Novel.md")!.wordsNote).toBeUndefined();
+    expect(parseProjectFrontmatter({ story: true, "bad-words": "  " }, "Novel/Novel.md")!.wordsNote).toBeUndefined();
+  });
+  it("linkTarget strips the brackets, the alias and the heading", () => {
+    expect(linkTarget("[[A#B|c]]")).toBe("A");
+    expect(linkTarget(3)).toBeUndefined();
   });
 });

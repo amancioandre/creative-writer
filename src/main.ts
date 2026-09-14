@@ -47,6 +47,10 @@ import { summarizeDay } from "./domain/progress/ProgressSummary";
 import { splitScenes } from "./domain/text/Scenes";
 import { inScope, parseProjectFrontmatter, projectStatus, projectStreak, recentAdded, type ProjectSpec, type ProjectStatus } from "./domain/progress/Project";
 import { enabledStyleKinds } from "./domain/settings/Settings";
+import { LENS_LABELS, nextLens, toggleLens, type Lens } from "./domain/lens/Lens";
+import { EMPTY_WORD_LISTS, wordListsFacet, wordsExtension } from "./infrastructure/codemirror/wordsExtension";
+import { lensExtension } from "./infrastructure/codemirror/lensExtension";
+import { loadWordLists } from "./infrastructure/obsidian/VaultWordLists";
 import { BuildStoryMap } from "./application/use-cases/BuildStoryMap";
 import { AnalyzeSceneRelations } from "./application/use-cases/AnalyzeSceneRelations";
 import { VaultProjectNotes } from "./infrastructure/obsidian/VaultProjectNotes";
@@ -141,6 +145,11 @@ export default class CreativeZenModePlugin extends Plugin {
   private current!: PluginSettings;
   private readonly settingsCompartment = new Compartment();
   private readonly projectsCompartment = new Compartment();
+  private readonly wordsCompartment = new Compartment();
+  /** The notes the Words lens read last, so a change to one of them reloads the lists. */
+  private wordListPaths: readonly string[] = [];
+  private wordListsKey = "";
+  private lensStatus: HTMLElement | null = null;
   /** The one scope rule: what the editor runs in is what the log, the projects and the story map count. */
   private scope!: VaultWritingScope;
   private projectScopesKey = "";
@@ -182,6 +191,20 @@ export default class CreativeZenModePlugin extends Plugin {
         new Notice(`creative-writer: ${!active ? "on" : "off"} for this note`);
       },
     });
+
+    // Lenses: one reading pass at a time, everywhere. Each is a command that toggles it; the status-bar item cycles them.
+    this.addCommand({ id: "lens-style", name: COMMANDS["lens-style"], callback: () => void this.setLens(toggleLens(this.current.lens, "style")) });
+    this.addCommand({ id: "lens-words", name: COMMANDS["lens-words"], callback: () => void this.setLens(toggleLens(this.current.lens, "words")) });
+    this.addCommand({ id: "lens-next", name: COMMANDS["lens-next"], callback: () => void this.setLens(nextLens(this.current.lens)) });
+    this.addCommand({ id: "lens-off", name: COMMANDS["lens-off"], callback: () => void this.setLens("none") });
+    const lensStatus = this.addStatusBarItem();
+    lensStatus.addClass("czm-status-lens");
+    lensStatus.setAttribute("role", "button");
+    lensStatus.tabIndex = 0;
+    lensStatus.addEventListener("click", () => void this.setLens(nextLens(this.current.lens)));
+    lensStatus.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); void this.setLens(nextLens(this.current.lens)); } });
+    this.lensStatus = lensStatus;
+    this.renderLensStatus();
 
     const llm = new ConfiguredLlmAnalyser(
       new RequestUrlHttpClient(),
@@ -640,8 +663,8 @@ export default class CreativeZenModePlugin extends Plugin {
     });
     this.addRibbonIcon("book-open", "Open manuscript", () => void this.openManuscript(null));
     this.registerEvent(this.app.workspace.on("editor-change", (_editor, info) => { if (info.file) this.refreshManuscript(); }));
-    this.registerEvent(this.app.vault.on("modify", () => this.refreshManuscript()));
-    this.registerEvent(this.app.metadataCache.on("resolved", () => { this.refreshStoryMap(); this.refreshWriter(); this.pushProjectScopes(); }));
+    this.registerEvent(this.app.vault.on("modify", (file) => { this.refreshManuscript(); if (this.wordListPaths.includes(file.path)) void this.reloadWordLists(); }));
+    this.registerEvent(this.app.metadataCache.on("resolved", () => { this.refreshStoryMap(); this.refreshWriter(); this.pushProjectScopes(); void this.reloadWordLists(); }));
     this.registerEvent(this.app.vault.on("rename", () => this.refreshStoryMap()));
     this.registerEvent(this.app.vault.on("delete", () => this.refreshStoryMap()));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.refreshDesk()));
@@ -661,6 +684,7 @@ export default class CreativeZenModePlugin extends Plugin {
     this.app.workspace.onLayoutReady(() => void this.tracker.start().then(() => {
       const md = this.app.workspace.getActiveViewOfType(MarkdownView);
       if (md?.file) this.observe(md.file.path, md.editor.getValue());
+      void this.reloadWordLists();
     }));
 
     const readability = this.addStatusBarItem();
@@ -674,7 +698,10 @@ export default class CreativeZenModePlugin extends Plugin {
     this.registerEditorExtension([
       this.settingsCompartment.of(settingsFacet.of(this.current)),
       this.projectsCompartment.of(projectScopesFacet.of(this.projectScopes())),
+      this.wordsCompartment.of(wordListsFacet.of(EMPTY_WORD_LISTS)),
       activeNoteExtension((state) => state.field(editorInfoField, false)?.file?.path ?? null),
+      lensExtension(),
+      wordsExtension((state) => state.field(editorInfoField, false)?.file?.path ?? null),
       readabilityStatusExtension(profile, (p) => {
         readability.setText(statusLabel(p));
         readability.title = p?.readingEase ? `${p.readingEase.band.hint}${p.variety ? `\n${p.variety.band.hint}` : ""}` : "";
@@ -708,6 +735,43 @@ export default class CreativeZenModePlugin extends Plugin {
         scopeSummary: () => this.scopeSummary(),
       }),
     );
+  }
+
+  private async setLens(lens: Lens): Promise<void> {
+    await this.updateSettings({ ...this.current, lens });
+    if (lens === "words" && this.wordListsKey === "" ) new Notice(`Lens: words — no word list yet. Write one at ${this.current.words.note}: a heading per category, the words under it.`, 8000);
+    else new Notice(`Lens: ${LENS_LABELS[lens].toLowerCase()}`);
+  }
+
+  private renderLensStatus(): void {
+    const el = this.lensStatus;
+    if (!el) return;
+    const lens = this.current.lens;
+    el.setText(lens === "none" ? "No lens" : `Lens: ${LENS_LABELS[lens].toLowerCase()}`);
+    el.classList.toggle("is-off", lens === "none");
+    el.setAttribute("aria-label", `${lens === "none" ? "No lens" : `Lens: ${LENS_LABELS[lens]}`}. Click for the next lens.`);
+  }
+
+  /** Reads the global word list note and every project's own, and pushes them into the editors when something changed. */
+  private async reloadWordLists(): Promise<void> {
+    const vault = this.app.vault;
+    const notes = vaultNoteIO(vault);
+    const projects = vault.getMarkdownFiles()
+      .map((f) => parseProjectFrontmatter(this.app.metadataCache.getFileCache(f)?.frontmatter, f.path))
+      .filter((s): s is ProjectSpec => s !== null);
+    const loaded = await loadWordLists({
+      exists: (p) => notes.exists(p),
+      read: (p) => notes.read(p),
+      resolveLink: (link, from) => this.app.metadataCache.getFirstLinkpathDest(link.replace(/\.md$/i, ""), from)?.path ?? null,
+    }, this.current.words.note, projects);
+    this.wordListPaths = loaded.paths;
+    const key = JSON.stringify(loaded.lists);
+    if (key === this.wordListsKey) return;
+    this.wordListsKey = loaded.paths.length === 0 ? "" : key;
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      const editor = (leaf.view as { editor?: { cm?: { dispatch: (spec: unknown) => void } } }).editor;
+      editor?.cm?.dispatch({ effects: this.wordsCompartment.reconfigure(wordListsFacet.of(loaded.lists)) });
+    });
   }
 
   /** A note came into view: its size is the baseline for what follows, even if the scope later lets it in. */
@@ -1142,8 +1206,11 @@ export default class CreativeZenModePlugin extends Plugin {
 
   private async updateSettings(next: PluginSettings): Promise<void> {
     const manuscriptChanged = next.manuscript !== this.current.manuscript;
+    const wordsNoteChanged = next.words.note !== this.current.words.note;
     this.current = next;
     if (manuscriptChanged) this.refreshManuscript();
+    this.renderLensStatus();
+    if (wordsNoteChanged) void this.reloadWordLists();
     await this.settingsRepo.save(next);
     // Push the new settings into every open editor; extensions react via the facet.
     this.app.workspace.iterateAllLeaves((leaf) => {

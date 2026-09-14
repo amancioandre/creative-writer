@@ -56,7 +56,7 @@ describe("asyncFindingsExtension", () => {
   });
 
   it("does nothing when the feature is disabled", async () => {
-    h = mount(DOC, asyncFindingsExtension(firstWordAnalyser, { idleMs: 50 }), { ...llmOn, styleEnabled: false });
+    h = mount(DOC, asyncFindingsExtension(firstWordAnalyser, { idleMs: 50 }), { ...llmOn, lens: "none" });
     h.moveCursor(1);
     await vi.advanceTimersByTimeAsync(100);
     expect(marks(h)).toHaveLength(0);

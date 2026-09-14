@@ -1,5 +1,8 @@
 import { RhythmScale } from "../rhythm/RhythmScale";
 import { FINDING_KINDS, type FindingKind } from "../style/Finding";
+import { isLens, type Lens } from "../lens/Lens";
+
+export type { Lens } from "../lens/Lens";
 import type { ScopeMode, ScopeSettings } from "../scope/NoteScope";
 import { DEFAULT_STRIP_PREFIX, type ManuscriptOptions } from "../manuscript/Manuscript";
 import { DEFAULT_TAGS, REF_TAG_SPEC, type TagSpec } from "../manuscript/Comments";
@@ -229,8 +232,12 @@ export interface PluginSettings {
   readonly rhythmTiers: number;
   /** Request browser fullscreen when entering Zen Mode. */
   readonly zenFullscreen: boolean;
-  readonly styleEnabled: boolean;
+  /** The one reading lens on, everywhere; "style" is the style checks. */
+  readonly lens: Lens;
+  /** Keep the faint rhythm tint under a lens; the lenses that colour by speaker hide it regardless. */
+  readonly rhythmUnderLens: boolean;
   readonly styleChecks: Readonly<Record<FindingKind, boolean>>;
+  readonly words: WordsSettings;
   /** Show the cursor paragraph's readability bands in the status bar. */
   readonly readabilityEnabled: boolean;
   readonly goals: GoalSettings;
@@ -297,6 +304,19 @@ function boolMap(raw: unknown): Record<string, boolean> {
   return out;
 }
 
+/** The Words lens: where the writer's own word lists live. A project note can name its own with `bad-words:`. */
+export interface WordsSettings {
+  /** Vault-relative path of the global list note. */
+  readonly note: string;
+}
+
+export const DEFAULT_WORDS: WordsSettings = { note: "Creative Writer/Bad words.md" };
+
+function normalizeWords(raw: unknown): WordsSettings {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  return { note: normalizeNotePath(r.note) ?? DEFAULT_WORDS.note };
+}
+
 export interface GoalSettings {
   /** Words added per day; 0 = no daily goal (any writing day counts for streaks). */
   readonly dailyWords: number;
@@ -324,8 +344,10 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   rhythmEnabled: true,
   rhythmTiers: 6,
   zenFullscreen: false,
-  styleEnabled: true,
+  lens: "style",
+  rhythmUnderLens: true,
   styleChecks: DEFAULT_STYLE_CHECKS,
+  words: DEFAULT_WORDS,
   readabilityEnabled: true,
   goals: DEFAULT_GOALS,
   llm: DEFAULT_LLM_SETTINGS,
@@ -367,8 +389,11 @@ export function normalizeSettings(raw: unknown): PluginSettings {
         ? clampInt(r.rhythmTiers, RhythmScale.MIN_TIERS, RhythmScale.MAX_TIERS)
         : DEFAULT_SETTINGS.rhythmTiers,
     zenFullscreen: bool("zenFullscreen"),
-    styleEnabled: bool("styleEnabled"),
+    // Before lenses, the style checks had their own switch; a saved "off" stays off.
+    lens: isLens(r.lens) ? r.lens : r.styleEnabled === false ? "none" : DEFAULT_SETTINGS.lens,
+    rhythmUnderLens: bool("rhythmUnderLens"),
     styleChecks: normalizeChecks(r.styleChecks),
+    words: normalizeWords(r.words),
     readabilityEnabled: bool("readabilityEnabled"),
     goals: normalizeGoals(r.goals),
     llm: normalizeLlm(r.llm),
@@ -472,9 +497,9 @@ function normalizeChecks(raw: unknown): Record<FindingKind, boolean> {
   return out;
 }
 
-/** The set of kinds currently switched on — what the style use case consumes. */
+/** The set of kinds currently switched on — what the style use case consumes. Empty unless the style lens is on. */
 export function enabledStyleKinds(s: PluginSettings): Set<FindingKind> {
-  return new Set(FINDING_KINDS.filter((k) => s.styleEnabled && s.styleChecks[k]));
+  return new Set(FINDING_KINDS.filter((k) => s.lens === "style" && s.styleChecks[k]));
 }
 
 const PROVIDERS: readonly LlmProvider[] = ["off", "ollama", "claude"];

@@ -31,6 +31,7 @@ export default defineConfig({
           items: [
             { text: "Zen Mode & focus", link: "/guide/editor" },
             { text: "Paragraph rhythm", link: "/guide/rhythm" },
+            { text: "Lenses", link: "/guide/lenses" },
             { text: "Style checks", link: "/guide/style-checks" },
             { text: "Readability", link: "/guide/readability" },
           ],

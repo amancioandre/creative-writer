@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DEFAULT_SETTINGS, normalizeNotePath, normalizeSettings, tagsToText, textToTags } from "../../../src/domain/settings/Settings";
+import { DEFAULT_SETTINGS, enabledStyleKinds, normalizeNotePath, normalizeSettings, tagsToText, textToTags } from "../../../src/domain/settings/Settings";
 
 describe("normalizeSettings", () => {
   it("returns defaults for undefined input", () => {
@@ -28,7 +28,7 @@ describe("normalizeSettings", () => {
 describe("style settings", () => {
   it("defaults every style check on and the feature on", () => {
     const s = normalizeSettings(undefined);
-    expect(s.styleEnabled).toBe(true);
+    expect(s.lens).toBe("style");
     expect(s.styleChecks).toEqual({ cliche: true, passive: true, filter: true, adverb: true, repetition: true, metaphor: true, nominalization: true, weakverb: true });
   });
   it("merges partial styleChecks with defaults and drops junk", () => {
@@ -143,5 +143,30 @@ describe("writer settings", () => {
     expect(normalizePlotGrid(undefined)).toEqual(DEFAULT_PLOT_GRID);
     expect(normalizePlotGrid({ panelOpen: false, castExpanded: true, folded: { arc: true, bogus: true }, hidden: { "Novel/": ["Time", 3, " "], "Other/": [] }, unmoved: false, sections: { "pg-cell": false, x: "no" } }))
       .toEqual({ panelOpen: false, castExpanded: true, folded: { arc: true, theme: false, subplot: false, free: false }, hidden: { "Novel/": ["Time"] }, unmoved: false, sections: { "pg-cell": false } });
+  });
+});
+
+describe("lens settings", () => {
+  it("defaults to the style lens with the rhythm tint underneath and a word list note", () => {
+    const s = normalizeSettings(undefined);
+    expect(s.lens).toBe("style");
+    expect(s.rhythmUnderLens).toBe(true);
+    expect(s.words.note).toBe("Creative Writer/Bad words.md");
+  });
+  it("keeps a saved lens and drops an unknown one", () => {
+    expect(normalizeSettings({ lens: "words" }).lens).toBe("words");
+    expect(normalizeSettings({ lens: "sepia" }).lens).toBe("style");
+  });
+  it("reads the old style switch: off stays off, on becomes the style lens", () => {
+    expect(normalizeSettings({ styleEnabled: false }).lens).toBe("none");
+    expect(normalizeSettings({ styleEnabled: true }).lens).toBe("style");
+  });
+  it("normalises the word list note path and falls back to the default", () => {
+    expect(normalizeSettings({ words: { note: "Lists/Words" } }).words.note).toBe("Lists/Words.md");
+    expect(normalizeSettings({ words: { note: "  " } }).words.note).toBe("Creative Writer/Bad words.md");
+  });
+  it("only the style lens enables style kinds", () => {
+    expect(enabledStyleKinds(normalizeSettings({ lens: "words" })).size).toBe(0);
+    expect(enabledStyleKinds(normalizeSettings({ lens: "style" })).size).toBe(8);
   });
 });

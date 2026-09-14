@@ -2,7 +2,7 @@
 
 Tints in the paragraph you are editing, one colour per kind, hover for the note. Everything here runs offline in a few milliseconds: hand-written rules, a part-of-speech tagger ([compromise](https://github.com/spencermountain/compromise)) and a table of word concreteness ([Brysbaert et al.](https://link.springer.com/article/10.3758/s13428-013-0403-5), CC-BY). Nothing is sent anywhere.
 
-Each kind has its own toggle under Settings → **Style checks**, and the whole group has a master toggle.
+The checks are one [lens](/guide/lenses): on when **Lens** under Settings → Lenses is *Style checks* (the default), or by the **Lens: style checks** command. Each kind is a chip under the lens; click one to leave that kind out.
 
 ## What the plugin does *not* check
 

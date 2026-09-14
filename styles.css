@@ -924,3 +924,14 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-chip { height: auto; padding: 2px 10px; border-radius: 12px; font-size: var(--font-ui-smaller); color: var(--text-muted); background: transparent; border: 1px solid var(--background-modifier-border); box-shadow: none; }
 .czm-chip:hover { color: var(--text-normal); background: var(--background-modifier-hover); }
 .czm-chip.is-active { color: var(--text-normal); border-color: var(--interactive-accent); background: color-mix(in srgb, var(--interactive-accent) 18%, transparent); }
+
+/* --- Lenses -----------------------------------------------------------------
+   One reading pass at a time. The Words lens tints the writer's own terms by
+   category (the colour rides on the mark as --czm-words); `czm-lens-solo`
+   hides the rhythm tint under a lens; Zen Mode shows no lens at all. */
+.cm-line .czm-words { background-color: color-mix(in srgb, var(--czm-words, #9a74ed) 30%, transparent); border-radius: 2px; }
+.czm-lens-solo .cm-line [class*="czm-rhythm-"] { background-color: transparent; }
+body.czm-zen .cm-line [class*="czm-style-"],
+body.czm-zen .cm-line .czm-words { background-color: transparent; border-bottom: none; }
+.czm-status-lens { cursor: pointer; }
+.czm-status-lens.is-off { color: var(--text-faint); }

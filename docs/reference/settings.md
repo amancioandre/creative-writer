@@ -28,12 +28,14 @@ The editor while you draft. Everything here stays on under any lens.
 
 ## Lenses
 
-A lens is a reading pass: it colours the page one way at a time.
+A [lens](/guide/lenses) is a reading pass: it colours every open note one way at a time. Each lens is also a command with the *Lens:* prefix.
 
 | Setting | Default | What |
 |---|---|---|
-| Style checks | on | Tint clichés, passive voice, filter verbs, adverbs, repetition, nominalisations, weak verbs and metaphor candidates in the current paragraph. Hover a tint for the note. See [Style checks](/guide/style-checks). |
-| Kinds | all on | With Style checks: one chip per kind; click a chip to switch that kind off or on. |
+| Lens | Style checks | The one lens on, everywhere, kept between sessions: none, style checks, or words. The status-bar item and the *Lens:* commands are the same switch. |
+| Rhythm tint underneath | on | With a lens on: keep the faint [rhythm](/guide/rhythm) tint under it. |
+| Kinds | all on | With the style checks lens: one chip per kind (clichés, passive voice, filter verbs, adverbs, repetition, nominalisations, weak verbs, metaphor candidates); click a chip to switch that kind off or on. See [Style checks](/guide/style-checks). |
+| Bad words note | `Creative Writer/Bad words.md` | The note holding your own overused words for the words lens: one heading per category, the words under it. A project note can name its own with `bad-words:`. |
 
 ## Manuscript
 

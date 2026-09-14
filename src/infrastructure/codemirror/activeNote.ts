@@ -42,7 +42,7 @@ export function effectiveSettings(state: EditorState): PluginSettings {
       currentLineEnabled: false,
       focusFadeEnabled: false,
       rhythmEnabled: false,
-      styleEnabled: false,
+      lens: "none",
       readabilityEnabled: false,
       llm: { ...s.llm, provider: "off" },
       manuscript: { ...s.manuscript, tintTags: false },

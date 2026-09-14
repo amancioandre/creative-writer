@@ -2,6 +2,14 @@
 
 Release notes for every version are on the [releases page](https://github.com/amancioandre/creative-writer/releases). This file carries the same text for the versions since it was started.
 
+## Unreleased — Reading lenses
+
+Three revision passes from the way Maxwell Alexander Drake edits, designed on 2026-09-14 as *lenses*: one reading pass at a time, everywhere, so a tint always means one thing. The settings tab was reworked first to give them a home.
+
+- **The settings pass.** Eight groups in the order a writer meets them (Where it runs, Writing, Lenses, Manuscript outline / comments / page, Stories and goals, Model assistant); rows that only matter while another is on stay hidden until then; one-line descriptions with the detail in the docs; the two manuscript view switches leave the tab; the style-check kinds become one row of chips.
+- **Lenses.** Style checks and Words are lenses: one on across the vault, kept between sessions, switched from the status-bar item or the `Lens:` commands (`Lens: style checks`, `Lens: words`, `Lens: next`, `Lens: off`). The rhythm tint stays underneath unless told not to; Zen Mode shows no lens.
+- **Words lens.** Your own overused words from a note of your own, one heading per category, tinted wherever they occur with the category and the count in the note on hover; `bad-words:` in a project note names a list for that project.
+
 ## Unreleased — The plot grid
 
 The story timeline grows into a plot grid: a scene is a row, a hand-drawn thread from `Story threads.md` is a column, and the cell is what the thread is doing in the scene. Designed on 2026-09-13 (`docs/development/plot-grid.md`), built in eight increments.

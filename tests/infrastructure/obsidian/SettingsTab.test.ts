@@ -50,7 +50,7 @@ describe("CreativeZenSettingsTab", () => {
       const all = names(defs());
       expect(all).toEqual(expect.arrayContaining([
         "Enabled", "Notes", "Folders", "Typewriter scrolling", "Current line", "Focus fade", "Paragraph strength", "Far text strength", "Paragraph rhythm", "Rhythm tiers", "Zen Mode goes fullscreen",
-        "Readability in the status bar", "Style checks", "Kinds",
+        "Readability in the status bar", "Lens", "Rhythm tint underneath", "Kinds", "Bad words note",
         "Model", "Analyse automatically", "Ollama URL", "Ollama model", "Claude model", "Anthropic API key", "Daily spending cap (USD)",
         "Writing log note", "Echoes on the page", "Echo sensitivity", "Stories folder", "Daily word goal",
       ]));
@@ -78,11 +78,16 @@ describe("CreativeZenSettingsTab", () => {
 
       await tab.setControlValue("focusFadeEnabled", false);
       await tab.setControlValue("rhythmEnabled", false);
-      await tab.setControlValue("styleEnabled", false);
+      await tab.setControlValue("lens", "none");
       expect(shown("Paragraph strength")).toBe(false);
       expect(shown("Far text strength")).toBe(false);
       expect(shown("Rhythm tiers")).toBe(false);
       expect(shown("Kinds")).toBe(false);
+      expect(shown("Rhythm tint underneath")).toBe(false);
+      await tab.setControlValue("lens", "words");
+      expect(shown("Kinds")).toBe(false);
+      expect(shown("Rhythm tint underneath")).toBe(true);
+      expect(shown("Bad words note")).toBe(true);
 
       await tab.setControlValue("scope.mode", "folders");
       expect(shown("Folders")).toBe(true);
@@ -135,6 +140,13 @@ describe("CreativeZenSettingsTab", () => {
       expect(def).not.toContain("Toggle Creative Writer (everywhere)");
     });
 
+    it("keeps the word list note on a usable path", async () => {
+      await tab.setControlValue("words.note", "Lists/Words");
+      expect(saved[0]!.words.note).toBe("Lists/Words.md");
+      await tab.setControlValue("words.note", "");
+      expect(saved).toHaveLength(1);
+    });
+
     it("keeps the writing log note on a usable path and the echo sensitivity on a known level", async () => {
       await tab.setControlValue("goals.logNote", "Journal/Log");
       expect(saved[0]!.goals.logNote).toBe("Journal/Log.md");
@@ -176,7 +188,7 @@ describe("CreativeZenSettingsTab", () => {
 
     it("renders the same definitions: headings, visible rows, and the chips", () => {
       const created = Setting.created.map((s) => s.name).filter(Boolean);
-      expect(created).toEqual(expect.arrayContaining(["Where it runs", "Typewriter scrolling", "Rhythm tiers", "Lenses", "Style checks", "Kinds", "Model", "Writing log note"]));
+      expect(created).toEqual(expect.arrayContaining(["Where it runs", "Typewriter scrolling", "Rhythm tiers", "Lenses", "Lens", "Kinds", "Model", "Writing log note"]));
       expect(created).not.toContain("Ollama URL");
       expect(created).not.toContain("Folders");
       expect(Setting.created.find((s) => s.name === "Tags")!.textarea).toBeDefined();

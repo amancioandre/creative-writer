@@ -27,7 +27,11 @@ One command hides the ribbon, tabs, sidebars and status bar (optionally fullscre
 
 Each sentence of the current paragraph sits on a faint tint, cool → warm by its felt length, so you *see* monotony before you hear it; in Zen Mode the tint leaves the text for a meter in the margin. Style checks tint clichés, passive voice, filter verbs, adverbs, repetition, nominalisations, weak verbs and metaphor candidates; hover for the note. Rules, a part-of-speech tagger and concreteness norms — no network, no model required.
 
-Settings → Writing → Paragraph rhythm · Settings → Lenses → Style checks (every kind is a chip)
+Settings → Writing → Paragraph rhythm · Settings → Lenses (the style checks are one lens; every kind is a chip)
+
+### Lenses
+
+A lens is a reading pass: it colours every open note one way at a time, so a tint always means one thing. **Style checks** is one lens; **Words** is another: your own overused words from a note of your own (`Creative Writer/Bad words.md`, one heading per category), tinted by category wherever they occur, a project able to keep its own list with `bad-words:` in its project note. The status bar shows the lens and cycles it on a click; every lens is a command under the `Lens:` prefix. Zen Mode shows no lens.
 
 ### Story map
 
