@@ -121,7 +121,7 @@ Strips share the slots exactly, so a spike lines up with the scene above it at e
 | Section | What |
 |---|---|
 | *Head* | Project dropdown; a search box over thread labels. |
-| *Head* | The project, a search, one line (*12 scenes · 5 arcs · 1 contradiction*), **Fit**, **Threads note**, and the jumps to the sibling panels (the story map among them). |
+| *Head* | The project, a search, one line (*12 scenes · 5 arcs · 1 contradiction*), **Fit**, **Threads note**, the **⋯** menu (zoom, fit, the note and the three readings, each naming its command), and the jumps to the sibling panels (the story map among them). |
 | *Side column* | **Read project for facts** / **Stop**, the one filled button; **Read contradictions for intent** and **Read project for echoes** beneath it. |
 | **Threads** | A toggle per kind with counts; *Follow one name…*; any broken links in your threads. |
 | **Contradictions** | Open and dismissed counts; *Only contradictions*; *Show dismissed*. |

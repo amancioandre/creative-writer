@@ -1,6 +1,6 @@
 import { ItemView, Setting, setIcon, type WorkspaceLeaf } from "obsidian";
 import { couldNot, StatusLine } from "./StatusLine";
-import { PanelShell, type PanelId } from "./PanelShell";
+import { PanelShell, type MenuEntry, type PanelId } from "./PanelShell";
 import { onActivate } from "./keys";
 import type { ProjectSpec } from "../../../domain/progress/Project";
 import type { WriterSettings } from "../../../domain/settings/Settings";
@@ -64,7 +64,7 @@ const EDGE_SUGGESTIONS = ["inspired by", "contradicts", "same theme", "adopted"]
 const pairKey = (a: string, b: string) => [a, b].sort().join(" ");
 
 /** What a command or a key asks the board to do; the keys map onto these and Obsidian commands reach them too. */
-export type WriterAction = "next-lane" | "previous-lane" | "next-group" | "previous-group" | "new-note" | "fit" | "help";
+export type WriterAction = "next-lane" | "previous-lane" | "next-group" | "previous-group" | "new-note" | "add-note" | "new-story" | "copy-schema" | "fit" | "help";
 
 /** The keyboard, as shown by `?`. Single keys and arrows only: Tab keeps its native meaning and Ctrl/Cmd stays with Obsidian. */
 export const KEY_HELP: readonly (readonly [string, string])[] = [
@@ -206,6 +206,7 @@ export class WriterView extends ItemView {
       onView: () => { this.paint(); this.queueView(); },
     });
     this.panel = this.shell.side;
+    this.shell.overflow(() => this.menuEntries());
     this.panel.addClass("czm-writer-panel");
     this.card = this.root.createDiv({ cls: "czm-map-card czm-writer-side" });
     this.status = new StatusLine(this.root);
@@ -847,6 +848,14 @@ export class WriterView extends ItemView {
         if (g && g !== UNSORTED.id) this.newNoteForm(g, this.selection);
         break;
       }
+      case "add-note": {
+        const at = this.spot();
+        const g = at?.kind === "group" ? at.id : this.into ?? groupsOf(this.board.framework)[0]?.id;
+        if (g && g !== UNSORTED.id) void this.addNote(g);
+        break;
+      }
+      case "new-story": this.select({ kind: "new-story" }); break;
+      case "copy-schema": void this.source.copySchema(); break;
       case "fit": this.fit(); break;
       case "help": { const open = this.help.classList.toggle("is-open"); if (open) this.help.querySelector<HTMLButtonElement>(".czm-writer-help-close")?.focus(); else this.root.focus({ preventScroll: true }); break; }
     }
@@ -957,6 +966,18 @@ export class WriterView extends ItemView {
   // --- panel ---------------------------------------------------------------------
 
   /** The head: the framework (this board's scope), the search, one line about what is on the board, and the tools. */
+  private menuEntries(): (MenuEntry | "-")[] {
+    return [
+      { label: "New note here", icon: "file-plus", command: "writer-new-note", onClick: () => this.run("new-note") },
+      { label: "Add an existing note…", icon: "file-input", command: "writer-add-note", onClick: () => this.run("add-note") },
+      { label: "New story…", icon: "book-plus", command: "writer-new-story", onClick: () => this.run("new-story") },
+      "-",
+      { label: "Fit the board", icon: "maximize", command: "writer-fit", onClick: () => this.run("fit") },
+      { label: "Keyboard shortcuts", icon: "keyboard", command: "writer-shortcuts", onClick: () => this.run("help") },
+      { label: "Copy the writer schema", icon: "clipboard-copy", command: "copy-writer-schema", onClick: () => this.run("copy-schema") },
+    ];
+  }
+
   private renderHead(): void {
     const head = this.shell.scope;
     const active = document.activeElement;

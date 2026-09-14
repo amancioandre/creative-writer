@@ -109,9 +109,13 @@ export class ButtonComponent {
 export function setIcon(el: HTMLElement, icon: string): void { el.setAttribute("data-icon", icon); }
 export class MenuItem {
   title = "";
+  checked: boolean | null = null;
+  disabled = false;
   cb: () => unknown = () => undefined;
-  setTitle(t: string) { this.title = t; return this; }
+  setTitle(t: string | DocumentFragment) { this.title = typeof t === "string" ? t : t.textContent ?? ""; return this; }
   setIcon(_i: string) { return this; }
+  setChecked(c: boolean | null) { this.checked = c; return this; }
+  setDisabled(d: boolean) { this.disabled = d; return this; }
   onClick(cb: () => unknown) { this.cb = cb; return this; }
 }
 export class Menu {
@@ -151,6 +155,7 @@ declare global {
   function createEl<K extends keyof HTMLElementTagNameMap>(tag: K, o?: DomOpts): HTMLElementTagNameMap[K];
   function createDiv(o?: DomOpts): HTMLElement;
   function createSpan(o?: DomOpts): HTMLElement;
+  function createFragment(): DocumentFragment;
 }
 
 export type SettingDefinitionItem = unknown;

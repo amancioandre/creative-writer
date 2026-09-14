@@ -15,7 +15,7 @@ The page follows your typing: edit a chapter in the editor beside it and that ch
 
 ## Keyboard
 
-The page is one Tab stop; Tab and Shift+Tab move between the project list, the toolbar, the page, the comment field and the comment list.
+The page is one Tab stop; Tab and Shift+Tab move between the project list, the toolbar, the page, the comment field and the comment list. The toolbar ends in a **⋯** menu that repeats its switches and the export as rows, each naming the command it is, for Settings → Hotkeys.
 
 | Key | Where | Does |
 |---|---|---|

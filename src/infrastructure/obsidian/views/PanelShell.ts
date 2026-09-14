@@ -1,4 +1,5 @@
-import { setIcon } from "obsidian";
+import { Menu, setIcon } from "obsidian";
+import { commandName, type CommandId } from "../commands";
 
 /** The panels a writer moves between, in the order they are offered everywhere. */
 export type PanelId = "desk" | "board" | "map" | "timeline" | "threads" | "manuscript";
@@ -51,6 +52,47 @@ export interface Fix {
  *          the right for filters and settings, folded by a tool in the head.
  *          Docked, not floating, so it never covers what it filters.
  */
+/** One row of a panel's ⋯ menu: the action, the command it is also, and whether it is a toggle that is on. */
+export interface MenuEntry {
+  readonly label: string;
+  readonly icon?: string;
+  readonly command?: CommandId;
+  readonly checked?: boolean;
+  readonly disabled?: boolean;
+  readonly onClick: () => void;
+}
+
+/**
+ * The overflow menu every panel shares: each row repeats an action from the head or the side
+ * column and names the command it is, so the key for it can be bound in Settings → Hotkeys.
+ */
+export function showOverflow(ev: MouseEvent, entries: readonly (MenuEntry | "-")[]): Menu {
+  const menu = new Menu();
+  for (const e of entries) {
+    if (e === "-") { menu.addSeparator(); continue; }
+    menu.addItem((item) => {
+      const title = createFragment();
+      title.createSpan({ text: e.label, cls: "czm-menu-label" });
+      if (e.command) title.createSpan({ text: commandName(e.command), cls: "czm-menu-cmd" });
+      item.setTitle(title);
+      if (e.icon) item.setIcon(e.icon);
+      if (e.checked !== undefined) item.setChecked(e.checked);
+      if (e.disabled) item.setDisabled(true);
+      item.onClick(() => e.onClick());
+    });
+  }
+  menu.showAtMouseEvent(ev);
+  return menu;
+}
+
+/** The ⋯ button: built once, the rows built at each click, so they follow the panel's state. */
+export function overflowButton(parent: HTMLElement, build: () => readonly (MenuEntry | "-")[]): HTMLButtonElement {
+  const b = parent.createEl("button", { cls: "clickable-icon czm-shell-tool czm-shell-more", attr: { "aria-label": "More actions", title: "More actions", "aria-haspopup": "menu" } });
+  setIcon(b, "more-horizontal");
+  b.addEventListener("click", (ev) => showOverflow(ev, build()));
+  return b;
+}
+
 export class PanelShell {
   readonly root: HTMLElement;
   readonly head: HTMLElement;
@@ -85,6 +127,13 @@ export class PanelShell {
       this.setSideOpen(side.isOpen());
     }
     renderJumps(this.jumps, opts.current, opts.jump);
+  }
+
+  /** The ⋯ menu in the head, before the side toggle. */
+  overflow(build: () => readonly (MenuEntry | "-")[]): HTMLButtonElement {
+    const b = overflowButton(this.fixed, build);
+    this.fixed.prepend(b);
+    return b;
   }
 
   setSideOpen(open: boolean): void {

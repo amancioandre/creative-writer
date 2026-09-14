@@ -25,3 +25,4 @@ proto.setText = function (this: HTMLElement, t: string) { this.textContent = t; 
 (globalThis as Record<string, unknown>).createEl = make;
 (globalThis as Record<string, unknown>).createDiv = (o?: Opts) => make("div", o);
 (globalThis as Record<string, unknown>).createSpan = (o?: Opts) => make("span", o);
+(globalThis as Record<string, unknown>).createFragment = () => document.createDocumentFragment();

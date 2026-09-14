@@ -67,6 +67,7 @@ export class StoryTimelineView extends ItemView {
   render(): void {
     this.contentEl.empty();
     const shell = new PanelShell(this.contentEl, { current: "timeline", jump: (to) => this.source.jumpTo(to, this.project) });
+    shell.overflow(() => [{ label: "Clear the search", icon: "x", command: "story-timeline-clear-search", disabled: !this.query.trim(), onClick: () => this.run("clear-search") }]);
     this.shell = shell;
     this.body = shell.main.createDiv({ cls: "czm-tl" });
     const head = shell.scope;
@@ -84,6 +85,11 @@ export class StoryTimelineView extends ItemView {
     // The field stays put and keeps its caret; only the table under it is redrawn, once the typing pauses.
     search.addEventListener("input", () => { this.query = search.value; if (this.searchTimer !== null) window.clearTimeout(this.searchTimer); this.searchTimer = window.setTimeout(() => { this.searchTimer = null; this.renderTable(); }, SEARCH_DEBOUNCE_MS); });
     this.renderTable();
+  }
+
+  /** The head's actions, as the commands and the ⋯ menu reach them. */
+  run(action: "clear-search"): void {
+    if (action === "clear-search") this.clearSearch();
   }
 
   private clearSearch(): void {

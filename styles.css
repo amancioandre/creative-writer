@@ -323,6 +323,9 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-shell-reset, .czm-shell-fix { font-size: var(--font-ui-smaller); padding: 1px 8px; height: auto; }
 .czm-shell-tools { display: inline-flex; align-items: center; gap: 2px; }
 .czm-shell-tool.is-active { color: var(--text-accent); background: var(--background-modifier-hover); }
+/* A ⋯ menu row: the action, and under it the command it also is, so it can be found in Settings → Hotkeys. */
+.menu-item-title .czm-menu-label { display: block; }
+.menu-item-title .czm-menu-cmd { display: block; font-size: var(--font-ui-smaller); color: var(--text-faint); font-family: var(--font-monospace); }
 .czm-shell-jumps { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; padding-left: 8px; border-left: 1px solid var(--background-modifier-border); }
 .czm-shell-jump.is-current { color: var(--text-accent); opacity: 1; cursor: default; }
 .czm-shell-body { flex: 1 1 auto; display: flex; min-height: 0; }

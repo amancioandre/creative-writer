@@ -1,6 +1,8 @@
 import { ItemView, Setting, setIcon, type WorkspaceLeaf } from "obsidian";
 import { couldNot, StatusLine } from "./StatusLine";
-import { PanelShell, type Fix, type PanelId } from "./PanelShell";
+import { PanelShell, type Fix, type MenuEntry, type PanelId } from "./PanelShell";
+
+export type StoryMapAction = "add" | "fit" | "show-all" | "shake" | "read-project" | "reset-filters";
 import { inField, onActivate } from "./keys";
 import type { ProjectSpec } from "../../../domain/progress/Project";
 import { DEFAULT_DISPLAY, DEFAULT_FORCES, DEFAULT_STORY_COLORS, DEFAULT_STORY_MAP, DISPLAY_RANGES, FORCE_RANGES, STORY_KINDS, STORY_LAYERS, type DisplaySettings, type ForceSettings, type StoryEntityKind, type StoryLayer, type StoryMapSettings } from "../../../domain/settings/Settings";
@@ -208,6 +210,7 @@ export class StoryMapView extends ItemView {
     }
 
     this.panel = this.shell.side;
+    this.shell.overflow(() => this.menuEntries());
     this.card = this.root.createDiv({ cls: "czm-map-card" });
     this.composer = this.root.createDiv({ cls: "czm-map-new" });
     this.status = new StatusLine(this.root);
@@ -753,19 +756,45 @@ this.renderCard(); this.paint();
     if (this.project) tool("plus", "Add a character, place, item, faction or event as a new note (or double-click the background)", "czm-map-add", () => this.openComposerAtCentre());
     tool("maximize", "Fit the map in the view", "czm-map-fit", () => this.fit());
     if (this.focusId) tool("eye", "Show all: leave the focus on one node", "czm-map-unfocus", () => { this.focusId = null; this.rebuild(); });
-    tool("shuffle", "Shake: unpin everything and let the layout settle again", "czm-map-shake", () => {
-      // Remember every hand-placed node so the shake can be taken back.
-      const held = new Map<string, Point>();
-      for (const id of this.nodeEls.keys()) if (this.sim.isPinned(id)) { const p = this.sim.position(id); if (p) held.set(id, p); }
-      for (const id of this.nodeEls.keys()) this.sim.pin(id, false);
-      this.sim.reheat(); this.applySelectionClasses(); this.startLoop(); this.queueLayoutSave();
-      if (held.size) {
-        this.status.undoable(`Shaken: ${held.size} hand-placed node${held.size === 1 ? "" : "s"} let go`, async () => {
-          for (const [id, p] of held) this.sim.drag(id, p);
-          this.applySelectionClasses(); this.startLoop(); this.queueLayoutSave();
-        });
-      }
-    });
+    tool("shuffle", "Shake: unpin everything and let the layout settle again", "czm-map-shake", () => this.shake());
+  }
+
+  private shake(): void {
+    // Remember every hand-placed node so the shake can be taken back.
+    const held = new Map<string, Point>();
+    for (const id of this.nodeEls.keys()) if (this.sim.isPinned(id)) { const p = this.sim.position(id); if (p) held.set(id, p); }
+    for (const id of this.nodeEls.keys()) this.sim.pin(id, false);
+    this.sim.reheat(); this.applySelectionClasses(); this.startLoop(); this.queueLayoutSave();
+    if (held.size) {
+      this.status.undoable(`Shaken: ${held.size} hand-placed node${held.size === 1 ? "" : "s"} let go`, async () => {
+        for (const [id, p] of held) this.sim.drag(id, p);
+        this.applySelectionClasses(); this.startLoop(); this.queueLayoutSave();
+      });
+    }
+  }
+
+  /** The head's and the side column's actions, as the commands and the ⋯ menu reach them. */
+  run(action: StoryMapAction): void {
+    switch (action) {
+      case "add": if (this.project) this.openComposerAtCentre(); break;
+      case "fit": this.fit(); break;
+      case "show-all": if (this.focusId) { this.focusId = null; this.rebuild(); } break;
+      case "shake": this.shake(); break;
+      case "read-project": if (this.project) void this.toggleAnalyse(null); break;
+      case "reset-filters": this.resetFilters(); break;
+    }
+  }
+
+  private menuEntries(): (MenuEntry | "-")[] {
+    return [
+      { label: "Add a node…", icon: "plus", command: "story-map-add-node", disabled: !this.project, onClick: () => this.run("add") },
+      { label: "Fit the map", icon: "maximize", command: "story-map-fit", onClick: () => this.run("fit") },
+      { label: "Show all", icon: "eye", command: "story-map-show-all", disabled: !this.focusId, onClick: () => this.run("show-all") },
+      { label: "Shake the layout", icon: "shuffle", command: "story-map-shake", onClick: () => this.run("shake") },
+      { label: "Reset filters", icon: "filter-x", command: "story-map-reset-filters", disabled: !this.filtersOn(), onClick: () => this.run("reset-filters") },
+      "-",
+      { label: this.running ? "Stop reading" : "Read project with model", icon: "sparkles", command: "story-map-read-project", disabled: !this.project, onClick: () => this.run("read-project") },
+    ];
   }
 
   private renderPanel(): void {

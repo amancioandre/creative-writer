@@ -11,6 +11,8 @@
 
 The first column and the header row stay put while you scroll, so a long manuscript with a big cast is still legible. The search box filters the cast.
 
+The head's **⋯** menu holds the one action, clearing the search, as the command *Story timeline: clear the search*.
+
 ## Same data as the map
 
 The timeline is a projection of the same graph the [story map](/guide/story-map) builds — same notes, same mention extraction, same `Story map.md` readings — so the two never disagree, and both refresh together when you edit.

@@ -1,4 +1,4 @@
-import { MarkdownRenderer, MarkdownView, Notice, Plugin, editorInfoField, type WorkspaceLeaf } from "obsidian";
+import { MarkdownRenderer, MarkdownView, Notice, Plugin, editorInfoField, type Constructor, type View, type WorkspaceLeaf } from "obsidian";
 import { Compartment } from "@codemirror/state";
 
 import type { PluginSettings } from "./domain/settings/Settings";
@@ -60,7 +60,7 @@ import { VaultWriterTags } from "./infrastructure/obsidian/VaultWriterTags";
 import { VaultWriterFiles } from "./infrastructure/obsidian/VaultWriterFiles";
 import { BuildWriterStories } from "./application/use-cases/BuildWriterStories";
 import { PromoteIdea } from "./application/use-cases/PromoteIdea";
-import { WRITER_VIEW_TYPE, WriterView, type WriterAction, type WriterSource } from "./infrastructure/obsidian/views/WriterView";
+import { WRITER_VIEW_TYPE, WriterView, type WriterSource } from "./infrastructure/obsidian/views/WriterView";
 import { WRITER_EXTENSION, renameCard } from "./domain/writer/WriterFile";
 import { writerTag } from "./domain/writer/Tags";
 import { STORY_TIMELINE_VIEW_TYPE, StoryTimelineView } from "./infrastructure/obsidian/views/StoryTimelineView";
@@ -75,6 +75,7 @@ import { MANUSCRIPT_VIEW_TYPE, ManuscriptView } from "./infrastructure/obsidian/
 import type { PanelId } from "./infrastructure/obsidian/views/PanelShell";
 import { castFromGraph, conflictMarks, echoMarks, threadMarks, type SectionFacts } from "./domain/manuscript/StoryFacts";
 import { toggleResolved } from "./domain/manuscript/Comments";
+import { COMMANDS, type CommandId } from "./infrastructure/obsidian/commands";
 import { OllamaFactAnalyser } from "./infrastructure/llm/OllamaFactAnalyser";
 import { OllamaIntentAnalyser } from "./infrastructure/llm/OllamaIntentAnalyser";
 import { OllamaEmbedder } from "./infrastructure/llm/OllamaEmbedder";
@@ -272,7 +273,8 @@ export default class CreativeZenModePlugin extends Plugin {
       settings: () => this.current.storyMap,
     };
     this.registerView(STORY_TIMELINE_VIEW_TYPE, (leaf: WorkspaceLeaf) => new StoryTimelineView(leaf, storySource));
-    this.addCommand({ id: "open-story-timeline", name: "Open story timeline", callback: () => void this.openStoryTimeline(null) });
+    this.addCommand({ id: "open-story-timeline", name: COMMANDS["open-story-timeline"], callback: () => void this.openStoryTimeline(null) });
+    this.viewCommands(StoryTimelineView, [["story-timeline-clear-search", "clear-search"]]);
     this.registerView(STORY_MAP_VIEW_TYPE, (leaf: WorkspaceLeaf) => new StoryMapView(leaf, {
       ...storySource,
       activeNotePath: () => this.app.workspace.getActiveViewOfType(MarkdownView)?.file?.path ?? null,
@@ -308,7 +310,9 @@ export default class CreativeZenModePlugin extends Plugin {
         return new AnalyzeSceneRelations(projectNotes, storyRepo, analyser).execute(project, notePath, graph, signal, onProgress);
       },
     }));
-    this.addCommand({ id: "open-story-map", name: "Open story map", callback: () => void this.openStoryMap() });
+    this.addCommand({ id: "open-story-map", name: COMMANDS["open-story-map"], callback: () => void this.openStoryMap() });
+    // The map's head, as commands too, so they can be rebound in Settings → Hotkeys. Live only while the map is the active view.
+    this.viewCommands(StoryMapView, [["story-map-add-node", "add"], ["story-map-fit", "fit"], ["story-map-show-all", "show-all"], ["story-map-shake", "shake"], ["story-map-read-project", "read-project"], ["story-map-reset-filters", "reset-filters"]]);
     this.addRibbonIcon("git-fork", "Open story map", () => void this.openStoryMap());
 
     // Writer: the board is rebuilt from tagged notes; only layout, colours and named edges persist, in the vault's one `.writer` file.
@@ -318,7 +322,7 @@ export default class CreativeZenModePlugin extends Plugin {
       await navigator.clipboard.writeText(await buildWriterBoard.schema());
       new Notice("creative-writer: the writer protocol is on the clipboard.");
     };
-    this.addCommand({ id: "copy-writer-schema", name: "Copy writer schema", callback: () => void copySchema() });
+    this.addCommand({ id: "copy-writer-schema", name: COMMANDS["copy-writer-schema"], callback: () => void copySchema() });
     const asFile = (path: string): TFile | null => { const f = this.app.vault.getAbstractFileByPath(path); return f instanceof TFile ? f : null; };
     const frontMatterOf = async (path: string, change: (fm: Record<string, unknown>) => void) => { const f = asFile(path); if (f) await this.app.fileManager.processFrontMatter(f, change); };
     const writerTags = new VaultWriterTags({
@@ -419,20 +423,12 @@ export default class CreativeZenModePlugin extends Plugin {
     this.writer = { repo: writerRepo, board: buildWriterBoard, source: writerSource };
     this.registerView(WRITER_VIEW_TYPE, (leaf: WorkspaceLeaf) => new WriterView(leaf, writerSource));
     this.registerExtensions([WRITER_EXTENSION], WRITER_VIEW_TYPE);
-    this.addCommand({ id: "open-writer", name: "Open writer", callback: () => void this.openWriter() });
-    // The board's keys, as commands too, so they can be rebound in Settings → Hotkeys. Live only while the board is the active view.
-    const boardActions: [string, string, WriterAction][] = [
-      ["writer-next-lane", "Writer: next lane", "next-lane"],
-      ["writer-previous-lane", "Writer: previous lane", "previous-lane"],
-      ["writer-next-group", "Writer: next group", "next-group"],
-      ["writer-previous-group", "Writer: previous group", "previous-group"],
-      ["writer-new-note", "Writer: new note in the focused group", "new-note"],
-      ["writer-fit", "Writer: fit the board", "fit"],
-      ["writer-shortcuts", "Writer: show keyboard shortcuts", "help"],
-    ];
-    for (const [id, name, action] of boardActions) {
-      this.addCommand({ id, name, checkCallback: (checking) => { const view = this.app.workspace.getActiveViewOfType(WriterView); if (!view) return false; if (!checking) view.run(action); return true; } });
-    }
+    this.addCommand({ id: "open-writer", name: COMMANDS["open-writer"], callback: () => void this.openWriter() });
+    // The board's keys and its side column, as commands too, so they can be rebound in Settings → Hotkeys. Live only while the board is the active view.
+    this.viewCommands(WriterView, [
+      ["writer-next-lane", "next-lane"], ["writer-previous-lane", "previous-lane"], ["writer-next-group", "next-group"], ["writer-previous-group", "previous-group"],
+      ["writer-new-note", "new-note"], ["writer-add-note", "add-note"], ["writer-new-story", "new-story"], ["writer-fit", "fit"], ["writer-shortcuts", "help"],
+    ]);
     this.addRibbonIcon("layout-dashboard", "Open writer", () => void this.openWriter());
     this.registerEvent(this.app.vault.on("rename", (file, oldPath) => { if (file instanceof TFile && file.extension === "md") void writerRepo.update((f) => renameCard(f, oldPath, file.path)).then(() => this.refreshWriter()); }));
     this.addRibbonIcon("gantt-chart", "Open story timeline", () => void this.openStoryTimeline(null));
@@ -484,7 +480,8 @@ export default class CreativeZenModePlugin extends Plugin {
       updateSettings: (next) => void this.updateSettings({ ...this.current, threads: next }),
       jumpTo: (to, project) => this.jumpTo(to, project),
     }));
-    this.addCommand({ id: "open-story-threads", name: "Open story threads", callback: () => void this.openStoryThreads(null) });
+    this.addCommand({ id: "open-story-threads", name: COMMANDS["open-story-threads"], callback: () => void this.openStoryThreads(null) });
+    this.viewCommands(StoryThreadsView, [["story-threads-zoom-in", "zoom-in"], ["story-threads-zoom-out", "zoom-out"], ["story-threads-fit", "fit"], ["story-threads-open-note", "open-note"], ["story-threads-read-project", "read-project"]]);
     this.addRibbonIcon("spline", "Open story threads", () => void this.openStoryThreads(null));
     this.addCommand({
       id: "read-note-for-story-threads",
@@ -493,12 +490,12 @@ export default class CreativeZenModePlugin extends Plugin {
     });
     this.addCommand({
       id: "read-contradictions-for-intent",
-      name: "Read contradictions for intent (story threads)",
+      name: COMMANDS["read-contradictions-for-intent"],
       callback: () => void this.openStoryThreads(null).then(() => (this.app.workspace.getLeavesOfType(STORY_THREADS_VIEW_TYPE)[0]?.view as StoryThreadsView | undefined)?.readIntent()),
     });
     this.addCommand({
       id: "read-project-for-echoes",
-      name: "Read project for echoes (story threads)",
+      name: COMMANDS["read-project-for-echoes"],
       callback: () => void this.openStoryThreads(null).then(() => (this.app.workspace.getLeavesOfType(STORY_THREADS_VIEW_TYPE)[0]?.view as StoryThreadsView | undefined)?.readEchoes()),
     });
     // Manuscript: the project's prose stitched into one read-only page; every note keeps its element and re-renders alone.
@@ -545,7 +542,8 @@ export default class CreativeZenModePlugin extends Plugin {
       promote: (project, name, kind) => this.createEntityNote(project.scope, name, kind),
       ignore: (project, name) => this.editList(project.notePath, "story-ignore", (list) => [...list.filter((n) => n !== name), name]),
     }));
-    this.addCommand({ id: "open-manuscript", name: "Open manuscript", callback: () => void this.openManuscript(null) });
+    this.addCommand({ id: "open-manuscript", name: COMMANDS["open-manuscript"], callback: () => void this.openManuscript(null) });
+    this.viewCommands(ManuscriptView, [["manuscript-prose-only", "prose-only"], ["manuscript-comments", "comments"], ["manuscript-ruler", "ruler"], ["manuscript-story", "story"], ["manuscript-echoes", "echoes"]]);
     this.addCommand({
       id: "return-to-manuscript",
       name: "Return to manuscript",
@@ -561,7 +559,7 @@ export default class CreativeZenModePlugin extends Plugin {
     });
     this.addCommand({
       id: "export-manuscript",
-      name: "Export manuscript to a note",
+      name: COMMANDS["export-manuscript"],
       callback: () => {
         const project = storySource.activeProject() ?? storySource.projects()[0];
         if (!project) { new Notice("creative-writer: no project — put story: true or writing-target in a note's front matter."); return; }
@@ -834,6 +832,13 @@ export default class CreativeZenModePlugin extends Plugin {
       lines[at] = `${lines[at]}${insert}`;
       return lines.join("\n");
     });
+  }
+
+  /** A panel's actions as commands, named from the one table the ⋯ menus read; live only while that panel is the active view. */
+  private viewCommands<A extends string, V extends View & { run(action: A): void }>(type: Constructor<V>, actions: readonly (readonly [CommandId, A])[]): void {
+    for (const [id, action] of actions) {
+      this.addCommand({ id, name: COMMANDS[id], checkCallback: (checking) => { const view = this.app.workspace.getActiveViewOfType(type); if (!view) return false; if (!checking) view.run(action); return true; } });
+    }
   }
 
   /** Rewrites a note through its open editor when one shows it, so no unsaved keystroke is lost, else on disk. */

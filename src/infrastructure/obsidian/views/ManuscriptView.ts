@@ -1,5 +1,7 @@
 import { ItemView, Menu, Notice, setIcon, type WorkspaceLeaf } from "obsidian";
-import { renderJumps, type PanelId } from "./PanelShell";
+import { overflowButton, renderJumps, type MenuEntry, type PanelId } from "./PanelShell";
+
+export type ManuscriptAction = "prose-only" | "comments" | "ruler" | "story" | "echoes" | "export";
 import { onActivate } from "./keys";
 import type { ProjectSpec } from "../../../domain/progress/Project";
 import { EMPTY_MANUSCRIPT, type Manuscript, type ManuscriptBlock, type NoteItem } from "../../../domain/manuscript/Manuscript";
@@ -227,30 +229,60 @@ export class ManuscriptView extends ItemView {
     if (time) line.createSpan({ text: ` · ${time} to read`, cls: "czm-ms-time", attr: { title: speed, "aria-label": `${time} to read. ${speed}` } });
     if (count) line.createSpan({ text: ` · ${count} comment${count === 1 ? "" : "s"}` });
     const tools = head.createDiv({ cls: "czm-ms-tools" });
-    const toggle = (icon: string, label: string, on: boolean, apply: (v: boolean) => ManuscriptSettings, light = false) => {
+    const toggle = (icon: string, label: string, on: boolean, action: ManuscriptAction) => {
       const btn = tools.createEl("button", { cls: `clickable-icon czm-ms-tool${on ? " is-active" : ""}`, attr: { "aria-label": label, "aria-pressed": String(on), title: label } });
       setIcon(btn, icon);
-      // A switch that only shows or hides a pane redraws the pane, not the book.
-      btn.addEventListener("click", () => { this.source.updateSettings(apply(!on)); if (light) { this.renderHead(); this.renderSide(); } else void this.refresh(); });
+      btn.addEventListener("click", () => this.run(action));
       return btn;
     };
-    toggle("text", "Prose only: paragraphs, headings, quotes and scene breaks — no lists, tables, code or callouts", settings.proseOnly, (v) => ({ ...this.source.settings(), proseOnly: v }));
-    toggle("message-square", "Comments pane: this paragraph's comments and a field to add one; every comment below", settings.showComments, (v) => ({ ...this.source.settings(), showComments: v }), true);
-    toggle("ruler", "Ruler: one segment per section, wide by words, coloured by readability, marked when it changed today", settings.showRuler, (v) => ({ ...this.source.settings(), showRuler: v }));
-    toggle("users", "Story: who is in each section and scene, and the model's contradictions in the gutter", settings.showStory, (v) => ({ ...this.source.settings(), showStory: v }));
-    toggle("repeat", "Echoes: repeated phrases marked in the gutter, each naming another place the words occur", settings.showEchoes, (v) => ({ ...this.source.settings(), showEchoes: v }));
-    const project = this.project;
+    toggle("text", "Prose only: paragraphs, headings, quotes and scene breaks — no lists, tables, code or callouts", settings.proseOnly, "prose-only");
+    toggle("message-square", "Comments pane: this paragraph's comments and a field to add one; every comment below", settings.showComments, "comments");
+    toggle("ruler", "Ruler: one segment per section, wide by words, coloured by readability, marked when it changed today", settings.showRuler, "ruler");
+    toggle("users", "Story: who is in each section and scene, and the model's contradictions in the gutter", settings.showStory, "story");
+    toggle("repeat", "Echoes: repeated phrases marked in the gutter, each naming another place the words occur", settings.showEchoes, "echoes");
     const exportBtn = tools.createEl("button", { cls: "clickable-icon czm-ms-tool czm-ms-export", attr: { "aria-label": "Export as one note beside the project (comments left out)", title: "Export as one note beside the project (comments left out)" } });
     setIcon(exportBtn, "file-output");
-    exportBtn.addEventListener("click", () => {
-      exportBtn.disabled = true;
-      void this.source.exportNote(project).then(() => {
-        setIcon(exportBtn, "check");
-        window.setTimeout(() => setIcon(exportBtn, "file-output"), 1200);
-      }, (e: unknown) => {
-        new Notice(`creative-writer: could not export ${project.name}: ${e instanceof Error ? e.message : String(e)}. Nothing was written; check that the folder beside the project is writable.`, 8000);
-      }).finally(() => { exportBtn.disabled = false; });
-    });
+    exportBtn.addEventListener("click", () => this.run("export"));
+    overflowButton(tools, () => this.menuEntries());
+  }
+
+  /** The tool bar's actions, as the commands and the ⋯ menu reach them. A switch that only shows or hides a pane redraws the pane, not the book. */
+  run(action: ManuscriptAction): void {
+    const s = this.source.settings();
+    const set = (next: ManuscriptSettings, light = false) => { this.source.updateSettings(next); if (light) { this.renderHead(); this.renderSide(); } else void this.refresh(); };
+    switch (action) {
+      case "prose-only": set({ ...s, proseOnly: !s.proseOnly }); break;
+      case "comments": set({ ...s, showComments: !s.showComments }, true); break;
+      case "ruler": set({ ...s, showRuler: !s.showRuler }); break;
+      case "story": set({ ...s, showStory: !s.showStory }); break;
+      case "echoes": set({ ...s, showEchoes: !s.showEchoes }); break;
+      case "export": this.export(); break;
+    }
+  }
+
+  private export(): void {
+    const project = this.project;
+    if (!project) return;
+    const btn = this.head?.querySelector<HTMLButtonElement>(".czm-ms-export") ?? null;
+    if (btn) btn.disabled = true;
+    void this.source.exportNote(project).then(() => {
+      if (btn) { setIcon(btn, "check"); window.setTimeout(() => setIcon(btn, "file-output"), 1200); }
+    }, (e: unknown) => {
+      new Notice(`creative-writer: could not export ${project.name}: ${e instanceof Error ? e.message : String(e)}. Nothing was written; check that the folder beside the project is writable.`, 8000);
+    }).finally(() => { if (btn) btn.disabled = false; });
+  }
+
+  private menuEntries(): (MenuEntry | "-")[] {
+    const s = this.source.settings();
+    return [
+      { label: "Prose only", icon: "text", command: "manuscript-prose-only", checked: s.proseOnly, onClick: () => this.run("prose-only") },
+      { label: "Comments pane", icon: "message-square", command: "manuscript-comments", checked: s.showComments, onClick: () => this.run("comments") },
+      { label: "Ruler", icon: "ruler", command: "manuscript-ruler", checked: s.showRuler, onClick: () => this.run("ruler") },
+      { label: "Story marks", icon: "users", command: "manuscript-story", checked: s.showStory, onClick: () => this.run("story") },
+      { label: "Echoes", icon: "repeat", command: "manuscript-echoes", checked: s.showEchoes, onClick: () => this.run("echoes") },
+      "-",
+      { label: "Export as one note", icon: "file-output", command: "export-manuscript", disabled: !this.project, onClick: () => this.run("export") },
+    ];
   }
 
   // --- ruler --------------------------------------------------------------------------------------------------

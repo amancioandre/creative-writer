@@ -1,6 +1,8 @@
 import { ItemView, Setting, setIcon, type WorkspaceLeaf } from "obsidian";
 import { couldNot, StatusLine } from "./StatusLine";
-import { PanelShell, type Fix, type PanelId } from "./PanelShell";
+import { PanelShell, type Fix, type MenuEntry, type PanelId } from "./PanelShell";
+
+export type StoryThreadsAction = "zoom-in" | "zoom-out" | "fit" | "open-note" | "read-project" | "read-intent" | "read-echoes";
 import { inField, onActivate } from "./keys";
 import type { ProjectSpec } from "../../../domain/progress/Project";
 import { DEFAULT_THREADS, THREAD_KINDS, type StoryEntityKind, type ThreadKind, type ThreadsSettings } from "../../../domain/settings/Settings";
@@ -189,6 +191,7 @@ export class StoryThreadsView extends ItemView {
     this.scroller.addEventListener("scroll", () => { if (this.placeFrame === null) this.placeFrame = window.requestAnimationFrame(() => { this.placeFrame = null; this.placeCard(); }); });
 
     this.panel = this.shell.side;
+    this.shell.overflow(() => this.menuEntries());
     this.measureSurface();
     if (typeof ResizeObserver === "function") {
       const ro = new ResizeObserver(() => { this.measureSurface(); this.placeCard(); });
@@ -478,7 +481,34 @@ export class StoryThreadsView extends ItemView {
     tool("zoom-in", "Zoom in (+)", "czm-th-zoom-in", () => this.zoomByKey(1.25));
     tool("zoom-out", "Zoom out (−)", "czm-th-zoom-out", () => this.zoomByKey(0.8));
     tool("maximize", "Fit the whole manuscript in the view (f)", "czm-map-fit", () => this.fit());
-    if (this.project) tool("file-text", "Open Story threads.md, where hand-drawn threads live", "czm-th-note-btn", () => this.source.openNote(this.source.threadsNotePath(this.project!)));
+    if (this.project) tool("file-text", "Open Story threads.md, where hand-drawn threads live", "czm-th-note-btn", () => this.run("open-note"));
+  }
+
+  /** The head's and the side column's actions, as the commands and the ⋯ menu reach them. */
+  run(action: StoryThreadsAction): void {
+    switch (action) {
+      case "zoom-in": this.zoomByKey(1.25); break;
+      case "zoom-out": this.zoomByKey(0.8); break;
+      case "fit": this.fit(); break;
+      case "open-note": if (this.project) this.source.openNote(this.source.threadsNotePath(this.project)); break;
+      case "read-project": if (this.project) void this.toggleRead(null); break;
+      case "read-intent": if (this.project) void this.toggleIntent(); break;
+      case "read-echoes": if (this.project) void this.toggleEchoes(); break;
+    }
+  }
+
+  private menuEntries(): (MenuEntry | "-")[] {
+    const stop = this.running ? "Stop reading" : null;
+    return [
+      { label: "Zoom in", icon: "zoom-in", command: "story-threads-zoom-in", onClick: () => this.run("zoom-in") },
+      { label: "Zoom out", icon: "zoom-out", command: "story-threads-zoom-out", onClick: () => this.run("zoom-out") },
+      { label: "Fit the manuscript", icon: "maximize", command: "story-threads-fit", onClick: () => this.run("fit") },
+      { label: "Open Story threads.md", icon: "file-text", command: "story-threads-open-note", disabled: !this.project, onClick: () => this.run("open-note") },
+      "-",
+      { label: stop ?? "Read project for facts", icon: "sparkles", command: "story-threads-read-project", disabled: !this.project, onClick: () => this.run("read-project") },
+      { label: stop ?? "Read contradictions for intent", icon: "sparkles", command: "read-contradictions-for-intent", disabled: !this.project, onClick: () => this.run("read-intent") },
+      { label: stop ?? "Read project for echoes", icon: "repeat", command: "read-project-for-echoes", disabled: !this.project, onClick: () => this.run("read-echoes") },
+    ];
   }
 
   private renderPanel(): void {

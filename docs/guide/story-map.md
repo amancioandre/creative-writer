@@ -57,7 +57,7 @@ Every panel of the plugin wears the same shell: a head with the project, a searc
 | Section | What |
 |---|---|
 | *Head* | Project dropdown; a search box — matching names stay, with their direct neighbours for context. |
-| *Head* | **Add** a node; **Fit**; **Shake**; **Show all** when a focus is active; the jumps to the desk, board, [timeline](/guide/story-timeline), [threads](/guide/story-threads) and manuscript. |
+| *Head* | **Add** a node; **Fit**; **Shake**; **Show all** when a focus is active; the **⋯** menu, which repeats these and the model reading as rows that name their commands; the jumps to the desk, board, [timeline](/guide/story-timeline), [threads](/guide/story-threads) and manuscript. |
 | *Side column* | **Read project with model** (see [Reading a project](/guide/model-reading)), the one filled button, with its cost beneath; then the folded groups below, each header showing its value. Kinds absent from the project fold into one line. |
 | **Filters** | Toggle each layer; *Hide loners* removes nodes with no visible edge. |
 | **Kinds & colours** | A colour swatch and a toggle per kind, with counts; *Reset colours*. |
