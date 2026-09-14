@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { WORD_PALETTE, WordMatcher, categoryColour, parseWordLists } from "../../../src/domain/words/WordList";
+import { WORD_PALETTE, WordMatcher, addTerm, categoryColour, parseWordLists, removeTerm } from "../../../src/domain/words/WordList";
 
 const NOTE = `---
 creative-writer-words: true
@@ -68,5 +68,19 @@ describe("WordMatcher", () => {
     const m = new WordMatcher([]);
     expect(m.empty).toBe(true);
     expect(m.findAll("felt")).toEqual([]);
+  });
+});
+
+describe("editing a list", () => {
+  it("adds a term to the category's last line, after a heading with nothing under it, or as a new heading", () => {
+    expect(addTerm("## A\nfelt, saw\n\n## B\n- turned\n", "a", "heard")).toBe("## A\nfelt, saw, heard\n\n## B\n- turned\n");
+    expect(addTerm("## A\n\n## B\nturned", "A", "heard")).toBe("## A\nheard\n\n## B\nturned");
+    expect(addTerm("## A\nfelt", "Glue", "just")).toBe("## A\nfelt\n\n## Glue\njust\n");
+    expect(addTerm("", "Glue", "just")).toBe("## Glue\njust\n");
+    expect(parseWordLists(addTerm("## A\nfelt", "Glue", "just")).map((c) => c.terms)).toEqual([["felt"], ["just"]]);
+  });
+  it("removes a term wherever it stands, dropping a line it empties, and leaves headings and colours alone", () => {
+    expect(removeTerm("## A\nfelt, *saw*, heard\ncolour: #123456\n- saw\n\n## B\nSAW", "saw")).toBe("## A\nfelt, heard\ncolour: #123456\n\n## B");
+    expect(removeTerm("## A\nfelt", "nope")).toBe("## A\nfelt");
   });
 });

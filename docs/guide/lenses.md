@@ -67,6 +67,14 @@ accent-never: [my, yes, no, will, into]
 
 Words or phrases, a list or a comma string, matched whole and case-insensitively. A character with neither key gets no marks. Attribution is the dialogue lens's, so a wrong guess there is a wrong mark here; add a tag and both follow.
 
+## The box as the lens's hands
+
+Every hover card can act, not only explain:
+
+- **Style checks**: *Not a cliché here*, and the finding is gone from that paragraph. The plugin writes `%% not cliche %%` at the end of the paragraph, a hidden comment like the speaker's pin; delete it to have the check back. The model's findings respect it too.
+- **Words**: *Remove "then" from Stage direction* takes the word out of the list note it came from. The other way round is a command, **Words: add the word under the cursor to the list…**, which asks for a category from the list's headings, or a new one typed in, and writes the word under it; the note is created if it is not there yet.
+- **Accents**: *Remove "aye" from Tomas's accent* edits the character note's front matter. Two commands add: **Accents: the word under the cursor is the speaker's** and **Accents: the speaker never says the word under the cursor**, both for the line's certain speaker, so pin first where the page is grey.
+
 ## Words
 
 Your own overused words, tinted wherever they occur in the visible part of the note, one colour per category. Hover a tint for the category and how many times the word occurs in the note.

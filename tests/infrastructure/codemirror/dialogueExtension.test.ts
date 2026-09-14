@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { EditorState } from "@codemirror/state";
-import { conventionsFacet, conventionsFor, dialogueExtension, paragraphsIn, rosterFor, rostersFacet } from "../../../src/infrastructure/codemirror/dialogueExtension";
+import { conventionsFacet, conventionsFor, dialogueExtension, paragraphsIn, rosterFor, rostersFacet, speakerAtCursor } from "../../../src/infrastructure/codemirror/dialogueExtension";
 import { allFindings } from "../../../src/infrastructure/codemirror/findingsTooltip";
 import { DEFAULT_SETTINGS } from "../../../src/domain/settings/Settings";
 import { mount, type Harness } from "./helpers";
@@ -129,5 +129,23 @@ describe("paragraphsIn", () => {
     const doc = EditorState.create({ doc: "a\nb\n\nc\n\n\nd" }).doc;
     expect(paragraphsIn(doc, 2, 5).map((p) => doc.sliceString(p.from, p.to))).toEqual(["a\nb", "c"]);
     expect(paragraphsIn(doc, 0, doc.length).map((p) => doc.sliceString(p.from, p.to))).toEqual(["a\nb", "c", "d"]);
+  });
+});
+
+describe("dialogueExtension — the lens's hands", () => {
+  let h: Harness;
+  afterEach(() => h?.destroy());
+  const SCENE = "“Aye, my brother,” Tomas said.\n\n“Yes.”";
+
+  it("offers to take a marked word out of the character note, and names the certain speaker at the cursor", () => {
+    const edits: [string, string, string, boolean][] = [];
+    h = mount(SCENE, [conventionsFacet.of({}), rostersFacet.of(ROSTER), dialogueExtension(() => "ch1.md", { editAccent: (s, list, term, add) => { edits.push([s.name, list, term, add]); } })], { lens: "accents" });
+    const fs = allFindings(h.view);
+    expect(fs.map((f) => f.actions?.[0]?.label)).toEqual(['Remove "aye" from Tomas\'s accent', 'Remove "my" from Tomas\'s never-say list']);
+    fs[1]!.actions![0]!.run();
+    expect(edits).toEqual([["Tomas", "accent-never", "my", false]]);
+    const who = (pos: number) => { h.moveCursor(pos); return h.view.state.facet(speakerAtCursor).map((f) => f(h.view)).find((s) => s)?.name ?? null; };
+    expect(who(2)).toBe("Tomas");
+    expect(who(SCENE.length - 1)).toBeNull();
   });
 });

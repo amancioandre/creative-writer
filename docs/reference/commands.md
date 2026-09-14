@@ -9,6 +9,8 @@ All commands appear in the palette under **Creative Writer:**. None has a defaul
 | **Toggle Creative Writer for this note** | Write `creative-writer: true` or `false` into the active note's front matter. |
 | **Lens: style checks** / **Lens: dialogue** / **Lens: words** / **Lens: accents** | Switch that [lens](/guide/lenses) on, everywhere; run it again to switch it off. One lens at a time. |
 | **Lens: next** / **Lens: off** | Cycle through the lenses, or show the plain page. The status-bar item opens a menu of the same rows. |
+| **Words: add the word under the cursor to the list…** | The selection or the word at the cursor into the [words lens](/guide/lenses#words)'s list note, under a category picked from its headings or typed anew; the note is created when missing. |
+| **Accents: the word under the cursor is the speaker's** / **the speaker never says the word under the cursor** | The selection or the word at the cursor into the character note of the line's certain speaker: `accent:` or `accent-never:`. Needs the dialogue or accents lens and a pinned or tagged line. |
 | **Dialogue: tag the speaker** | Open the [speaker box](/guide/lenses#the-speaker-box) on the cursor's paragraph, armed for the keyboard: arrows choose, Enter pins the speaker as a hidden `%% Name %%` comment, Escape closes. Needs the dialogue or accents lens. |
 | **Analyse paragraph with model** | Send the cursor paragraph to the configured model for contextual findings. |
 | **Analyse selection for myth and archetype** | Sidebar report of mythic patterns and archetypes in the selection (or the whole note if nothing is selected). Local model only. |

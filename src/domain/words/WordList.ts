@@ -55,6 +55,53 @@ export function parseWordLists(markdown: string): WordCategory[] {
   return out.filter((c) => c.terms.length > 0);
 }
 
+/** The note with `term` added under `category`: on the category's last term line, or as a new heading at the end. */
+export function addTerm(markdown: string, category: string, term: string): string {
+  const t = term.trim();
+  if (!t) return markdown;
+  const lines = markdown.split(/\r?\n/);
+  let inCategory = false;
+  let lastTermLine = -1;
+  let found = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!.trim();
+    const heading = HEADING.exec(line);
+    if (heading) { if (inCategory) break; inCategory = heading[1]!.trim().toLowerCase() === category.trim().toLowerCase(); if (inCategory) found = true; continue; }
+    if (!inCategory || !line || COLOUR.test(line) || line.startsWith("%%") || line.startsWith("<!--")) continue;
+    lastTermLine = i;
+  }
+  if (!found) {
+    const tail = markdown.endsWith("\n") || markdown === "" ? "" : "\n";
+    return `${markdown}${tail}${markdown.trim() ? "\n" : ""}## ${category.trim()}\n${t}\n`;
+  }
+  if (lastTermLine < 0) {
+    // A heading with nothing under it yet: the term goes right after it.
+    const at = lines.findIndex((l) => { const h = HEADING.exec(l.trim()); return !!h && h[1]!.trim().toLowerCase() === category.trim().toLowerCase(); });
+    lines.splice(at + 1, 0, t);
+    return lines.join("\n");
+  }
+  lines[lastTermLine] = `${lines[lastTermLine]!.replace(/[\s,;]+$/, "")}, ${t}`;
+  return lines.join("\n");
+}
+
+/** The note without `term`, wherever it stands; a line left empty by that goes too. */
+export function removeTerm(markdown: string, term: string): string {
+  const key = term.trim().toLowerCase().replace(/[’ʼ‘]/g, "'");
+  if (!key) return markdown;
+  const same = (piece: string) => piece.trim().replace(DECOR, "").trim().toLowerCase().replace(/[’ʼ‘]/g, "'") === key;
+  const out: string[] = [];
+  for (const raw of markdown.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || HEADING.test(line) || COLOUR.test(line) || line.startsWith("%%") || line.startsWith("<!--")) { out.push(raw); continue; }
+    const bullet = raw.match(BULLET)?.[0] ?? "";
+    const pieces = raw.replace(BULLET, "").split(/[,;·]/);
+    if (!pieces.some(same)) { out.push(raw); continue; }
+    const kept = pieces.filter((p) => !same(p)).map((p) => p.trim()).filter(Boolean);
+    if (kept.length) out.push(`${bullet}${kept.join(", ")}`);
+  }
+  return out.join("\n");
+}
+
 export interface WordMatch {
   readonly from: number;
   readonly to: number;

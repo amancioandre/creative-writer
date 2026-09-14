@@ -965,3 +965,7 @@ body.czm-zen .cm-line .czm-accent-uses, body.czm-zen .cm-line .czm-accent-never 
 .czm-ms-block.is-voiced { box-shadow: inset 3px 0 0 var(--czm-speech, var(--text-faint)); }
 .czm-ms-pop.has-voice { pointer-events: auto; }
 .czm-ms-pop .czm-speaker-box { padding: 4px 6px; }
+/* Actions in a finding's hover card: a button each, the lens's hands. */
+.czm-style-tooltip-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.czm-style-tooltip-action { height: auto; padding: 1px 8px; border-radius: 10px; font-size: var(--font-ui-smaller); color: var(--text-muted); background: transparent; border: 1px solid var(--background-modifier-border); box-shadow: none; }
+.czm-style-tooltip-action:hover { color: var(--text-normal); background: var(--background-modifier-hover); }

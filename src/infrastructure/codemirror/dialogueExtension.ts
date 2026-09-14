@@ -24,6 +24,14 @@ export const rostersFacet = Facet.define<RostersByScope, RostersByScope>({
   combine: (values) => values[values.length - 1] ?? {},
 });
 
+/** What the box can do to a character note; the host supplies it. `add` false removes. */
+export interface AccentActions {
+  editAccent(speaker: Speaker, list: "accent" | "accent-never", term: string, add: boolean): void;
+}
+
+/** The speaker of the cursor's paragraph, for the host's commands; provided by the extension. */
+export const speakerAtCursor = Facet.define<(view: EditorView) => Speaker | null>();
+
 export const SPEECH_CLASS = "czm-speech";
 export const THOUGHT_CLASS = "czm-thought";
 export const NARRATION_CLASS = "czm-narration";
@@ -129,7 +137,7 @@ function accentHits(p: { from: number; text: string; spans: readonly DialogueSpa
  * is sure about. The whole note is analysed (turn-taking needs what came
  * before) on every edit; decorating is bounded by the viewport.
  */
-export function dialogueExtension(pathOf: (state: EditorState) => string | null) {
+export function dialogueExtension(pathOf: (state: EditorState) => string | null, actions: AccentActions | null = null) {
   const plugin = ViewPlugin.fromClass(class {
     decorations: DecorationSet = Decoration.none;
     paragraphs: Analysed[] = [];
@@ -198,10 +206,20 @@ export function dialogueExtension(pathOf: (state: EditorState) => string | null)
       if (!this.attributed) return [];
       const words: HoverFinding[] = [];
       for (const p of this.visible(view)) {
-        const who = p.attribution;
-        for (const h of p.accents) words.push({ from: h.from, to: h.to, kind: h.never ? "accent-never" : "accent", note: h.never ? `${who!.speaker.name} never says this · accent-never in the character note` : `${who!.speaker.name} · accent` });
+        const who = p.attribution?.speaker;
+        if (!who) continue;
+        for (const h of p.accents) {
+          const f: HoverFinding = { from: h.from, to: h.to, kind: h.never ? "accent-never" : "accent", note: h.never ? `${who.name} never says this · accent-never in the character note` : `${who.name} · accent` };
+          words.push(actions ? { ...f, actions: [{ label: `Remove "${h.term}" from ${who.name}'s ${h.never ? "never-say list" : "accent"}`, run: () => actions.editAccent(who, h.never ? "accent-never" : "accent", h.term, false) }] } : f);
+        }
       }
       return words;
+    }
+    /** The speaker the cursor's paragraph is pinned or attributed to, when certain. */
+    speakerAt(view: EditorView): Speaker | null {
+      const pos = view.state.selection.main.head;
+      const p = this.paragraphs.find((q) => pos >= q.from && pos <= q.to);
+      return p?.attribution && isCertain(p.attribution.how) ? p.attribution.speaker : null;
     }
     /** What the speaker box reads; null when there is nothing to tag. */
     boxData(view: EditorView): BoxData | null {
@@ -213,6 +231,7 @@ export function dialogueExtension(pathOf: (state: EditorState) => string | null)
   return [
     plugin,
     findingProviders.of((view) => view.plugin(plugin)?.findings(view) ?? []),
+    speakerAtCursor.of((view) => view.plugin(plugin)?.speakerAt(view) ?? null),
     speakerBox((view) => view.plugin(plugin)?.boxData(view) ?? null),
   ];
 }

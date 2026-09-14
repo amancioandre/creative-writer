@@ -10,9 +10,17 @@ import { pathInScope } from "../../domain/scope/NoteScope";
 export interface WordLists {
   readonly vault: readonly WordCategory[];
   readonly byScope: Readonly<Record<string, readonly WordCategory[]>>;
+  /** Where each list came from, so an edit from the box lands in the right note. */
+  readonly vaultPath?: string | null;
+  readonly scopePaths?: Readonly<Record<string, string>>;
 }
 
 export const EMPTY_WORD_LISTS: WordLists = { vault: [], byScope: {} };
+
+/** What the box can do to a list; the host supplies it, with the vault behind it. */
+export interface WordsActions {
+  removeTerm(notePath: string, term: string): void;
+}
 
 export const wordListsFacet = Facet.define<WordLists, WordLists>({
   combine: (values) => values[values.length - 1] ?? EMPTY_WORD_LISTS,
@@ -20,16 +28,22 @@ export const wordListsFacet = Facet.define<WordLists, WordLists>({
 
 export const WORDS_MARK_CLASS = "czm-words";
 
+function scopeFor(lists: WordLists, path: string | null): string | null {
+  let best: string | null = null;
+  if (path !== null) for (const scope of Object.keys(lists.byScope)) if (pathInScope(path, scope) && (best === null || scope.length > best.length)) best = scope;
+  return best;
+}
+
 /** A note inside a project that names its own list uses that; the most specific scope wins; everything else uses the vault-wide note. */
 export function listsFor(lists: WordLists, path: string | null): readonly WordCategory[] {
-  if (path !== null) {
-    let best: string | null = null;
-    for (const scope of Object.keys(lists.byScope)) {
-      if (pathInScope(path, scope) && (best === null || scope.length > best.length)) best = scope;
-    }
-    if (best !== null) return lists.byScope[best]!;
-  }
-  return lists.vault;
+  const best = scopeFor(lists, path);
+  return best === null ? lists.vault : lists.byScope[best]!;
+}
+
+/** The note the list for `path` was read from, when the host said. */
+export function sourceOf(lists: WordLists, path: string | null): string | null {
+  const best = scopeFor(lists, path);
+  return (best === null ? lists.vaultPath : lists.scopePaths?.[best]) ?? null;
 }
 
 const matchers = new WeakMap<readonly WordCategory[], WordMatcher>();
@@ -44,7 +58,7 @@ function matcherFor(categories: readonly WordCategory[]): WordMatcher {
  * in the visible part of the editor. Work is bounded by the viewport; the
  * per-note count in the tooltip is computed only on hover.
  */
-export function wordsExtension(pathOf: (state: EditorState) => string | null) {
+export function wordsExtension(pathOf: (state: EditorState) => string | null, actions: WordsActions | null = null) {
   const plugin = ViewPlugin.fromClass(class {
     decorations: DecorationSet = Decoration.none;
     /** Absolute offsets, in document order, for the tooltip. */
@@ -79,9 +93,12 @@ export function wordsExtension(pathOf: (state: EditorState) => string | null) {
       if (!matcher || this.matches.length === 0) return [];
       const counts = new Map<string, number>();
       for (const m of matcher.findAll(view.state.doc.toString())) counts.set(m.term, (counts.get(m.term) ?? 0) + 1);
+      const source = sourceOf(view.state.facet(wordListsFacet), pathOf(view.state));
       return this.matches.map((m) => {
         const n = counts.get(m.term) ?? 1;
-        return { from: m.from, to: m.to, kind: "words", note: `${matcher.categories[m.category]!.name} · ${n} in this note` };
+        const category = matcher.categories[m.category]!.name;
+        const f: HoverFinding = { from: m.from, to: m.to, kind: "words", note: `${category} · ${n} in this note` };
+        return actions && source ? { ...f, actions: [{ label: `Remove "${m.term}" from ${category}`, run: () => actions.removeTerm(source, m.term) }] } : f;
       });
     }
   }, { decorations: (v) => v.decorations });

@@ -6,6 +6,13 @@ export interface HoverFinding {
   readonly to: number;
   readonly kind: string;
   readonly note: string;
+  /** What the writer can do about it from the box: a button each. */
+  readonly actions?: readonly HoverAction[];
+}
+
+export interface HoverAction {
+  readonly label: string;
+  readonly run: () => void;
 }
 
 export type FindingProvider = (view: EditorView) => readonly HoverFinding[];
@@ -33,6 +40,10 @@ export function tooltipFor(f: HoverFinding): Tooltip {
       const dom = createDiv({ cls: `czm-style-tooltip czm-style-tooltip-${f.kind}` });
       dom.createDiv({ cls: "czm-style-tooltip-kind", text: f.kind });
       dom.createDiv({ text: f.note });
+      if (f.actions?.length) {
+        const row = dom.createDiv({ cls: "czm-style-tooltip-actions" });
+        for (const a of f.actions) row.createEl("button", { cls: "czm-style-tooltip-action", text: a.label, attr: { type: "button" } }).addEventListener("click", () => a.run());
+      }
       // hoverTooltip nests this inside a host `.cm-tooltip`; tag the host so styles.css can theme it without `:has()`.
       return { dom, mount: () => dom.parentElement?.classList.add("czm-style-tooltip-host") };
     },

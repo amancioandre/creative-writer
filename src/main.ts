@@ -1,5 +1,6 @@
-import { MarkdownRenderer, MarkdownView, Notice, Plugin, editorInfoField, type Constructor, type View, type WorkspaceLeaf } from "obsidian";
+import { MarkdownRenderer, MarkdownView, Notice, Plugin, editorInfoField, type Constructor, type Editor, type FuzzyMatch, type View, type WorkspaceLeaf } from "obsidian";
 import { Compartment } from "@codemirror/state";
+import type { EditorView } from "@codemirror/view";
 
 import type { PluginSettings } from "./domain/settings/Settings";
 import { ToggleZenMode } from "./application/use-cases/ToggleZenMode";
@@ -48,9 +49,11 @@ import { splitScenes } from "./domain/text/Scenes";
 import { inScope, parseProjectFrontmatter, projectConventions, projectStatus, projectStreak, recentAdded, type ProjectSpec, type ProjectStatus } from "./domain/progress/Project";
 import { enabledStyleKinds } from "./domain/settings/Settings";
 import { LENS_LABELS, nextLens, toggleLens, type Lens } from "./domain/lens/Lens";
-import { EMPTY_WORD_LISTS, wordListsFacet, wordsExtension } from "./infrastructure/codemirror/wordsExtension";
+import { EMPTY_WORD_LISTS, listsFor, sourceOf, wordListsFacet, wordsExtension, type WordLists } from "./infrastructure/codemirror/wordsExtension";
+import { addTerm, removeTerm } from "./domain/words/WordList";
 import { lensExtension } from "./infrastructure/codemirror/lensExtension";
-import { conventionsFacet, dialogueExtension, rostersFacet, type ConventionsByScope, type RostersByScope } from "./infrastructure/codemirror/dialogueExtension";
+import { conventionsFacet, dialogueExtension, rostersFacet, speakerAtCursor, type ConventionsByScope, type RostersByScope } from "./infrastructure/codemirror/dialogueExtension";
+import type { Speaker } from "./domain/dialogue/Speakers";
 import { buildRoster } from "./domain/dialogue/Speakers";
 import { resolveConventions } from "./domain/dialogue/DialogueSpans";
 import { pinLine } from "./domain/dialogue/Voices";
@@ -157,6 +160,7 @@ export default class CreativeZenModePlugin extends Plugin {
   private readonly rostersCompartment = new Compartment();
   /** The notes the Words lens read last, so a change to one of them reloads the lists. */
   private wordListPaths: readonly string[] = [];
+  private wordLists: WordLists = EMPTY_WORD_LISTS;
   private wordListsKey = "";
   private lensStatus: HTMLElement | null = null;
   /** The one scope rule: what the editor runs in is what the log, the projects and the story map count. */
@@ -206,6 +210,33 @@ export default class CreativeZenModePlugin extends Plugin {
     this.addCommand({ id: "lens-dialogue", name: COMMANDS["lens-dialogue"], callback: () => void this.setLens(toggleLens(this.current.lens, "dialogue")) });
     this.addCommand({ id: "lens-words", name: COMMANDS["lens-words"], callback: () => void this.setLens(toggleLens(this.current.lens, "words")) });
     this.addCommand({ id: "lens-accents", name: COMMANDS["lens-accents"], callback: () => void this.setLens(toggleLens(this.current.lens, "accents")) });
+    // The lenses' hands: the word under the cursor into a list, or into a character's accent.
+    this.addCommand({
+      id: "words-add",
+      name: COMMANDS["words-add"],
+      editorCallback: (editor, view) => {
+        const word = wordAtCursor(editor);
+        if (!word) { new Notice("creative-writer: put the cursor on a word, or select a phrase."); return; }
+        const path = (view as MarkdownView).file?.path ?? null;
+        const note = sourceOf(this.wordLists, path) ?? this.current.words.note;
+        const categories = listsFor(this.wordLists, path).map((c) => c.name);
+        new CategoryModal(this.app, categories, word, (category) => void this.addWord(note, category, word)).open();
+      },
+    });
+    for (const [id, list] of [["accents-add", "accent"], ["accents-never", "accent-never"]] as const) {
+      this.addCommand({
+        id,
+        name: COMMANDS[id],
+        editorCallback: (editor, view) => {
+          const word = wordAtCursor(editor);
+          if (!word) { new Notice("creative-writer: put the cursor on a word, or select a phrase."); return; }
+          const cm = (view as MarkdownView & { editor: { cm?: EditorView } }).editor.cm;
+          const speaker = cm ? cm.state.facet(speakerAtCursor).map((f) => f(cm)).find((s) => s !== null) ?? null : null;
+          if (!speaker) { new Notice("creative-writer: this line has no certain speaker. Switch to the dialogue or accents lens and pin one first."); return; }
+          void this.editAccent(speaker, list, word, true);
+        },
+      });
+    }
     this.addCommand({
       id: "dialogue-tag-speaker",
       name: COMMANDS["dialogue-tag-speaker"],
@@ -733,8 +764,8 @@ export default class CreativeZenModePlugin extends Plugin {
       this.rostersCompartment.of(rostersFacet.of(this.projectRosters())),
       activeNoteExtension((state) => state.field(editorInfoField, false)?.file?.path ?? null),
       lensExtension(),
-      dialogueExtension((state) => state.field(editorInfoField, false)?.file?.path ?? null),
-      wordsExtension((state) => state.field(editorInfoField, false)?.file?.path ?? null),
+      dialogueExtension((state) => state.field(editorInfoField, false)?.file?.path ?? null, { editAccent: (speaker, list, term, add) => void this.editAccent(speaker, list, term, add) }),
+      wordsExtension((state) => state.field(editorInfoField, false)?.file?.path ?? null, { removeTerm: (path, term) => void this.editNote(path, (text) => removeTerm(text, term)) }),
       readabilityStatusExtension(profile, (p) => {
         readability.setText(statusLabel(p));
         readability.title = p?.readingEase ? `${p.readingEase.band.hint}${p.variety ? `\n${p.variety.band.hint}` : ""}` : "";
@@ -801,6 +832,7 @@ export default class CreativeZenModePlugin extends Plugin {
       resolveLink: (link, from) => this.app.metadataCache.getFirstLinkpathDest(link.replace(/\.md$/i, ""), from)?.path ?? null,
     }, this.current.words.note, projects);
     this.wordListPaths = loaded.paths;
+    this.wordLists = loaded.lists;
     const key = JSON.stringify(loaded.lists);
     if (key === this.wordListsKey) return;
     this.wordListsKey = loaded.paths.length === 0 ? "" : key;
@@ -808,6 +840,29 @@ export default class CreativeZenModePlugin extends Plugin {
       const editor = (leaf.view as { editor?: { cm?: { dispatch: (spec: unknown) => void } } }).editor;
       editor?.cm?.dispatch({ effects: this.wordsCompartment.reconfigure(wordListsFacet.of(loaded.lists)) });
     });
+  }
+
+  /** `term` into the word list note under `category`; the note is created when it is not there yet. */
+  private async addWord(note: string, category: string, term: string): Promise<void> {
+    const io = vaultNoteIO(this.app.vault);
+    if (!(await io.exists(note))) await io.write(note, "");
+    await this.editNote(note, (text) => addTerm(text, category, term));
+    new Notice(`Words: "${term}" under ${category} in ${note}`);
+    await this.reloadWordLists();
+  }
+
+  /** A word into, or out of, a character note's accent list; a speaker with no note (a bare pin) has nowhere to keep it. */
+  private async editAccent(speaker: Speaker, list: "accent" | "accent-never", term: string, add: boolean): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(speaker.id);
+    if (!(file instanceof TFile)) { new Notice(`creative-writer: ${speaker.name} has no character note to keep the accent in.`); return; }
+    const word = term.trim().toLowerCase();
+    await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
+      const raw = fm[list];
+      const items = (Array.isArray(raw) ? raw : typeof raw === "string" ? raw.split(",") : []).filter((x): x is string => typeof x === "string").map((x) => x.trim()).filter(Boolean);
+      const next = add ? (items.some((x) => x.toLowerCase() === word) ? items : [...items, word]) : items.filter((x) => x.toLowerCase() !== word);
+      if (next.length) fm[list] = next; else delete fm[list];
+    });
+    new Notice(add ? `Accents: "${word}" is ${speaker.name}'s${list === "accent-never" ? " never-say" : ""}` : `Accents: "${word}" removed from ${speaker.name}`);
   }
 
   /** A note came into view: its size is the baseline for what follows, even if the scope later lets it in. */
@@ -1281,4 +1336,32 @@ export default class CreativeZenModePlugin extends Plugin {
       editor?.cm?.dispatch({ effects: this.settingsCompartment.reconfigure(settingsFacet.of(next)) });
     });
   }
+}
+
+/** The selection, or the word under the cursor. */
+function wordAtCursor(editor: Editor): string | null {
+  const selected = editor.getSelection().trim();
+  if (selected) return selected;
+  const range = editor.wordAt(editor.getCursor());
+  return range ? editor.getRange(range.from, range.to).trim() || null : null;
+}
+
+/** Which category the word goes under: the list's headings, or a new one typed in. */
+class CategoryModal extends FuzzySuggestModal<string> {
+  constructor(app: App, private readonly categories: readonly string[], word: string, private readonly onPick: (category: string) => void) {
+    super(app);
+    this.setPlaceholder(`A category for "${word}"…`);
+  }
+  getItems(): string[] { return [...this.categories]; }
+  getItemText(item: string): string { return item; }
+  getSuggestions(query: string): FuzzyMatch<string>[] {
+    const found = super.getSuggestions(query);
+    const q = query.trim();
+    if (q && !this.categories.some((c) => c.toLowerCase() === q.toLowerCase())) found.push({ item: q, match: { score: 0, matches: [] } });
+    return found;
+  }
+  renderSuggestion(match: FuzzyMatch<string>, el: HTMLElement): void {
+    el.setText(this.categories.includes(match.item) ? match.item : `New category: ${match.item}`);
+  }
+  onChooseItem(item: string): void { this.onPick(item); }
 }

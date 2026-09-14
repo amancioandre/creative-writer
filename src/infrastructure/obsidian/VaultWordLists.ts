@@ -34,13 +34,15 @@ export async function loadWordLists(vault: WordListVault, vaultNote: string, pro
     return parseWordLists(await vault.read(path));
   };
   const shared = (await readLists(vaultNote)) ?? [];
+  const vaultPath = paths.includes(vaultNote) ? vaultNote : null;
   const byScope: Record<string, readonly WordCategory[]> = {};
+  const scopePaths: Record<string, string> = {};
   for (const p of projects) {
     if (!p.wordsNote) continue;
     const path = vault.resolveLink(p.wordsNote, p.notePath);
     if (!path) continue;
     const lists = await readLists(path);
-    if (lists) byScope[p.scope] = lists;
+    if (lists) { byScope[p.scope] = lists; scopePaths[p.scope] = path; }
   }
-  return { lists: { vault: shared, byScope }, paths };
+  return { lists: { vault: shared, byScope, vaultPath, scopePaths }, paths };
 }

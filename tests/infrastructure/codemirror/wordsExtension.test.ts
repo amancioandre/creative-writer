@@ -8,6 +8,8 @@ const DOC = "She felt the cold and then she turned.\n\nThen nothing.";
 const LISTS: WordLists = {
   vault: parseWordLists("## Filtering\nfelt\n## Stage direction\ncolour: #7a4fd6\nthen, and then"),
   byScope: { "book/": parseWordLists("## Motions\nturned") },
+  vaultPath: "Bad words.md",
+  scopePaths: { "book/": "book/Words.md" },
 };
 const marks = (h: Harness) => Array.from(h.view.dom.querySelectorAll<HTMLElement>(".czm-words"));
 const ext = (path: string | null, lists: WordLists = LISTS) => [wordListsFacet.of(lists), wordsExtension(() => path)];
@@ -60,5 +62,23 @@ describe("listsFor", () => {
     expect(listsFor(lists, "book/ch.md")[0]!.name).toBe("B");
     expect(listsFor(lists, "elsewhere.md")[0]!.name).toBe("V");
     expect(listsFor(lists, null)[0]!.name).toBe("V");
+  });
+});
+
+describe("wordsExtension — actions", () => {
+  let h: Harness;
+  afterEach(() => h?.destroy());
+
+  it("offers to remove the word from its list, naming the note the list came from", () => {
+    const removed: [string, string][] = [];
+    h = mount(DOC, [wordListsFacet.of(LISTS), wordsExtension(() => "book/ch1.md", { removeTerm: (p, t) => { removed.push([p, t]); } })], { lens: "words" });
+    const f = allFindings(h.view)[0]!;
+    expect(f.actions?.map((a) => a.label)).toEqual(['Remove "turned" from Motions']);
+    f.actions![0]!.run();
+    expect(removed).toEqual([["book/Words.md", "turned"]]);
+  });
+  it("offers nothing without a host to write, or a note to write to", () => {
+    h = mount(DOC, ext("notes/ch1.md", { ...LISTS, vaultPath: null }), { lens: "words" });
+    expect(allFindings(h.view)[0]!.actions).toBeUndefined();
   });
 });

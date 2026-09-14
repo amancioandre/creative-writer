@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { styleExtension } from "../../../src/infrastructure/codemirror/styleExtension";
-import { findingAt, tooltipFor, tooltipSource } from "../../../src/infrastructure/codemirror/findingsTooltip";
+import { allFindings, findingAt, tooltipFor, tooltipSource } from "../../../src/infrastructure/codemirror/findingsTooltip";
 import { AnalyzeParagraphStyle } from "../../../src/application/use-cases/AnalyzeParagraphStyle";
 import { Finding } from "../../../src/domain/style/Finding";
 import { mount, type Harness } from "./helpers";
@@ -71,5 +71,22 @@ describe("hover tooltip", () => {
     h.moveCursor(1);
     expect(tooltipSource(h.view, 2)?.pos).toBe(0);
     expect(tooltipSource(h.view, DOC.length - 2)).toBeNull();
+  });
+});
+
+describe("styleExtension — not here", () => {
+  let h: Harness;
+  afterEach(() => h?.destroy());
+
+  it("offers \"not a cliché here\" on the hover, writes the comment at the end of the paragraph, and the finding is gone", () => {
+    h = mount(DOC, ext());
+    h.moveCursor(1);
+    const fs = allFindings(h.view);
+    expect(fs.map((f) => f.actions?.map((a) => a.label))).toEqual([["Not a cliché here"], ["Not a passive here"]]);
+    fs[0]!.actions![0]!.run();
+    expect(h.view.state.doc.toString()).toBe("At the end of the day she was seen. %% not cliche %%\n\nClean paragraph here.");
+    expect(marks(h).map((m) => m.textContent)).toEqual(["was seen"]);
+    const dom = tooltipFor(allFindings(h.view)[0]!).create(h.view).dom;
+    expect(dom.querySelector(".czm-style-tooltip-action")?.textContent).toBe("Not a passive here");
   });
 });

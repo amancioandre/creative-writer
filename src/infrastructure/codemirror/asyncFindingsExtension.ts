@@ -3,6 +3,7 @@ import { type EditorState, StateEffect, StateField } from "@codemirror/state";
 import { EditorView, ViewPlugin, type ViewUpdate, Decoration } from "@codemirror/view";
 import { settingsFacet, settingsChanged } from "./settingsFacet";
 import { cursorParagraph } from "./cursorParagraph";
+import { suppressedKinds } from "../../domain/style/Suppress";
 import { decorateFindings } from "./findingDecorations";
 import { findingProviders } from "./findingsTooltip";
 import { syncFindingsField } from "./styleExtension";
@@ -55,7 +56,8 @@ export function asyncFindingsExtension(analyser: ParagraphAnalyser, options: Par
     const r = state.field(results);
     if (r.key !== ScheduleAnalysis.keyFor(p.text)) return [];
     const sync = state.facet(syncFindingsField).flatMap((f) => state.field(f));
-    return r.findings.filter((f) => enabled.has(f.kind) && !sync.some((s) => s.kind === f.kind && f.from < s.to && f.to > s.from));
+    const not = suppressedKinds(p.text);
+    return r.findings.filter((f) => enabled.has(f.kind) && !not.has(f.kind) && !sync.some((s) => s.kind === f.kind && f.from < s.to && f.to > s.from));
   }
 
   const decorations = EditorView.decorations.compute([results, settingsFacet, activeField, "selection", "doc"], (state) => {
