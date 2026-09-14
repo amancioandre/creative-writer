@@ -35,6 +35,8 @@ export interface ManuscriptSource {
   exportNote(project: ProjectSpec): Promise<string>;
   /** Appends ` %% comment %%` to the end of a line of the note, through its open editor when there is one. */
   appendComment(path: string, line: number, comment: string): Promise<void>;
+  /** Resolves the comment opening at (line, ch), or reopens it: a trailing check mark inside the comment. */
+  toggleResolved(path: string, line: number, ch: number): Promise<void>;
   /** Readability, today's words, and — with `story` — cast and contradictions for these notes. */
   facts(project: ProjectSpec, paths: readonly string[], story: boolean, echoes?: boolean): Promise<StoryFacts>;
   storyColors(): Readonly<Record<EntityKind, string>>;
@@ -489,8 +491,9 @@ export class ManuscriptView extends ItemView {
       }
     }
     const all = this.annotations();
+    const open = all.filter(({ a }) => !a.resolved).length;
     const title = pane.createDiv({ cls: "czm-ms-side-title" });
-    title.createSpan({ text: all.length ? `All comments (${all.length})` : "All comments" });
+    title.createSpan({ text: all.length ? `All comments (${open === all.length ? all.length : `${open} open of ${all.length}`})` : "All comments" });
     if (all.length === 0) { pane.createEl("p", { text: "None in the manuscript yet.", cls: "czm-ms-hint" }); return; }
     const tags = [...new Set(all.map(({ a }) => tagKey(a)))].sort();
     const filter = title.createEl("select", { cls: "dropdown", attr: { "aria-label": "Show comments with tag" } });
@@ -506,10 +509,10 @@ export class ManuscriptView extends ItemView {
       if (entry.item !== last) {
         last = entry.item;
         group = list.createDiv({ cls: "czm-ms-cm-group" });
-        const n = shown.filter((e) => e.item === entry.item).length;
+        const n = shown.filter((e) => e.item === entry.item && !e.a.resolved).length;
         const head = group.createDiv({ cls: "czm-ms-cm-head" });
         head.createSpan({ text: entry.item.title, cls: "czm-ms-cm-head-title" });
-        head.createSpan({ text: String(n), cls: "czm-ms-cm-head-count" });
+        head.createSpan({ text: String(n), cls: "czm-ms-cm-head-count", attr: { title: `${n} open` } });
       }
       this.renderRows(group!, [entry], settings.tags, false);
     }
@@ -521,13 +524,24 @@ export class ManuscriptView extends ItemView {
   /** Comment rows: a tag badge in its colour, the text, and where it is. Arrows move, Enter opens the editor, Escape returns to the page. */
   private renderRows(parent: HTMLElement, rows: readonly { item: Pick<NoteItem, "title" | "path">; a: Annotation }[], tags: readonly TagSpec[], where: boolean): void {
     rows.forEach(({ item, a }, i) => {
-      const row = parent.createDiv({ cls: "czm-ms-cm-row", attr: { role: "button", tabindex: i === 0 ? "0" : "-1" } });
+      const row = parent.createDiv({ cls: `czm-ms-cm-row${a.resolved ? " is-resolved" : ""}`, attr: { role: "button", tabindex: i === 0 ? "0" : "-1" } });
       const badge = row.createSpan({ text: a.kind === "highlight" ? "mark" : a.tag ?? "note", cls: `czm-ms-cm-badge${a.kind === "highlight" ? " is-highlight" : ""}` });
       const color = colorOf(a.tag, tags);
       if (color) badge.style.setProperty("--czm-tag", color);
       row.createSpan({ text: a.text.length > 160 ? `${a.text.slice(0, 160)}…` : a.text, cls: "czm-ms-cm-text" });
       if (where) row.createSpan({ text: item.title, cls: "czm-ms-cm-where" });
       const anchor = "block" in rows[i]! ? this.anchorText((rows[i] as { block: ManuscriptBlock | null }).block) : "";
+      if (a.kind === "comment") {
+        // Resolve is a trailing check mark inside the comment; one more click takes it out again.
+        const done = row.createEl("button", { cls: "czm-ms-cm-resolve", text: "✓", attr: { type: "button", tabindex: "-1", "aria-label": a.resolved ? "Reopen" : "Resolve", title: a.resolved ? "Reopen: take the check mark out of the comment" : "Resolve: a check mark at the end of the comment", "aria-pressed": a.resolved ? "true" : "false" } });
+        done.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          void this.source.toggleResolved(item.path, a.line, a.ch).then(
+            () => new Notice(a.resolved ? "Reopened" : "Resolved · ✓ again reopens it", 3000),
+            (e: unknown) => { new Notice(`creative-writer: could not ${a.resolved ? "reopen" : "resolve"} the comment in ${item.title}: ${e instanceof Error ? e.message : String(e)}. The note was not changed.`, 8000); },
+          );
+        });
+      }
       if (anchor) row.createSpan({ text: anchor, cls: "czm-ms-cm-anchor", attr: { title: anchor } });
       // Click: the page goes to the paragraph and the editor follows. Double click or Shift+Enter: into the editor at the comment.
       row.addEventListener("click", () => this.goTo(item.path, a.line, (b) => b.annotations.includes(a)));
@@ -550,6 +564,7 @@ export class ManuscriptView extends ItemView {
       else if ((ev.key === "Enter" || ev.key === " ") && ev.shiftKey) { ev.preventDefault(); items[at]!.dispatchEvent(new MouseEvent("dblclick")); }
       else if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); items[at]!.click(); }
       else if (ev.key === "Escape") { ev.preventDefault(); this.activeEl()?.focus(); }
+      else if (ev.key === "r" && !ev.ctrlKey && !ev.metaKey && !ev.altKey) { ev.preventDefault(); items[at]!.querySelector<HTMLButtonElement>(".czm-ms-cm-resolve")?.click(); }
     });
   }
 
@@ -605,8 +620,8 @@ export class ManuscriptView extends ItemView {
         // One dot per comment in the gutter, in its tag's colour; the tooltip says what it is, the box says the rest.
         const marks = b.createSpan({ cls: "czm-ms-marks" });
         for (const a of block.annotations) {
-          const label = a.kind === "highlight" ? `Highlight: ${a.text}` : `${a.tag ? `${a.tag}: ` : ""}${a.text}`;
-          const dot = marks.createSpan({ cls: `czm-ms-mark${a.kind === "highlight" ? " is-highlight" : ""}`, attr: { title: label, "aria-label": label } });
+          const label = `${a.kind === "highlight" ? `Highlight: ${a.text}` : `${a.tag ? `${a.tag}: ` : ""}${a.text}`}${a.resolved ? " (resolved)" : ""}`;
+          const dot = marks.createSpan({ cls: `czm-ms-mark${a.kind === "highlight" ? " is-highlight" : ""}${a.resolved ? " is-resolved" : ""}`, attr: { title: label, "aria-label": label } });
           const color = colorOf(a.tag, settings.tags);
           if (color) dot.style.setProperty("--czm-tag", color);
         }

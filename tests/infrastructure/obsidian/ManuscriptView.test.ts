@@ -12,7 +12,7 @@ const novel: ProjectSpec = { name: "Novel", scope: "Novel/", targetWords: 1, dea
 const seg = new IntlSentenceSegmenter();
 
 function open(notes: ManuscriptNote[], overrides: Partial<ManuscriptSource> = {}) {
-  const calls = { revealed: [] as [string, number, number, boolean][], links: [] as string[], renders: 0, exported: [] as string[], comments: [] as [string, number, string][], facts: [] as [string[], boolean][], promoted: [] as [string, string][], ignored: [] as string[], builds: 0 };
+  const calls = { revealed: [] as [string, number, number, boolean][], links: [] as string[], renders: 0, exported: [] as string[], comments: [] as [string, number, string][], resolved: [] as [string, number, number][], facts: [] as [string[], boolean][], promoted: [] as [string, string][], ignored: [] as string[], builds: 0 };
   let settings: ManuscriptSettings = DEFAULT_MANUSCRIPT;
   const src: ManuscriptSource = {
     projects: () => [novel],
@@ -26,6 +26,7 @@ function open(notes: ManuscriptNote[], overrides: Partial<ManuscriptSource> = {}
     updateSettings: (next) => { settings = next; },
     exportNote: async (p) => { calls.exported.push(p.name); return "Novel/Novel (manuscript).md"; },
     appendComment: async (p, l, c) => { calls.comments.push([p, l, c]); },
+    toggleResolved: async (p, l, c) => { calls.resolved.push([p, l, c]); },
     facts: async (_p, paths, story) => { calls.facts.push([[...paths], story]); return EMPTY_FACTS; },
     storyColors: () => DEFAULT_STORY_COLORS,
     promote: async (_p, name, kind) => { calls.promoted.push([name, kind]); return `Novel/Characters/${name}.md`; },
@@ -243,6 +244,10 @@ describe("ManuscriptView", () => {
     expect(blocks[1]!.classList.contains("is-active")).toBe(true);
     expect(calls.revealed.at(-1)).toEqual(["Novel/One.md", 2, 0, false]);
     expect(document.activeElement).toBe(rows()[2]);
+    // Resolve is a check mark on the row; a highlight has none; r on the focused row presses it.
+    expect(rows().map((r) => r.querySelector(".czm-ms-cm-resolve")?.getAttribute("aria-label") ?? null)).toEqual(["Resolve", null, "Resolve"]);
+    key(rows()[2]!, "r");
+    expect(calls.resolved).toEqual([["Novel/One.md", 2, 5]]);
     expect(v.contentEl.querySelector(".czm-ms-side-para")?.textContent).toContain("End.");
     key(rows()[2]!, "Enter", { shiftKey: true });
     expect(calls.revealed.at(-1)).toEqual(["Novel/One.md", 2, 5, true]);
@@ -400,5 +405,22 @@ describe("ManuscriptView", () => {
     const none = open([], { projects: () => [], activeProject: () => null });
     await none.v.onOpen();
     expect(none.v.contentEl.textContent).toContain("No project yet");
+  });
+});
+
+describe("resolved comments", () => {
+  it("dims a resolved row, counts only the open ones, and offers Reopen", async () => {
+    const text = "Marta woke. %% CHECK: the coat ✓ %% She stayed. %% TODO: more %%";
+    const { v } = open([{ path: "Novel/One.md", frontmatter: {}, text }]);
+    await v.onOpen();
+    const all = v.contentEl.querySelector<HTMLElement>(".czm-ms-side-all")!;
+    expect(all.querySelector(".czm-ms-side-title")!.textContent).toContain("All comments (1 open of 2)");
+    expect(all.querySelector(".czm-ms-cm-head-count")!.textContent).toBe("1");
+    const rows = [...all.querySelectorAll<HTMLElement>(".czm-ms-cm-row")];
+    expect(rows[0]!.classList.contains("is-resolved")).toBe(true);
+    expect(rows[0]!.querySelector(".czm-ms-cm-text")!.textContent).toBe("the coat");
+    expect(rows[0]!.querySelector(".czm-ms-cm-resolve")!.getAttribute("aria-label")).toBe("Reopen");
+    expect(rows[1]!.classList.contains("is-resolved")).toBe(false);
+    expect(v.contentEl.querySelector(".czm-ms-mark.is-resolved")).not.toBeNull();
   });
 });

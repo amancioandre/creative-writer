@@ -39,10 +39,17 @@ export function splitTag(text: string): { tag: string | null; body: string } {
   return m ? { tag: m[1]!, body: text.slice(m[0].length).trim() } : { tag: null, body: text.trim() };
 }
 
+/** A comment is resolved by a trailing check mark inside it: `%% TODO: the lamp ✓ %%`. The tag and the colour survive; the pane dims it. */
+export const RESOLVED_MARK = "✓";
+const RESOLVED_AT_END = /\s*✓\s*$/;
+
 export interface Annotation {
   readonly kind: "comment" | "highlight";
   readonly tag: string | null;
+  /** The comment without its tag prefix and without the resolved mark. */
   readonly text: string;
+  /** A comment that ends in the check mark; a highlight never is. */
+  readonly resolved: boolean;
   /** 0-based line and column of the opening marker in the note. */
   readonly line: number;
   readonly ch: number;
@@ -68,11 +75,12 @@ export function findAnnotations(markdown: string): Annotation[] {
     if (inSkipped(m.index)) continue;
     comments.push([m.index, m.index + m[0].length]);
     const { tag, body } = splitTag(m[1]!);
-    out.push({ kind: "comment", tag, text: body, ...at(m.index) });
+    const resolved = RESOLVED_AT_END.test(body);
+    out.push({ kind: "comment", tag, text: resolved ? body.replace(RESOLVED_AT_END, "") : body, resolved, ...at(m.index) });
   }
   for (const m of markdown.matchAll(HIGHLIGHT)) {
     if (inSkipped(m.index) || comments.some(([a, b]) => m.index >= a && m.index < b)) continue;
-    out.push({ kind: "highlight", tag: null, text: m[1]!.trim(), ...at(m.index) });
+    out.push({ kind: "highlight", tag: null, text: m[1]!.trim(), resolved: false, ...at(m.index) });
   }
   return out.sort((a, b) => a.line - b.line || a.ch - b.ch);
 }
@@ -92,6 +100,24 @@ function skippedRanges(markdown: string): [number, number][] {
   }
   if (open) out.push([open.index, markdown.length]);
   return out;
+}
+
+/**
+ * The note with the comment that opens at (line, ch) resolved, or reopened when it already is:
+ * the check mark goes in before the closing `%%`, or comes out. Anything else returns the text unchanged.
+ */
+export function toggleResolved(markdown: string, line: number, ch: number): string {
+  const lines = markdown.split("\n");
+  let index = 0;
+  for (let i = 0; i < line && i < lines.length; i++) index += lines[i]!.length + 1;
+  index += ch;
+  if (markdown.slice(index, index + 2) !== "%%") return markdown;
+  const close = markdown.indexOf("%%", index + 2);
+  if (close < 0) return markdown;
+  const inner = markdown.slice(index + 2, close);
+  const trimmed = inner.replace(/\s+$/, "");
+  const next = RESOLVED_AT_END.test(inner) ? `${inner.replace(RESOLVED_AT_END, "")} ` : `${trimmed} ${RESOLVED_MARK} `;
+  return `${markdown.slice(0, index + 2)}${next}${markdown.slice(close)}`;
 }
 
 /** The text with every `%% comment %%` removed: what a reader would count. */

@@ -621,11 +621,11 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-ms-legend { display: flex; flex-wrap: wrap; gap: 4px; }
 .czm-ms-legend-chip { cursor: pointer; border: 0; line-height: 1.6; }
 .czm-ms-legend-chip:hover { filter: brightness(1.1); }
-.czm-ms-cm-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 1px 8px; align-items: baseline; padding: 3px 10px 3px 0; cursor: pointer; border-radius: var(--radius-s); }
+.czm-ms-cm-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 1px 8px; align-items: baseline; padding: 3px 10px 3px 0; cursor: pointer; border-radius: var(--radius-s); }
 /* In the list the tag is a bar down the row's edge, so the comment stays the loudest thing on it. */
 .czm-ms-side-all .czm-ms-cm-row { padding-left: 8px; margin-left: 10px; border-left: 2px solid var(--czm-tag, var(--text-faint)); border-radius: 0; }
 .czm-ms-side-all .czm-ms-cm-badge { background: none; padding: 0; min-width: 0; color: var(--czm-tag, var(--text-muted)); }
-.czm-ms-cm-anchor { grid-column: 2 / 4; font-style: italic; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.czm-ms-cm-anchor { grid-column: 2 / 5; font-style: italic; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .czm-ms-cm-row:hover { background: var(--background-modifier-hover); }
 .czm-ms-cm-row:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -2px; }
 /* Badge text is the tag colour pulled toward the theme's text colour, so amber reads on white and navy reads on black. */
@@ -633,6 +633,14 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-ms-cm-badge.is-highlight { background: var(--text-highlight-bg); color: var(--text-normal); }
 .czm-ms-cm-text { flex: 1 1 auto; min-width: 0; white-space: normal; }
 .czm-ms-cm-where { flex: 0 0 auto; color: var(--text-faint); font-weight: normal; }
+/* Resolve: a check mark at the end of the comment. The row dims and keeps its colour; the button is the mark itself. */
+.czm-ms-cm-resolve { grid-column: 4; justify-self: end; border: 1px solid var(--background-modifier-border); background: none; box-shadow: none; padding: 0 5px; height: 18px; line-height: 16px; font-size: 0.8em; color: var(--text-faint); border-radius: var(--radius-s); cursor: pointer; opacity: 0; }
+.czm-ms-cm-row:hover .czm-ms-cm-resolve, .czm-ms-cm-row:focus-within .czm-ms-cm-resolve, .czm-ms-cm-resolve[aria-pressed="true"] { opacity: 1; }
+.czm-ms-cm-resolve:hover { color: var(--text-normal); border-color: var(--text-muted); }
+.czm-ms-cm-resolve[aria-pressed="true"] { color: var(--text-success); border-color: transparent; }
+.czm-ms-cm-row.is-resolved .czm-ms-cm-text, .czm-ms-cm-row.is-resolved .czm-ms-cm-badge, .czm-ms-cm-row.is-resolved .czm-ms-cm-anchor { opacity: 0.45; }
+.czm-ms-cm-row.is-resolved .czm-ms-cm-text { text-decoration: line-through; }
+.czm-ms-mark.is-resolved { opacity: 0.35; }
 
 /* --- Comment tags in the editor --------------------------------------------- */
 .cm-line .czm-tag { background: color-mix(in srgb, var(--czm-tag, var(--text-accent)) 24%, transparent); color: var(--czm-tag, var(--text-accent)); border-radius: 2px; font-weight: 600; }

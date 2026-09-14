@@ -74,6 +74,7 @@ import { ExportManuscript } from "./application/use-cases/ExportManuscript";
 import { MANUSCRIPT_VIEW_TYPE, ManuscriptView } from "./infrastructure/obsidian/views/ManuscriptView";
 import type { PanelId } from "./infrastructure/obsidian/views/PanelShell";
 import { castFromGraph, conflictMarks, echoMarks, threadMarks, type SectionFacts } from "./domain/manuscript/StoryFacts";
+import { toggleResolved } from "./domain/manuscript/Comments";
 import { OllamaFactAnalyser } from "./infrastructure/llm/OllamaFactAnalyser";
 import { OllamaIntentAnalyser } from "./infrastructure/llm/OllamaIntentAnalyser";
 import { OllamaEmbedder } from "./infrastructure/llm/OllamaEmbedder";
@@ -522,6 +523,7 @@ export default class CreativeZenModePlugin extends Plugin {
       updateSettings: (next) => void this.updateSettings({ ...this.current, manuscript: next }),
       exportNote,
       appendComment: (path, line, comment) => this.appendComment(path, line, comment),
+      toggleResolved: (path, line, ch) => this.editNote(path, (text) => toggleResolved(text, line, ch)),
       // Readability from the same profiler as the desk, today's words from the log, cast and contradictions from the map and threads.
       facts: async (project, paths, story, echoes = false) => {
         const texts = new Map((await projectNotes.notes(project)).map((n) => [n.path, n.text ?? ""]));
@@ -832,6 +834,28 @@ export default class CreativeZenModePlugin extends Plugin {
       lines[at] = `${lines[at]}${insert}`;
       return lines.join("\n");
     });
+  }
+
+  /** Rewrites a note through its open editor when one shows it, so no unsaved keystroke is lost, else on disk. */
+  private async editNote(path: string, change: (text: string) => string): Promise<void> {
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+      const view = leaf.view;
+      if (view instanceof MarkdownView && view.file?.path === path) {
+        const before = view.editor.getValue();
+        const after = change(before);
+        if (after === before) return;
+        // Replace only the span that changed, so the cursor, the scroll and the undo history stay.
+        let start = 0;
+        while (start < before.length && start < after.length && before[start] === after[start]) start++;
+        let endB = before.length, endA = after.length;
+        while (endB > start && endA > start && before[endB - 1] === after[endA - 1]) { endB--; endA--; }
+        view.editor.replaceRange(after.slice(start, endA), view.editor.offsetToPos(start), view.editor.offsetToPos(endB));
+        return;
+      }
+    }
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) return;
+    await this.app.vault.process(file, change);
   }
 
   /** The text of a note as an open editor has it, or null when no editor shows it. */
