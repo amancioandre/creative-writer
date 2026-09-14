@@ -31,7 +31,7 @@ Settings → Writing → Paragraph rhythm · Settings → Lenses (the style chec
 
 ### Lenses
 
-A lens is a reading pass: it colours every open note one way at a time, so a tint always means one thing. **Style checks** is one lens; **Dialogue** is another (speech and thought tinted, narration dimmed, by the conventions of the project: quotes, single quotes or dash lines, a whole italic paragraph as a thought); **Words** is a third: your own overused words from a note of your own (`Creative Writer/Bad words.md`, one heading per category), tinted by category wherever they occur, a project able to keep its own list with `bad-words:` in its project note. The status bar shows the lens and cycles it on a click; every lens is a command under the `Lens:` prefix. Zen Mode shows no lens.
+A lens is a reading pass: it colours every open note one way at a time, so a tint always means one thing. **Style checks** is one lens; **Dialogue** is another (speech and thought tinted, narration dimmed, by the conventions of the project: quotes, single quotes or dash lines, a whole italic paragraph as a thought); **Accents** is a third (inside each speaker's own lines, the words their character note says they use and never say); **Words** is a fourth: your own overused words from a note of your own (`Creative Writer/Bad words.md`, one heading per category), tinted by category wherever they occur, a project able to keep its own list with `bad-words:` in its project note. The status bar shows the lens and cycles it on a click; every lens is a command under the `Lens:` prefix. Zen Mode shows no lens.
 
 ### Story map
 

@@ -16,12 +16,30 @@ export interface Speaker {
   readonly name: string;
   readonly aliases: readonly string[];
   readonly colour: string;
+  /** Words and phrases this character's speech uses (`accent:` in the note), lowercased. */
+  readonly accent: readonly string[];
+  /** Words this character never says (`accent-never:`), lowercased. */
+  readonly accentNever: readonly string[];
 }
 
 export const SPEAKER_PALETTE: readonly string[] = ["#4a8fe2", "#c8773a", "#3fa66b", "#8e5bd6", "#d64545", "#d9a621", "#48bbaa", "#e07b39"];
 export const UNATTRIBUTED_COLOUR = "#8a8a8a";
 
 const HEX = /^#[0-9a-f]{6}$/i;
+
+/** A list or a comma string of words, as the matcher wants them: trimmed, lowercased, straight apostrophes. */
+function wordsOf(frontmatter: unknown, key: string): string[] {
+  const fm = (frontmatter && typeof frontmatter === "object" ? frontmatter : {}) as Record<string, unknown>;
+  const raw = fm[key];
+  const items = Array.isArray(raw) ? raw : typeof raw === "string" ? raw.split(",") : [];
+  const out: string[] = [];
+  for (const item of items) {
+    if (typeof item !== "string") continue;
+    const w = item.trim().toLowerCase().replace(/[’ʼ‘]/g, "'");
+    if (w && !out.includes(w)) out.push(w);
+  }
+  return out;
+}
 
 function colourOf(frontmatter: unknown): string | null {
   const fm = (frontmatter && typeof frontmatter === "object" ? frontmatter : {}) as Record<string, unknown>;
@@ -42,7 +60,7 @@ export function buildRoster(notes: readonly EntityNote[], scope: string | null, 
   for (const n of notes) {
     if (entityKindOf(n) !== "character" || !inCast(n.path)) continue;
     const name = basenameOf(n.path);
-    cast.push({ id: n.path, name, aliases: aliasesOf(n.frontmatter).filter((a) => a !== name), colour: colourOf(n.frontmatter) ?? "" });
+    cast.push({ id: n.path, name, aliases: aliasesOf(n.frontmatter).filter((a) => a !== name), colour: colourOf(n.frontmatter) ?? "", accent: wordsOf(n.frontmatter, "accent"), accentNever: wordsOf(n.frontmatter, "accent-never") });
   }
   let list = cast;
   if (speakers && speakers.length > 0) {
@@ -54,7 +72,7 @@ export function buildRoster(notes: readonly EntityNote[], scope: string | null, 
       const pinned = m?.[2]?.toLowerCase();
       const key = normalise(label);
       const known = cast.find((c) => normalise(c.name) === key || c.aliases.some((a) => normalise(a) === key));
-      const speaker = known ?? { id: `speaker:${key}`, name: label, aliases: [], colour: "" };
+      const speaker = known ?? { id: `speaker:${key}`, name: label, aliases: [], colour: "", accent: [], accentNever: [] };
       if (!list.some((s) => s.id === speaker.id)) list.push(pinned ? { ...speaker, colour: pinned } : speaker);
     }
   }

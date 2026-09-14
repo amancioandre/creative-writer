@@ -4,7 +4,7 @@ import { DEFAULT_CONVENTIONS, findDialogue } from "../../../src/domain/dialogue/
 
 const notes = [
   { path: "Characters/Mara.md", frontmatter: { aliases: ["M."] } },
-  { path: "Characters/Tomas.md", frontmatter: { colour: "#C8773A", aliases: "the Roarthian" } },
+  { path: "Characters/Tomas.md", frontmatter: { colour: "#C8773A", aliases: "the Roarthian", accent: ["Aye", "ye’ll", "aye"], "accent-never": "my, yes, no" } },
   { path: "Novel/Cast/Ilse.md", frontmatter: { type: "character" } },
   { path: "Other/Cast/Nobody.md", frontmatter: { type: "character" } },
   { path: "Places/Roarth.md", frontmatter: {} },
@@ -20,6 +20,9 @@ describe("buildRoster", () => {
     expect(r[1]!.colour).toBe("#c8773a");
     expect(r[2]!.colour).toBe(SPEAKER_PALETTE[2]);
     expect(r[1]!.aliases).toEqual(["the Roarthian"]);
+    expect(r[1]!.accent).toEqual(["aye", "ye'll"]);
+    expect(r[1]!.accentNever).toEqual(["my", "yes", "no"]);
+    expect(r[0]!.accent).toEqual([]);
   });
   it("with no scope, every character note in the vault", () => {
     expect(buildRoster(notes, null, scopes).map((s) => s.name)).toEqual(["Mara", "Tomas", "Ilse", "Nobody"]);
@@ -31,9 +34,9 @@ describe("buildRoster", () => {
 });
 
 const roster: Speaker[] = [
-  { id: "m", name: "Mara", aliases: [], colour: "#111111" },
-  { id: "t", name: "Tomas", aliases: ["the Roarthian"], colour: "#222222" },
-  { id: "k", name: "The Keeper", aliases: [], colour: "#333333" },
+  { id: "m", name: "Mara", aliases: [], colour: "#111111", accent: [], accentNever: [] },
+  { id: "t", name: "Tomas", aliases: ["the Roarthian"], colour: "#222222", accent: [], accentNever: [] },
+  { id: "k", name: "The Keeper", aliases: [], colour: "#333333", accent: [], accentNever: [] },
 ];
 const para = (text: string): SpokenParagraph => ({ text, spans: findDialogue(text, DEFAULT_CONVENTIONS) });
 const who = (texts: string[]) => attributeSpeakers(texts.map(para), roster).map((a) => (a ? `${a.speaker.name}/${a.how}` : null));

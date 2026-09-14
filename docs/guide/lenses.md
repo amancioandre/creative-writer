@@ -1,6 +1,6 @@
 # Lenses
 
-A lens is a reading pass. It colours every open note one way at a time, so a tint always means one thing: under the **style checks** lens a tint is a cliché, a passive, a filter verb; under the **dialogue** lens it is speech or thought; under the **words** lens it is one of your own overused words, coloured by category. One lens is on across the vault and is kept between sessions. Switching one on switches the other off.
+A lens is a reading pass. It colours every open note one way at a time, so a tint always means one thing: under the **style checks** lens a tint is a cliché, a passive, a filter verb; under the **dialogue** lens it is speech or thought; under the **words** lens it is one of your own overused words, coloured by category; under the **accents** lens it is a word a character uses or never says. One lens is on across the vault and is kept between sessions. Switching one on switches the other off.
 
 The idea comes from the way Maxwell Alexander Drake revises: a dialogue pass, then an accent pass, then a bad-words pass, each with its own highlight, never all at once. Five highlights on one page cannot be read; one at a time can.
 
@@ -9,7 +9,7 @@ What is not a lens stays under every lens: focus fade, the current line, typewri
 ## Switching
 
 - The status bar shows the lens on the right, *Lens: words*, or *No lens*. Click it for the next one.
-- Every lens is a command, and every lens command starts with **Lens:**, so typing `lens` in the palette lists them all: **Lens: style checks**, **Lens: dialogue**, **Lens: words**, **Lens: next**, **Lens: off**. A lens command toggles its lens: on when another or none is on, off when it is the one on.
+- Every lens is a command, and every lens command starts with **Lens:**, so typing `lens` in the palette lists them all: **Lens: style checks**, **Lens: dialogue**, **Lens: words**, **Lens: accents**, **Lens: next**, **Lens: off**. A lens command toggles its lens: on when another or none is on, off when it is the one on.
 - None ships with a hotkey, as with every command in this plugin; bind your own in Settings → Hotkeys, where the prefix keeps them together.
 - Settings → Lenses → **Lens** is the same switch as a dropdown.
 
@@ -44,6 +44,21 @@ Attribution is a guess, and it says how good a guess:
 A grey line is a question, not an error: add a tag, or leave it. Switch **Speaker colours** off for one colour and no attribution.
 
 The dialogue lens hides the rhythm tint whatever the *Rhythm tint underneath* setting says: a colour here means one thing.
+
+## Accents
+
+Drake writes accents and wants them consistent: a Roarthian never says *my*, *yes*, *no*, *will*, *into*. The accents lens shows the dialogue page at a faint tint by speaker and, inside each speaker's own lines, the words their character note says they **use** (green) and the words they **never say** (red). Never in narration, never in a line nobody is pinned to: a grey line under the dialogue lens gets no accent marks here. Hover a word for whose accent it is.
+
+The lists live in the character note:
+
+```yaml
+aliases: [the Roarthian]
+colour: "#c8773a"
+accent: [aye, yer, ye'll, nay]
+accent-never: [my, yes, no, will, into]
+```
+
+Words or phrases, a list or a comma string, matched whole and case-insensitively. A character with neither key gets no marks. Attribution is the dialogue lens's, so a wrong guess there is a wrong mark here; add a tag and both follow.
 
 ## Words
 

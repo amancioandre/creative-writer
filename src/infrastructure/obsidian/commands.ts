@@ -6,6 +6,7 @@ export const COMMANDS = {
   "lens-style": "Lens: style checks",
   "lens-dialogue": "Lens: dialogue",
   "lens-words": "Lens: words",
+  "lens-accents": "Lens: accents",
   "lens-next": "Lens: next",
   "lens-off": "Lens: off",
   "open-story-map": "Open story map",

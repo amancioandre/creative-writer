@@ -943,3 +943,10 @@ body.czm-zen .cm-line .czm-words { background-color: transparent; border-bottom:
 .czm-lens-dialogue .cm-line [class*="czm-rhythm-"] { background-color: transparent; }
 body.czm-zen .cm-line .czm-speech, body.czm-zen .cm-line .czm-thought { background-color: transparent; }
 body.czm-zen .cm-line .czm-narration { opacity: 1; }
+/* The Accents lens: the page at a faint tint by speaker; inside a speaker's own speech, the words the character uses (green) and never says (red). */
+.czm-lens-accents .cm-line .czm-speech { background-color: color-mix(in srgb, var(--czm-speech) 10%, transparent); }
+.czm-lens-accents .cm-line .czm-thought { background-color: color-mix(in srgb, var(--czm-speech) 6%, transparent); }
+.czm-lens-accents .cm-line [class*="czm-rhythm-"] { background-color: transparent; }
+.cm-line .czm-accent-uses { background-color: rgba(63, 166, 107, 0.22); border-radius: 2px; }
+.cm-line .czm-accent-never { background-color: rgba(229, 83, 83, 0.42); border-radius: 2px; }
+body.czm-zen .cm-line .czm-accent-uses, body.czm-zen .cm-line .czm-accent-never { background-color: transparent; }

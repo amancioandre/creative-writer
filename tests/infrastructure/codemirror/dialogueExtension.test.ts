@@ -7,7 +7,7 @@ import { mount, type Harness } from "./helpers";
 
 const DOC = "“You came alone?” Tomas did not look up.\n\n_He is guessing._\n\nThe keeper snorted.";
 const texts = (h: Harness, cls: string) => Array.from(h.view.dom.querySelectorAll<HTMLElement>(`.${cls}`)).map((m) => m.textContent);
-const ROSTER = { "": [{ id: "m", name: "Mara", aliases: [], colour: "#111111" }, { id: "t", name: "Tomas", aliases: [], colour: "#222222" }] };
+const ROSTER = { "": [{ id: "m", name: "Mara", aliases: [], colour: "#111111", accent: [], accentNever: ["yes"] }, { id: "t", name: "Tomas", aliases: [], colour: "#222222", accent: ["aye", "ye'll"], accentNever: ["my", "yes"] }] };
 const ext = (path: string | null, byScope = {}, rosters = {}) => [conventionsFacet.of(byScope), rostersFacet.of(rosters), dialogueExtension(() => path)];
 const styles = (h: Harness, cls: string) => Array.from(h.view.dom.querySelectorAll<HTMLElement>(`.${cls}`)).map((m) => m.getAttribute("style"));
 
@@ -67,12 +67,43 @@ describe("dialogueExtension — speakers", () => {
   });
 
   it("uses the project's cast inside the project and follows a cast change", () => {
-    const rosters = { ...ROSTER, "book/": [{ id: "i", name: "Ilse", aliases: [], colour: "#333333" }] };
+    const rosters = { ...ROSTER, "book/": [{ id: "i", name: "Ilse", aliases: [], colour: "#333333", accent: [], accentNever: [] }] };
     h = mount("“Go,” Ilse said.", ext("book/ch1.md", {}, rosters), { lens: "dialogue" });
     expect(styles(h, "czm-speech")).toEqual(["--czm-speech: #333333"]);
     expect(rosterFor(rosters, "book/ch1.md")[0]!.name).toBe("Ilse");
     expect(rosterFor(rosters, "elsewhere.md")[0]!.name).toBe("Mara");
     expect(rosterFor({}, "elsewhere.md")).toEqual([]);
+  });
+});
+
+describe("dialogueExtension — accents", () => {
+  let h: Harness;
+  afterEach(() => h?.destroy());
+  const SCENE = "Mara came in.\n\n“Aye, my brother sent you. Yes,” Tomas said. My word.\n\n“Yes, my turn,” said Mara.\n\n_Yes, aye._\n\n***\n\n“Yes, aye.”";
+
+  it("marks a speaker's own accent words inside their speech only: green for uses, red for never", () => {
+    h = mount(SCENE, ext("ch1.md", {}, ROSTER), { lens: "accents" });
+    expect(texts(h, "czm-accent-uses")).toEqual(["Aye"]);
+    expect(texts(h, "czm-accent-never")).toEqual(["my", "Yes", "Yes"]);
+    expect(texts(h, "czm-speech")).toHaveLength(3);
+    expect(styles(h, "czm-speech")[0]).toBe("--czm-speech: #222222");
+  });
+
+  it("says whose accent on hover, before who is speaking", () => {
+    h = mount(SCENE, ext("ch1.md", {}, ROSTER), { lens: "accents" });
+    const notes = allFindings(h.view).map((f) => [f.kind, f.note]);
+    expect(notes.slice(0, 4)).toEqual([
+      ["accent", "Tomas · accent"],
+      ["accent-never", "Tomas never says this · accent-never in the character note"],
+      ["accent-never", "Tomas never says this · accent-never in the character note"],
+      ["accent-never", "Mara never says this · accent-never in the character note"],
+    ]);
+    expect(notes.at(-1)).toEqual(["dialogue", "speaker not found · no tag or name in this paragraph and no clean turn-taking"]);
+  });
+
+  it("marks nothing under the dialogue lens", () => {
+    h = mount(SCENE, ext("ch1.md", {}, ROSTER), { lens: "dialogue" });
+    expect(texts(h, "czm-accent-never")).toEqual([]);
   });
 });
 

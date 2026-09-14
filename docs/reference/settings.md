@@ -32,7 +32,7 @@ A [lens](/guide/lenses) is a reading pass: it colours every open note one way at
 
 | Setting | Default | What |
 |---|---|---|
-| Lens | Style checks | The one lens on, everywhere, kept between sessions: none, style checks, dialogue, or words. The status-bar item and the *Lens:* commands are the same switch. |
+| Lens | Style checks | The one lens on, everywhere, kept between sessions: none, style checks, dialogue, words, or accents. The status-bar item and the *Lens:* commands are the same switch. |
 | Rhythm tint underneath | on | With a lens on: keep the faint [rhythm](/guide/rhythm) tint under it. |
 | Kinds | all on | With the style checks lens: one chip per kind (clichés, passive voice, filter verbs, adverbs, repetition, nominalisations, weak verbs, metaphor candidates); click a chip to switch that kind off or on. See [Style checks](/guide/style-checks). |
 | Bad words note | `Creative Writer/Bad words.md` | The note holding your own overused words for the words lens: one heading per category, the words under it. A project note can name its own with `bad-words:`. |

@@ -5,6 +5,7 @@ import { settingsChanged } from "./settingsFacet";
 import { findingProviders, type HoverFinding } from "./findingsTooltip";
 import { findDialogue, resolveConventions, type DialogueConventions, type DialogueSpan } from "../../domain/dialogue/DialogueSpans";
 import { attributeSpeakers, HOW_LABELS, UNATTRIBUTED_COLOUR, UNATTRIBUTED_NOTE, type Attribution, type Speaker } from "../../domain/dialogue/Speakers";
+import { WordMatcher } from "../../domain/words/WordList";
 import { pathInScope } from "../../domain/scope/NoteScope";
 import type { PluginSettings } from "../../domain/settings/Settings";
 
@@ -25,6 +26,8 @@ export const rostersFacet = Facet.define<RostersByScope, RostersByScope>({
 export const SPEECH_CLASS = "czm-speech";
 export const THOUGHT_CLASS = "czm-thought";
 export const NARRATION_CLASS = "czm-narration";
+export const ACCENT_USES_CLASS = "czm-accent-uses";
+export const ACCENT_NEVER_CLASS = "czm-accent-never";
 
 function mostSpecific(keys: readonly string[], path: string | null): string | null {
   let best: string | null = null;
@@ -45,6 +48,8 @@ export function rosterFor(byScope: RostersByScope, path: string | null): readonl
 }
 
 const narrationMark = Decoration.mark({ class: NARRATION_CLASS });
+const usesMark = Decoration.mark({ class: ACCENT_USES_CLASS });
+const neverMark = Decoration.mark({ class: ACCENT_NEVER_CLASS });
 const plain = { speech: Decoration.mark({ class: SPEECH_CLASS }), thought: Decoration.mark({ class: THOUGHT_CLASS }) };
 const coloured = new Map<string, { speech: Decoration; thought: Decoration }>();
 function marksFor(colour: string | null) {
@@ -54,6 +59,17 @@ function marksFor(colour: string | null) {
     const attributes = { style: `--czm-speech: ${colour}` };
     m = { speech: Decoration.mark({ class: SPEECH_CLASS, attributes }), thought: Decoration.mark({ class: THOUGHT_CLASS, attributes }) };
     coloured.set(colour, m);
+  }
+  return m;
+}
+
+/** A speaker's accent lists as matchers, built once per speaker. */
+const accentMatchers = new WeakMap<Speaker, { uses: WordMatcher; never: WordMatcher }>();
+function accentsOf(s: Speaker) {
+  let m = accentMatchers.get(s);
+  if (!m) {
+    m = { uses: new WordMatcher([{ name: "accent", colour: null, terms: s.accent }]), never: new WordMatcher([{ name: "accent-never", colour: null, terms: s.accentNever }]) };
+    accentMatchers.set(s, m);
   }
   return m;
 }
@@ -77,21 +93,45 @@ export function paragraphsIn(doc: Text, from: number, to: number): { from: numbe
   return out;
 }
 
-interface Analysed { readonly from: number; readonly to: number; readonly spans: readonly DialogueSpan[]; readonly attribution: Attribution | null }
+interface AccentHit { readonly from: number; readonly to: number; readonly never: boolean; readonly term: string }
+interface Analysed { readonly from: number; readonly to: number; readonly spans: readonly DialogueSpan[]; readonly attribution: Attribution | null; readonly accents: readonly AccentHit[] }
+
+/** The accent words inside a speaker's own speech: what they use, and what they never say. Absolute offsets, in order. */
+function accentHits(p: { from: number; text: string; spans: readonly DialogueSpan[] }, speaker: Speaker): AccentHit[] {
+  const { uses, never } = accentsOf(speaker);
+  if (uses.empty && never.empty) return [];
+  const out: AccentHit[] = [];
+  for (const s of p.spans) {
+    if (s.kind !== "speech") continue;
+    const text = p.text.slice(s.from, s.to);
+    const base = p.from + s.from;
+    const hits = [
+      ...uses.findAll(text).map((m) => ({ from: base + m.from, to: base + m.to, never: false, term: m.term })),
+      ...never.findAll(text).map((m) => ({ from: base + m.from, to: base + m.to, never: true, term: m.term })),
+    ].sort((a, b) => a.from - b.from || a.to - b.to);
+    let at = -1;
+    for (const h of hits) { if (h.from >= at) { out.push(h); at = h.to; } }
+  }
+  return out;
+}
 
 /**
- * The Dialogue lens: speech and thought tinted, narration dimmed, by the
- * conventions of the project the note is in. With a cast, each paragraph
- * is attributed and tinted in its speaker's colour, grey when nobody can
- * be pinned to it; the hover says who and how sure. The whole note is
- * analysed (turn-taking needs what came before) on every edit; decorating
- * is bounded by the viewport.
+ * The Dialogue and Accents lenses. Dialogue: speech and thought tinted,
+ * narration dimmed, by the conventions of the project the note is in;
+ * with a cast, each paragraph is attributed and tinted in its speaker's
+ * colour, grey when nobody can be pinned, the hover saying who and how
+ * sure. Accents: the same page at a faint tint, and inside each
+ * speaker's own speech the words their character note says they use and
+ * the words they never say; never in narration, never in speech nobody
+ * is pinned to. The whole note is analysed (turn-taking needs what came
+ * before) on every edit; decorating is bounded by the viewport.
  */
 export function dialogueExtension(pathOf: (state: EditorState) => string | null) {
   const plugin = ViewPlugin.fromClass(class {
     decorations: DecorationSet = Decoration.none;
     paragraphs: Analysed[] = [];
     attributed = false;
+    accents = false;
     constructor(view: EditorView) { this.analyse(view); this.decorate(view); }
     update(u: ViewUpdate) {
       const facetsChanged = u.startState.facet(conventionsFacet) !== u.state.facet(conventionsFacet) || u.startState.facet(rostersFacet) !== u.state.facet(rostersFacet);
@@ -103,15 +143,19 @@ export function dialogueExtension(pathOf: (state: EditorState) => string | null)
       const settings = effectiveSettings(view.state);
       this.paragraphs = [];
       this.attributed = false;
-      if (settings.lens !== "dialogue") return;
+      this.accents = settings.lens === "accents";
+      if (settings.lens !== "dialogue" && settings.lens !== "accents") return;
       const path = pathOf(view.state);
       const conventions = conventionsFor(settings, view.state.facet(conventionsFacet), path);
       const doc = view.state.doc;
       const found = paragraphsIn(doc, 0, doc.length).map((p) => ({ ...p, text: doc.sliceString(p.from, p.to) })).map((p) => ({ ...p, spans: findDialogue(p.text, conventions) }));
-      const roster = settings.dialogue.speakerColours ? rosterFor(view.state.facet(rostersFacet), path) : [];
+      const roster = settings.dialogue.speakerColours || this.accents ? rosterFor(view.state.facet(rostersFacet), path) : [];
       this.attributed = roster.length > 0;
       const attributions = this.attributed ? attributeSpeakers(found, roster) : [];
-      this.paragraphs = found.map((p, i) => ({ from: p.from, to: p.to, spans: p.spans, attribution: attributions[i] ?? null }));
+      this.paragraphs = found.map((p, i) => {
+        const attribution = attributions[i] ?? null;
+        return { from: p.from, to: p.to, spans: p.spans, attribution, accents: this.accents && attribution ? accentHits(p, attribution.speaker) : [] };
+      });
     }
     private decorate(view: EditorView) {
       if (this.paragraphs.length === 0) { this.decorations = Decoration.none; return; }
@@ -120,11 +164,14 @@ export function dialogueExtension(pathOf: (state: EditorState) => string | null)
       for (const p of this.visible(view)) {
         const marks = marksFor(this.attributed ? p.attribution?.speaker.colour ?? UNATTRIBUTED_COLOUR : null);
         let at = p.from;
+        let hit = 0;
         for (const s of p.spans) {
           const from = p.from + s.from;
           const to = p.from + s.to;
           if (dim && from > at) builder.add(at, from, narrationMark);
           builder.add(from, to, marks[s.kind]);
+          // Accent words nest inside the speech mark; the builder takes them in order after it.
+          for (; hit < p.accents.length && p.accents[hit]!.from < to; hit++) { const h = p.accents[hit]!; builder.add(h.from, h.to, h.never ? neverMark : usesMark); }
           at = to;
         }
         if (dim && p.to > at) builder.add(at, p.to, narrationMark);
@@ -136,15 +183,18 @@ export function dialogueExtension(pathOf: (state: EditorState) => string | null)
       for (const r of view.visibleRanges) for (const p of this.paragraphs) if (p.to >= r.from && p.from <= r.to && !out.includes(p)) out.push(p);
       return out;
     }
-    /** Who the hover says is speaking, and how that was decided. */
+    /** Who the hover says is speaking and how that was decided; under the accents lens, the accent word first. */
     findings(view: EditorView): HoverFinding[] {
       if (!this.attributed) return [];
-      const out: HoverFinding[] = [];
+      const words: HoverFinding[] = [];
+      const lines: HoverFinding[] = [];
       for (const p of this.visible(view)) {
-        const note = p.attribution ? `${p.attribution.speaker.name} · ${HOW_LABELS[p.attribution.how]}` : UNATTRIBUTED_NOTE;
-        for (const s of p.spans) out.push({ from: p.from + s.from, to: p.from + s.to, kind: "dialogue", note });
+        const who = p.attribution;
+        for (const h of p.accents) words.push({ from: h.from, to: h.to, kind: h.never ? "accent-never" : "accent", note: h.never ? `${who!.speaker.name} never says this · accent-never in the character note` : `${who!.speaker.name} · accent` });
+        const note = who ? `${who.speaker.name} · ${HOW_LABELS[who.how]}` : UNATTRIBUTED_NOTE;
+        for (const s of p.spans) lines.push({ from: p.from + s.from, to: p.from + s.to, kind: "dialogue", note });
       }
-      return out;
+      return [...words, ...lines];
     }
   }, { decorations: (v) => v.decorations });
 

@@ -7,7 +7,7 @@ All commands appear in the palette under **Creative Writer:**. None has a defaul
 | **Toggle Zen Mode** | Hide or show ribbon, tabs, sidebars, status bar and title bar (and go fullscreen if *Fullscreen in Zen Mode* is on). |
 | **Toggle Creative Writer (everywhere)** | Flip the master switch for all editor features. |
 | **Toggle Creative Writer for this note** | Write `creative-writer: true` or `false` into the active note's front matter. |
-| **Lens: style checks** / **Lens: dialogue** / **Lens: words** | Switch that [lens](/guide/lenses) on, everywhere; run it again to switch it off. One lens at a time. |
+| **Lens: style checks** / **Lens: dialogue** / **Lens: words** / **Lens: accents** | Switch that [lens](/guide/lenses) on, everywhere; run it again to switch it off. One lens at a time. |
 | **Lens: next** / **Lens: off** | Cycle through the lenses (what the status-bar item does on a click), or show the plain page. |
 | **Analyse paragraph with model** | Send the cursor paragraph to the configured model for contextual findings. |
 | **Analyse selection for myth and archetype** | Sidebar report of mythic patterns and archetypes in the selection (or the whole note if nothing is selected). Local model only. |

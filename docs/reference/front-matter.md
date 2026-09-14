@@ -39,6 +39,8 @@ Notes that are people, places and things in the story.
 | `aliases` | list or string (Obsidian's own property) | Other names the prose uses: `[Marti, M.]`. Written by the map's *Alias of…*. |
 | `name` | text | Treated as an extra alias. |
 | `colour` (or `color`) | `"#c8773a"` | A character's speaker colour under the [dialogue lens](/guide/lenses#who-is-speaking). Absent, one from the palette in cast order. |
+| `accent` | list or comma string | Words and phrases this character's speech uses, marked green inside their lines under the [accents lens](/guide/lenses#accents). |
+| `accent-never` | list or comma string | Words this character never says, marked red inside their lines under the accents lens. |
 
 Created by the map's *Character · Place · Item · Faction · Event* exits as:
 
