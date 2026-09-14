@@ -6,7 +6,7 @@ import { IntlSentenceSegmenter } from "../../../src/infrastructure/segmentation/
 import { EMPTY_LOG } from "../../../src/domain/progress/WritingLog";
 
 const profile = new ProfileProse(new IntlSentenceSegmenter("en"));
-const progress = { log: () => EMPTY_LOG, today: () => "2026-08-24", dailyGoal: () => 500, projects: async () => [], scenes: () => [], revealLine: () => undefined, echoes: async () => null, revealScene: () => undefined, jumpTo: () => undefined };
+const progress = { log: () => EMPTY_LOG, today: () => "2026-08-24", dailyGoal: () => 500, projects: async () => [], scenes: () => [], revealLine: () => undefined, echoes: async () => null, revealScene: () => undefined, jumpTo: () => undefined, rhythmTiers: () => 4 };
 
 describe("DeskView", () => {
   it("has a stable view type and title", () => {
@@ -32,6 +32,11 @@ describe("DeskView", () => {
     expect(v.contentEl.querySelectorAll(".czm-desk-band")).toHaveLength(3);
     expect(t).toContain("Flesch");
     expect(t).toMatch(/\d+% of words are spoken/);
+    // The editor's colours are written down here, once: as many rhythm swatches as tiers, and one tint per style check.
+    const key = v.contentEl.querySelector(".czm-desk-editor-key")!;
+    expect(key.querySelectorAll(".czm-desk-key-swatch")).toHaveLength(4);
+    expect([...key.querySelectorAll(".czm-desk-key-tint")].map((c) => c.className)).toContain("czm-desk-key-tint czm-style-cliche");
+    expect(key.textContent).toContain("Rhythm: short");
   });
 
   it("says when there is not enough prose", () => {
@@ -65,6 +70,13 @@ describe("DeskView progress", () => {
     expect(v.contentEl.querySelectorAll(".czm-desk-cell")).toHaveLength(12 * 7);
     expect(v.contentEl.querySelectorAll(".czm-desk-cell.is-future")).toHaveLength(6);
     expect(v.contentEl.querySelectorAll(".czm-desk-cell.czm-level-4")).toHaveLength(1);
+    // The heatmap key is swatches, not a sentence.
+    const key = v.contentEl.querySelector(".czm-desk-heatmap-key")!;
+    expect(key.querySelectorAll(".czm-desk-key-cell")).toHaveLength(6);
+    expect(key.textContent).toContain("up to 700 words touched");
+    expect(key.textContent).toContain("goal met");
+    expect(key.textContent).toContain("mostly cut");
+    expect(v.contentEl.textContent).not.toContain("purple");
   });
 
   it("omits the bar without a goal and explains an empty calendar", () => {

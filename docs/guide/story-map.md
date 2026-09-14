@@ -33,9 +33,9 @@ Unknown names are collected too: a capital letter mid-sentence is the signal. Ca
 
 | Layer | Edges | Where they come from |
 |---|---|---|
-| **Links** (grey; **orange** for drawn) | *linked* — a wikilink one note makes to another; *appears* — an entity and the chapter it is mentioned in; *yours* — a relationship you drew on the map or wrote under `## Relationships` | `metadataCache`; the writer's own links and lines |
+| **Links** (grey; **accent** for drawn) | *linked* — a wikilink one note makes to another; *appears* — an entity and the chapter it is mentioned in; *yours* — a relationship you drew on the map or wrote under `## Relationships` | `metadataCache`; the writer's own links and lines |
 | **Scenes** (accent colour) | *N scenes together* — two entities mentioned in the same scene, thicker with more shared scenes; *labelled relationships* ("sister", "owes money to") | offline extraction; the model reading |
-| **References** (purple) | an entity → an outside reference, labelled with the model's note ("myth: descent with a rule not to look back") | the model reading |
+| **References** (grey, dotted) | an entity → an outside reference, labelled with the model's note ("myth: descent with a rule not to look back") | the model reading |
 
 A **scene** is a heading and the prose under it. Every extracted edge carries the scenes that justify it; click the edge to see them and jump to any.
 
@@ -121,7 +121,7 @@ What gets written is a list line in the first node's note:
 
 Write those lines by hand if you prefer; the map reads them the same way. Wikilinks, markdown links and bare names all work, and so do `:` and `-` as separators. The section can be `## Relationships` or `## Relations`, at any heading level. Lines under other headings are ignored.
 
-Drawn relationships are **orange** and always painted on top. Their card says which note holds the line and jumps to it.
+Drawn relationships are in the **accent** colour and always painted on top. Their card says which note holds the line and jumps to it.
 
 ### When you and the model disagree
 

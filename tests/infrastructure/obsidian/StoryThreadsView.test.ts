@@ -91,6 +91,9 @@ describe("StoryThreadsView", () => {
     expect(el.querySelector(".czm-th-badge")!.textContent).toBe("1 contradiction");
     expect(el.querySelector(".czm-th-badge")!.classList.contains("is-alert")).toBe(true);
     expect(el.querySelectorAll(".czm-th-strip-label").length).toBeGreaterThan(3);
+    expect(el.querySelector(".czm-th-strip-label")!.textContent).toMatch(/^Cast on stage \(names\)( · up to \d+)?$/);
+    // The kind toggles carry the arcs' own colours as swatches.
+    expect(setting("czm-set-thread-writer").settingEl.classList.contains("czm-th-kind-writer")).toBe(true);
     expect(el.querySelector(".czm-th-broken")!.textContent).toContain("Nine#Nowhere");
   });
 

@@ -21,9 +21,9 @@ A thread is a named thing that recurs, and the scenes it touches. Between each c
 | Kind | Colour | Where it comes from | On by default |
 |---|---|---|---|
 | **Names** (entity) | the node's colour from the story map | Where a character, place, item or faction is mentioned — the story graph, no model. | off — these are the densest and the least surprising; *Follow one name…* in the panel turns on just that one |
-| **Facts** | accent | Concrete facts a local model read from each scene: eye colour, age, hometown, weapon, who is alive, who knows what. One thread per name-and-attribute that appears in two scenes or more. | on |
-| **Yours** (writer) | orange | Threads you drew by hand in `Story threads.md` — a clue, a motif, a promise to the reader. | on |
-| **Echoes** | purple | A phrase or a sentence that recurs across the book, heard by the [echo finder](#echoes) offline. | off — *Follow one echo…* in the panel turns on just that one |
+| **Facts** | grey | Concrete facts a local model read from each scene: eye colour, age, hometown, weapon, who is alive, who knows what. One thread per name-and-attribute that appears in two scenes or more. | on |
+| **Yours** (writer) | accent | Threads you drew by hand in `Story threads.md` — a clue, a motif, a promise to the reader. | on |
+| **Echoes** | grey, dotted | A phrase or a sentence that recurs across the book, heard by the [echo finder](#echoes) offline. | off — *Follow one echo…* in the panel turns on just that one |
 
 Hover an arc and the rest of its thread lights up with it; click for the card. Arcs from a fact reading whose scene has since changed are **dashed** — read again to refresh.
 
@@ -35,7 +35,7 @@ Contradictions are found by code, never by the model. Values are compared after 
 
 A contradiction is one of two things, and the card has a verb for each.
 
-**This is a reversal** is for the change the story means: she dyed her hair after the funeral, the letter turns out to have been addressed to her mother. The pair becomes one of your own threads, written into `Story threads.md` with the earlier scene as the *plant* and the later one as the *reversal*, both anchored to the model's quotes (see [Directed threads](#directed-threads)). It leaves the red count without a dismissal: the arc is now orange, with an arrow, and it is yours.
+**This is a reversal** is for the change the story means: she dyed her hair after the funeral, the letter turns out to have been addressed to her mother. The pair becomes one of your own threads, written into `Story threads.md` with the earlier scene as the *plant* and the later one as the *reversal*, both anchored to the model's quotes (see [Directed threads](#directed-threads)). It leaves the red count without a dismissal: the arc is now in the accent colour, with an arrow, and it is yours.
 
 **Dismiss** is for the rest: two ways of saying one thing the normaliser did not catch. A dismissed pair fades and drops out of the count; *Show dismissed* in the panel brings them back, and **Restore** undoes it. Dismissals are remembered in `Story map.md` by a key built from the two scenes and the two values, so they survive re-reads and reorderings and only come back if you change one of the quoted scenes so the value or the heading changes — at which point the question is legitimately new.
 
@@ -84,7 +84,7 @@ One `"quoted sentence"` on the line is the stop's **anchor**: the quote is looke
 
 On the chart a directed thread's arcs carry an **arrow**, and a plant with no payoff or reversal after it draws a short **stub** that ends in the air: a promise the reader is still carrying. The panel lists those, and the *Open threads (yours)* strip counts a plant as open until its payoff. An arc's card shows each stop's role and quote, and **Promise** / **Pays off** set the roles from there.
 
-On the [manuscript](/guide/manuscript) page, with *Story* on, an anchored plant is an orange mark in the gutter at its sentence and an anchored payoff or reversal a green one; each names the other end, and a click takes the page there.
+On the [manuscript](/guide/manuscript) page, with *Story* on, an anchored plant is an accent-coloured mark in the gutter at its sentence (pointing on) and an anchored payoff or reversal a filled one (pointing back); each names the other end, and a click takes the page there.
 
 ## Echoes
 

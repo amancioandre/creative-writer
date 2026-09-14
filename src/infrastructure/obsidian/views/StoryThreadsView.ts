@@ -300,7 +300,10 @@ export class StoryThreadsView extends ItemView {
       const label = document.createElementNS(SVG, "text");
       label.setAttribute("class", "czm-th-strip-label");
       label.setAttribute("x", "4"); label.setAttribute("y", f(row.y + STRIP_LABEL_HEIGHT - 4));
-      label.textContent = `${row.label}${row.max > 0 ? ` · max ${row.max}` : ""}`;
+      // The unit, unless the label already says it ("Threads through" needs no "(threads)").
+      const unit = this.model.strips.find((s) => s.label === row.label)?.unit;
+      const said = !unit || row.label.toLowerCase().includes(unit.toLowerCase().split(" ")[0]!);
+      label.textContent = `${row.label}${said ? "" : ` (${unit})`}${row.max > 0 ? ` · up to ${row.max}` : ""}`;
       this.stripsG.appendChild(label);
       const rule = document.createElementNS(SVG, "line");
       rule.setAttribute("class", "czm-th-strip-rule");
@@ -459,7 +462,8 @@ export class StoryThreadsView extends ItemView {
     const threads = section("Threads", "filters", true, `${kindsOn} of ${THREAD_KINDS.length} kinds`);
     for (const kind of THREAD_KINDS) {
       const n = this.model.threads.filter((t) => t.kind === kind).length;
-      new Setting(threads).setName(`${KIND_TITLE[kind]}${n ? ` · ${n}` : ""}`).setClass(`czm-set-thread-${kind}`).addToggle((t) => t.setValue(s.kinds[kind]).onChange((v) => { this.saveSettings({ ...this.settings, kinds: { ...this.settings.kinds, [kind]: v } }); this.renderChart(); this.renderCard(); }));
+      // The row carries the arc's own colour as a swatch, so the toggle is the key.
+      new Setting(threads).setName(`${KIND_TITLE[kind]}${n ? ` · ${n}` : ""}`).setClass(`czm-set-thread-${kind}`).setClass(`czm-th-kind-${kind}`).addToggle((t) => t.setValue(s.kinds[kind]).onChange((v) => { this.saveSettings({ ...this.settings, kinds: { ...this.settings.kinds, [kind]: v } }); this.renderChart(); this.renderCard(); }));
     }
     const entities = this.model.threads.filter((t) => t.kind === "entity");
     if (entities.length) {

@@ -244,6 +244,7 @@ export default class CreativeZenModePlugin extends Plugin {
       },
       revealScene: (ref) => void this.revealScene(ref.path, ref.line),
       jumpTo: (to) => this.jumpTo(to, null),
+      rhythmTiers: () => this.current.rhythmTiers,
     }));
     this.addCommand({ id: "open-writing-desk", name: "Open writing desk", callback: () => void this.openDesk() });
 

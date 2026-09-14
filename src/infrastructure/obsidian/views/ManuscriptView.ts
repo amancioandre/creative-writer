@@ -469,6 +469,17 @@ export class ManuscriptView extends ItemView {
 
   private renderAllPane(side: HTMLElement, settings: ManuscriptSettings): void {
     const pane = side.createDiv({ cls: "czm-ms-side-all" });
+    if (settings.showStory || settings.showEchoes) {
+      // The gutter's shapes, named once: what a mark in the margin means.
+      const key = pane.createDiv({ cls: "czm-ms-marks-key", attr: { "aria-label": "Gutter marks" } });
+      const items: [string, string, boolean][] = [["conflict", "contradiction", settings.showStory], ["plant", "plant", settings.showStory], ["payoff", "payoff or reversal", settings.showStory], ["echo", "echo", settings.showEchoes]];
+      for (const [kind, name, on] of items) {
+        if (!on) continue;
+        const item = key.createSpan({ cls: "czm-ms-marks-key-item" });
+        item.createSpan({ cls: `czm-ms-mark is-story is-${kind}` });
+        item.createSpan({ text: name });
+      }
+    }
     const all = this.annotations();
     const title = pane.createDiv({ cls: "czm-ms-side-title" });
     title.createSpan({ text: all.length ? `All comments (${all.length})` : "All comments" });

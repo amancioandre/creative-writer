@@ -10,7 +10,7 @@ Below: current streak, best streak, this week's total.
 
 ## Heatmap
 
-Twelve weeks, one cell per day, shaded by words added *or* cut (busiest day sets the scale). Outlined cells met the goal; purple cells were mostly revision. Hover a cell for the exact numbers.
+Twelve weeks, one cell per day, shaded by words added *or* cut (busiest day sets the scale). The key under the grid says the rest: an outlined cell met the goal, a hollow cell was mostly cutting. Hover a cell for the exact numbers. Under the readability bands sits the editor's own key: the rhythm tiers from short to long, and the tint of each style check.
 
 ## How words are counted
 

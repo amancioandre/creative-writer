@@ -1020,6 +1020,7 @@ export class WriterView extends ItemView {
       new Setting(colours).setName(`${pg.group.def.name}${n ? ` · ${n}` : ""}`).setClass(`czm-set-group-${pg.group.def.id}`)
         .addColorPicker((c) => c.setValue(pg.group.colour).onChange((v) => { this.queue((file) => setColour(file, pg.group.def.id, v)); this.recolour(); }));
     }
+    colours.createDiv({ text: "A card's dots are the groups it is in, in these colours; a story card's chip is its stage.", cls: "czm-map-hint czm-writer-dots-key" });
     new Setting(colours).setName("Reset colours").setClass("czm-set-reset-colours").addButton((b) => b.setButtonText("Reset").onClick(() => {
       const before = this.file.colours;
       this.queue((file) => ({ ...file, colours: {} }));

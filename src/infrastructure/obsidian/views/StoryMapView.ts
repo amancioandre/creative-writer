@@ -765,6 +765,7 @@ this.renderCard(); this.paint();
     }
     const absent = STORY_KINDS.filter((k) => !present.includes(k));
     if (absent.length) kinds.createDiv({ text: `Not in this project: ${absent.map((k) => KIND_LABEL[k]).join(", ")}.`, cls: "czm-map-hint czm-map-absent" });
+    if (counts.get("candidate")) kinds.createDiv({ text: "A dashed node is a name found in the text with no note yet; its card makes one, or says it is not a name.", cls: "czm-map-hint czm-map-candidate-key" });
     new Setting(kinds).setName("Reset colours").setClass("czm-set-reset-colors").addButton((b) => b.setButtonText("Reset").onClick(() => { this.saveSettings({ ...this.settings, colors: DEFAULT_STORY_COLORS }); this.renderPanel(); this.recolor(); }));
 
     if (this.project?.ignoredNames.length) {

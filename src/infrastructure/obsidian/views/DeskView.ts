@@ -24,6 +24,8 @@ const HEATMAP_WEEKS = 12;
 export interface DeskSource {
   /** Opens a sibling panel. */
   jumpTo(to: PanelId): void;
+  /** How many rhythm tiers the editor colours, for the key. */
+  rhythmTiers(): number;
   /** Profile of the active note, or null when no markdown note is active. */
   activeProfile(): { name: string; profile: ProseProfile } | null;
   log(): WritingLog;
@@ -97,6 +99,7 @@ export class DeskView extends ItemView {
     }
     root.createEl("p", { text: active.name, cls: "czm-desk-title" });
     renderProfile(root, active.profile);
+    renderEditorKey(root, this.source.rhythmTiers());
 
     const scenes = this.source.scenes();
     if (scenes.length > 1 || (scenes.length === 1 && scenes[0]!.scene.level > 0)) {
@@ -199,7 +202,19 @@ export function renderHeatmap(root: HTMLElement, log: WritingLog, today: Day, go
       el.title = `${cell.day}: +${cell.added} −${cell.removed}`;
     }
   }
-  root.createDiv({ text: map.max > 0 ? `Busiest day: ${map.max.toLocaleString()} words added or cut. Outlined days met the goal; purple days were mostly revision.` : "Nothing logged yet — write and the calendar fills in.", cls: "czm-desk-legend" });
+  if (map.max === 0) { root.createDiv({ text: "Nothing logged yet — write and the calendar fills in.", cls: "czm-desk-legend" }); return; }
+  // The key is a key: four swatches for volume, the outline for the goal, the hollow cell for a day that mostly cut.
+  const key = root.createDiv({ cls: "czm-desk-key czm-desk-heatmap-key", attr: { "aria-label": "Heatmap key" } });
+  const ramp = key.createSpan({ cls: "czm-desk-key-item" });
+  ramp.createSpan({ text: "fewer", cls: "czm-desk-key-word" });
+  for (const level of [1, 2, 3, 4]) ramp.createSpan({ cls: `czm-desk-key-cell czm-level-${level}` });
+  ramp.createSpan({ text: `more, up to ${map.max.toLocaleString()} words touched`, cls: "czm-desk-key-word" });
+  const met = key.createSpan({ cls: "czm-desk-key-item" });
+  met.createSpan({ cls: "czm-desk-key-cell czm-level-2 is-met" });
+  met.createSpan({ text: "goal met", cls: "czm-desk-key-word" });
+  const cut = key.createSpan({ cls: "czm-desk-key-item" });
+  cut.createSpan({ cls: "czm-desk-key-cell czm-level-2 is-revising" });
+  cut.createSpan({ text: "mostly cut", cls: "czm-desk-key-word" });
 }
 
 export function renderProjects(root: HTMLElement, projects: readonly ProjectStatus[]): void {
@@ -267,6 +282,21 @@ export function renderProfile(root: HTMLElement, p: ProseProfile): void {
   if (p.variety) band(root, "Sentence rhythm", p.variety.band.label, p.variety.band.hint, `${p.sentenceCount} sentences, variation ${Math.round(p.variety.cv * 100)}%`);
   else band(root, "Sentence rhythm", "—", "Needs at least three sentences.", "");
   band(root, "Dialogue", p.dialogue.band.label, p.dialogue.band.hint, `${Math.round(p.dialogue.ratio * 100)}% of words are spoken`);
+}
+
+/** Names of the style checks, in the order the key shows them. */
+const STYLE_KEY: readonly (readonly [string, string])[] = [["cliche", "cliché"], ["passive", "passive"], ["filter", "filter verb"], ["adverb", "adverb"], ["repetition", "repetition"], ["nominalization", "nominalisation"], ["weakverb", "weak verb"], ["metaphor", "metaphor"]];
+
+/** What the editor's colours mean: the rhythm tiers cool to warm, and the tint of each style check. The one place the encoding is written down. */
+export function renderEditorKey(root: HTMLElement, tiers: number): void {
+  const key = root.createDiv({ cls: "czm-desk-key czm-desk-editor-key", attr: { "aria-label": "Editor colours" } });
+  const rhythm = key.createSpan({ cls: "czm-desk-key-item" });
+  rhythm.createSpan({ text: "Rhythm: short", cls: "czm-desk-key-word" });
+  for (let t = 1; t <= Math.max(1, Math.min(6, tiers)); t++) rhythm.createSpan({ cls: `czm-desk-key-swatch czm-rhythm-${t}` });
+  rhythm.createSpan({ text: "long", cls: "czm-desk-key-word" });
+  const style = key.createSpan({ cls: "czm-desk-key-item" });
+  style.createSpan({ text: "Style:", cls: "czm-desk-key-word" });
+  for (const [kind, name] of STYLE_KEY) style.createSpan({ text: name, cls: `czm-desk-key-tint czm-style-${kind}` });
 }
 
 function band(root: HTMLElement, name: string, label: string, hint: string, detail: string): void {
