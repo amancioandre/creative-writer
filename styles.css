@@ -950,3 +950,14 @@ body.czm-zen .cm-line .czm-narration { opacity: 1; }
 .cm-line .czm-accent-uses { background-color: rgba(63, 166, 107, 0.22); border-radius: 2px; }
 .cm-line .czm-accent-never { background-color: rgba(229, 83, 83, 0.42); border-radius: 2px; }
 body.czm-zen .cm-line .czm-accent-uses, body.czm-zen .cm-line .czm-accent-never { background-color: transparent; }
+/* The speaker box: the cast as chips over a line of speech; a click or Enter pins the speaker as a hidden comment. */
+.cm-editor .cm-tooltip.czm-speaker-box-host { background-color: var(--background-secondary); color: var(--text-normal); border: 1px solid var(--background-modifier-border); border-radius: 6px; box-shadow: var(--shadow-s); }
+.czm-speaker-box { padding: 6px 10px; font-size: var(--font-ui-small); line-height: 1.4; max-width: 32em; }
+.czm-speaker-box-head { margin-bottom: 4px; }
+.czm-speaker-box-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.czm-speaker-chip { display: inline-flex; align-items: center; gap: 5px; height: auto; padding: 1px 8px; border-radius: 10px; font-size: var(--font-ui-smaller); color: var(--text-muted); background: transparent; border: 1px solid var(--background-modifier-border); box-shadow: none; }
+.czm-speaker-chip:hover { color: var(--text-normal); background: var(--background-modifier-hover); }
+.czm-speaker-chip.is-selected { border-color: var(--interactive-accent); color: var(--text-normal); }
+.czm-speaker-chip.is-pinned { color: var(--text-normal); background: color-mix(in srgb, var(--interactive-accent) 18%, transparent); }
+.czm-speaker-chip-dot { width: 8px; height: 8px; border-radius: 2px; background: var(--czm-speech, #8a8a8a); }
+.czm-speaker-box-hint { margin-top: 4px; font-size: var(--font-ui-smaller); color: var(--text-faint); }

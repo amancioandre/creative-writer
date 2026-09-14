@@ -324,9 +324,11 @@ export interface DialogueSettings extends DialogueConventions {
   readonly dimNarration: boolean;
   /** Attribute speech to the cast and tint it in the speaker's colour; off, one colour for all speech. */
   readonly speakerColours: boolean;
+  /** Open the tag box by itself when the cursor rests in a line nobody is sure about; off, only by the command. */
+  readonly autoBox: boolean;
 }
 
-export const DEFAULT_DIALOGUE: DialogueSettings = { ...DEFAULT_CONVENTIONS, dimNarration: true, speakerColours: true };
+export const DEFAULT_DIALOGUE: DialogueSettings = { ...DEFAULT_CONVENTIONS, dimNarration: true, speakerColours: true, autoBox: true };
 
 function normalizeDialogue(raw: unknown): DialogueSettings {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
@@ -336,6 +338,7 @@ function normalizeDialogue(raw: unknown): DialogueSettings {
     thoughtPattern: typeof r.thoughtPattern === "string" ? r.thoughtPattern : DEFAULT_DIALOGUE.thoughtPattern,
     dimNarration: typeof r.dimNarration === "boolean" ? r.dimNarration : DEFAULT_DIALOGUE.dimNarration,
     speakerColours: typeof r.speakerColours === "boolean" ? r.speakerColours : DEFAULT_DIALOGUE.speakerColours,
+    autoBox: typeof r.autoBox === "boolean" ? r.autoBox : DEFAULT_DIALOGUE.autoBox,
   };
 }
 

@@ -24,6 +24,7 @@ The note whose front matter declares a [project](/guide/projects). Any note in t
 | `writing-scope` | `note` | Count only this note, not the folder. |
 | `story-ignore` | list or comma string | Capitalised words the story map must not turn into candidates. Written by the map's *Not a name*; edit freely. |
 | `plot-pov`, `plot-time`, `plot-theme` | a heading from `Story threads.md`, e.g. `Theme: What we owe the dead` | Which thread the [plot grid](/guide/plot-grid) draws as its POV, Time and main theme columns. Written by a column's *Use as…*; edit freely. |
+| `%% Name %%` at the start of a paragraph | a cast name, or `not speech` | Not front matter but the same kind of thing: the [speaker box](/guide/lenses#the-speaker-box)'s pin, a hidden comment naming who speaks the paragraph. Written by the box; edit or delete it freely. |
 | `bad-words` | `[[Bad words]]` or a path | The project's own word list for the [words lens](/guide/lenses#words): notes inside the project use it instead of the vault-wide note. |
 | `dialogue` | `double`, `single`, `dash`, `none` | How speech is written in this project, for the [dialogue lens](/guide/lenses#dialogue); `quotes` and `travessão` are read too. Absent, the vault-wide setting. |
 | `thoughts` | `italic-paragraph`, `italic-any`, `single-quotes`, `none`, or a regular expression | How thought is written in this project. Anything that is not a preset is taken as a pattern: every match in a paragraph is a thought. |

@@ -83,19 +83,53 @@ export function buildRoster(notes: readonly EntityNote[], scope: string | null, 
   return list.map((s) => (s.colour ? s : { ...s, colour: (free.length ? free : SPEAKER_PALETTE)[next++ % (free.length || SPEAKER_PALETTE.length)]! }));
 }
 
-export type AttributionHow = "tag" | "named" | "turns";
+export type AttributionHow = "pinned" | "tag" | "named" | "turns";
+
+/** A tag, a name in the paragraph, or the writer's own pin: certain. A turn is a guess the page does not assert. */
+export function isCertain(how: AttributionHow): boolean {
+  return how !== "turns";
+}
+
+/**
+ * The writer's pin: a hidden comment at the start of the paragraph,
+ * `%% Tomas %%`, written by the tag box, never rendered, stripped from
+ * the export. `%% not speech %%` says the quotes are not dialogue.
+ */
+export interface Pin {
+  readonly from: number;
+  readonly to: number;
+  readonly label: string;
+  readonly notSpeech: boolean;
+}
+
+export const NOT_SPEECH = "not speech";
+const PIN = /^(\s*)%%\s*([^%\n]+?)\s*%%[ \t]*/;
+
+export function pinOf(text: string): Pin | null {
+  const m = PIN.exec(text);
+  if (!m) return null;
+  const label = m[2]!;
+  // `to` takes the spaces after the comment with it, so replacing or removing the pin leaves the paragraph clean.
+  return { from: m[1]!.length, to: m[0].length, label, notSpeech: label.trim().toLowerCase() === NOT_SPEECH };
+}
+
+export function pinComment(label: string): string {
+  return `%% ${label} %%`;
+}
 
 export interface Attribution {
   readonly speaker: Speaker;
   readonly how: AttributionHow;
 }
 
-export const HOW_LABELS: Readonly<Record<AttributionHow, string>> = { tag: "dialogue tag", named: "named in the paragraph", turns: "turn-taking" };
+export const HOW_LABELS: Readonly<Record<AttributionHow, string>> = { pinned: "pinned by you", tag: "dialogue tag", named: "named in the paragraph", turns: "turn-taking" };
 export const UNATTRIBUTED_NOTE = "speaker not found · no tag or name in this paragraph and no clean turn-taking";
 
 export interface SpokenParagraph {
   readonly text: string;
   readonly spans: readonly DialogueSpan[];
+  /** The writer's pin, when the paragraph opens with one. */
+  readonly pin?: Pin | null;
 }
 
 const SCENE_BREAK = /^\s*(?:#{1,6}\s|\*\s*\*\s*\*|---+\s*$|___+\s*$)/;
@@ -114,6 +148,23 @@ const MAX_GAP = 2;
 export function attributeSpeakers(paragraphs: readonly SpokenParagraph[], roster: readonly Speaker[]): (Attribution | null)[] {
   const lookup = new NameLookup<Speaker>();
   for (const s of roster) for (const label of [s.name, ...s.aliases]) lookup.add(label, s);
+  // A pin naming someone with no character note is a speaker too, with a colour of their own for the note.
+  const extras = new Map<string, Speaker>();
+  const used = new Set(roster.map((s) => s.colour));
+  const pinned = (label: string): Speaker => {
+    const known = lookup.resolve(label);
+    if (known) return known;
+    const key = normalise(label);
+    let s = extras.get(key);
+    if (!s) {
+      const colour = SPEAKER_PALETTE.find((c) => !used.has(c)) ?? SPEAKER_PALETTE[extras.size % SPEAKER_PALETTE.length]!;
+      used.add(colour);
+      s = { id: `speaker:${key}`, name: label.trim(), aliases: [], colour, accent: [], accentNever: [] };
+      extras.set(key, s);
+      lookup.add(s.name, s);
+    }
+    return s;
+  };
   let history: Speaker[] = [];
   let present: Speaker[] = [];
   let gap = 0;
@@ -127,7 +178,8 @@ export function attributeSpeakers(paragraphs: readonly SpokenParagraph[], roster
     const speaks = p.spans.some((s) => s.kind === "speech");
     let result: Attribution | null = null;
     const tagged = named.filter((n) => n.tagged);
-    if (tagged.length > 0 && tagged.every((n) => n.speaker === tagged[0]!.speaker)) result = { speaker: tagged[0]!.speaker, how: "tag" };
+    if (p.pin && !p.pin.notSpeech) result = { speaker: pinned(p.pin.label), how: "pinned" };
+    else if (tagged.length > 0 && tagged.every((n) => n.speaker === tagged[0]!.speaker)) result = { speaker: tagged[0]!.speaker, how: "tag" };
     else if (named.length === 1 && speaks) result = { speaker: named[0]!.speaker, how: "named" };
     else if (gap <= MAX_GAP) {
       const last = history[history.length - 1];

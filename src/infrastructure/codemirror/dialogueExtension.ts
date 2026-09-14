@@ -4,7 +4,8 @@ import { activeChanged, effectiveSettings } from "./activeNote";
 import { settingsChanged } from "./settingsFacet";
 import { findingProviders, type HoverFinding } from "./findingsTooltip";
 import { findDialogue, resolveConventions, type DialogueConventions, type DialogueSpan } from "../../domain/dialogue/DialogueSpans";
-import { attributeSpeakers, HOW_LABELS, UNATTRIBUTED_COLOUR, UNATTRIBUTED_NOTE, type Attribution, type Speaker } from "../../domain/dialogue/Speakers";
+import { attributeSpeakers, isCertain, pinOf, UNATTRIBUTED_COLOUR, type Attribution, type Pin, type Speaker } from "../../domain/dialogue/Speakers";
+import { speakerBox, type BoxData } from "./speakerBox";
 import { WordMatcher } from "../../domain/words/WordList";
 import { pathInScope } from "../../domain/scope/NoteScope";
 import type { PluginSettings } from "../../domain/settings/Settings";
@@ -94,7 +95,7 @@ export function paragraphsIn(doc: Text, from: number, to: number): { from: numbe
 }
 
 interface AccentHit { readonly from: number; readonly to: number; readonly never: boolean; readonly term: string }
-interface Analysed { readonly from: number; readonly to: number; readonly spans: readonly DialogueSpan[]; readonly attribution: Attribution | null; readonly accents: readonly AccentHit[] }
+interface Analysed { readonly from: number; readonly to: number; readonly spans: readonly DialogueSpan[]; readonly attribution: Attribution | null; readonly pin: Pin | null; readonly accents: readonly AccentHit[] }
 
 /** The accent words inside a speaker's own speech: what they use, and what they never say. Absolute offsets, in order. */
 function accentHits(p: { from: number; text: string; spans: readonly DialogueSpan[] }, speaker: Speaker): AccentHit[] {
@@ -120,10 +121,12 @@ function accentHits(p: { from: number; text: string; spans: readonly DialogueSpa
  * narration dimmed, by the conventions of the project the note is in;
  * with a cast, each paragraph is attributed and tinted in its speaker's
  * colour, grey when nobody can be pinned, the hover saying who and how
- * sure. Accents: the same page at a faint tint, and inside each
+ * sure. Only a tag, a name in the paragraph or the writer's own pin
+ * colours a line; a turn is a guess, grey on the page and offered in the
+ * speaker box. Accents: the same page at a faint tint, and inside each
  * speaker's own speech the words their character note says they use and
  * the words they never say; never in narration, never in speech nobody
- * is pinned to. The whole note is analysed (turn-taking needs what came
+ * is sure about. The whole note is analysed (turn-taking needs what came
  * before) on every edit; decorating is bounded by the viewport.
  */
 export function dialogueExtension(pathOf: (state: EditorState) => string | null) {
@@ -148,13 +151,19 @@ export function dialogueExtension(pathOf: (state: EditorState) => string | null)
       const path = pathOf(view.state);
       const conventions = conventionsFor(settings, view.state.facet(conventionsFacet), path);
       const doc = view.state.doc;
-      const found = paragraphsIn(doc, 0, doc.length).map((p) => ({ ...p, text: doc.sliceString(p.from, p.to) })).map((p) => ({ ...p, spans: findDialogue(p.text, conventions) }));
+      const found = paragraphsIn(doc, 0, doc.length).map((p) => {
+        const text = doc.sliceString(p.from, p.to);
+        const pin = pinOf(text);
+        // The pin comment is blanked, not cut, so a thought paragraph still opens with its italic and offsets hold.
+        const body = pin ? " ".repeat(pin.to) + text.slice(pin.to) : text;
+        return { ...p, text, pin, spans: pin?.notSpeech ? [] : findDialogue(body, conventions) };
+      });
       const roster = settings.dialogue.speakerColours || this.accents ? rosterFor(view.state.facet(rostersFacet), path) : [];
       this.attributed = roster.length > 0;
       const attributions = this.attributed ? attributeSpeakers(found, roster) : [];
       this.paragraphs = found.map((p, i) => {
         const attribution = attributions[i] ?? null;
-        return { from: p.from, to: p.to, spans: p.spans, attribution, accents: this.accents && attribution ? accentHits(p, attribution.speaker) : [] };
+        return { from: p.from, to: p.to, spans: p.spans, attribution, pin: p.pin, accents: this.accents && attribution && isCertain(attribution.how) ? accentHits(p, attribution.speaker) : [] };
       });
     }
     private decorate(view: EditorView) {
@@ -162,7 +171,8 @@ export function dialogueExtension(pathOf: (state: EditorState) => string | null)
       const dim = effectiveSettings(view.state).dialogue.dimNarration;
       const builder = new RangeSetBuilder<Decoration>();
       for (const p of this.visible(view)) {
-        const marks = marksFor(this.attributed ? p.attribution?.speaker.colour ?? UNATTRIBUTED_COLOUR : null);
+        const a = p.attribution;
+        const marks = marksFor(this.attributed ? (a && isCertain(a.how) ? a.speaker.colour : UNATTRIBUTED_COLOUR) : null);
         let at = p.from;
         let hit = 0;
         for (const s of p.spans) {
@@ -183,20 +193,26 @@ export function dialogueExtension(pathOf: (state: EditorState) => string | null)
       for (const r of view.visibleRanges) for (const p of this.paragraphs) if (p.to >= r.from && p.from <= r.to && !out.includes(p)) out.push(p);
       return out;
     }
-    /** Who the hover says is speaking and how that was decided; under the accents lens, the accent word first. */
+    /** The accent words on hover; who is speaking is the speaker box's to say. */
     findings(view: EditorView): HoverFinding[] {
       if (!this.attributed) return [];
       const words: HoverFinding[] = [];
-      const lines: HoverFinding[] = [];
       for (const p of this.visible(view)) {
         const who = p.attribution;
         for (const h of p.accents) words.push({ from: h.from, to: h.to, kind: h.never ? "accent-never" : "accent", note: h.never ? `${who!.speaker.name} never says this · accent-never in the character note` : `${who!.speaker.name} · accent` });
-        const note = who ? `${who.speaker.name} · ${HOW_LABELS[who.how]}` : UNATTRIBUTED_NOTE;
-        for (const s of p.spans) lines.push({ from: p.from + s.from, to: p.from + s.to, kind: "dialogue", note });
       }
-      return [...words, ...lines];
+      return words;
+    }
+    /** What the speaker box reads; null when there is nothing to tag. */
+    boxData(view: EditorView): BoxData | null {
+      if (!this.attributed) return null;
+      return { paragraphs: this.paragraphs, roster: rosterFor(view.state.facet(rostersFacet), pathOf(view.state)) };
     }
   }, { decorations: (v) => v.decorations });
 
-  return [plugin, findingProviders.of((view) => view.plugin(plugin)?.findings(view) ?? [])];
+  return [
+    plugin,
+    findingProviders.of((view) => view.plugin(plugin)?.findings(view) ?? []),
+    speakerBox((view) => view.plugin(plugin)?.boxData(view) ?? null),
+  ];
 }

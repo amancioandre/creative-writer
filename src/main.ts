@@ -55,6 +55,7 @@ import { buildRoster } from "./domain/dialogue/Speakers";
 import type { EntityNote } from "./domain/story/EntityIndex";
 import { loadWordLists } from "./infrastructure/obsidian/VaultWordLists";
 import { lensMenu } from "./infrastructure/obsidian/lensMenu";
+import { tagSpeaker } from "./infrastructure/codemirror/speakerBox";
 import { BuildStoryMap } from "./application/use-cases/BuildStoryMap";
 import { AnalyzeSceneRelations } from "./application/use-cases/AnalyzeSceneRelations";
 import { VaultProjectNotes } from "./infrastructure/obsidian/VaultProjectNotes";
@@ -203,6 +204,15 @@ export default class CreativeZenModePlugin extends Plugin {
     this.addCommand({ id: "lens-dialogue", name: COMMANDS["lens-dialogue"], callback: () => void this.setLens(toggleLens(this.current.lens, "dialogue")) });
     this.addCommand({ id: "lens-words", name: COMMANDS["lens-words"], callback: () => void this.setLens(toggleLens(this.current.lens, "words")) });
     this.addCommand({ id: "lens-accents", name: COMMANDS["lens-accents"], callback: () => void this.setLens(toggleLens(this.current.lens, "accents")) });
+    this.addCommand({
+      id: "dialogue-tag-speaker",
+      name: COMMANDS["dialogue-tag-speaker"],
+      editorCallback: (_editor, view) => {
+        if (this.current.lens !== "dialogue" && this.current.lens !== "accents") { new Notice("creative-writer: switch to the dialogue lens to tag a speaker."); return; }
+        const cm = (view as MarkdownView & { editor: { cm?: { dispatch: (spec: unknown) => void } } }).editor.cm;
+        cm?.dispatch({ effects: tagSpeaker.of(null) });
+      },
+    });
     this.addCommand({ id: "lens-next", name: COMMANDS["lens-next"], callback: () => void this.setLens(nextLens(this.current.lens)) });
     this.addCommand({ id: "lens-off", name: COMMANDS["lens-off"], callback: () => void this.setLens("none") });
     const lensStatus = this.addStatusBarItem();

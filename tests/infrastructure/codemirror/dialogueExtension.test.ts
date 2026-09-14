@@ -50,11 +50,19 @@ describe("dialogueExtension — speakers", () => {
   afterEach(() => h?.destroy());
   const EXCHANGE = "Mara stepped in.\n\n“You came alone?” Tomas did not look up.\n\n“Yes.”\n\n_He is guessing._\n\n***\n\n“Hello?”";
 
+  it("colours a pinned line in the pinned speaker's colour, and a pin for a name with no note gets a colour of its own", () => {
+    const doc = "%% Mara %% “Yes.”\n\n%% The Keeper %% “Go.”\n\n%% not speech %% “A sign on the door.”";
+    h = mount(doc, ext("ch1.md", {}, ROSTER), { lens: "dialogue" });
+    expect(styles(h, "czm-speech")).toEqual(["--czm-speech: #111111", "--czm-speech: #4a8fe2"]);
+    expect(texts(h, "czm-narration")).toContain("%% not speech %% “A sign on the door.”");
+  });
+
   it("tints speech in the speaker's colour, grey when nobody can be pinned, and says who on hover", () => {
     h = mount(EXCHANGE, ext("ch1.md", {}, ROSTER), { lens: "dialogue" });
-    expect(styles(h, "czm-speech")).toEqual(["--czm-speech: #222222", "--czm-speech: #111111", "--czm-speech: #8a8a8a"]);
-    expect(styles(h, "czm-thought")).toEqual(["--czm-speech: #222222"]);
-    expect(allFindings(h.view).map((f) => f.note)).toEqual(["Tomas · named in the paragraph", "Mara · turn-taking", "Tomas · turn-taking", "speaker not found · no tag or name in this paragraph and no clean turn-taking"]);
+    // Only what is certain is coloured: the named line; the turns are guesses and stay grey until pinned.
+    expect(styles(h, "czm-speech")).toEqual(["--czm-speech: #222222", "--czm-speech: #8a8a8a", "--czm-speech: #8a8a8a"]);
+    expect(styles(h, "czm-thought")).toEqual(["--czm-speech: #8a8a8a"]);
+    expect(allFindings(h.view)).toEqual([]);
   });
 
   it("one colour and no hover without a cast, or when speaker colours are off", () => {
@@ -98,7 +106,7 @@ describe("dialogueExtension — accents", () => {
       ["accent-never", "Tomas never says this · accent-never in the character note"],
       ["accent-never", "Mara never says this · accent-never in the character note"],
     ]);
-    expect(notes.at(-1)).toEqual(["dialogue", "speaker not found · no tag or name in this paragraph and no clean turn-taking"]);
+    expect(notes).toHaveLength(4);
   });
 
   it("marks nothing under the dialogue lens", () => {

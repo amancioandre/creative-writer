@@ -125,7 +125,8 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
         { name: "Thought marks", desc: "How thought is written. Italics inside a sentence are emphasis and never count. Override with thoughts:.", control: dropdown("dialogue.thoughts", THOUGHT_OPTIONS) },
         { name: "Thought pattern", desc: "A regular expression; every match in a paragraph is a thought, group 1 when there is one.", control: text("dialogue.thoughtPattern", "^[_*](.+)[_*][.!?]?$"), visible: () => s().dialogue.thoughts === "custom" },
         { name: "Dim narration", desc: "Under the dialogue lens, fade everything that is not speech or thought.", control: toggle("dialogue.dimNarration") },
-        { name: "Speaker colours", desc: "Tint speech by who is speaking: colour: in the character note, or the palette in cast order. Grey when nobody can be pinned.", control: toggle("dialogue.speakerColours") },
+        { name: "Speaker colours", desc: "Tint speech by who is speaking: colour: in the character note, or the palette in cast order. Grey when nobody is sure.", control: toggle("dialogue.speakerColours") },
+        { name: "Tag box opens by itself", desc: "When the cursor rests in a line nobody is sure about, the speaker box opens. Off: only by the \"Dialogue: tag the speaker\" command.", control: toggle("dialogue.autoBox"), visible: () => s().dialogue.speakerColours },
       ]),
       group("Manuscript outline", [
         { name: "Folder levels as headings", desc: "Folder levels below the project folder that become headings. 0 = no outline.", control: slider("manuscript.folderDepth", 0, 6, 1) },

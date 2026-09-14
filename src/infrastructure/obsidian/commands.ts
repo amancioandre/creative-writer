@@ -7,6 +7,7 @@ export const COMMANDS = {
   "lens-dialogue": "Lens: dialogue",
   "lens-words": "Lens: words",
   "lens-accents": "Lens: accents",
+  "dialogue-tag-speaker": "Dialogue: tag the speaker",
   "lens-next": "Lens: next",
   "lens-off": "Lens: off",
   "open-story-map": "Open story map",

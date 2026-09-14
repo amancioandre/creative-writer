@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { SPEAKER_PALETTE, attributeSpeakers, buildRoster, type Speaker, type SpokenParagraph } from "../../../src/domain/dialogue/Speakers";
+import { SPEAKER_PALETTE, attributeSpeakers, buildRoster, isCertain, pinComment, pinOf, type Speaker, type SpokenParagraph } from "../../../src/domain/dialogue/Speakers";
 import { DEFAULT_CONVENTIONS, findDialogue } from "../../../src/domain/dialogue/DialogueSpans";
 
 const notes = [
@@ -81,5 +81,28 @@ describe("attributeSpeakers", () => {
   });
   it("a name inside speech does not attribute", () => {
     expect(who(["“Mara, come here.”"])).toEqual([null]);
+  });
+});
+
+describe("pins", () => {
+  it("reads the writer's pin at the start of a paragraph, and not speech", () => {
+    expect(pinOf("%% Tomas %% “Aye.”")).toEqual({ from: 0, to: 12, label: "Tomas", notSpeech: false });
+    expect(pinOf("  %%not speech%% “A sign.”")).toEqual({ from: 2, to: 17, label: "not speech", notSpeech: true });
+    expect(pinOf("“Aye.” %% Tomas %%")).toBeNull();
+    expect(pinComment("Mara")).toBe("%% Mara %%");
+  });
+  it("a pin is certain, a turn is not", () => {
+    expect(isCertain("pinned")).toBe(true);
+    expect(isCertain("tag")).toBe(true);
+    expect(isCertain("named")).toBe(true);
+    expect(isCertain("turns")).toBe(false);
+  });
+  it("a pin wins over everything, feeds the turns after it, and an unknown name becomes a speaker with its own colour", () => {
+    const texts = ["%% Mara %% “Yes,” Tomas said.", "“No.”", "%% The Keeper %% “Out.”", "%% The Keeper %% “Now.”"];
+    const out = attributeSpeakers(texts.map((t) => ({ ...para(t), pin: pinOf(t) })), roster);
+    expect(out.map((a) => (a ? `${a.speaker.name}/${a.how}` : null))).toEqual(["Mara/pinned", "Tomas/turns", "The Keeper/pinned", "The Keeper/pinned"]);
+    const stranger = attributeSpeakers([{ ...para("%% Ilse %% “Hm.”"), pin: pinOf("%% Ilse %% “Hm.”") }], roster);
+    expect(stranger[0]!.speaker.name).toBe("Ilse");
+    expect(roster.map((s) => s.colour)).not.toContain(stranger[0]!.speaker.colour);
   });
 });
