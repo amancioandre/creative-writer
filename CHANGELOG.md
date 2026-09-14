@@ -4,7 +4,7 @@ Release notes for every version are on the [releases page](https://github.com/am
 
 ## 0.9.1 — The tint
 
-The first slice of the UX audit of 2026-09-13: rhythm stops competing for the underline, and four things the audit caught are fixed.
+The UX audit of 2026-09-13, built in fourteen slices: rhythm becomes a faint tint on the text, every panel answers what it did and how to undo it, the panels share one head and one docked side column, the keyboard reaches everything, colours mean one thing each, the desk leads with a verdict, the comments pane is one list with resolve, the board's cards carry their identity, the editor gets its polish and Zen its one indicator, every panel ends in a ⋯ menu that names its commands, and the whole thing stays steady under a real manuscript.
 
 - Paragraph rhythm: each sentence of the cursor paragraph sits on a **faint tint** instead of a 2 px underline. Underlines are left to spellcheck, Harper and links; style-check tints stack on top of the rhythm wash.
 - Zen Mode: rhythm leaves the text for a **meter in the margin**, one bar per sentence stacked from the top of the paragraph, wide by tier. The page stays plain.
