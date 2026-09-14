@@ -208,3 +208,47 @@ Canvas: <https://claude.ai/code/artifact/44a5f71a-ae1f-430a-8e7b-a8bcc1bda1de> (
 ## 10. Verification per increment
 
 `npm run lint`, `npm run build`, `npm test`, then the vault loop: install into `/home/apollo/obsidian-dev`, a dated QA note whose project has a threads note with an `Arc:`, a `Theme:` and a `Subplot:` column, a *POV* and a *Time* thread named from the project note, a directed thread, a plain one, a stop whose anchor no longer matches, and a chapter with no stops at all, so the empty column, the audit and the reading path are all exercised. Increment 5's QA note is run against Ollama with `qwen2.5:7b` first; the Claude path is checked once against the cap.
+
+## 11. Execution plan
+
+Written 2026-09-13, after the two design passes. Eight increments, each a working, tested, installable plugin; the model does not appear until the fifth, so the first five are testable with no Ollama running. One focused session per increment at the Tier 2 cadence, two for the first and the fifth.
+
+### Order and dependencies
+
+```
+0 domain ──► 1 panel ──► 2 cells ──► 3 kinds · POV · Time · keys ──► 4 audit · snapshot
+                                                                          │
+                                                          5 read · check ◄┘──► 6 propose columns ──► 7 long books
+```
+
+0 to 4 are serial; each builds on the last's data. 5 needs 4's plan/verified/broken states to draw readings beside them. 6 needs 5's adapters. 7 is independent of 5 and 6 and can be pulled forward if a real manuscript stutters earlier.
+
+### Per increment
+
+| # | Domain and application | Infrastructure and view | Tests | QA note exercises |
+|---|---|---|---|---|
+| 0 | `domain/plot/PlotGrid.ts`: `Column` (derived · thread by kind · cast), `Cell` (empty · plan · verified · broken · reading), `buildPlotGrid`. `domain/threads/StoryThreadsNote.ts`: heading prefixes, `[[link]]` in an arc heading, arc roles under `Arc:`. `domain/story/Order.ts`: headings without prose as rows. | none | `tests/domain/plot/PlotGrid.test.ts` (projection by scene key, kinds, cell states from anchors), threads-note parser cases for every prefix, an unknown prefix, arc roles, a bare-name arc. Coverage stays at the thresholds. | none |
+| 1 | `PanelId` gains nothing: `timeline` is renamed in display only. | `StoryTimelineView` → `PlotGridView` (same view type string, name *Plot grid*, icon `table`); `PanelShell` jump label and icon; thread columns render stops, Plot renders events, cast folds with expand; `styles.css` `.czm-pg-*`; `docs/guide/plot-grid.md` with a note at the old address. | `tests/infrastructure/obsidian/PlotGridView.test.ts` from the timeline's test: rows, bands, columns in order, fold and expand, search filters columns. | Threads note with three kinds and a free thread; the cast folded and expanded; the old timeline command still opens it. |
+| 2 | `StoryThreadsNoteRepository`: `putStop`, `removeStop`, `addThread`, `removeThread`, `renameThread` (line rewrites, serialised through the existing update queue). | Selection, inline editing, the CELL section (role, anchor picker, note), the arrow loop, `Enter`, `Escape`, `Ctrl+Enter`, `Delete` with Undo in the status line; the ⋯ menu; commands in `commands.ts`. | Repository cases: add a stop to an existing thread, to a new heading, replace, remove the last stop leaves the heading, rename rewrites one line. View: type into an empty cell and read the note back; undo restores the line. | Type five cells by keyboard only; rename a column; delete one with the confirmation. |
+| 3 | `PluginSettings.plotGrid` + `normalizePlotGrid`; `plot-pov`, `plot-time`, `plot-theme` in `parseProjectFrontmatter`; arc binding through `EntityIndex`. | Kind groups with fold pills; the eyebrow; POV and Time in the derived block; the 3 px chip; arc header dot; "present, unmoved" (off until a verified stop); column header menu with *Set kind…*, *Use as…*, *Pin*, *Hide*; `?` list; the first-round keys. | Settings normalisation; front matter keys; group folding state round-trips; the mark's rule. | Set POV and main theme from the menu and read the project note; fold each group; `?` matches the doc's table. |
+| 4 | `domain/plot/Audit.ts`: cell state from `Anchors`; counts per column and for the grid. `domain/plot/Snapshot.ts`: the markdown table. | Audit view toggle (`v`) with the three glyphs; counts in headers and the state line; `n`/`p` over broken anchors; `"` picker filtered to near-matches; *Snapshot the grid* writing `Plot grid · <date>.md` with the front-matter flag and the status line naming it. | Audit states from a note with a matching, a missing and a moved quote; snapshot table shape; the snapshot flag keeps the file out of `VaultProjectNotes`. | Break an anchor by editing the prose, repair it with `n` `"` Enter; snapshot twice and diff. |
+| 5 | `application/ports/ColumnAnalyser.ts` (read, check); `domain/story/StoryMapFile.ts` `GridReading` + `putGridReadings` (version 4 with migration); `validateReading` for grid readings through `locateQuote`. | `infrastructure/llm/prompts/gridRulebook.ts`; `OllamaColumnAnalyser`, `ClaudeColumnAnalyser` behind `ConfiguredLlmAnalyser`; *Read this column…*, *Read…* for all, *Check this column against the draft…*; readings as note glyph, placeholder, CELL section, manuscript comments pane row; answered on write, dismissed by `x`; stale on hash mismatch; `n`/`p` extended. | Adapter against recorded fixtures (no network); schema; validator drops an unlocatable quote; answered-on-write; stale on hash change; the comments pane renders a reading read-only. | `qwen2.5:7b`: read one column, answer two readings by typing, dismiss one, edit the scene and see one go stale; Claude once against the cap. |
+| 6 | `application/ports/ColumnProposer.ts`; input from `StoryMapFile.readings` events and the cast. | `proposeColumnsRulebook`; the modal; headings written with kinds; *Read the project* offered when no readings exist. | Fixture-driven; headings written in the right form; the greyed duplicate. | Propose on the QA project, add two, see them empty in the grid. |
+| 7 | none | Row virtualisation past fifty scenes; fit row heights; *Export grid* as the undated snapshot, optional CSV. | Virtual window renders the rows the scroll shows; export shape. | A 120-scene fixture project in the dev vault. |
+
+### Before the first commit of increment 0
+
+- Confirm decisions 1 to 15 in section 8, or amend them there; every later increment cites them.
+- File the feature in creative-suite as one issue with the increments as a checklist, the way #3 and #4 hold echoes and directed threads.
+- Copy the Claude Design files into the repo (done: `docs/public/design/plot-grid.dc.html`, `creative-writer-critique.dc.html`, `support.js`; they render only inside the Claude Design editor, which supplies React, so they are the record, not a page).
+
+### Definition of done, every increment
+
+`npm run lint`, `npm run build`, `npm test` green; the vault loop from section 10; the guide page and the reference tables updated in the same commit; the changelog line written; `docs/development/plot-grid.md` Status line updated with what departed from the plan and why, as the echoes doc does.
+
+### Risks
+
+- **The threads note grammar grows** (prefixes, four arc roles, `[[link]]` headings). Every addition is confined and parses today's notes unchanged, and the parser tests carry one fixture per generation of the note. If the grammar reaches a third round, stop and consider a kind field.
+- **The timeline rename** moves a shipped command's name. The id stays, so bound hotkeys survive; the release note says so.
+- **Placeholder readings on Obsidian's textarea**: the placeholder must not be selectable or copyable, which the native attribute guarantees; if the Obsidian build ever styles placeholders away, fall back to a faint line under the field, never text in it.
+- **Local model quality on arcs.** A 7B model reads subplots well and arcs badly. Increment 5's QA runs the arc prompt on the QA project before the Claude path, and the rulebook keeps the arc question narrow: what this scene does to the want, in one sentence, with a quote.

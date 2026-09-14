@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #121212; }
+  ::selection { background: rgba(139,108,239,.35); }
+  a { color: #a18cf0; text-decoration: none; }
+  a:hover { color: #bcaef5; text-decoration: underline; }
+</style>
+</helmet>
+
+<div style="background:#121212;color:#dcddde;font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:15px;line-height:1.55;padding:56px 40px 96px;text-wrap:pretty">
+<div style="max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:64px">
+
+  <header style="display:flex;flex-direction:column;gap:18px;max-width:760px">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#6f6f6f">Creative Writer · Obsidian plugin · ux review and redesign</div>
+    <h1 style="margin:0;font-size:34px;line-height:1.2;font-weight:600;letter-spacing:-.01em">Everything that touches the page lives in the editor. Everything about the work lives in panels.</h1>
+    <p style="margin:0;color:#9a9a9a">The plugin already holds that line. What it does not yet hold is one vocabulary: five panels invent five layouts, five colour systems and five ways to reach an action, and the editor spends its one scarce channel — the underline — on three unrelated things at once. This review goes screen by screen, ranks the ten changes worth making first, and redesigns three panels around a shared shell.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8a8a8a">
+      <span style="border:1px solid #2b2b2b;border-radius:4px;padding:4px 8px">obsidian css variables only</span>
+      <span style="border:1px solid #2b2b2b;border-radius:4px;padding:4px 8px">light + dark + community themes</span>
+      <span style="border:1px solid #2b2b2b;border-radius:4px;padding:4px 8px">native setting rows, dropdowns, clickable-icons</span>
+      <span style="border:1px solid #2b2b2b;border-radius:4px;padding:4px 8px">desktop keyboard-first</span>
+      <span style="border:1px solid #2b2b2b;border-radius:4px;padding:4px 8px">no default hotkeys</span>
+    </div>
+  </header>
+
+  <section style="display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:baseline;gap:14px;border-bottom:1px solid #242424;padding-bottom:12px">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#6f6f6f">01</span>
+      <h2 style="margin:0;font-size:22px;font-weight:600">Heuristic evaluation, screen by screen</h2>
+      <span style="color:#6f6f6f;font-size:13px;margin-left:auto">hierarchy · density · typography · colour semantics · empty states · discoverability · consistency</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px">
+
+      <article style="background:#1a1a1a;border:1px solid #262626;border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:baseline;gap:10px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b6cef">01</span>
+          <h3 style="margin:0;font-size:16px;font-weight:600">Editor: rhythm, style checks, focus fade</h3>
+        </div>
+        <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px;font-size:14px;color:#b9b9b9">
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">colour semantics</span><br>Rhythm underlines, style-check tints, spell-check squiggles and internal links all land on the same channel under the same words. A measurement (sentence length) is rendered in the visual language of a fault.</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">density</span><br>Four layers are live on the cursor paragraph at once — fade, band, underline, tint. There is no one-key way to see the prose plain.</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">hierarchy</span><br>The current-line band runs the full viewport width, well past the text column, so the widest object on screen is a cursor affordance.</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">discoverability</span><br>Nothing on the page says what warm versus cool means. The legend exists only in the settings tab.</li>
+        </ul>
+      </article>
+
+      <article style="background:#1a1a1a;border:1px solid #262626;border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:baseline;gap:10px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b6cef">02</span>
+          <h3 style="margin:0;font-size:16px;font-weight:600">Zen mode</h3>
+        </div>
+        <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px;font-size:14px;color:#b9b9b9">
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#53a67e">works</span><br>Chrome is gone and the measure is preserved. This is the strongest screen in the set.</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">density</span><br>Every decoration layer survives into zen. The one place ink should be quietest is as loud as the normal editor.</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">hierarchy</span><br>The line band bleeds to the window edge, reading as leftover UI in a mode defined by having none.</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">discoverability</span><br>No exit affordance and no word count. A writer who entered zen by command palette has to guess at Esc.</li>
+        </ul>
+      </article>
+
+      <article style="background:#1a1a1a;border:1px solid #262626;border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:baseline;gap:10px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b6cef">03</span>
+          <h3 style="margin:0;font-size:16px;font-weight:600">Writing desk sidebar</h3>
+        </div>
+        <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px;font-size:14px;color:#b9b9b9">
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">hierarchy</span><br>"0 words" is the largest thing in the panel and the least useful: it is a raw count, not a verdict. What a novelist wants at a glance is how far behind they are.</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">density</span><br>The heatmap key is a two-sentence paragraph doing a tooltip's job, and it is longer than the heatmap.</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">typography</span><br>Counts are set in the UI font without tabular figures, so "232 / 3,000 · 8%" and "844 / 20,000 · 4%" do not align down the column.</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">empty states</span><br>Three voices in four lines: "Nothing added this week.", a bare projected date, and "Open a note to see how it reads." None says what to do next.</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">colour semantics</span><br>Purple heatmap squares mean "mostly revision" and also happen to be the accent colour used for interactive elements everywhere else.</li>
+        </ul>
+      </article>
+
+      <article style="background:#1a1a1a;border:1px solid #262626;border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:baseline;gap:10px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b6cef">04</span>
+          <h3 style="margin:0;font-size:16px;font-weight:600">Writer board</h3>
+        </div>
+        <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px;font-size:14px;color:#b9b9b9">
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">colour semantics</span><br>Six group hues with tinted backgrounds, none of them the theme accent, and loose chips outlined in red — which reads as an error state rather than "unfiled".</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">hierarchy</span><br>Two label layers say the same word: the section label "STORIES" sits directly above the group header "Stories · 5".</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">density</span><br>Cards carry four analysis metrics (ease, grade, variety, dialogue) plus an identical italic placeholder about missing premises. The card stops being an identity and becomes a report.</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">discoverability</span><br>Every action lives behind one unlabelled icon, and three of them — "Fit", "Shake", "Copy schema" — cannot be guessed from their labels.</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">consistency</span><br>Empty groups explain themselves ("Places and milieus you return to."); filled groups never do. Cards clip at the right edge with no scroll affordance.</li>
+        </ul>
+      </article>
+
+      <article style="background:#1a1a1a;border:1px solid #262626;border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:baseline;gap:10px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b6cef">05</span>
+          <h3 style="margin:0;font-size:16px;font-weight:600">Story map</h3>
+        </div>
+        <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px;font-size:14px;color:#b9b9b9">
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d4645e">empty states</span><br>"Nothing matches the current filters." is the worst state in the plugin: it names no filter, offers no button, and sits opposite a panel where "Hide loners" is on and the project has one node. The user is told they are wrong without being told how.</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">density</span><br>Nine toggles and eight colour rows are expanded by default, and toggle switches — a settings control — are used for what is really per-kind visibility.</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">hierarchy</span><br>Five buttons at equal weight. "Read project with model" is slow and consequential; it looks exactly like "Fit".</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">colour semantics</span><br>Kind swatches are saturated web colours that ignore the theme, and only one row ("Notes · 1") carries a count, so the panel cannot tell you what the project actually contains.</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">discoverability</span><br>The panel floats over the right third of the canvas and covers the nodes it is filtering.</li>
+        </ul>
+      </article>
+
+      <article style="background:#1a1a1a;border:1px solid #262626;border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:baseline;gap:10px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b6cef">06</span>
+          <h3 style="margin:0;font-size:16px;font-weight:600">Story timeline</h3>
+        </div>
+        <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px;font-size:14px;color:#b9b9b9">
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">hierarchy</span><br>The matrix occupies the left quarter of a full-width tab; four fifths of the screen is empty. Column width should grow with the cast.</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">typography</span><br>Rotated cast names at roughly 10px are the hardest text to read in the plugin, and they are the axis you scan constantly.</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d4645e">colour semantics</span><br>Blue, green and grey dots, plus blue and green names, with no key anywhere. On stage, mentioned and absent are indistinguishable to a new user.</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">density</span><br>Rows carry word counts only. Chapter rows show no totals, so the one structural question the view could answer — is this chapter light? — goes unanswered.</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">consistency</span><br>This is the only panel with its controls in a top bar rather than the floating panel, and the only one with no jump buttons to its siblings.</li>
+        </ul>
+      </article>
+
+      <article style="background:#1a1a1a;border:1px solid #262626;border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:baseline;gap:10px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b6cef">07</span>
+          <h3 style="margin:0;font-size:16px;font-weight:600">Story threads</h3>
+        </div>
+        <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px;font-size:14px;color:#b9b9b9">
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">hierarchy</span><br>Strips are labelled below themselves in small grey text, and the label slot carries an axis note ("· max 2") instead of a unit. Reading the chart requires reading upward.</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d4645e">colour semantics</span><br>Five strips of identical purple for five different quantities, and orange versus blue arcs with no key. Colour is decoration here, not information.</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">empty states</span><br>"No facts read yet." sits under the CONTRADICTIONS heading while a real, actionable warning — a letter pointing at no scene — is stranded in the THREADS section above it. The urgent item has the quietest home.</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">discoverability</span><br>Nothing in the view suggests what to do about a contradiction: no click target, no jump to the scene.</li>
+        </ul>
+      </article>
+
+      <article style="background:#1a1a1a;border:1px solid #262626;border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:baseline;gap:10px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b6cef">08</span>
+          <h3 style="margin:0;font-size:16px;font-weight:600">Manuscript and comments pane</h3>
+        </div>
+        <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px;font-size:14px;color:#b9b9b9">
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">hierarchy</span><br>Two lists compete in one column: "This paragraph" and "All comments (11)". The selected paragraph gets a purple outline heavier than the prose inside it.</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d4645e">typography</span><br>Two vocabularies for one concept: six uppercase kinds (TODO, FIX, CHECK, IDEA, CUT, REF) and two lowercase ones (note, mark). Users will read them as different systems, because they look like different systems.</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">colour semantics</span><br>Chip colours run yellow, green, red, grey with no stated meaning, and "mark" (a highlight) and "FIX" (an action) sit at the same weight.</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">density</span><br>The chapter name — the one piece of context needed to navigate the list — is right-aligned in the faintest colour available.</li>
+          <li><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#d9a23b">discoverability</span><br>The composer placeholder is a syntax lesson, and "Enter appends it to the end of this paragraph" describes a side effect on the manuscript that the composer's position does not imply.</li>
+        </ul>
+      </article>
+
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:baseline;gap:14px;border-bottom:1px solid #242424;padding-bottom:12px">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#6f6f6f">02</span>
+      <h2 style="margin:0;font-size:22px;font-weight:600">Top ten changes, ranked by impact for a daily novelist</h2>
+    </div>
+
+    <ol style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:1px;background:#242424;border:1px solid #242424;border-radius:6px;overflow:hidden">
+      <li style="background:#1a1a1a;padding:16px 20px;display:grid;grid-template-columns:32px 1fr 150px;gap:16px;align-items:start">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#8b6cef">01</span>
+        <div><div style="font-weight:600">Every empty state names its cause and carries the fix</div><div style="color:#9a9a9a;font-size:14px">"Hide loners is hiding 1 node" with a button beside it, not "Nothing matches the current filters." Applies to the map, threads, readability and empty board groups. Cheapest change with the largest effect on whether the panels feel broken.</div></div>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6f6f6f;text-align:right">all panels · copy + 1 button</span>
+      </li>
+      <li style="background:#1a1a1a;padding:16px 20px;display:grid;grid-template-columns:32px 1fr 150px;gap:16px;align-items:start">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#8b6cef">02</span>
+        <div><div style="font-weight:600">One colour dictionary, built from theme variables</div><div style="color:#9a9a9a;font-size:14px">Three meanings only: accent for what the writer made, warning for what needs checking, muted for what the model derived. Retire the six board hues and the saturated map swatches; derive kind colours from the accent's hue ramp so community themes stay coherent.</div></div>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6f6f6f;text-align:right">system · medium</span>
+      </li>
+      <li style="background:#1a1a1a;padding:16px 20px;display:grid;grid-template-columns:32px 1fr 150px;gap:16px;align-items:start">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#8b6cef">03</span>
+        <div><div style="font-weight:600">Take sentence rhythm off the underline channel</div><div style="color:#9a9a9a;font-size:14px">Underlines belong to spelling and links. Rhythm moves to a gutter meter in the left margin — one tick per sentence, length by width — and ships off by default. Style checks keep the tint, at half the current alpha, and only inside the cursor paragraph.</div></div>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6f6f6f;text-align:right">editor · medium</span>
+      </li>
+      <li style="background:#1a1a1a;padding:16px 20px;display:grid;grid-template-columns:32px 1fr 150px;gap:16px;align-items:start">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#8b6cef">04</span>
+        <div><div style="font-weight:600">One panel shell for all five panels</div><div style="color:#9a9a9a;font-size:14px">Docked right, not floating over the canvas. Same header: scope dropdown, search, overflow. Same body: native setting rows, everything collapsed except the section you last used. Same footer: sibling jumps. Learning one panel then teaches the other four.</div></div>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6f6f6f;text-align:right">all panels · large</span>
+      </li>
+      <li style="background:#1a1a1a;padding:16px 20px;display:grid;grid-template-columns:32px 1fr 150px;gap:16px;align-items:start">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#8b6cef">05</span>
+        <div><div style="font-weight:600">Comments become one grouped list with the current paragraph pinned</div><div style="color:#9a9a9a;font-size:14px">Sticky chapter headers replace the faint right-aligned labels; the selected paragraph's comments pin to the top with a two-line quote. Revision means moving between comments all day, so this is the highest-traffic list in the plugin.</div></div>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6f6f6f;text-align:right">manuscript · medium</span>
+      </li>
+      <li style="background:#1a1a1a;padding:16px 20px;display:grid;grid-template-columns:32px 1fr 150px;gap:16px;align-items:start">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#8b6cef">06</span>
+        <div><div style="font-weight:600">The desk leads with a verdict, not a count</div><div style="color:#9a9a9a;font-size:14px">"120 to go" over "380 of 500", with pace as a single short clause. Counts set in tabular monospace so project rows align. The heatmap key becomes a four-square legend plus a tooltip.</div></div>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6f6f6f;text-align:right">desk · small</span>
+      </li>
+      <li style="background:#1a1a1a;padding:16px 20px;display:grid;grid-template-columns:32px 1fr 150px;gap:16px;align-items:start">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#8b6cef">07</span>
+        <div><div style="font-weight:600">Visibility stops being a toggle switch</div><div style="color:#9a9a9a;font-size:14px">Kind and filter rows get a clickable-icon eye plus a count, and kinds absent from the project collapse into one faint line. The map panel loses roughly half its height without losing a control.</div></div>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6f6f6f;text-align:right">map, threads · small</span>
+      </li>
+      <li style="background:#1a1a1a;padding:16px 20px;display:grid;grid-template-columns:32px 1fr 150px;gap:16px;align-items:start">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#8b6cef">08</span>
+        <div><div style="font-weight:600">One filled button per panel, and it is the expensive one</div><div style="color:#9a9a9a;font-size:14px">"Read project with model" is the only accent button, with its cost stated beneath it. Fit, shake and copy schema move into the overflow menu, where each row shows its command name so the writer can bind their own key.</div></div>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6f6f6f;text-align:right">all panels · small</span>
+      </li>
+      <li style="background:#1a1a1a;padding:16px 20px;display:grid;grid-template-columns:32px 1fr 150px;gap:16px;align-items:start">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#8b6cef">09</span>
+        <div><div style="font-weight:600">Timeline and threads get a key and the whole pane</div><div style="color:#9a9a9a;font-size:14px">A one-line legend under the header defines every dot and arc. The matrix stretches to the tab width, cast names go horizontal on a sticky header row, and chapter rows carry totals. Strip labels move above their strips with a unit.</div></div>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6f6f6f;text-align:right">timeline, threads · medium</span>
+      </li>
+      <li style="background:#1a1a1a;padding:16px 20px;display:grid;grid-template-columns:32px 1fr 150px;gap:16px;align-items:start">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#8b6cef">10</span>
+        <div><div style="font-weight:600">Zen mode drops to one layer and admits one indicator</div><div style="color:#9a9a9a;font-size:14px">Focus fade only; no band, no rhythm, no tints. A word count and an exit hint fade in on mouse move and out after two seconds, both inside the text column.</div></div>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6f6f6f;text-align:right">editor · small</span>
+      </li>
+    </ol>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:baseline;gap:14px;border-bottom:1px solid #242424;padding-bottom:12px">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#6f6f6f">03</span>
+      <h2 style="margin:0;font-size:22px;font-weight:600">The shared panel shell</h2>
+      <span style="color:#6f6f6f;font-size:13px;margin-left:auto">the contract the three artboards below all obey</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px">
+      <div style="background:#1a1a1a;border:1px solid #262626;border-radius:6px;padding:18px"><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#8b6cef;margin-bottom:8px">scope</div><div style="font-size:14px;color:#b9b9b9">First row, always: which story this panel is about, then search. Never below an action.</div></div>
+      <div style="background:#1a1a1a;border:1px solid #262626;border-radius:6px;padding:18px"><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#8b6cef;margin-bottom:8px">state line</div><div style="font-size:14px;color:#b9b9b9">One monospace line under scope: what is in the project, what is hidden, and a reset. The panel's summary of itself.</div></div>
+      <div style="background:#1a1a1a;border:1px solid #262626;border-radius:6px;padding:18px"><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#8b6cef;margin-bottom:8px">sections</div><div style="font-size:14px;color:#b9b9b9">Native setting rows in collapsed groups, each header showing its current value so it can be read without opening.</div></div>
+      <div style="background:#1a1a1a;border:1px solid #262626;border-radius:6px;padding:18px"><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#8b6cef;margin-bottom:8px">footer</div><div style="font-size:14px;color:#b9b9b9">Sibling jumps in the same order in all five panels: desk, board, map, timeline, threads. Current panel shown, not linked.</div></div>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:22px">
+    <div style="display:flex;align-items:baseline;gap:14px;border-bottom:1px solid #242424;padding-bottom:12px">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#6f6f6f">04</span>
+      <h2 style="margin:0;font-size:22px;font-weight:600">Artboard A — story map panel</h2>
+      <span style="color:#6f6f6f;font-size:13px;margin-left:auto">docked · 300px · shown in its hardest state, nothing visible</span>
+    </div>
+
+    <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">
+
+      <div style="display:flex;border:1px solid #2b2b2b;border-radius:8px;overflow:hidden;background:#1e1e1e;width:760px;height:660px;flex:0 0 auto;font-family:'IBM Plex Sans',sans-serif">
+        <div style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;padding:28px;background:#1e1e1e">
+          <div style="max-width:300px;display:flex;flex-direction:column;gap:14px;text-align:center;align-items:center">
+            <div style="font-size:15px;color:#dcddde;font-weight:500">Nothing is visible right now</div>
+            <div style="font-size:13px;color:#9a9a9a;line-height:1.5">QA Story has 14 nodes. Hide loners is hiding 11 of them, and links are switched off.</div>
+            <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+              <button style="font-family:inherit;font-size:13px;color:#dcddde;background:#2a2a2a;border:1px solid #363636;border-radius:5px;padding:6px 12px;cursor:pointer" style-hover="background:#333;border-color:#454545">Show loners</button>
+              <button style="font-family:inherit;font-size:13px;color:#dcddde;background:#2a2a2a;border:1px solid #363636;border-radius:5px;padding:6px 12px;cursor:pointer" style-hover="background:#333;border-color:#454545">Reset all filters</button>
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8a8a8a;margin-top:4px">or ⌘P → creative writer: read project</div>
+          </div>
+        </div>
+
+        <aside style="width:300px;flex:0 0 300px;background:#171717;border-left:1px solid #2b2b2b;display:flex;flex-direction:column;font-size:13px">
+          <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #242424">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#8a8a8a;flex:1">Story map</span>
+            <span style="width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#8a8a8a;cursor:pointer" style-hover="background:#242424;color:#dcddde">⌕</span>
+            <span style="width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#8a8a8a;cursor:pointer" style-hover="background:#242424;color:#dcddde">⋯</span>
+          </div>
+
+          <div style="padding:12px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid #242424">
+            <div style="display:flex;align-items:center;justify-content:space-between;background:#1e1e1e;border:1px solid #333;border-radius:4px;padding:6px 10px;color:#dcddde;cursor:pointer">QA Story<span style="color:#7a7a7a;font-size:11px">⌃⌄</span></div>
+            <div style="background:#1e1e1e;border:1px solid #2b2b2b;border-radius:4px;padding:6px 10px;color:#5c5c5c">Find a name…</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7a7a7a;display:flex;gap:6px;align-items:baseline;flex-wrap:wrap;padding-top:2px">
+              <span>14 nodes · 0 shown · 2 filters on</span>
+              <span style="color:#8b6cef;cursor:pointer;margin-left:auto" style-hover="color:#a795f2">reset</span>
+            </div>
+          </div>
+
+          <div style="padding:12px;border-bottom:1px solid #242424;display:flex;flex-direction:column;gap:8px">
+            <button style="font-family:inherit;font-size:13px;width:100%;background:#8b6cef;color:#fff;border:none;border-radius:5px;padding:7px 10px;font-weight:500;cursor:pointer" style-hover="background:#7a5be0">Read project with model</button>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8a8a8a;text-align:center">reads 24 notes · about 8 seconds · last run never</div>
+          </div>
+
+          <div style="padding:10px 12px 4px;display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:#7a7a7a">Kinds</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5c5c5c">5 of 5 shown</span>
+          </div>
+          <div style="padding:0 6px 10px">
+            <sc-for list="{{ kinds }}" as="kind" hint-placeholder-count="5">
+              <div style="display:flex;align-items:center;gap:10px;padding:5px 6px;border-radius:4px" style-hover="background:#1e1e1e">
+                <span style="width:9px;height:9px;border-radius:2px;flex:0 0 auto;background:{{ kind.colour }}"></span>
+                <span style="flex:1;color:#dcddde">{{ kind.name }}</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7a7a7a;font-variant-numeric:tabular-nums">{{ kind.count }}</span>
+                <sc-if value="{{ eyeControl }}" hint-placeholder-val="{{ true }}">
+                  <span style="width:20px;height:20px;border-radius:3px;display:flex;align-items:center;justify-content:center;color:#8a8a8a;font-size:11px;cursor:pointer" style-hover="background:#242424;color:#dcddde">◉</span>
+                </sc-if>
+                <sc-if value="{{ switchControl }}">
+                  <span style="width:30px;height:16px;border-radius:8px;background:#8b6cef;position:relative;flex:0 0 auto;cursor:pointer"><span style="position:absolute;top:2px;right:2px;width:12px;height:12px;border-radius:6px;background:#fff"></span></span>
+                </sc-if>
+              </div>
+            </sc-for>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8a8a8a;padding:6px 6px 0">not in this project: factions, items, outside</div>
+          </div>
+
+          <div style="border-top:1px solid #242424">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;cursor:pointer" style-hover="background:#1e1e1e">
+              <span style="color:#dcddde">Filters</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#d9a23b">2 on<span style="color:#5c5c5c;margin-left:8px">›</span></span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;cursor:pointer" style-hover="background:#1e1e1e">
+              <span style="color:#dcddde">Display</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7a7a7a">labels, arrows<span style="color:#5c5c5c;margin-left:8px">›</span></span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;cursor:pointer" style-hover="background:#1e1e1e">
+              <span style="color:#dcddde">Forces</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7a7a7a">default<span style="color:#5c5c5c;margin-left:8px">›</span></span>
+            </div>
+          </div>
+
+          <div style="margin-top:auto;border-top:1px solid #242424;padding:9px 12px;display:flex;gap:12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7a7a7a;flex-wrap:wrap">
+            <span style="color:#5c5c5c">desk</span>
+            <span style="color:#5c5c5c">board</span>
+            <span style="color:#dcddde">map</span>
+            <a href="#artboard-a" style="color:#8b6cef">timeline</a>
+            <a href="#artboard-a" style="color:#8b6cef">threads</a>
+          </div>
+        </aside>
+      </div>
+
+      <sc-if value="{{ showAnnotations }}" hint-placeholder-val="{{ true }}">
+      <ol id="artboard-a" style="flex:1;min-width:280px;margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:14px">
+        <li style="display:flex;gap:12px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b6cef;flex:0 0 auto;padding-top:2px">01</span><div><div style="font-weight:600;font-size:14px">Docked, not floating</div><div style="color:#9a9a9a;font-size:14px">The panel is a sibling of the canvas rather than a sheet on top of it, so filtering never hides the thing being filtered. It also inherits Obsidian's own resize handle for free.</div></div></li>
+        <li style="display:flex;gap:12px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b6cef;flex:0 0 auto;padding-top:2px">02</span><div><div style="font-weight:600;font-size:14px">The state line carries the truth</div><div style="color:#9a9a9a;font-size:14px">"14 nodes · 0 shown · 2 filters on" plus reset. The user learns the graph is not empty before they learn anything else, and reset is one click from the diagnosis.</div></div></li>
+        <li style="display:flex;gap:12px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b6cef;flex:0 0 auto;padding-top:2px">03</span><div><div style="font-weight:600;font-size:14px">The empty state explains and repairs</div><div style="color:#9a9a9a;font-size:14px">It names both filters responsible and offers exactly the two buttons that undo them. The command palette hint teaches the keyboard route without claiming a hotkey.</div></div></li>
+        <li style="display:flex;gap:12px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b6cef;flex:0 0 auto;padding-top:2px">04</span><div><div style="font-weight:600;font-size:14px">One accent button, with its price on the label's line</div><div style="color:#9a9a9a;font-size:14px">Cost and last-run time sit beneath "Read project with model". Fit, shake and copy schema live in the ⋯ menu, each row naming its command so the writer can bind a key themselves.</div></div></li>
+        <li style="display:flex;gap:12px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b6cef;flex:0 0 auto;padding-top:2px">05</span><div><div style="font-weight:600;font-size:14px">Kinds show counts and hide absences</div><div style="color:#9a9a9a;font-size:14px">Only kinds present in the project get a row; the rest collapse to one faint line. Swatches are the accent hue ramp rather than fixed web colours, so a community theme restyles them. An eye icon replaces the switch: it reads as visibility, is half the height, and matches the core graph view.</div></div></li>
+        <li style="display:flex;gap:12px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b6cef;flex:0 0 auto;padding-top:2px">06</span><div><div style="font-weight:600;font-size:14px">Collapsed sections state their value</div><div style="color:#9a9a9a;font-size:14px">Filters says "2 on" in warning colour, display says "labels, arrows". Three former panels of switches are now three readable rows, and the active filter count is the only warning-coloured thing in the panel.</div></div></li>
+      </ol>
+      </sc-if>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:22px">
+    <div style="display:flex;align-items:baseline;gap:14px;border-bottom:1px solid #242424;padding-bottom:12px">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#6f6f6f">05</span>
+      <h2 style="margin:0;font-size:22px;font-weight:600">Artboard B — manuscript comments pane</h2>
+      <span style="color:#6f6f6f;font-size:13px;margin-left:auto">420px · one list, current paragraph pinned</span>
+    </div>
+
+    <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">
+      <div style="width:420px;flex:0 0 auto;height:812px;background:#171717;border:1px solid #2b2b2b;border-radius:8px;overflow:hidden;display:flex;flex-direction:column;font-size:13px">
+
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #242424">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#8a8a8a;flex:1">Comments</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7a7a7a">11 · 4 open</span>
+          <span style="width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#8a8a8a;cursor:pointer" style-hover="background:#242424;color:#dcddde">⋯</span>
+        </div>
+
+        <sc-if value="{{ filterSegmented }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #242424">
+          <div style="display:flex;background:#1e1e1e;border:1px solid #2b2b2b;border-radius:5px;padding:2px;gap:2px">
+            <span style="padding:3px 10px;border-radius:3px;background:#8b6cef;color:#fff;font-size:12px;cursor:pointer">All</span>
+            <span style="padding:3px 10px;border-radius:3px;color:#9a9a9a;font-size:12px;cursor:pointer" style-hover="background:#242424;color:#dcddde">Open</span>
+            <span style="padding:3px 10px;border-radius:3px;color:#9a9a9a;font-size:12px;cursor:pointer" style-hover="background:#242424;color:#dcddde">Mine</span>
+          </div>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:6px;background:#1e1e1e;border:1px solid #2b2b2b;border-radius:4px;padding:4px 8px;color:#9a9a9a;font-size:12px;cursor:pointer">All kinds<span style="color:#5c5c5c">⌃⌄</span></div>
+        </div>
+        </sc-if>
+        <sc-if value="{{ filterDropdown }}">
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #242424">
+          <span style="color:#9a9a9a;font-size:12px">Show</span>
+          <div style="flex:1;display:flex;align-items:center;justify-content:space-between;background:#1e1e1e;border:1px solid #333;border-radius:4px;padding:5px 9px;color:#dcddde;font-size:12px;cursor:pointer">All comments<span style="color:#7a7a7a">⌃⌄</span></div>
+        </div>
+        </sc-if>
+
+        <div style="padding:12px;background:#1c1a24;border-bottom:1px solid #242424;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:baseline;gap:8px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#a795f2">On this paragraph</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#7a7a7a;margin-left:auto">prologue · 13 words</span>
+          </div>
+          <div style="border-left:2px solid #8b6cef;padding-left:10px;color:#b9b9b9;font-style:italic;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">Before any of it, there was the gate, and the gate was shut.</div>
+          <div style="color:#7a7a7a;font-size:12px">No comments here yet.</div>
+        </div>
+
+        <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column">
+          <div style="display:flex;align-items:baseline;gap:8px;padding:9px 12px;background:#171717;border-bottom:1px solid #242424;position:sticky;top:0">
+            <span style="font-weight:600;color:#dcddde;font-size:13px">Chapter one</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7a7a7a">3</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5c5c5c;margin-left:auto">2 open</span>
+          </div>
+
+          <div style="display:flex;gap:10px;padding:10px 12px;border-bottom:1px solid #1f1f1f;background:#1c1c1c">
+            <span style="width:2px;flex:0 0 auto;background:#d9a23b;border-radius:1px"></span>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;align-items:baseline;gap:8px">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#d9a23b">check</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5c5c5c;margin-left:auto">you · 2d</span>
+                <span style="width:18px;height:18px;border-radius:3px;display:flex;align-items:center;justify-content:center;color:#8a8a8a;font-size:11px;cursor:pointer" style-hover="background:#2a2a2a;color:#dcddde">✓</span>
+              </div>
+              <div style="color:#dcddde;line-height:1.45">Was it a coat in chapter three?</div>
+              <div style="color:#6f6f6f;font-size:12px;font-style:italic;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden">…walked to the gate of Lisbon with her hands in her coat.</div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;padding:10px 12px;border-bottom:1px solid #1f1f1f">
+            <span style="width:2px;flex:0 0 auto;background:#8b6cef;border-radius:1px"></span>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;align-items:baseline;gap:8px">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#a795f2">todo</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5c5c5c;margin-left:auto">you · 2d</span>
+              </div>
+              <div style="color:#dcddde;line-height:1.45">The lamp pays off in part two.</div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;padding:10px 12px;border-bottom:1px solid #1f1f1f">
+            <span style="width:2px;flex:0 0 auto;background:#3a3a3a;border-radius:1px"></span>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;align-items:baseline;gap:8px">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#7a7a7a">mark</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5c5c5c;margin-left:auto">you · 5d</span>
+              </div>
+              <div style="color:#9a9a9a;line-height:1.45;font-style:italic">She crouched and let it pull at her fingers until they ached.</div>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:baseline;gap:8px;padding:9px 12px;background:#171717;border-top:1px solid #242424;border-bottom:1px solid #242424">
+            <span style="font-weight:600;color:#dcddde;font-size:13px">Chapter two</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7a7a7a">4</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5c5c5c;margin-left:auto">2 open</span>
+          </div>
+
+          <div style="display:flex;gap:10px;padding:10px 12px;border-bottom:1px solid #1f1f1f">
+            <span style="width:2px;flex:0 0 auto;background:#8b6cef;border-radius:1px"></span>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;align-items:baseline;gap:8px">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#a795f2">fix</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5c5c5c;margin-left:auto">you · 1d</span>
+              </div>
+              <div style="color:#dcddde;line-height:1.45">This whole block is a comment on its own; it shows as a note between paragraphs.</div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;padding:10px 12px;border-bottom:1px solid #1f1f1f">
+            <span style="width:2px;flex:0 0 auto;background:#3a3a3a;border-radius:1px"></span>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;align-items:baseline;gap:8px">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#7a7a7a">idea</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5c5c5c;margin-left:auto">you · 1d</span>
+              </div>
+              <div style="color:#dcddde;line-height:1.45">More wisdom.</div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;padding:10px 12px;border-bottom:1px solid #1f1f1f;opacity:.65">
+            <span style="width:2px;flex:0 0 auto;background:#2f2f2f;border-radius:1px"></span>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;align-items:baseline;gap:8px">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6f6f6f">cut</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5c5c5c;margin-left:auto">you · 6d</span>
+              </div>
+              <div style="color:#8a8a8a;line-height:1.45;text-decoration:line-through">This whole-line note sits inside the paragraph above.</div>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:baseline;gap:8px;padding:9px 12px;background:#171717;border-top:1px solid #242424">
+            <span style="font-weight:600;color:#dcddde;font-size:13px">Epilogue</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7a7a7a">4</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5c5c5c;margin-left:auto">all resolved</span>
+          </div>
+        </div>
+
+        <div style="border-top:1px solid #2b2b2b;padding:10px 12px;background:#1a1a1a;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;gap:8px;align-items:center">
+            <div style="display:flex;align-items:center;gap:5px;background:#1e1e1e;border:1px solid #333;border-radius:4px;padding:5px 8px;color:#dcddde;font-family:'IBM Plex Mono',monospace;font-size:11px;cursor:pointer">todo<span style="color:#7a7a7a">⌃⌄</span></div>
+            <div style="flex:1;background:#1e1e1e;border:1px solid #2b2b2b;border-radius:4px;padding:6px 9px;color:#5c5c5c">Comment on this paragraph…</div>
+          </div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8a8a8a">enter adds it · shift+enter for a new line · written into the note at the end of this paragraph</div>
+        </div>
+      </div>
+
+      <sc-if value="{{ showAnnotations }}" hint-placeholder-val="{{ true }}">
+      <ol style="flex:1;min-width:280px;margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:14px">
+        <li style="display:flex;gap:12px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b6cef;flex:0 0 auto;padding-top:2px">01</span><div><div style="font-weight:600;font-size:14px">One list, one scroll</div><div style="color:#9a9a9a;font-size:14px">The "this paragraph" block is pinned above the same list rather than being a second list. It holds the quote, the location, and the composer's target — so the writer always knows where a new comment will land.</div></div></li>
+        <li style="display:flex;gap:12px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b6cef;flex:0 0 auto;padding-top:2px">02</span><div><div style="font-weight:600;font-size:14px">Section headers replace the faint right column</div><div style="color:#9a9a9a;font-size:14px">Chapter names become sticky headers with a count and an open count. Navigation context moves from the weakest colour in the panel to the strongest.</div></div></li>
+        <li style="display:flex;gap:12px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b6cef;flex:0 0 auto;padding-top:2px">03</span><div><div style="font-weight:600;font-size:14px">Kinds get one casing and three colours</div><div style="color:#9a9a9a;font-size:14px">All lowercase monospace, as tags in the note actually are. Accent for what you must do (todo, fix), warning for what you must verify (check), muted for thinking and marks (idea, note, mark, ref), and cut struck through at reduced opacity. Colour lives in a 2px bar, not a filled chip, so the comment text stays the loudest thing in the row.</div></div></li>
+        <li style="display:flex;gap:12px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b6cef;flex:0 0 auto;padding-top:2px">04</span><div><div style="font-weight:600;font-size:14px">Anchor text under the comment</div><div style="color:#9a9a9a;font-size:14px">One clamped italic line of the prose the comment is attached to. It is what makes an eleven-item list navigable without clicking each row.</div></div></li>
+        <li style="display:flex;gap:12px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b6cef;flex:0 0 auto;padding-top:2px">05</span><div><div style="font-weight:600;font-size:14px">Resolve is per row, on hover</div><div style="color:#9a9a9a;font-size:14px">A clickable-icon tick appears on the hovered row (shown on the first item). Resolved comments leave the open count but stay in the list, dimmed, because writers revisit their own reasoning.</div></div></li>
+        <li style="display:flex;gap:12px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b6cef;flex:0 0 auto;padding-top:2px">06</span><div><div style="font-weight:600;font-size:14px">The composer states its side effect once</div><div style="color:#9a9a9a;font-size:14px">Kind moves out of the placeholder into a dropdown; the placeholder says what the field is for; the mono line underneath says where the text goes and which keys commit it. No syntax lesson in a placeholder.</div></div></li>
+      </ol>
+      </sc-if>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:22px">
+    <div style="display:flex;align-items:baseline;gap:14px;border-bottom:1px solid #242424;padding-bottom:12px">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#6f6f6f">06</span>
+      <h2 style="margin:0;font-size:22px;font-weight:600">Artboard C — writing desk</h2>
+      <span style="color:#6f6f6f;font-size:13px;margin-left:auto">320px · verdict first, counts tabular</span>
+    </div>
+
+    <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">
+      <div style="width:320px;flex:0 0 auto;background:#171717;border:1px solid #2b2b2b;border-radius:8px;overflow:hidden;display:flex;flex-direction:column;font-size:13px">
+
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #242424">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#8a8a8a;flex:1">Writing desk</span>
+          <span style="width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#8a8a8a;cursor:pointer" style-hover="background:#242424;color:#dcddde">⋯</span>
+        </div>
+
+        <div style="padding:14px 12px;border-bottom:1px solid #242424;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#7a7a7a">Today</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#53a67e">on pace</span>
+          </div>
+          <sc-if value="{{ paceFirst }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;align-items:baseline;gap:8px">
+              <span style="font-size:28px;font-weight:600;letter-spacing:-.01em;font-variant-numeric:tabular-nums">120 to go</span>
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9a9a9a;font-variant-numeric:tabular-nums">380 of 500 words</div>
+          </sc-if>
+          <sc-if value="{{ countFirst }}">
+            <div style="display:flex;align-items:baseline;gap:8px">
+              <span style="font-size:28px;font-weight:600;letter-spacing:-.01em;font-variant-numeric:tabular-nums">380</span>
+              <span style="color:#9a9a9a;font-family:'IBM Plex Mono',monospace;font-size:11px">words of 500</span>
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9a9a9a">120 to go</div>
+          </sc-if>
+          <div style="height:3px;border-radius:2px;background:#262626;overflow:hidden"><div style="width:76%;height:100%;background:#8b6cef"></div></div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7a7a7a;display:flex;gap:14px;font-variant-numeric:tabular-nums">
+            <span>streak 4 d</span><span>best 11 d</span><span>week 2,140 w</span>
+          </div>
+        </div>
+
+        <div style="padding:14px 12px;border-bottom:1px solid #242424;display:flex;flex-direction:column;gap:10px;position:relative">
+          <div style="display:flex;align-items:baseline;justify-content:space-between">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#7a7a7a">Last 13 weeks</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#7a7a7a">34 of 91 days</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(13,1fr);grid-auto-rows:1fr;gap:3px">
+            <sc-for list="{{ heatCells }}" as="cell" hint-placeholder-count="91">
+              <div style="aspect-ratio:1;border-radius:2px;background:{{ cell.bg }};box-shadow:{{ cell.ring }}"></div>
+            </sc-for>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6f6f6f">
+            <span>less</span>
+            <span style="width:8px;height:8px;border-radius:2px;background:#212121"></span>
+            <span style="width:8px;height:8px;border-radius:2px;background:#3b3155"></span>
+            <span style="width:8px;height:8px;border-radius:2px;background:#5f4bad"></span>
+            <span style="width:8px;height:8px;border-radius:2px;background:#8b6cef"></span>
+            <span>more</span>
+            <span style="margin-left:auto;display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:#212121;box-shadow:0 0 0 1px #53a67e"></span>goal met</span>
+          </div>
+          <div style="position:absolute;right:12px;top:56px;background:#0f0f0f;border:1px solid #363636;border-radius:5px;padding:6px 9px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#dcddde;line-height:1.5;box-shadow:0 4px 14px rgba(0,0,0,.5)">tue 8 sep<br>2,811 words · goal met</div>
+        </div>
+
+        <div style="padding:14px 12px;border-bottom:1px solid #242424;display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#7a7a7a">Projects</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8b6cef;cursor:pointer" style-hover="color:#a795f2">add</span>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;align-items:baseline;gap:8px">
+              <span style="font-weight:600;color:#dcddde">Mountain Camp</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7a7a7a;margin-left:auto;font-variant-numeric:tabular-nums">232 / 3,000</span>
+            </div>
+            <div style="height:3px;border-radius:2px;background:#262626;overflow:hidden"><div style="width:8%;height:100%;background:#8b6cef"></div></div>
+            <div style="display:flex;align-items:baseline;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#d9a23b">
+              <span style="width:5px;height:5px;border-radius:3px;background:#d9a23b;flex:0 0 auto"></span>
+              <span>stalled · nothing added this week</span>
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8a8a8a">2,768 words a day to finish by 7 oct</div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;align-items:baseline;gap:8px">
+              <span style="font-weight:600;color:#dcddde">QA Story</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7a7a7a;margin-left:auto;font-variant-numeric:tabular-nums">844 / 20,000</span>
+            </div>
+            <div style="height:3px;border-radius:2px;background:#262626;overflow:hidden"><div style="width:4%;height:100%;background:#8b6cef"></div></div>
+            <div style="display:flex;align-items:baseline;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#53a67e">
+              <span style="width:5px;height:5px;border-radius:3px;background:#53a67e;flex:0 0 auto"></span>
+              <span>on pace · 420 words a day</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="padding:14px 12px;border-bottom:1px solid #242424;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#7a7a7a">How this note reads</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6f6f6f">QA-Rhythm-Sample</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums">
+            <div><div style="font-size:15px;color:#dcddde">91</div><div style="font-size:10px;color:#6f6f6f">ease</div></div>
+            <div><div style="font-size:15px;color:#dcddde">3</div><div style="font-size:10px;color:#6f6f6f">grade</div></div>
+            <div><div style="font-size:15px;color:#dcddde">0.54</div><div style="font-size:10px;color:#6f6f6f">variety</div></div>
+            <div><div style="font-size:15px;color:#dcddde">6%</div><div style="font-size:10px;color:#6f6f6f">dialogue</div></div>
+          </div>
+          <div style="color:#9a9a9a;font-size:12px;line-height:1.5">Easy to read, and the sentences are close to one length. Worth a long one.</div>
+        </div>
+
+        <div style="padding:9px 12px;display:flex;gap:12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7a7a7a;flex-wrap:wrap">
+          <span style="color:#dcddde">desk</span>
+          <a href="#artboard-c" style="color:#8b6cef">board</a>
+          <a href="#artboard-c" style="color:#8b6cef">map</a>
+          <a href="#artboard-c" style="color:#8b6cef">timeline</a>
+          <a href="#artboard-c" style="color:#8b6cef">threads</a>
+        </div>
+      </div>
+
+      <sc-if value="{{ showAnnotations }}" hint-placeholder-val="{{ true }}">
+      <ol id="artboard-c" style="flex:1;min-width:280px;margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:14px">
+        <li style="display:flex;gap:12px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b6cef;flex:0 0 auto;padding-top:2px">01</span><div><div style="font-weight:600;font-size:14px">The headline is the decision, not the measurement</div><div style="color:#9a9a9a;font-size:14px">"120 to go" answers the question a novelist opens this panel with. The raw count drops to a mono subline, and pace is a two-word verdict in the corner rather than a sentence.</div></div></li>
+        <li style="display:flex;gap:12px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b6cef;flex:0 0 auto;padding-top:2px">02</span><div><div style="font-weight:600;font-size:14px">Streak facts collapse to one mono row</div><div style="color:#9a9a9a;font-size:14px">Streak, best and week sit on a single line in tabular figures instead of a three-item header above the heatmap.</div></div></li>
+        <li style="display:flex;gap:12px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b6cef;flex:0 0 auto;padding-top:2px">03</span><div><div style="font-weight:600;font-size:14px">The heatmap key is a key</div><div style="color:#9a9a9a;font-size:14px">Four swatches for volume, a ring for goal met, and detail on hover. Two sentences of prose become nine characters. The section header carries the only number worth stating up front: days written out of days elapsed.</div></div></li>
+        <li style="display:flex;gap:12px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b6cef;flex:0 0 auto;padding-top:2px">04</span><div><div style="font-weight:600;font-size:14px">Revision is intensity, not a second hue</div><div style="color:#9a9a9a;font-size:14px">One accent ramp for words touched; goal met becomes an outline. That frees green and amber to mean only pace, everywhere in the plugin.</div></div></li>
+        <li style="display:flex;gap:12px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b6cef;flex:0 0 auto;padding-top:2px">05</span><div><div style="font-weight:600;font-size:14px">Project rows read as a column</div><div style="color:#9a9a9a;font-size:14px">Name, tabular count, bar, then one verdict clause with a dot: stalled in amber, on pace in green. The projected date moves to a labelled mono line, so "7 oct" is never mistaken for a deadline the plugin knows about.</div></div></li>
+        <li style="display:flex;gap:12px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b6cef;flex:0 0 auto;padding-top:2px">06</span><div><div style="font-weight:600;font-size:14px">Readability names its subject and says one useful thing</div><div style="color:#9a9a9a;font-size:14px">Four numbers in a row with the note's name beside the header, plus a plain-language line. With no note open the section header stays and the body reads "open a note and this fills in" — the panel never loses a row.</div></div></li>
+      </ol>
+      </sc-if>
+    </div>
+  </section>
+
+  <footer style="border-top:1px solid #242424;padding-top:20px;display:flex;flex-direction:column;gap:8px;color:#7a7a7a;font-size:13px;max-width:760px">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#6f6f6f">Not covered here</div>
+    <p style="margin:0">The board, timeline and threads panels are diagnosed above but not drawn. If the shared shell is agreed, those three are mostly a re-layout of existing controls into it, plus the legends in change nine.</p>
+  </footer>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;showAnnotations&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Document&quot; },
+  &quot;mapKindControl&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;eye&quot;, &quot;switch&quot;], &quot;default&quot;: &quot;eye&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Artboard A — story map&quot; },
+  &quot;commentsFilter&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;segmented&quot;, &quot;dropdown&quot;], &quot;default&quot;: &quot;segmented&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Artboard B — comments&quot; },
+  &quot;deskPaceFirst&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Artboard C — writing desk&quot; }
+}">
+class Component extends DCLogic {
+  renderVals() {
+    const p = this.props;
+    const control = p.mapKindControl ?? "eye";
+    const filter = p.commentsFilter ?? "segmented";
+    const paceFirst = p.deskPaceFirst ?? true;
+
+    const kinds = [
+      { name: "Characters", count: 7, colour: "#8b6cef" },
+      { name: "Places", count: 3, colour: "#6f8fe0" },
+      { name: "Events", count: 2, colour: "#a86ce0" },
+      { name: "Notes", count: 1, colour: "#5c5c5c" },
+      { name: "Unnamed", count: 1, colour: "#3a3a3a" }
+    ];
+
+    // 13 weeks x 7 days, deterministic so the panel reads the same every render
+    const ramp = ["#212121", "#2b2542", "#3b3155", "#5f4bad", "#8b6cef"];
+    const heatCells = [];
+    for (let i = 0; i < 91; i++) {
+      const n = (i * 37) % 11;
+      const level = n > 8 ? 4 : n > 6 ? 3 : n > 4 ? 2 : n > 2 ? 1 : 0;
+      heatCells.push({
+        bg: ramp[level],
+        ring: level >= 3 ? "0 0 0 1px #53a67e" : "none"
+      });
+    }
+
+    return {
+      showAnnotations: p.showAnnotations ?? true,
+      eyeControl: control === "eye",
+      switchControl: control === "switch",
+      filterSegmented: filter === "segmented",
+      filterDropdown: filter === "dropdown",
+      paceFirst,
+      countFirst: !paceFirst,
+      kinds,
+      heatCells
+    };
+  }
+}
+</script>
+</body>
+</html>
