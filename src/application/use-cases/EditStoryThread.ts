@@ -1,5 +1,5 @@
 import type { ProjectSpec } from "../../domain/progress/Project";
-import { appendThreadItems, removeThreadItem, renameThread, setStopRole, upsertThreadItem } from "../../domain/threads/StoryThreadsNote";
+import { addThread, appendThreadItems, removeThread, removeThreadItem, renameThread, setStopRole, upsertThreadItem } from "../../domain/threads/StoryThreadsNote";
 import type { StopRole } from "../../domain/threads/Thread";
 
 /** A stop to write: where, what it is, the sentence it hangs on, a word about it. */
@@ -42,5 +42,16 @@ export class EditStoryThread {
 
   async rename(project: ProjectSpec, from: string, to: string): Promise<void> {
     await this.repo.update(project, (md) => renameThread(md, from, to));
+  }
+
+  /** A thread with no stops: an empty column of the plot grid. */
+  async addThread(project: ProjectSpec, name: string): Promise<void> {
+    if (!name.trim()) return;
+    await this.repo.update(project, (md) => addThread(md, name));
+  }
+
+  /** The heading and every stop under it. */
+  async removeThread(project: ProjectSpec, name: string): Promise<void> {
+    await this.repo.update(project, (md) => removeThread(md, name));
   }
 }

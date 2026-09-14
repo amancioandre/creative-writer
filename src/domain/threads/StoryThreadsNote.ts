@@ -227,6 +227,27 @@ export function removeThreadItem(markdown: string, thread: string, link: string)
   return lines.join("\n");
 }
 
+/** Starts a thread with no stops yet: a column of the plot grid the writer will fill. Nothing happens when it already exists. */
+export function addThread(markdown: string, name: string): string {
+  const heading = name.trim();
+  if (!heading || parseStoryThreads(markdown).some((t) => sameName(t.name, heading))) return markdown;
+  const body = markdown.replace(/\s*$/, "");
+  return `${body}${body ? "\n\n" : ""}## ${heading}\n`;
+}
+
+/** Takes a thread out whole, heading and stops; the section's trailing blank line goes with it. */
+export function removeThread(markdown: string, name: string): string {
+  const lines = markdown.split("\n");
+  const existing = parseStoryThreads(markdown).find((t) => sameName(t.name, name));
+  if (!existing) return markdown;
+  const end = sectionEnd(lines, existing.line);
+  lines.splice(existing.line, end - existing.line);
+  // The blank line that separated the section from what follows is now a stray at the top, or a double.
+  if (lines[existing.line]?.trim() === "" && (existing.line === 0 || lines[existing.line - 1]!.trim() === "")) lines.splice(existing.line, 1);
+  while (lines.length > 1 && lines[lines.length - 1]!.trim() === "" && lines[lines.length - 2]!.trim() === "") lines.pop();
+  return lines.join("\n");
+}
+
 export function renameThread(markdown: string, from: string, to: string): string {
   const lines = markdown.split("\n");
   const existing = parseStoryThreads(markdown).find((t) => sameName(t.name, from));

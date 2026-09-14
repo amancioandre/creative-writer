@@ -4,7 +4,7 @@ import { PLOT_GRID_VIEW_TYPE, PlotGridView, actOf, type PlotGridSource } from ".
 import { buildStoryGraph, type ProjectNote } from "../../../src/domain/story/BuildGraph";
 import { buildPlotGrid } from "../../../src/domain/plot/PlotGrid";
 import { buildThreads } from "../../../src/domain/threads/BuildThreads";
-import { parseStoryThreads } from "../../../src/domain/threads/StoryThreadsNote";
+import { addThread, appendThreadItems, parseStoryThreads, removeThread, removeThreadItem } from "../../../src/domain/threads/StoryThreadsNote";
 import { splitScenes } from "../../../src/domain/text/Scenes";
 import { EMPTY_STORY_MAP_FILE, putReading } from "../../../src/domain/story/StoryMapFile";
 import { textHash } from "../../../src/domain/story/StoryGraph";
@@ -34,16 +34,22 @@ function grid(threads = threadsNote) {
 }
 
 function open(overrides: Partial<PlotGridSource> = {}, threads = threadsNote) {
-  const calls = { opened: [] as string[], revealed: [] as string[], jumps: [] as string[] };
+  const calls = { opened: [] as string[], revealed: [] as string[], jumps: [] as string[], writes: [] as string[] };
+  // The threads note as a string the writes edit, so the grid reads back what it wrote.
+  let md = threads;
   const src: PlotGridSource = {
     projects: () => [novel], activeProject: () => novel,
-    build: async () => grid(threads),
+    build: async () => grid(md),
     openNote: (p) => { calls.opened.push(p); }, reveal: (r) => { calls.revealed.push(`${r.title}@${r.line}`); }, jumpTo: (to) => { calls.jumps.push(to); },
     settings: () => DEFAULT_STORY_MAP,
     threadsNotePath: () => "Novel/Story threads.md",
+    addStops: async (_p, thread, stops) => { calls.writes.push(`add ${thread}: ${stops.map((s) => `${s.link} ${s.role ?? ""} ${s.quote ?? ""} ${s.note}`).join(" | ")}`); md = appendThreadItems(md, thread, stops); },
+    removeFromThread: async (_p, thread, link) => { calls.writes.push(`remove ${thread}: ${link}`); md = removeThreadItem(md, thread, link); },
+    addThread: async (_p, name) => { calls.writes.push(`thread ${name}`); md = addThread(md, name); },
+    removeThread: async (_p, name) => { calls.writes.push(`delete ${name}`); md = removeThread(md, name); },
     ...overrides,
   };
-  return { v: new PlotGridView(new WorkspaceLeaf(), src), calls };
+  return { v: new PlotGridView(new WorkspaceLeaf(), src), calls, note: () => md };
 }
 
 /** The search field redraws once typing pauses. */
@@ -95,6 +101,8 @@ describe("PlotGridView", () => {
     expect(arc[1]!.classList.contains("is-unmoved")).toBe(true);
     expect(arc[1]!.textContent).toBe("present, unmoved");
     (gate[0] as HTMLElement).click();
+    expect(calls.revealed).toEqual([]);
+    gate[0]!.dispatchEvent(new KeyboardEvent("keydown", { key: "o", bubbles: true }));
     expect(calls.revealed).toEqual(["Camp@1"]);
   });
 
@@ -140,6 +148,103 @@ describe("PlotGridView", () => {
     const odd = open({}, "## Arcs: Ilse\n- [[One#Camp]] — x\n");
     await odd.v.onOpen();
     expect(odd.v.contentEl.querySelector(".czm-shell-state-text")!.textContent).toContain("1 heading not read as a kind (Arcs:)");
+  });
+
+  it("selects a cell with a click, moves with the arrows, and the side column follows", async () => {
+    const { v } = open();
+    await v.onOpen();
+    const el = v.contentEl;
+    const first = el.querySelector<HTMLElement>('.czm-pg-cell[data-col="1"][data-row="0"]')!;
+    first.click();
+    expect(first.classList.contains("is-selected")).toBe(true);
+    expect(el.querySelector(".czm-map-section-pg-cell .czm-map-section-value")?.textContent).toBe("The gate · Camp");
+    expect(el.querySelector(".czm-pg-state")?.textContent).toContain("verified");
+    expect((el.querySelector(".czm-pg-role-select") as HTMLSelectElement).value).toBe("plant");
+    expect((el.querySelector(".czm-pg-quote") as HTMLInputElement).value).toBe("gate of Lisbon");
+    first.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    expect(el.querySelector('.czm-pg-cell[data-col="1"][data-row="1"]')?.classList.contains("is-selected")).toBe(true);
+    expect(el.querySelector(".czm-pg-state")?.textContent).toBe("empty");
+    el.querySelector<HTMLElement>('.czm-pg-cell[data-col="1"][data-row="1"]')!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+    expect(el.querySelector('.czm-pg-cell[data-col="0"][data-row="1"]')?.classList.contains("is-selected")).toBe(true);
+    // An arc column offers the arc roles too.
+    expect([...el.querySelectorAll(".czm-pg-role-select option")].map((o) => (o as HTMLOptionElement).value)).toEqual(["plant", "touch", "payoff", "reversal", "want", "lie", "turn", "truth"]);
+  });
+
+  it("writes a cell typed in place as a stop line, keeping the role and quote, with undo", async () => {
+    const { v, calls, note } = open();
+    await v.onOpen();
+    const el = v.contentEl;
+    const cell = el.querySelector<HTMLElement>('.czm-pg-cell[data-col="1"][data-row="1"]')!;
+    cell.click();
+    cell.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    const field = el.querySelector(".czm-pg-editor") as HTMLTextAreaElement;
+    expect(field).not.toBeNull();
+    field.value = "Ilse washes in it";
+    field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(calls.writes).toEqual(["add Subplot: The gate: One#Creek   Ilse washes in it"]);
+    expect(note()).toContain("- [[One#Creek]] — Ilse washes in it");
+    expect(el.querySelector('.czm-pg-cell[data-col="1"][data-row="1"] .czm-pg-cell-text')?.textContent).toBe("Ilse washes in it");
+    expect(el.querySelector(".czm-map-status")?.textContent).toContain("Written: The gate at Creek");
+    (el.querySelector(".czm-map-status button") as HTMLElement).click();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(note()).not.toContain("Ilse washes in it");
+    // Editing a stop that has a role and a quote keeps both.
+    const verified = el.querySelector<HTMLElement>('.czm-pg-cell[data-col="1"][data-row="0"]')!;
+    verified.click(); verified.click();
+    const f2 = el.querySelector(".czm-pg-editor") as HTMLTextAreaElement;
+    f2.value = "planted, and noticed";
+    f2.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(note()).toContain('- [[One#Camp]] — plant: "gate of Lisbon" planted, and noticed');
+    // Escape leaves the note alone.
+    const again = el.querySelector<HTMLElement>('.czm-pg-cell[data-col="1"][data-row="0"]')!;
+    again.click(); again.click();
+    const f3 = el.querySelector(".czm-pg-editor") as HTMLTextAreaElement;
+    f3.value = "thrown away";
+    f3.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(note()).not.toContain("thrown away");
+  });
+
+  it("the side column saves role, anchor and note, removes a stop, and adds and deletes columns", async () => {
+    const { v, calls, note } = open();
+    await v.onOpen();
+    const el = v.contentEl;
+    el.querySelector<HTMLElement>('.czm-pg-cell[data-col="1"][data-row="2"]')!.click();
+    (el.querySelector(".czm-pg-role-select") as HTMLSelectElement).value = "payoff";
+    (el.querySelector(".czm-pg-quote") as HTMLInputElement).value = "closes";
+    (el.querySelector(".czm-pg-note-field") as HTMLTextAreaElement).value = "the gate closes on her";
+    (el.querySelector(".czm-pg-save") as HTMLElement).click();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(note()).toContain('- [[One#Later]] — payoff: "closes" the gate closes on her');
+    el.querySelector<HTMLElement>('.czm-pg-cell[data-col="1"][data-row="2"]')!.click();
+    (el.querySelector(".czm-pg-remove") as HTMLElement).click();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(note()).not.toContain("[[One#Later]]");
+    expect(el.querySelector(".czm-map-status")?.textContent).toContain("Later taken out of “The gate”");
+    // Delete on a selected cell removes its stop too; a new column is a heading; a deleted column takes its stops and can come back.
+    const camp = el.querySelector<HTMLElement>('.czm-pg-cell[data-col="1"][data-row="0"]')!;
+    camp.click();
+    camp.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete", bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(note()).not.toContain("[[One#Camp]] — plant");
+    const input = el.querySelector(".czm-pg-new-name") as HTMLInputElement;
+    input.value = "Theme: Salt";
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(note()).toContain("## Theme: Salt");
+    expect([...el.querySelectorAll(".czm-pg-col-thread .czm-pg-col-title")].map((s) => s.textContent)).toEqual(["Ilse", "Salt", "The gate"]);
+    const del = el.querySelector<HTMLElement>('.czm-pg-col-delete[aria-label="Delete column Ilse"]')!;
+    del.click();
+    expect(del.textContent).toBe("Delete?");
+    del.click();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(note()).not.toContain("## Arc: [[Ilse]]");
+    expect(calls.writes.at(-1)).toBe("delete Arc: [[Ilse]]");
+    (el.querySelector(".czm-map-status button") as HTMLElement).click();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(note()).toContain("## Arc: [[Ilse]]\n- [[One#Camp]] — want: \"woke before Ilse\" to be first");
   });
 
   it("reads a note's folder below the project as its act", () => {

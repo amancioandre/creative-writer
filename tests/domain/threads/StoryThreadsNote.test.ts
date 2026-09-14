@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { appendThreadItems, formatThreadItem, parseStopText, parseStoryThreads, removeThreadItem, renameThread, resolveThreadRef, sameLink, serializeStoryThreadsNote, upsertThreadItem } from "../../../src/domain/threads/StoryThreadsNote";
+import { addThread, removeThread, appendThreadItems, formatThreadItem, parseStopText, parseStoryThreads, removeThreadItem, renameThread, resolveThreadRef, sameLink, serializeStoryThreadsNote, upsertThreadItem } from "../../../src/domain/threads/StoryThreadsNote";
 
 const note = `---
 creative-writer: false
@@ -121,5 +121,18 @@ describe("Story threads note", () => {
     expect(md.startsWith("---\ncreative-writer: false\ncreative-writer-threads: 1\n---")).toBe(true);
     expect(md).toContain("Story threads for **Novel**");
     expect(parseStoryThreads(md)).toEqual([]);
+  });
+
+  it("starts a thread with no stops, once, and takes a whole thread out with its section", () => {
+    const md = "## The letter\n- [[One#Camp]] — x\n";
+    const added = addThread(md, "Theme: Salt");
+    expect(added).toBe("## The letter\n- [[One#Camp]] — x\n\n## Theme: Salt\n");
+    expect(addThread(added, "theme: salt")).toBe(added);
+    expect(addThread("", "  ")).toBe("");
+    expect(parseStoryThreads(added).map((t) => [t.name, t.items.length])).toEqual([["The letter", 1], ["Theme: Salt", 0]]);
+    const three = addThread(added, "Last");
+    expect(removeThread(three, "Theme: Salt")).toBe("## The letter\n- [[One#Camp]] — x\n\n## Last\n");
+    expect(removeThread(three, "The letter")).toBe("## Theme: Salt\n\n## Last\n");
+    expect(removeThread(three, "Nobody")).toBe(three);
   });
 });

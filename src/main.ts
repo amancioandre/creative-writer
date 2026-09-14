@@ -440,14 +440,18 @@ export default class CreativeZenModePlugin extends Plugin {
     const buildThreads = new BuildStoryThreads(buildStoryMap, projectNotes, storyRepo, threadsRepo, undefined, { segmenter: new IntlSentenceSegmenter(), sensitivity: () => this.current.threads.echoSensitivity });
     // The plot grid: the timeline grown up. Same view type, so leaves open across the update come back as the grid.
     const buildPlotGrid = new BuildPlotGrid(buildThreads);
+    const editThread = new EditStoryThread(threadsRepo);
     this.registerView(PLOT_GRID_VIEW_TYPE, (leaf: WorkspaceLeaf) => new PlotGridView(leaf, {
       ...storySource,
       build: (project) => buildPlotGrid.execute(project),
       threadsNotePath: (project) => StoryThreadsNoteRepository.pathFor(project),
+      addStops: (project, thread, stops) => editThread.addStops(project, thread, stops),
+      removeFromThread: (project, thread, link) => editThread.removeRef(project, thread, link),
+      addThread: (project, name) => editThread.addThread(project, name),
+      removeThread: (project, name) => editThread.removeThread(project, name),
     }));
     this.addCommand({ id: "open-story-timeline", name: COMMANDS["open-story-timeline"], callback: () => void this.openPlotGrid(null) });
-    this.viewCommands(PlotGridView, [["story-timeline-clear-search", "clear-search"], ["plot-grid-toggle-cast", "toggle-cast"], ["plot-grid-open-note", "open-note"]]);
-    const editThread = new EditStoryThread(threadsRepo);
+    this.viewCommands(PlotGridView, [["story-timeline-clear-search", "clear-search"], ["plot-grid-toggle-cast", "toggle-cast"], ["plot-grid-open-note", "open-note"], ["plot-grid-toggle-panel", "toggle-panel"], ["plot-grid-new-column", "new-column"]]);
     this.registerView(STORY_THREADS_VIEW_TYPE, (leaf: WorkspaceLeaf) => new StoryThreadsView(leaf, {
       projects: storySource.projects,
       activeProject: storySource.activeProject,

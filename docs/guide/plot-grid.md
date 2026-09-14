@@ -16,7 +16,7 @@
   ```
 
   An **arc** follows one character; the heading links their note, and the header carries their dot. A **theme** is an argument the book makes. A **subplot** is a line of events. A heading with no prefix is a free thread, as every thread ever written was. A prefix that is almost one of these ("Arcs:", "Sub-plot:") is read as a free thread and the state line says so.
-- **Cells** are the thread's stops at the scene, the lines under the heading. The first stop's note shows, a `+1` says there is another. A stop's role is a glyph before it: ▶ plant, ◀ payoff, ▼ reversal; under an arc, ▸ want, ▹ lie, ▼ turn, ◂ truth. Click a cell to go to the scene, at the stop's quote when it has one.
+- **Cells** are the thread's stops at the scene, the lines under the heading. The first stop's note shows, a `+1` says there is another. A stop's role is a glyph before it: ▶ plant, ◀ payoff, ▼ reversal; under an arc, ▸ want, ▹ lie, ▼ turn, ◂ truth. A click selects a cell; `o` or **Open scene** goes to the scene, at the stop's quote when it has one.
 - **The cell's edge is its audit.** A stop with no quote is a plan: a claim about the scene, typed ahead of the draft or from memory of it. A stop anchored to a quote the code finds in the scene is *verified* and carries a green edge; one whose quote no longer matches is *broken* and carries an amber one, the same as the threads chart's warning for a lost anchor.
 - **Present, unmoved.** Once an arc column holds a verified stop, a scene where its character is on the page and the arc has no stop says so, faintly. It is the grid's one finding of its own: the scene where someone is in the room and nothing happens to them. It stays quiet until a column has earned it, because on a first draft it would fire everywhere.
 - **Cast.** One column with a dot per member of the cast in their kind's colour, absence a faint dot, so a long absence still reads down the column. Click the header (or **Plot grid: fold or expand the cast**) and it spreads into one column per name, as the timeline drew it; click a name to open its note. The *Kinds* toggles in the story map panel apply here too.
@@ -25,7 +25,16 @@ The first column and the header row stay put while you scroll. The search filter
 
 ## Writing in it
 
-For now the grid reads the threads note; it does not yet write it. Add a stop with **Add to a thread** on a scene's card in the [story threads](/guide/story-threads#drawing-threads-yourself) view, or write the line by hand:
+Everything typed into the grid is a line in `Story threads.md`; the grid writes lines and never owns them, so the note stays yours to edit by hand.
+
+- **Select** a cell with a click, or with the arrow keys once one is selected; Home and End go to the row's first and last column, Page Up and Page Down ten rows. The side column's **Cell** section follows: the scene, the state, the role, the anchor, the note.
+- **Type** into a cell with Enter, a second click, or a double click. The field grows with the text; Enter or a click elsewhere saves, Shift+Enter makes a new line, Escape puts it back. A stop that had a role and a quote keeps them. Emptying a cell removes the stop.
+- **Role and anchor** are set in the side column: the role from the four thread roles, or the eight under an arc; the anchor as a few words quoted from the scene, which the grid looks for in the prose and reports as verified or broken. **Save stop** writes the line. **Remove stop** (or Delete on the selected cell) takes it out.
+- **Open scene** (or `o`) goes to the scene at the anchor when there is one. Escape from a selected cell puts the focus on the row's name.
+- **Columns**: the side column lists every column by kind with its count; **New column** takes a heading, `Arc: [[Anna]]`, `Theme: …`, `Subplot: …` or a plain name, and writes it to the note as an empty section, ready to fill. The ✕ on a column arms, and a second click deletes the heading and every stop under it.
+- Every write reports in the status line with **Undo** for eight seconds: a changed cell goes back to its previous line, a written one is removed, a removed one is written back, a deleted column comes back with its stops.
+
+The line the grid writes is the line you would write:
 
 ```markdown
 ## Subplot: The letter

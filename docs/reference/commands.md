@@ -25,6 +25,8 @@ All commands appear in the palette under **Creative Writer:**. None has a defaul
 | **Plot grid: clear the search** | Live while the grid is the active tab. |
 | **Plot grid: fold or expand the cast** | Live while the grid is the active tab. One column of dots, or one column per name. |
 | **Plot grid: open Story threads.md** | Live while the grid is the active tab. |
+| **Plot grid: toggle the panel** | Live while the grid is the active tab. Folds or opens the side column. |
+| **Plot grid: new column** | Live while the grid is the active tab. Opens the side column with the cursor in the new column field. |
 | **Manuscript: toggle prose only** / **toggle the comments pane** / **toggle the ruler** / **toggle story marks** / **toggle echoes** | The [manuscript's](/guide/manuscript) toolbar switches as commands, live while the manuscript is the active tab. |
 
 Every panel's head ends in a **⋯** menu that repeats these actions as rows; each row names the command it is, so what you find in the menu you can find in Settings → Hotkeys.

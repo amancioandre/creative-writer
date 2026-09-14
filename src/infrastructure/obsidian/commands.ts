@@ -22,6 +22,8 @@ export const COMMANDS = {
   "story-timeline-clear-search": "Plot grid: clear the search",
   "plot-grid-toggle-cast": "Plot grid: fold or expand the cast",
   "plot-grid-open-note": "Plot grid: open Story threads.md",
+  "plot-grid-toggle-panel": "Plot grid: toggle the panel",
+  "plot-grid-new-column": "Plot grid: new column",
   "open-writer": "Open writer",
   "writer-next-lane": "Writer: next lane",
   "writer-previous-lane": "Writer: previous lane",

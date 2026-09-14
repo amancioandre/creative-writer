@@ -529,7 +529,7 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-pg-words { text-align: right; font-family: var(--font-monospace); font-variant-numeric: tabular-nums; color: var(--text-muted); white-space: nowrap; }
 .czm-pg-plot { color: var(--text-muted); font-size: 11.5px; max-width: 240px; }
 /* A cell: a stop at a scene. Its edge says what its anchor says: nothing for a plan, a tick's colour for verified, a warning for broken. */
-.czm-pg-cell { min-height: 22px; padding: 2px 5px; border-radius: 4px; border: 1px solid transparent; line-height: 1.35; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; cursor: pointer; }
+.czm-pg-cell { min-height: 22px; padding: 2px 5px; border-radius: 4px; border: 1px solid transparent; line-height: 1.35; cursor: pointer; }
 .czm-pg-cell:hover { background: var(--background-modifier-hover); }
 .czm-pg-cell:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -1px; }
 .czm-pg-cell.is-empty { color: transparent; }
@@ -538,15 +538,35 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-pg-cell.is-broken { border-left: 2px solid var(--text-warning); }
 .czm-pg-cell.is-unmoved { color: var(--text-faint); font-style: italic; }
 .czm-pg-cell.is-unmoved .czm-pg-unmoved { font-size: 11px; }
-.czm-pg-role { color: var(--text-accent); font-size: 10px; flex: 0 0 auto; }
-.czm-pg-cell-text { flex: 1 1 auto; min-width: 0; }
-.czm-pg-more { color: var(--text-faint); font-family: var(--font-monospace); font-size: 11px; }
+.czm-pg-role { color: var(--text-accent); font-size: 10px; margin-right: 4px; vertical-align: 1px; }
+.czm-pg-more { color: var(--text-faint); font-family: var(--font-monospace); font-size: 11px; margin-left: 4px; }
 /* The cast, folded: one dot per member in its kind's colour; absence keeps its place as a faint dot so the strip holds its shape. */
 .czm-pg-strip { display: inline-flex; gap: 3px; align-items: center; padding-top: 5px; }
 .czm-pg-strip-dot { display: block; width: 7px; height: 7px; border-radius: 50%; background: var(--background-modifier-border); }
 .czm-pg-strip-dot.is-on { background: var(--czm-kind, var(--text-muted)); }
 .czm-pg-cast-dot { text-align: center; }
 .czm-pg-cast-dot.is-on::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--czm-kind, var(--text-muted)); margin-top: 6px; }
+.czm-pg-cell.is-selected { border-color: var(--interactive-accent); box-shadow: 0 0 0 1px var(--interactive-accent); background: color-mix(in srgb, var(--interactive-accent) 7%, transparent); color: var(--text-normal); }
+.czm-pg-cell.is-editing { padding: 0; cursor: text; }
+.czm-pg-editor { width: 100%; min-height: 24px; resize: none; padding: 2px 5px; border: 0; border-radius: 4px; background: var(--background-primary); font: inherit; line-height: 1.35; overflow: hidden; }
+.czm-pg-editor:focus { box-shadow: none; outline: none; }
+/* The side column: the selected cell, then every column with its count and a way to add or delete one. */
+.czm-pg-field { margin: 4px 8px 8px; }
+.czm-pg-field-label { font-size: 11px; color: var(--text-muted); margin-bottom: 3px; }
+.czm-pg-field-box { display: flex; justify-content: space-between; gap: 8px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); background: var(--background-primary); padding: 5px 8px; font-size: var(--font-ui-small); }
+.czm-pg-state.is-verified { color: var(--text-success); }
+.czm-pg-state.is-broken { color: var(--text-warning); }
+.czm-pg-state.is-plan, .czm-pg-state.is-empty { color: var(--text-muted); }
+.czm-pg-role-select, .czm-pg-quote, .czm-pg-note-field { width: 100%; box-sizing: border-box; margin: 0; font-size: var(--font-ui-small); }
+.czm-pg-note-field { resize: vertical; }
+.czm-pg-cell-actions { grid-template-columns: 1fr 1fr 1fr; }
+.czm-pg-side-kind { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); padding: 6px 6px 2px; }
+.czm-pg-side-col.is-unknown .czm-map-row-name { color: var(--text-warning); }
+.czm-pg-col-delete { width: 20px; height: 20px; flex: 0 0 auto; color: var(--text-faint); }
+.czm-pg-col-delete.is-armed { width: auto; padding: 0 6px; color: var(--text-on-accent); background: var(--color-red); font-size: var(--font-ui-smaller); }
+.czm-pg-new { display: flex; gap: 4px; margin: 6px 8px 4px; }
+.czm-pg-new-name { flex: 1; min-width: 0; font-size: var(--font-ui-smaller); }
+.czm-pg-new-add { font-size: var(--font-ui-smaller); padding: 3px 8px; height: auto; white-space: nowrap; }
 /* The key names the roles by their glyph, not a dot. */
 .czm-pg-key-role::before { width: auto; height: auto; border-radius: 0; background: none; color: var(--text-accent); font-size: 10px; }
 .czm-pg-key-role.is-plant::before { content: "▶"; }
