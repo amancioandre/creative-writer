@@ -70,7 +70,7 @@ export async function requestUrl(_req: unknown): Promise<{ status: number; json:
 }
 export class Notice {
   static shown: string[] = [];
-  constructor(message: string) { Notice.shown.push(message); }
+  constructor(message: string, _duration?: number) { Notice.shown.push(message); }
 }
 type DropdownCb = (v: string) => unknown;
 type TextCb = (v: string) => unknown;

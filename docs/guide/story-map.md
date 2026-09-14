@@ -44,7 +44,7 @@ Edges from a model reading whose scene has changed since are drawn **dashed** (s
 ## The map itself
 
 - **Pan** by dragging the background; **zoom** with the wheel (around the cursor); **Fit** in the panel frames everything.
-- Nodes settle under a live force simulation and stop moving after a few seconds. **Drag** a node and its neighbours react; a dragged node stays **pinned** where you left it, and pinned positions are remembered in `Story map.md`, so the map opens the same way on the laptop. **Unpin** in the node's card lets it float again; **Shake** unpins everything and lets the layout settle.
+- Nodes settle under a live force simulation and stop moving after a few seconds. **Drag** a node and its neighbours react; a dragged node stays **pinned** where you left it, and pinned positions are remembered in `Story map.md`, so the map opens the same way on the laptop. **Unpin** in the node's card lets it float again; **Shake** unpins everything and lets the layout settle, with an **Undo** in the status line that pins every hand-placed node back where it was.
 - Node radius scales with how often the entity is mentioned; edge thickness with how many scenes back it up.
 - A labelled edge — a relationship you drew, one the model read, or a reference — shows its word on the line itself, in small italics; click the word or the line for the card. When two nodes are joined more than once (*man owns horse*, *horse helps man*) the edges bend apart so each can be told from, and clicked, on its own. Label size 0 hides these too.
 - Bookmarked notes (Obsidian's Bookmarks core plugin) get a ★.
@@ -80,7 +80,7 @@ Click a node or an edge and a card appears beside it, inside the leaf.
 
 — then *Appears in* (each row jumps to the scene's heading) and *Connected to* (each row selects that edge).
 
-**An edge's card**: the two names (as buttons that select each node), the summary or relationship label, a stale warning if the scene changed, and the evidence scenes. A relationship you drew has a label field, **Relabel** and **Remove**; a relationship the model read has **Write down**, which keeps it as one of yours.
+**An edge's card**: the two names (as buttons that select each node), the summary or relationship label, a stale warning if the scene changed, and the evidence scenes. A relationship you drew has a label field, **Relabel** and **Remove** (with an **Undo** in the status line that writes the line back); a relationship the model read has **Write down**, which keeps it as one of yours.
 
 ### Candidates
 
@@ -104,7 +104,7 @@ Nothing on the map is a drawing that lives only on the map. A node you add is a 
 
 A blank map is a folder with one note in it saying `story: true` — no target, no prose, nothing for the writing desk to pace. That is the right project note for a book you are reading rather than writing, too: the map, the model reading and the timeline all work on it; the word goal simply never appears.
 
-**Rename** in the card renames the note; Obsidian updates every link to it, including relationship lines. **Delete** asks twice and moves the note to the trash.
+**Rename** in the card renames the note; Obsidian updates every link to it, including relationship lines. **Delete** asks twice, disarms by itself after five seconds, and moves the note to the trash; **Undo** in the status line writes the note back whole.
 
 ### Relationships
 

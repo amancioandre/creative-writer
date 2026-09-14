@@ -60,7 +60,7 @@ Click a scene's bar, and its card ends with **Add to a thread**: pick an existin
 - [[Chapter 41#The reading]] — payoff
 ```
 
-Write it by hand if you prefer — one `## heading` per thread, one list line per scene, wikilinks or markdown links, `—`, `:` or `-` before the note. A link with no heading means the note's first scene. The view draws each thread as arcs; a link that points at no scene is listed in the panel as broken and kept on the thread's card until you fix it. **Remove** on an arc's card takes a stop out; **Threads note** in the panel opens the file. Obsidian keeps the links current when you rename a chapter.
+Write it by hand if you prefer — one `## heading` per thread, one list line per scene, wikilinks or markdown links, `—`, `:` or `-` before the note. A link with no heading means the note's first scene. The view draws each thread as arcs; a link that points at no scene is listed in the panel as broken and kept on the thread's card until you fix it. **Remove** on an arc's card takes a stop out, with an **Undo** in the status line that writes it back; **Threads note** in the panel opens the file. Obsidian keeps the links current when you rename a chapter.
 
 ## Directed threads
 

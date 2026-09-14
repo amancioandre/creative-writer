@@ -74,7 +74,7 @@ Click anywhere on the board and the keys work; press `?` for the list on the boa
 | `Home` `End` | The first or last group of the row. |
 | `Enter` | On a group: the new-note form. On a card or a story: open the note. |
 | `n` · `N` · `a` | New note here · New story · Add an existing note here, through the picker. |
-| `Delete` | Take the card out of this group: the tag comes off, the note stays. |
+| `Delete` | Take the card out of this group: the tag comes off, the note stays. **Undo** in the status line puts it back. |
 | `f` · `z` · `+` `−` | Fit the board · Fit the selection · Zoom. |
 | `/` · `p` · `?` | Find a card · Fold the panel · The list of keys. |
 | `Esc` | Close the form, then step back from a card to its group, then clear the selection and fit the board. |
@@ -87,7 +87,7 @@ The lane and group moves, the new note, the fit and the list are also commands (
 
 - **Add note…** in the panel opens a picker over the whole vault and tags the note into the group chosen in the dropdown beside it. A group's own card has *Add note here*.
 - **New note…** creates a note with the tag already in place and selects its card; Ctrl+Enter in the form opens it too. The note goes where Obsidian puts new notes, *Settings → Files and links → Default location for new notes*, so a card is a note like any other.
-- Select a card and use **Remove** beside a group to take that tag off the note. The note itself is never touched beyond its tags.
+- Select a card and use **Remove** beside a group to take that tag off the note. The note itself is never touched beyond its tags, and every tag edit made from the board (Remove, Delete, a drop into another group) leaves an **Undo** in the status line for a few seconds.
 - Tag a note by hand and it appears on the next refresh. A tag whose suffix matches no group lands in **Unsorted**, so nothing is lost when you switch frameworks.
 
 ## The panel

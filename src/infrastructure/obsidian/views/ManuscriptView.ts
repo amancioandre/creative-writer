@@ -1,4 +1,4 @@
-import { ItemView, Menu, setIcon, type WorkspaceLeaf } from "obsidian";
+import { ItemView, Menu, Notice, setIcon, type WorkspaceLeaf } from "obsidian";
 import type { ProjectSpec } from "../../../domain/progress/Project";
 import { EMPTY_MANUSCRIPT, type Manuscript, type ManuscriptBlock, type NoteItem } from "../../../domain/manuscript/Manuscript";
 import { locateInBlock } from "../../../domain/manuscript/Locate";
@@ -232,6 +232,8 @@ export class ManuscriptView extends ItemView {
       void this.source.exportNote(project).then(() => {
         setIcon(exportBtn, "check");
         window.setTimeout(() => setIcon(exportBtn, "file-output"), 1200);
+      }, (e: unknown) => {
+        new Notice(`creative-writer: could not export ${project.name}: ${e instanceof Error ? e.message : String(e)}. Nothing was written; check that the folder beside the project is writable.`, 8000);
       }).finally(() => { exportBtn.disabled = false; });
     });
   }
@@ -439,7 +441,10 @@ export class ManuscriptView extends ItemView {
       if (!comment) return;
       text.disabled = true;
       this.focusComposer = true;
-      void this.source.appendComment(hit.item.path, hit.block.to, comment).then(() => { this.draft = ""; return this.refresh(); }).finally(() => { text.disabled = false; });
+      void this.source.appendComment(hit.item.path, hit.block.to, comment).then(
+        () => { this.draft = ""; return this.refresh(); },
+        (e: unknown) => { new Notice(`creative-writer: could not add the comment to ${hit.item.title}: ${e instanceof Error ? e.message : String(e)}. Your text is still in the box; the note was not changed.`, 8000); },
+      ).finally(() => { text.disabled = false; });
     };
     text.addEventListener("keydown", (ev) => {
       if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); submit(); return; }

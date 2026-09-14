@@ -1,4 +1,5 @@
 import { ItemView, Setting, setIcon, type WorkspaceLeaf } from "obsidian";
+import { couldNot, StatusLine } from "./StatusLine";
 import type { ProjectSpec } from "../../../domain/progress/Project";
 import { DEFAULT_DISPLAY, DEFAULT_FORCES, DEFAULT_STORY_COLORS, DISPLAY_RANGES, FORCE_RANGES, STORY_KINDS, STORY_LAYERS, type DisplaySettings, type ForceSettings, type StoryEntityKind, type StoryLayer, type StoryMapSettings } from "../../../domain/settings/Settings";
 import { applyFilter, neighbours, type GraphFilter } from "../../../domain/story/Filter";
@@ -30,8 +31,10 @@ export interface StoryMapSource {
   removeRelation(fromPath: string, toPath: string, label: string): Promise<void>;
   /** Renames a note (links follow); returns the new path. */
   rename(path: string, name: string): Promise<string>;
-  /** Moves a note to the trash. */
-  remove(path: string): Promise<void>;
+  /** Moves a note to the trash and returns its text as it was, so the deletion can be taken back. */
+  remove(path: string): Promise<string>;
+  /** Puts a note back at `path` with `text`: recreated when it is gone, rewritten when something is there. */
+  restore(path: string, text: string): Promise<void>;
   loadLayout(project: ProjectSpec): Promise<Layout>;
   saveLayout(project: ProjectSpec, layout: Layout): Promise<void>;
   /** Runs the model over one note's scenes, or the whole project's when `notePath` is null. Throws with a human message when no local model is configured. */
@@ -70,7 +73,6 @@ export class StoryMapView extends ItemView {
   private query = "";
   private generation = 0;
   private running: AbortController | null = null;
-  private status = "";
   private readonly sim = new Simulation(DEFAULT_FORCES, 0, 0);
   private frame: number | null = null;
   private view = { x: 0, y: 0, k: 1 };
@@ -96,7 +98,7 @@ export class StoryMapView extends ItemView {
   private card!: HTMLElement;
   private composer!: HTMLElement;
   private panel!: HTMLElement;
-  private statusEl!: HTMLElement;
+  private status!: StatusLine;
 
   constructor(leaf: WorkspaceLeaf, private readonly source: StoryMapSource) {
     super(leaf);
@@ -178,7 +180,7 @@ export class StoryMapView extends ItemView {
     this.panel = this.root.createDiv({ cls: "czm-map-panel" });
     this.card = this.root.createDiv({ cls: "czm-map-card" });
     this.composer = this.root.createDiv({ cls: "czm-map-new" });
-    this.statusEl = this.root.createDiv({ cls: "czm-map-status" });
+    this.status = new StatusLine(this.root);
     this.root.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
       if (this.linking) { this.cancelLink(); return; }
@@ -205,7 +207,7 @@ export class StoryMapView extends ItemView {
     this.renderGraph();
     this.renderPanel();
     this.renderCard();
-    this.renderStatus();
+
     this.startLoop();
     if (!this.fitted) { this.fit(); this.fitted = true; }
   }
@@ -484,16 +486,16 @@ export class StoryMapView extends ItemView {
     this.selection = { kind: "node", id };
     this.rubber.removeAttribute("x2"); this.rubber.removeAttribute("y2");
     this.root.classList.add("is-linking");
-    this.status = `Connecting ${e.name} — click another node, Esc to cancel.`;
-    this.applySelectionClasses(); this.renderCard(); this.renderStatus(); this.paint();
+    this.status.hold(`Connecting ${e.name} — click another node, Esc to cancel.`);
+    this.applySelectionClasses(); this.renderCard(); this.paint();
   }
 
   cancelLink(): void {
     if (!this.linking) return;
     this.linking = null;
     this.root.classList.remove("is-linking");
-    this.status = "";
-    this.renderStatus(); this.renderCard(); this.paint();
+    this.status.clear();
+this.renderCard(); this.paint();
   }
 
   private finishLink(to: string): void {
@@ -502,8 +504,8 @@ export class StoryMapView extends ItemView {
     if (!target?.path) { this.flash(`${target?.name ?? to} has no note yet — make one first.`); return; }
     this.linking = null;
     this.root.classList.remove("is-linking");
-    this.status = "";
-    this.renderStatus();
+    this.status.clear();
+
     this.select({ kind: "new-edge", from, to });
     this.card.querySelector<HTMLInputElement>(".czm-map-label-input")?.focus();
   }
@@ -512,7 +514,7 @@ export class StoryMapView extends ItemView {
     if (!this.project) return;
     try {
       await this.source.setRelation(fromPath, toPath, label, previousLabel);
-    } catch (e) { this.flash(e instanceof Error ? e.message : String(e)); return; }
+    } catch (e) { this.status.fail(couldNot("write the relationship", e)); return; }
     await this.show(this.project, true);
     this.selectEdgeLike("authored", fromPath, toPath, label);
     this.select(this.selection);
@@ -522,9 +524,14 @@ export class StoryMapView extends ItemView {
     if (!this.project) return;
     const holder = edge.evidence[0]?.path ?? edge.from;
     const other = holder === edge.from ? edge.to : edge.from;
-    await this.source.removeRelation(holder, other, edge.label);
+    const project = this.project;
+    try { await this.source.removeRelation(holder, other, edge.label); } catch (e) { this.status.fail(couldNot("remove the relationship", e)); return; }
     this.selection = { kind: "node", id: holder };
-    await this.show(this.project, true);
+    await this.show(project, true);
+    this.status.undoable(`Relationship “${edge.label}” removed`, async () => {
+      await this.source.setRelation(holder, other, edge.label);
+      await this.show(project, true);
+    });
   }
 
   /** The floating "new node" form, at a point in graph space. */
@@ -579,7 +586,7 @@ export class StoryMapView extends ItemView {
   private async renameNode(e: Entity, name: string): Promise<void> {
     if (!this.project || !e.path || !name.trim() || name.trim() === e.name) return;
     let path: string;
-    try { path = await this.source.rename(e.path, name.trim()); } catch (err) { this.flash(err instanceof Error ? err.message : String(err)); return; }
+    try { path = await this.source.rename(e.path, name.trim()); } catch (err) { this.status.fail(couldNot(`rename ${e.name}`, err)); return; }
     const p = this.sim.position(e.id);
     if (p) this.sim.seed(path, p, this.sim.isPinned(e.id));
     this.selection = { kind: "node", id: path };
@@ -589,10 +596,17 @@ export class StoryMapView extends ItemView {
 
   private async deleteNode(e: Entity): Promise<void> {
     if (!this.project || !e.path) return;
-    await this.source.remove(e.path);
+    const project = this.project, path = e.path;
+    let text: string;
+    try { text = await this.source.remove(path); } catch (err) { this.status.fail(couldNot(`delete ${e.name}`, err)); return; }
     this.selection = null;
-    await this.show(this.project, true);
+    await this.show(project, true);
     this.queueLayoutSave();
+    // The note is in the trash; Undo writes it back whole, front matter and all.
+    this.status.undoable(`${e.name} moved to the trash`, async () => {
+      await this.source.restore(path, text);
+      await this.show(project, true);
+    });
   }
 
   /** Pinned nodes are the ones worth remembering; the file keeps what it had for nodes not currently shown. */
@@ -613,9 +627,7 @@ export class StoryMapView extends ItemView {
   }
 
   private flash(message: string): void {
-    this.status = message;
-    this.renderStatus();
-    window.setTimeout(() => { if (this.status === message) { this.status = ""; this.renderStatus(); } }, 4000);
+    this.status.say(message);
   }
 
   // --- floating panel ------------------------------------------------------------
@@ -653,7 +665,19 @@ export class StoryMapView extends ItemView {
     }
     if (this.project) btn("Add", "czm-map-add", () => { const r = this.svg.getBoundingClientRect(); this.openComposer(this.toWorld(r.left + (r.width || 800) / 2, r.top + (r.height || 600) / 2)); }, "Add a character, place, item, faction or event as a new note. Or double-click the background.");
     btn("Fit", "czm-map-fit", () => this.fit());
-    btn("Shake", "czm-map-shake", () => { for (const id of this.nodeEls.keys()) this.sim.pin(id, false); this.sim.reheat(); this.applySelectionClasses(); this.startLoop(); this.queueLayoutSave(); }, "Unpin everything (forgetting hand-placed positions) and let the layout settle again.");
+    btn("Shake", "czm-map-shake", () => {
+      // Remember every hand-placed node so the shake can be taken back.
+      const held = new Map<string, Point>();
+      for (const id of this.nodeEls.keys()) if (this.sim.isPinned(id)) { const p = this.sim.position(id); if (p) held.set(id, p); }
+      for (const id of this.nodeEls.keys()) this.sim.pin(id, false);
+      this.sim.reheat(); this.applySelectionClasses(); this.startLoop(); this.queueLayoutSave();
+      if (held.size) {
+        this.status.undoable(`Shaken: ${held.size} hand-placed node${held.size === 1 ? "" : "s"} let go`, async () => {
+          for (const [id, p] of held) this.sim.drag(id, p);
+          this.applySelectionClasses(); this.startLoop(); this.queueLayoutSave();
+        });
+      }
+    }, "Unpin everything (forgetting hand-placed positions) and let the layout settle again.");
     if (this.focusId) btn("Show all", "czm-map-unfocus", () => { this.focusId = null; this.rebuild(); });
 
     const section = (title: string, open = true) => {
@@ -797,6 +821,8 @@ export class StoryMapView extends ItemView {
         const del = btn("Delete", "czm-act-delete", () => {
           del.setText("Delete note?"); del.classList.add("is-armed");
           del.onclick = () => void this.deleteNode(e);
+          // Disarm after a moment, so a click that comes later is a fresh question, not a deletion.
+          window.setTimeout(() => { if (del.isConnected) { del.setText("Delete"); del.classList.remove("is-armed"); del.onclick = null; } }, 5000);
         });
       }
     }
@@ -950,11 +976,6 @@ export class StoryMapView extends ItemView {
     this.card.style.top = `${Math.round(y)}px`;
   }
 
-  private renderStatus(): void {
-    this.statusEl.setText(this.status);
-    this.statusEl.classList.toggle("is-open", this.status.length > 0);
-  }
-
   // --- model -----------------------------------------------------------------------
 
   async readActiveNote(): Promise<void> {
@@ -966,16 +987,16 @@ export class StoryMapView extends ItemView {
     const project = this.project;
     if (!project) return;
     this.running = new AbortController();
-    this.status = "Reading…";
-    this.renderStatus(); this.renderPanel(); this.renderCard();
+    this.status.hold("Reading…");
+this.renderPanel(); this.renderCard();
     try {
       const n = await this.source.analyse(project, path, this.graph, this.running.signal, (p) => {
-        this.status = `${p.skipped ? "Unchanged" : "Read"} ${p.done}/${p.total}: ${basenameOf(p.scene.path)} › ${p.scene.title || "(opening)"}`;
-        this.renderStatus();
+        this.status.hold(`${p.skipped ? "Unchanged" : "Read"} ${p.done}/${p.total}: ${basenameOf(p.scene.path)} › ${p.scene.title || "(opening)"}`);
+
       });
-      this.status = n === 0 ? "Nothing new to read — every scene is unchanged since its last reading." : `Read ${n} scene${n === 1 ? "" : "s"}.`;
+      this.status.hold(n === 0 ? "Nothing new to read — every scene is unchanged since its last reading." : `Read ${n} scene${n === 1 ? "" : "s"}.`);
     } catch (e) {
-      this.status = e instanceof Error ? e.message : String(e);
+      this.status.fail(couldNot("read the project", e));
     } finally {
       this.running = null;
       await this.show(project, true);

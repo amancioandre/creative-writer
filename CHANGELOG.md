@@ -11,6 +11,9 @@ The first slice of the UX audit of 2026-09-13: rhythm stops competing for the un
 - Writing desk: a project whose deadline has passed and had nothing added this week says so ("Deadline Mon 7 Sept has passed with 2,768 words to go") instead of promising a daily count that "would still make" a date already gone. Dates in the desk read as *Mon 7 Sept*, never `2026-09-07`.
 - Settings: **Folders** and **Tags** are multi-line fields, as their "one per line" descriptions always said. **Writing log note**, **Echoes on the page** and **Echo sensitivity** are on the settings page on Obsidian 1.13 too, not only on older builds. The Enabled description names the command that exists, *Toggle everywhere*.
 - Writer: a card dropped into a group whose note cannot be retagged snaps back and keeps the error on screen, instead of the success line overwriting it a moment later.
+- **Undo for every edit to your notes from a panel.** Taking a card out of a group (Delete, or the group's Remove), moving it to another group, removing a named line, resetting the board's colours, Shake on the story map, removing a relationship, and taking a scene out of a thread and deleting a note from the story map each leave an **Undo** in the panel's status line for eight seconds; the deleted note is written back whole, front matter and all. The map's Delete also disarms itself after five seconds.
+- **Failures stay and say what they could not do.** "Could not move Courage: note is read-only" stays until the next action instead of vanishing after four seconds; the comments box and the export button on the manuscript page raise a notice with the note's name and a next step; the model assistant's notice points at its settings. Status lines are live regions, so a screen reader hears them.
+- Story threads: **Add** on a scene card writes once, however fast it is clicked; Writer: **Create** reads "Creating…" while the story is scaffolded.
 
 ## 0.9.0 — The threads
 

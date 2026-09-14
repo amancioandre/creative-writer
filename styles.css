@@ -335,7 +335,9 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-writer-help td { padding: 3px 4px; vertical-align: top; border-top: 1px solid var(--background-modifier-border); }
 .czm-writer-help-keys { white-space: nowrap; font-family: var(--font-monospace); font-size: 0.92em; opacity: 0.85; }
 .czm-writer:focus-visible { outline: none; }
-.czm-map-status.is-open { display: block; }
+.czm-map-status.is-open { display: flex; align-items: center; gap: 8px; }
+.czm-map-status.is-error { opacity: 1; color: var(--text-error); border-color: var(--text-error); }
+.czm-status-undo { font-size: var(--font-ui-smaller); padding: 1px 8px; height: auto; }
 
 /* --- Story threads ----------------------------------------------------------
    The manuscript as one line; arcs over it for everything that recurs;

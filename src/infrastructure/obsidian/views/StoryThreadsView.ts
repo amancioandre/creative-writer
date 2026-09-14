@@ -1,4 +1,5 @@
 import { ItemView, Setting, setIcon, type WorkspaceLeaf } from "obsidian";
+import { couldNot, StatusLine } from "./StatusLine";
 import type { ProjectSpec } from "../../../domain/progress/Project";
 import { THREAD_KINDS, type StoryEntityKind, type ThreadKind, type ThreadsSettings } from "../../../domain/settings/Settings";
 import { basenameOf } from "../../../domain/story/EntityIndex";
@@ -70,7 +71,6 @@ export class StoryThreadsView extends ItemView {
   private query = "";
   private generation = 0;
   private running: AbortController | null = null;
-  private status = "";
   private zoomX = 1;
   private saveTimer: number | null = null;
   private pendingSettings: ThreadsSettings | null = null;
@@ -88,7 +88,7 @@ export class StoryThreadsView extends ItemView {
   private panel!: HTMLElement;
   private card!: HTMLElement;
   private badge!: HTMLElement;
-  private statusEl!: HTMLElement;
+  private status!: StatusLine;
 
   constructor(leaf: WorkspaceLeaf, private readonly source: StoryThreadsSource) {
     super(leaf);
@@ -164,7 +164,7 @@ export class StoryThreadsView extends ItemView {
     this.panel = this.root.createDiv({ cls: "czm-map-panel" });
     this.badge = this.root.createDiv({ cls: "czm-th-badge" });
     this.card = this.root.createDiv({ cls: "czm-map-card czm-th-card" });
-    this.statusEl = this.root.createDiv({ cls: "czm-map-status" });
+    this.status = new StatusLine(this.root);
     this.root.addEventListener("keydown", (e) => { if (e.key === "Escape") this.select(null); });
     this.root.tabIndex = -1;
   }
@@ -175,7 +175,7 @@ export class StoryThreadsView extends ItemView {
     this.renderPanel();
     this.renderBadge();
     this.renderCard();
-    this.renderStatus();
+
   }
 
   /** After a rebuild, point an arc selection at the new model's copy of the same arc. */
@@ -629,7 +629,9 @@ export class StoryThreadsView extends ItemView {
     const submit = () => {
       const thread = pick.value === " new" ? name.value.trim() : pick.value;
       if (!thread) { name.focus(); return; }
-      void this.addStop(thread, scene, note.value.trim());
+      if (add.disabled) return; // one write at a time: Enter in a field or a second click waits
+      add.disabled = true;
+      void this.addStop(thread, scene, note.value.trim()).finally(() => { add.disabled = false; });
     };
     add.addEventListener("click", submit);
     name.addEventListener("keydown", (ev) => { if (ev.key === "Enter") submit(); });
@@ -671,15 +673,8 @@ export class StoryThreadsView extends ItemView {
     this.card.style.top = `${Math.round(y)}px`;
   }
 
-  private renderStatus(): void {
-    this.statusEl.setText(this.status);
-    this.statusEl.classList.toggle("is-open", this.status.length > 0);
-  }
-
   private flash(message: string): void {
-    this.status = message;
-    this.renderStatus();
-    window.setTimeout(() => { if (this.status === message) { this.status = ""; this.renderStatus(); } }, 4000);
+    this.status.say(message);
   }
 
   // --- actions -----------------------------------------------------------------
@@ -693,16 +688,16 @@ export class StoryThreadsView extends ItemView {
     const project = this.project;
     if (!project) return;
     this.running = new AbortController();
-    this.status = "Reading…";
-    this.renderStatus(); this.renderPanel(); this.renderCard();
+    this.status.hold("Reading…");
+this.renderPanel(); this.renderCard();
     try {
       const n = await this.source.readFacts(project, path, this.running.signal, (p) => {
-        this.status = `${p.skipped ? "Unchanged" : "Read"} ${p.done}/${p.total}: ${basenameOf(p.scene.path)} › ${p.scene.title || "(opening)"}`;
-        this.renderStatus();
+        this.status.hold(`${p.skipped ? "Unchanged" : "Read"} ${p.done}/${p.total}: ${basenameOf(p.scene.path)} › ${p.scene.title || "(opening)"}`);
+
       });
-      this.status = n === 0 ? "Nothing new to read — every scene is unchanged since its last reading." : `Read ${n} scene${n === 1 ? "" : "s"}.`;
+      this.status.hold(n === 0 ? "Nothing new to read — every scene is unchanged since its last reading." : `Read ${n} scene${n === 1 ? "" : "s"}.`);
     } catch (e) {
-      this.status = e instanceof Error ? e.message : String(e);
+      this.status.fail(couldNot("read the project", e));
     } finally {
       this.running = null;
       await this.show(project, true);
@@ -715,12 +710,12 @@ export class StoryThreadsView extends ItemView {
     const project = this.project;
     if (!project) return;
     this.running = new AbortController();
-    this.status = "Reading…";
-    this.renderStatus(); this.renderPanel(); this.renderCard();
+    this.status.hold("Reading…");
+this.renderPanel(); this.renderCard();
     try {
-      this.status = await work(this.running.signal);
+      this.status.hold(await work(this.running.signal));
     } catch (e) {
-      this.status = e instanceof Error ? e.message : String(e);
+      this.status.fail(couldNot("read the project", e));
     } finally {
       this.running = null;
       await this.show(project, true);
@@ -736,7 +731,7 @@ export class StoryThreadsView extends ItemView {
     const open = this.model.contradictions.filter(isLiveContradiction);
     if (!this.running && open.length === 0) { this.flash("No open contradictions to read."); return; }
     await this.runReading(async (signal) => {
-      const n = await this.source.readIntent(project, open, signal, (p) => { this.status = `${p.skipped ? "Already read" : "Read"} ${p.done}/${p.total}: ${p.scene.title || basenameOf(p.scene.path)}`; this.renderStatus(); });
+      const n = await this.source.readIntent(project, open, signal, (p) => { this.status.hold(`${p.skipped ? "Already read" : "Read"} ${p.done}/${p.total}: ${p.scene.title || basenameOf(p.scene.path)}`);});
       return n === 0 ? "Nothing new to read — every open contradiction already has a verdict." : `Read ${n} contradiction${n === 1 ? "" : "s"}.`;
     });
   }
@@ -745,7 +740,7 @@ export class StoryThreadsView extends ItemView {
     const project = this.project;
     if (!project) return;
     await this.runReading(async (signal) => {
-      const n = await this.source.readEchoes(project, signal, (p) => { this.status = `Embedded ${p.done}/${p.total} sentences…`; this.renderStatus(); });
+      const n = await this.source.readEchoes(project, signal, (p) => { this.status.hold(`Embedded ${p.done}/${p.total} sentences…`);});
       return n === 0 ? "No sentence pairs found alike." : `Found ${n} sentence pair${n === 1 ? "" : "s"} that say the same thing.`;
     });
   }
@@ -754,7 +749,7 @@ export class StoryThreadsView extends ItemView {
     if (!this.project) return;
     try {
       if (c.dismissed) await this.source.undismiss(this.project, c.key); else await this.source.dismiss(this.project, c.key);
-    } catch (e) { this.flash(e instanceof Error ? e.message : String(e)); return; }
+    } catch (e) { this.status.fail(couldNot("remember the dismissal", e)); return; }
     const sel = this.selection;
     await this.show(this.project, true);
     // Reselect the same pair in the rebuilt model, if it is still drawn.
@@ -774,7 +769,7 @@ export class StoryThreadsView extends ItemView {
         { link: sceneLink(plant.scene), note: plant.value ?? "", role: "plant", quote: plant.evidence ?? null },
         { link: sceneLink(reversal.scene), note: reversal.value ?? "", role: "reversal", quote: reversal.evidence ?? null },
       ]);
-    } catch (e) { this.flash(e instanceof Error ? e.message : String(e)); return; }
+    } catch (e) { this.status.fail(couldNot("write the reversal", e)); return; }
     this.flash(`“${name}” is a reversal now — drawn as your thread.`);
     this.selection = null;
     await this.show(this.project, true);
@@ -786,7 +781,7 @@ export class StoryThreadsView extends ItemView {
     const stops = thread.refs.filter((r) => r.index >= 0).map((r) => ({ link: sceneLink(r.scene), note: "", quote: r.quote ?? null }));
     try {
       await this.source.addStops(this.project, thread.label, stops);
-    } catch (e) { this.flash(e instanceof Error ? e.message : String(e)); return; }
+    } catch (e) { this.status.fail(couldNot("write the motif", e)); return; }
     this.flash(`“${thread.label}” is a motif now — drawn as your thread.`);
     this.selection = null;
     if (this.echoFilter === thread.id) this.echoFilter = null;
@@ -797,7 +792,7 @@ export class StoryThreadsView extends ItemView {
     if (!this.project) return;
     try {
       await this.source.setStopRole(this.project, thread.label, ref.unresolved ?? sceneLink(ref.scene), role);
-    } catch (e) { this.flash(e instanceof Error ? e.message : String(e)); return; }
+    } catch (e) { this.status.fail(couldNot("write the thread", e)); return; }
     await this.show(this.project, true);
   }
 
@@ -805,18 +800,24 @@ export class StoryThreadsView extends ItemView {
     if (!this.project) return;
     try {
       await this.source.addToThread(this.project, thread, sceneLink(scene.ref), note);
-    } catch (e) { this.flash(e instanceof Error ? e.message : String(e)); return; }
+    } catch (e) { this.status.fail(couldNot(`add to “${thread}”`, e)); return; }
     this.flash(`Added to “${thread}”.`);
     await this.show(this.project, true);
   }
 
   private async removeStop(thread: Thread, ref: ThreadRef): Promise<void> {
     if (!this.project) return;
+    const project = this.project;
+    const link = ref.unresolved ?? sceneLink(ref.scene);
     try {
-      await this.source.removeFromThread(this.project, thread.label, ref.unresolved ?? sceneLink(ref.scene));
-    } catch (e) { this.flash(e instanceof Error ? e.message : String(e)); return; }
+      await this.source.removeFromThread(project, thread.label, link);
+    } catch (e) { this.status.fail(couldNot("remove the stop", e)); return; }
     this.selection = null;
-    await this.show(this.project, true);
+    await this.show(project, true);
+    this.status.undoable(`${ref.scene.title || basenameOf(ref.scene.path)} taken out of “${thread.label}”`, async () => {
+      await this.source.addStops(project, thread.label, [{ link, note: ref.note, role: ref.role, quote: ref.quote ?? null }]);
+      await this.show(project, true);
+    });
   }
 }
 

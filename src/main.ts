@@ -273,7 +273,20 @@ export default class CreativeZenModePlugin extends Plugin {
       setRelation: (fromPath, toPath, label, previousLabel) => this.editRelation(fromPath, toPath, (text, link) => upsertRelation(text, link, label, previousLabel)),
       removeRelation: (fromPath, toPath, label) => this.editRelation(fromPath, toPath, (text, link) => removeRelation(text, link, label)),
       rename: (path, name) => this.renameNote(path, name),
-      remove: async (path) => { const f = this.app.vault.getAbstractFileByPath(path); if (f instanceof TFile) await this.app.fileManager.trashFile(f); },
+      remove: async (path) => {
+        const f = this.app.vault.getAbstractFileByPath(path);
+        if (!(f instanceof TFile)) return "";
+        const text = await this.app.vault.read(f);
+        await this.app.fileManager.trashFile(f);
+        return text;
+      },
+      restore: async (path, text) => {
+        const existing = this.app.vault.getAbstractFileByPath(path);
+        if (existing instanceof TFile) { await this.app.vault.modify(existing, text); return; }
+        const dir = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+        if (dir && !this.app.vault.getAbstractFileByPath(dir)) await this.app.vault.createFolder(dir);
+        await this.app.vault.create(path, text);
+      },
       loadLayout: (project) => storyRepo.load(project).then((f) => f.layout),
       saveLayout: (project, layout) => storyRepo.update(project, (f) => setLayout(f, layout)).then(() => undefined),
       updateSettings: (next) => void this.updateSettings({ ...this.current, storyMap: next }),
@@ -610,7 +623,7 @@ export default class CreativeZenModePlugin extends Plugin {
           // One notice a minute is plenty; a dead Ollama would otherwise spam on every pause.
           if (Date.now() - lastErrorAt < 60_000) return;
           lastErrorAt = Date.now();
-          new Notice(`creative-writer: ${e instanceof Error ? e.message : String(e)}`, 8000);
+          new Notice(`creative-writer: the model could not read the paragraph: ${e instanceof Error ? e.message : String(e)}. Check Settings → Model assistant, or turn "Analyse automatically" off.`, 8000);
         },
       }),
     ]);

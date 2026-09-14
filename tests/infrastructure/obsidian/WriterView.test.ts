@@ -504,6 +504,13 @@ describe("WriterView keyboard", () => {
     expect(card(el, "notes/Courage.md")).toBeNull();
     expect(selectedGroup(el)).toBe("archetype");
     expect(status(el)).toContain("taken out of Archetypes");
+    // Undo puts the tag back on the note and the card back on the board.
+    (el.querySelector(".czm-status-undo") as HTMLElement).click();
+    await tick(); await tick(); await tick();
+    expect(calls.retags[2]).toBe("notes/Courage.md: ∅ -> archetype");
+    expect(card(el, "notes/Courage.md")).not.toBeNull();
+    expect(card(el, "notes/Courage.md").classList.contains("is-selected")).toBe(true);
+    expect(el.querySelector(".czm-status-undo")).toBeNull();
   });
   it("walks the stories band: s enters it, left and right cross stories and pills, Enter opens the project note, down leaves it", async () => {
     const idea = note("notes/Idea.md", ["#writer/premise"], [], "A man hunts a bear.");

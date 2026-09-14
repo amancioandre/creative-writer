@@ -272,6 +272,26 @@ describe("StoryThreadsView", () => {
     click(card.querySelector(".czm-act-remove-stop")!);
     await tick(); await tick();
     expect(calls.removed).toEqual(["The letter -x One#Camp"]);
+    // Undo writes the stop back, with its note.
+    expect(el.querySelector(".czm-map-status")!.textContent).toContain("taken out of “The letter”");
+    click(el.querySelector(".czm-status-undo")!);
+    await tick(); await tick();
+    expect(calls.stops).toHaveLength(1);
+    expect(calls.stops[0]).toContain("The letter: ");
+    expect(calls.stops[0]).toContain("One#Camp");
+  });
+
+  it("disables Add while a stop is being written, so a double click adds once", async () => {
+    let release: () => void = () => undefined;
+    const { el, calls } = await open({ addToThread: async (_p, thread, link) => { calls.added.push(`${thread} <- ${link}`); await new Promise<void>((r) => { release = r; }); } });
+    click(el.querySelector(".czm-th-bar")!);
+    const card = el.querySelector(".czm-map-card.is-open")!;
+    const add = card.querySelector<HTMLButtonElement>(".czm-act-add-to-thread")!;
+    click(add); click(add);
+    expect(add.disabled).toBe(true);
+    expect(calls.added).toHaveLength(1);
+    release();
+    await tick(); await tick();
   });
 
   it("reads facts from the panel, the scene card, and the command; shows the model's own message when there is none", async () => {

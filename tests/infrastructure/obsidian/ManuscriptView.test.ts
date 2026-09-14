@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Menu, WorkspaceLeaf } from "obsidian";
+import { Menu, Notice, WorkspaceLeaf } from "obsidian";
 import { MANUSCRIPT_VIEW_TYPE, ManuscriptView, type ManuscriptSource } from "../../../src/infrastructure/obsidian/views/ManuscriptView";
 import { buildManuscript, type ManuscriptNote } from "../../../src/domain/manuscript/Manuscript";
 import { DEFAULT_MANUSCRIPT, type ManuscriptSettings } from "../../../src/domain/settings/Settings";
@@ -155,6 +155,25 @@ describe("ManuscriptView", () => {
     await tick();
     expect(v.contentEl.querySelectorAll(".czm-ms-block")).toHaveLength(1);
     expect(v.contentEl.querySelectorAll<HTMLElement>(".czm-ms-tool")[0]!.classList.contains("is-active")).toBe(true);
+  });
+
+  it("says so when a comment cannot be written, and keeps the text in the box", async () => {
+    Notice.shown = [];
+    const text = "Marta woke. She stayed.";
+    const { v } = open([{ path: "Novel/One.md", frontmatter: {}, text }], { appendComment: async () => { throw new Error("note is locked"); } });
+    await v.onOpen();
+    const el = v.contentEl;
+    const side = el.querySelector<HTMLElement>(".czm-ms-side")!;
+    const field = () => side.querySelector<HTMLTextAreaElement>(".czm-ms-compose-text")!;
+    key(el.querySelector<HTMLElement>(".czm-ms-block")!, "c");
+    field().value = "CHECK: was it a coat?";
+    field().dispatchEvent(new Event("input"));
+    key(field(), "Enter");
+    await tick(); await tick();
+    expect(Notice.shown.at(-1)).toContain("could not add the comment to One: note is locked");
+    expect(Notice.shown.at(-1)).toContain("still in the box");
+    expect(field().value).toBe("CHECK: was it a coat?");
+    expect(field().disabled).toBe(false);
   });
 
   it("writes a comment from one field: a tag prefix, Enter to save, focus kept", async () => {

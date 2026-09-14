@@ -1,4 +1,5 @@
 import { ItemView, Setting, setIcon, type WorkspaceLeaf } from "obsidian";
+import { couldNot, StatusLine } from "./StatusLine";
 import type { ProjectSpec } from "../../../domain/progress/Project";
 import type { WriterSettings } from "../../../domain/settings/Settings";
 import { EMPTY_BOARD, type Board, type Card } from "../../../domain/writer/Board";
@@ -98,7 +99,6 @@ export class WriterView extends ItemView {
   private inBand = false;
   private generation = 0;
   private fitted = false;
-  private status = "";
   /** Positions and rectangles while a drag is in flight. */
   private cardOverride = new Map<string, Point>();
   private groupOverride = new Map<string, Rect>();
@@ -113,7 +113,7 @@ export class WriterView extends ItemView {
   private edgeEls: { el: SVGLineElement; label: SVGTextElement | null; from: string; to: string; named: NamedEdge | null }[] = [];
   private card!: HTMLElement;
   private panel!: HTMLElement;
-  private statusEl!: HTMLElement;
+  private status!: StatusLine;
   private help!: HTMLElement;
 
   constructor(leaf: WorkspaceLeaf, private readonly source: WriterSource) {
@@ -193,7 +193,7 @@ export class WriterView extends ItemView {
     toggle.addEventListener("click", () => { this.source.updateSettings({ ...this.source.settings(), panelOpen: !this.source.settings().panelOpen }); this.renderPanel(); });
     this.panel = this.root.createDiv({ cls: "czm-map-panel czm-writer-panel" });
     this.card = this.root.createDiv({ cls: "czm-map-card czm-writer-side" });
-    this.statusEl = this.root.createDiv({ cls: "czm-map-status" });
+    this.status = new StatusLine(this.root);
     this.help = this.root.createDiv({ cls: "czm-writer-help", attr: { role: "dialog", "aria-label": "Keyboard shortcuts" } });
     this.help.createDiv({ text: "Keyboard", cls: "czm-map-card-name" });
     const table = this.help.createEl("table");
@@ -207,7 +207,7 @@ export class WriterView extends ItemView {
     this.renderGraph();
     this.renderPanel();
     this.renderCard();
-    this.renderStatus();
+
   }
 
   // --- graph ---------------------------------------------------------------------
@@ -597,13 +597,14 @@ export class WriterView extends ItemView {
     const target = groupAt(this.layout, cardCentre(at));
     const home = this.layout.groups.find((g) => g.group.def.id === pc.group);
     const moving = target !== null && target !== undefined && target.group.def.id !== pc.group;
+    const from = pc.card.tagGroups[pc.card.groups.indexOf(pc.group)] ?? pc.group;
+    const wasAt = this.file.cards[path] ?? null;
     if (moving) {
       // Retag first: if the note cannot be rewritten, the card snaps back and the error stays on screen.
-      const from = pc.card.tagGroups[pc.card.groups.indexOf(pc.group)] ?? pc.group;
       try {
         await this.source.retag(path, from, target.group.def.id);
       } catch (e) {
-        this.flash(`${pc.card.title} stays in ${this.groupName(pc.group)}: ${e instanceof Error ? e.message : String(e)}`);
+        this.status.fail(`${pc.card.title} stays in ${this.groupName(pc.group)}: ${e instanceof Error ? e.message : String(e)}`);
         this.cardOverride.delete(path);
         await this.show();
         return;
@@ -611,7 +612,14 @@ export class WriterView extends ItemView {
     }
     const origin = (target ?? home)?.rect ?? { x: 0, y: 0 };
     this.queue((file) => placeCard(file, path, { x: at.x - origin.x, y: at.y - origin.y }));
-    if (moving) this.flash(`${pc.card.title}: ${this.groupName(pc.group)} → ${target.group.def.name}`);
+    if (moving) {
+      this.status.undoable(`${pc.card.title}: ${this.groupName(pc.group)} → ${target.group.def.name}`, async () => {
+        await this.source.retag(path, target.group.def.id, from);
+        this.queue((file) => placeCard(file, path, wasAt));
+        await this.flushFile();
+        await this.show();
+      });
+    }
     await this.flushFile();
     this.cardOverride.delete(path);
     await this.show();
@@ -752,17 +760,26 @@ export class WriterView extends ItemView {
   private async retagCard(pc: PlacedCard, to: string | null): Promise<void> {
     const path = pc.card.path;
     const from = pc.card.tagGroups[pc.card.groups.indexOf(pc.group)] ?? pc.group;
-    try { await this.source.retag(path, from, to); } catch (e) { this.flash(e instanceof Error ? e.message : String(e)); return; }
+    const wasAt = this.file.cards[path] ?? null;
+    try { await this.source.retag(path, from, to); } catch (e) { this.status.fail(couldNot(`move ${pc.card.title}`, e)); return; }
     this.queue((file) => placeCard(file, path, null));
     await this.flushFile();
+    // Taking it back: the tag goes back on the note and the card returns to where it sat.
+    const undo = async () => {
+      await this.source.retag(path, to, from);
+      this.queue((file) => placeCard(file, path, wasAt));
+      await this.flushFile();
+      this.selection = { kind: "card", path };
+      await this.show();
+    };
     if (to) {
-      this.flash(`${pc.card.title}: ${this.groupName(pc.group)} → ${this.groupName(to)}`);
+      this.status.undoable(`${pc.card.title}: ${this.groupName(pc.group)} → ${this.groupName(to)}`, undo);
       this.selection = { kind: "card", path };
       await this.show();
       this.zoomed = to;
       this.fitGroup(to);
     } else {
-      this.flash(`${pc.card.title} taken out of ${this.groupName(pc.group)}`);
+      this.status.undoable(`${pc.card.title} taken out of ${this.groupName(pc.group)}`, undo);
       this.selection = { kind: "group", id: pc.group };
       await this.show();
     }
@@ -883,7 +900,7 @@ export class WriterView extends ItemView {
     try {
       this.file = await this.source.update((file) => changes.reduce((acc, c) => c(acc), file));
     } catch (e) {
-      this.flash(e instanceof Error ? e.message : String(e));
+      this.status.fail(couldNot("save the writer file", e));
     }
   }
 
@@ -902,14 +919,7 @@ export class WriterView extends ItemView {
   }
 
   private flash(message: string): void {
-    this.status = message;
-    this.renderStatus();
-    window.setTimeout(() => { if (this.status === message) { this.status = ""; this.renderStatus(); } }, 4000);
-  }
-
-  private renderStatus(): void {
-    this.statusEl.setText(this.status);
-    this.statusEl.classList.toggle("is-open", this.status.length > 0);
+    this.status.say(message);
   }
 
   // --- panel ---------------------------------------------------------------------
@@ -956,7 +966,11 @@ export class WriterView extends ItemView {
       new Setting(colours).setName(`${pg.group.def.name}${n ? ` · ${n}` : ""}`).setClass(`czm-set-group-${pg.group.def.id}`)
         .addColorPicker((c) => c.setValue(pg.group.colour).onChange((v) => { this.queue((file) => setColour(file, pg.group.def.id, v)); this.recolour(); }));
     }
-    new Setting(colours).setName("Reset colours").setClass("czm-set-reset-colours").addButton((b) => b.setButtonText("Reset").onClick(() => { this.queue((file) => ({ ...file, colours: {} })); void this.flushFile().then(() => this.show()); }));
+    new Setting(colours).setName("Reset colours").setClass("czm-set-reset-colours").addButton((b) => b.setButtonText("Reset").onClick(() => {
+      const before = this.file.colours;
+      this.queue((file) => ({ ...file, colours: {} }));
+      void this.flushFile().then(() => this.show()).then(() => this.status.undoable("Colours reset", async () => { this.queue((file) => ({ ...file, colours: before })); await this.flushFile(); await this.show(); }));
+    }));
     const prefixSec = section("Tag prefix", false);
     new Setting(prefixSec).setName("Prefix").setDesc(`Cards are notes tagged #${this.file.prefix}/<group>.`).setClass("czm-set-prefix")
       .addText((t) => t.setPlaceholder("writer").setValue(this.file.prefix).onChange((v) => { const p = normalizePrefix(v); if (p !== this.file.prefix) { this.queue((file) => ({ ...file, prefix: p })); void this.flushFile().then(() => this.show()); } }));
@@ -975,7 +989,7 @@ export class WriterView extends ItemView {
     if (!path) return;
     const existing = this.layout.cards.get(path)?.card;
     if (existing?.groups.includes(group)) { this.select({ kind: "card", path }); return; }
-    try { await this.source.retag(path, null, group); } catch (e) { this.flash(e instanceof Error ? e.message : String(e)); return; }
+    try { await this.source.retag(path, null, group); } catch (e) { this.status.fail(couldNot("tag the note", e)); return; }
     this.selection = { kind: "card", path };
     await this.show();
   }
@@ -1010,7 +1024,7 @@ export class WriterView extends ItemView {
 
   private async createNote(title: string, group: string, open: boolean): Promise<void> {
     let path: string;
-    try { path = await this.source.createNote(title, group); } catch (e) { this.flash(e instanceof Error ? e.message : String(e)); return; }
+    try { path = await this.source.createNote(title, group); } catch (e) { this.status.fail(couldNot("create the note", e)); return; }
     this.selection = { kind: "card", path };
     await this.show();
     this.root.focus({ preventScroll: true });
@@ -1056,7 +1070,10 @@ export class WriterView extends ItemView {
         colour.value = e.colour || "#d08c60";
         colour.addEventListener("input", () => { this.queue((file) => putEdge(file, { ...e, colour: colour.value })); void this.flushFile().then(() => this.show()); });
         const rm = row.createEl("button", { text: "Remove", cls: "czm-act-remove-edge" });
-        rm.addEventListener("click", () => { this.queue((file) => removeEdge(file, e.from, e.to, e.label)); void this.flushFile().then(() => this.show()); });
+        rm.addEventListener("click", () => {
+          this.queue((file) => removeEdge(file, e.from, e.to, e.label));
+          void this.flushFile().then(() => this.show()).then(() => this.status.undoable(`Line “${e.label || "(unnamed)"}” removed`, async () => { this.queue((file) => putEdge(file, e)); await this.flushFile(); await this.show(); }));
+        });
       }
     }
     if (linked) {
@@ -1089,7 +1106,7 @@ export class WriterView extends ItemView {
     const inferred = select.createEl("option", { text: `Inferred (${STAGE_LABEL[story.stage]})` });
     inferred.value = "";
     select.value = story.declared ? story.stage : "";
-    select.addEventListener("change", () => void this.source.setStage(story.spec, (select.value || null) as Stage | null).then(() => this.show(), (e: unknown) => this.flash(e instanceof Error ? e.message : String(e))));
+    select.addEventListener("change", () => void this.source.setStage(story.spec, (select.value || null) as Stage | null).then(() => this.show(), (e: unknown) => this.status.fail(couldNot("write the stage", e))));
     this.card.createDiv({ text: storyMeta(story, null), cls: "czm-map-hint" });
     if (story.fingerprint) this.card.createDiv({ text: fingerprintLine(story.fingerprint), cls: "czm-map-hint czm-writer-print" });
     const voices = this.board.cards.filter((c) => c.groups.includes("voice"));
@@ -1099,7 +1116,7 @@ export class WriterView extends ItemView {
     voiceSelect.createEl("option", { text: voices.length ? "No voice" : "No voice cards yet", attr: { value: "" } });
     for (const v of voices) { const o = voiceSelect.createEl("option", { text: v.title }); o.value = v.path; }
     voiceSelect.value = story.voice && voices.some((v) => v.path === story.voice) ? story.voice : "";
-    voiceSelect.addEventListener("change", () => void this.source.setVoice(story.spec, voiceSelect.value || null).then(() => this.show(), (e: unknown) => this.flash(e instanceof Error ? e.message : String(e))));
+    voiceSelect.addEventListener("change", () => void this.source.setVoice(story.spec, voiceSelect.value || null).then(() => this.show(), (e: unknown) => this.status.fail(couldNot("write the voice", e))));
     const actions = this.card.createDiv({ cls: "czm-map-card-actions" });
     const btn = (text: string, cls: string, onClick: () => void) => { const b = actions.createEl("button", { text, cls }); b.addEventListener("click", onClick); return b; };
     btn("Map", "czm-act-story-map", () => this.source.openStory("map", story.spec));
@@ -1137,7 +1154,7 @@ export class WriterView extends ItemView {
     const actions = this.card.createDiv({ cls: "czm-map-card-actions" });
     const declare = actions.createEl("button", { text: "Declare a story", cls: "czm-act-declare" });
     declare.title = "Writes story: true into the folder's namesake note, or its first note.";
-    declare.addEventListener("click", () => void this.source.declare(folder).then(() => { this.selection = null; return this.show(); }, (e: unknown) => this.flash(e instanceof Error ? e.message : String(e))));
+    declare.addEventListener("click", () => void this.source.declare(folder).then(() => { this.selection = null; return this.show(); }, (e: unknown) => this.status.fail(couldNot("declare the story", e))));
   }
 
   /** The form that turns an idea (or nothing) into a scaffolded story. */
@@ -1157,9 +1174,10 @@ export class WriterView extends ItemView {
       const n = name.value.trim();
       if (!n) { name.focus(); return; }
       create.disabled = true;
+      create.setText("Creating…");
       void this.source.promote(idea, n, folder.value.trim()).then(
         async (path) => { this.selection = null; await this.show(); const story = this.stories.stories.find((s) => s.spec.notePath === path); if (story) this.select({ kind: "story", scope: story.spec.scope }); this.source.openNote(path); },
-        (e: unknown) => { create.disabled = false; this.flash(e instanceof Error ? e.message : String(e)); },
+        (e: unknown) => { create.disabled = false; create.setText("Create"); this.status.fail(couldNot("create the story", e)); },
       );
     };
     create.addEventListener("click", go);
@@ -1193,7 +1211,13 @@ export class WriterView extends ItemView {
       row.createSpan({ text: this.groupName(gid), cls: "czm-map-row-name" });
       const rm = row.createEl("button", { text: "Remove", cls: "czm-act-remove-group" });
       rm.title = `Remove the #${this.file.prefix}/${c.tagGroups[i] ?? gid} tag from the note.`;
-      rm.addEventListener("click", () => void this.source.retag(path, c.tagGroups[i] ?? gid, null).then(() => this.show(), (e: unknown) => this.flash(e instanceof Error ? e.message : String(e))));
+      rm.addEventListener("click", () => {
+        const tag = c.tagGroups[i] ?? gid;
+        void this.source.retag(path, tag, null).then(
+          async () => { await this.show(); this.status.undoable(`${c.title} taken out of ${this.groupName(gid)}`, async () => { await this.source.retag(path, null, tag); await this.show(); }); },
+          (e: unknown) => this.status.fail(couldNot("remove the tag", e)),
+        );
+      });
     });
     const others = groupsOf(this.board.framework).filter((g) => !c.groups.includes(g.id));
     if (others.length) {
@@ -1204,7 +1228,7 @@ export class WriterView extends ItemView {
       const apply = row.createEl("button", { text: "Add", cls: "czm-act-add-group" });
       apply.disabled = true;
       select.addEventListener("change", () => { apply.disabled = !select.value; });
-      apply.addEventListener("click", () => void this.source.retag(path, null, select.value).then(() => this.show(), (e: unknown) => this.flash(e instanceof Error ? e.message : String(e))));
+      apply.addEventListener("click", () => void this.source.retag(path, null, select.value).then(() => this.show(), (e: unknown) => this.status.fail(couldNot("add the tag", e))));
     }
     if (c.groups.includes("reading")) {
       const row = this.card.createDiv({ cls: "czm-map-alias" });
@@ -1213,7 +1237,7 @@ export class WriterView extends ItemView {
       select.createEl("option", { text: "No status", attr: { value: "" } });
       for (const st of READING_STATUSES) { const o = select.createEl("option", { text: READING_LABEL[st] }); o.value = st; }
       select.value = c.reading ?? "";
-      select.addEventListener("change", () => void this.source.setReading(path, (select.value || null) as ReadingStatus | null).then(() => this.show(), (e: unknown) => this.flash(e instanceof Error ? e.message : String(e))));
+      select.addEventListener("change", () => void this.source.setReading(path, (select.value || null) as ReadingStatus | null).then(() => this.show(), (e: unknown) => this.status.fail(couldNot("write the reading status", e))));
       const analyses = this.board.derived.filter((e) => e.from === path || e.to === path).map((e) => (e.from === path ? e.to : e.from)).filter((p) => this.layout.cards.get(p)?.card.groups.includes("craft"));
       if (analyses.length) {
         this.card.createEl("h4", { text: "Analysis" });

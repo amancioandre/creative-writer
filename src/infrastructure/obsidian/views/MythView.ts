@@ -46,7 +46,7 @@ export class MythView extends ItemView {
 
   showError(message: string): void {
     const root = this.reset();
-    root.createEl("p", { text: message, cls: "czm-myth-error" });
+    root.createEl("p", { text: message, cls: "czm-myth-error", attr: { role: "alert" } });
   }
 
   showReport(report: MythReport, model: string): void {
@@ -87,6 +87,7 @@ export class MythView extends ItemView {
 
   private reset(): HTMLElement {
     this.contentEl.empty();
-    return this.contentEl.createDiv({ cls: "czm-myth" });
+    // A live region: "Analysing…" and the report that replaces it are announced without moving focus.
+    return this.contentEl.createDiv({ cls: "czm-myth", attr: { "aria-live": "polite" } });
   }
 }

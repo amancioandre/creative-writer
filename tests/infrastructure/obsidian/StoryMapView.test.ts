@@ -26,7 +26,7 @@ const file = putReading(EMPTY_STORY_MAP_FILE, {
 });
 
 function source(overrides: Partial<StoryMapSource> = {}) {
-  const calls = { opened: [] as string[], revealed: [] as string[], promoted: [] as string[], ignored: [] as string[], aliased: [] as string[], relations: [] as string[], renamed: [] as string[], removed: [] as string[], layouts: [] as Layout[], timeline: 0, threads: 0 };
+  const calls = { opened: [] as string[], revealed: [] as string[], promoted: [] as string[], ignored: [] as string[], aliased: [] as string[], relations: [] as string[], renamed: [] as string[], removed: [] as string[], restored: [] as string[], layouts: [] as Layout[], timeline: 0, threads: 0 };
   let settings: StoryMapSettings = DEFAULT_STORY_MAP;
   // Relations written through the source show up in the next build, as they would from the vault.
   const authored: ProjectRelation[] = [];
@@ -49,7 +49,8 @@ function source(overrides: Partial<StoryMapSource> = {}) {
     },
     removeRelation: async (from, to, label) => { calls.relations.push(`${from} -x ${to}: ${label}`); const i = authored.findIndex((r) => r.targetPath === to && r.label === label); if (i >= 0) authored.splice(i, 1); },
     rename: async (path, name) => { calls.renamed.push(`${path} -> ${name}`); return `Novel/Characters/${name}.md`; },
-    remove: async (path) => { calls.removed.push(path); },
+    remove: async (path) => { calls.removed.push(path); return `---\ntype: location\n---\n# ${path}\nA port city.`; },
+    restore: async (path, text) => { calls.restored.push(`${path}: ${text}`); },
     loadLayout: async () => ({}),
     saveLayout: async (_p, layout) => { calls.layouts.push(layout); },
     analyse: async () => { throw new Error("no model"); },
@@ -381,6 +382,11 @@ describe("StoryMapView", () => {
       await tick(); await tick(); await tick();
       expect(calls.relations.at(-1)).toBe(`${marta} -x ${ilse}: half-sister`);
       expect(v.querySelectorAll(".czm-edge-authored")).toHaveLength(0);
+      // Undo writes the line back into the note.
+      expect(v.querySelector(".czm-map-status")!.textContent).toContain("“half-sister” removed");
+      (v.querySelector(".czm-status-undo") as HTMLElement).click();
+      await tick(); await tick(); await tick();
+      expect(calls.relations.at(-1)).toBe(`${marta} -> ${ilse}: half-sister`);
     });
 
     it("shows a disagreement between the writer and the model on both edges, and lets either side be adopted", async () => {
@@ -447,6 +453,11 @@ describe("StoryMapView", () => {
       del.click();
       await tick(); await tick(); await tick();
       expect(calls.removed).toEqual([lisbon]);
+      // Undo writes the note back exactly as it was, front matter included.
+      expect(el.querySelector(".czm-map-status")!.textContent).toContain("moved to the trash");
+      (el.querySelector(".czm-status-undo") as HTMLElement).click();
+      await tick(); await tick(); await tick();
+      expect(calls.restored).toEqual([`${lisbon}: ---\ntype: location\n---\n# ${lisbon}\nA port city.`]);
     });
 
     it("remembers hand-placed nodes: a drag pins and saves, Shake forgets", async () => {
@@ -466,6 +477,13 @@ describe("StoryMapView", () => {
       (el.querySelector(".czm-map-shake") as HTMLElement).click();
       await new Promise((r) => setTimeout(r, 900));
       expect(Object.keys(layouts.at(-1)!)).toEqual(["Novel/Gone.md"]);
+      // Shake can be taken back: the hand-placed nodes are pinned again where they were.
+      expect(el.querySelector(".czm-map-status")!.textContent).toContain("2 hand-placed nodes let go");
+      (el.querySelector(".czm-status-undo") as HTMLElement).click();
+      await new Promise((r) => setTimeout(r, 900));
+      expect(Object.keys(layouts.at(-1)!).sort()).toEqual([ilse, marta, "Novel/Gone.md"].sort());
+      expect(layouts.at(-1)![ilse]).toEqual({ x: 300, y: 300 });
+      expect(el.querySelector(`.czm-node[data-id="${ilse}"]`)!.classList.contains("is-pinned")).toBe(true);
       await v.onClose();
     });
   });
