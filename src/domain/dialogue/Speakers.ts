@@ -76,7 +76,11 @@ export function buildRoster(notes: readonly EntityNote[], scope: string | null, 
       if (!list.some((s) => s.id === speaker.id)) list.push(pinned ? { ...speaker, colour: pinned } : speaker);
     }
   }
-  return list.map((s, i) => (s.colour ? s : { ...s, colour: SPEAKER_PALETTE[i % SPEAKER_PALETTE.length]! }));
+  // Palette colours go to the unpinned in cast order, skipping any colour a note pinned, so two speakers never share one by accident.
+  const taken = new Set(list.map((s) => s.colour).filter(Boolean));
+  const free = SPEAKER_PALETTE.filter((c) => !taken.has(c));
+  let next = 0;
+  return list.map((s) => (s.colour ? s : { ...s, colour: (free.length ? free : SPEAKER_PALETTE)[next++ % (free.length || SPEAKER_PALETTE.length)]! }));
 }
 
 export type AttributionHow = "tag" | "named" | "turns";

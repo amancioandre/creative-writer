@@ -8,7 +8,7 @@ All commands appear in the palette under **Creative Writer:**. None has a defaul
 | **Toggle Creative Writer (everywhere)** | Flip the master switch for all editor features. |
 | **Toggle Creative Writer for this note** | Write `creative-writer: true` or `false` into the active note's front matter. |
 | **Lens: style checks** / **Lens: dialogue** / **Lens: words** / **Lens: accents** | Switch that [lens](/guide/lenses) on, everywhere; run it again to switch it off. One lens at a time. |
-| **Lens: next** / **Lens: off** | Cycle through the lenses (what the status-bar item does on a click), or show the plain page. |
+| **Lens: next** / **Lens: off** | Cycle through the lenses, or show the plain page. The status-bar item opens a menu of the same rows. |
 | **Analyse paragraph with model** | Send the cursor paragraph to the configured model for contextual findings. |
 | **Analyse selection for myth and archetype** | Sidebar report of mythic patterns and archetypes in the selection (or the whole note if nothing is selected). Local model only. |
 | **Open writing desk** | Open the side panel with progress, readability, scenes and projects. |

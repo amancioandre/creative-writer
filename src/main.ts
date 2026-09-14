@@ -54,6 +54,7 @@ import { conventionsFacet, dialogueExtension, rostersFacet, type ConventionsBySc
 import { buildRoster } from "./domain/dialogue/Speakers";
 import type { EntityNote } from "./domain/story/EntityIndex";
 import { loadWordLists } from "./infrastructure/obsidian/VaultWordLists";
+import { lensMenu } from "./infrastructure/obsidian/lensMenu";
 import { BuildStoryMap } from "./application/use-cases/BuildStoryMap";
 import { AnalyzeSceneRelations } from "./application/use-cases/AnalyzeSceneRelations";
 import { VaultProjectNotes } from "./infrastructure/obsidian/VaultProjectNotes";
@@ -208,8 +209,15 @@ export default class CreativeZenModePlugin extends Plugin {
     lensStatus.addClass("czm-status-lens");
     lensStatus.setAttribute("role", "button");
     lensStatus.tabIndex = 0;
-    lensStatus.addEventListener("click", () => void this.setLens(nextLens(this.current.lens)));
-    lensStatus.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); void this.setLens(nextLens(this.current.lens)); } });
+    lensStatus.setAttribute("aria-haspopup", "menu");
+    const menuPort = { current: () => this.current, update: (next: PluginSettings) => void this.setLens(next.lens, next) };
+    lensStatus.addEventListener("click", (ev) => lensMenu(menuPort).showAtMouseEvent(ev));
+    lensStatus.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Enter" && ev.key !== " ") return;
+      ev.preventDefault();
+      const r = lensStatus.getBoundingClientRect();
+      lensMenu(menuPort).showAtPosition({ x: r.left, y: r.top });
+    });
     this.lensStatus = lensStatus;
     this.renderLensStatus();
 
@@ -747,9 +755,12 @@ export default class CreativeZenModePlugin extends Plugin {
     );
   }
 
-  private async setLens(lens: Lens): Promise<void> {
-    await this.updateSettings({ ...this.current, lens });
-    if (lens === "words" && this.wordListsKey === "" ) new Notice(`Lens: words — no word list yet. Write one at ${this.current.words.note}: a heading per category, the words under it.`, 8000);
+  /** Switch the lens (and, from the menu, a lens switch with it); the status bar follows, a notice says what happened. */
+  private async setLens(lens: Lens, next: PluginSettings = this.current): Promise<void> {
+    const changed = lens !== this.current.lens;
+    await this.updateSettings({ ...next, lens });
+    if (!changed) return;
+    if (lens === "words" && this.wordListsKey === "") new Notice(`Lens: words — no word list yet. Write one at ${this.current.words.note}: a heading per category, the words under it.`, 8000);
     else new Notice(`Lens: ${LENS_LABELS[lens].toLowerCase()}`);
   }
 
@@ -759,7 +770,7 @@ export default class CreativeZenModePlugin extends Plugin {
     const lens = this.current.lens;
     el.setText(lens === "none" ? "No lens" : `Lens: ${LENS_LABELS[lens].toLowerCase()}`);
     el.classList.toggle("is-off", lens === "none");
-    el.setAttribute("aria-label", `${lens === "none" ? "No lens" : `Lens: ${LENS_LABELS[lens]}`}. Click for the next lens.`);
+    el.setAttribute("aria-label", `${lens === "none" ? "No lens" : `Lens: ${LENS_LABELS[lens]}`}. Click to choose a lens.`);
   }
 
   /** Reads the global word list note and every project's own, and pushes them into the editors when something changed. */

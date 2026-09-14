@@ -24,6 +24,17 @@ describe("buildRoster", () => {
     expect(r[1]!.accentNever).toEqual(["my", "yes", "no"]);
     expect(r[0]!.accent).toEqual([]);
   });
+  it("never hands out a palette colour a note has pinned", () => {
+    const pinned = [
+      { path: "Characters/A.md", frontmatter: { colour: SPEAKER_PALETTE[0] } },
+      { path: "Characters/B.md", frontmatter: {} },
+      { path: "Characters/C.md", frontmatter: { colour: SPEAKER_PALETTE[2] } },
+      { path: "Characters/D.md", frontmatter: {} },
+    ];
+    const r = buildRoster(pinned, null, []);
+    expect(r.map((s) => s.colour)).toEqual([SPEAKER_PALETTE[0], SPEAKER_PALETTE[1], SPEAKER_PALETTE[2], SPEAKER_PALETTE[3]]);
+    expect(new Set(r.map((s) => s.colour)).size).toBe(4);
+  });
   it("with no scope, every character note in the vault", () => {
     expect(buildRoster(notes, null, scopes).map((s) => s.name)).toEqual(["Mara", "Tomas", "Ilse", "Nobody"]);
   });

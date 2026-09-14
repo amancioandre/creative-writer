@@ -8,7 +8,7 @@ What is not a lens stays under every lens: focus fade, the current line, typewri
 
 ## Switching
 
-- The status bar shows the lens on the right, *Lens: words*, or *No lens*. Click it for the next one.
+- The status bar shows the lens on the right, *Lens: words*, or *No lens*. Click it for the menu: one row per lens, the one on ticked, each naming its command, and under a line the two switches that shape a lens, *Rhythm tint underneath* and *Dim narration*.
 - Every lens is a command, and every lens command starts with **Lens:**, so typing `lens` in the palette lists them all: **Lens: style checks**, **Lens: dialogue**, **Lens: words**, **Lens: accents**, **Lens: next**, **Lens: off**. A lens command toggles its lens: on when another or none is on, off when it is the one on.
 - None ships with a hotkey, as with every command in this plugin; bind your own in Settings → Hotkeys, where the prefix keeps them together.
 - Settings → Lenses → **Lens** is the same switch as a dropdown.

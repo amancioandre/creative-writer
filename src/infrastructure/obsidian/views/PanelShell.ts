@@ -72,6 +72,13 @@ export interface MenuEntry {
  * column and names the command it is, so the key for it can be bound in Settings → Hotkeys.
  */
 export function showOverflow(ev: MouseEvent, entries: readonly (MenuEntry | "-")[]): Menu {
+  const menu = buildMenu(entries);
+  menu.showAtMouseEvent(ev);
+  return menu;
+}
+
+/** The rows of a ⋯ menu, not yet shown: the status bar shows one at a position, the panels at the mouse. */
+export function buildMenu(entries: readonly (MenuEntry | "-")[]): Menu {
   const menu = new Menu();
   for (const e of entries) {
     if (e === "-") { menu.addSeparator(); continue; }
@@ -86,7 +93,6 @@ export function showOverflow(ev: MouseEvent, entries: readonly (MenuEntry | "-")
       item.onClick(() => e.onClick());
     });
   }
-  menu.showAtMouseEvent(ev);
   return menu;
 }
 
