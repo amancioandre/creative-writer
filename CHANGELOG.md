@@ -2,7 +2,7 @@
 
 Release notes for every version are on the [releases page](https://github.com/amancioandre/creative-writer/releases). This file carries the same text for the versions since it was started.
 
-## Unreleased — Reading lenses
+## 0.10.0 — The plot grid and the reading lenses
 
 Three revision passes from the way Maxwell Alexander Drake edits, designed on 2026-09-14 as *lenses*: one reading pass at a time, everywhere, so a tint always means one thing. The settings tab was reworked first to give them a home.
 
@@ -15,8 +15,6 @@ Three revision passes from the way Maxwell Alexander Drake edits, designed on 20
 - **The box as the lens's hands.** Style: *Not a cliché here* writes a hidden `%% not cliche %%` into the paragraph and the finding goes, the model's too. Words: *Remove "then" from Stage direction* edits the list note, and a command adds the word under the cursor under a category picked or typed. Accents: a marked word can be taken out of the character note from the card, and two commands put the word under the cursor into the speaker's `accent` or `accent-never`.
 - **Accents lens.** The dialogue page at a faint tint and, inside each speaker's own lines, the words their character note says they use (`accent:`, green) and never say (`accent-never:`, red); never in narration, never in a line nobody is pinned to.
 - **Words lens.** Your own overused words from a note of your own, one heading per category, tinted wherever they occur with the category and the count in the note on hover; `bad-words:` in a project note names a list for that project.
-
-## Unreleased — The plot grid
 
 The story timeline grows into a plot grid: a scene is a row, a hand-drawn thread from `Story threads.md` is a column, and the cell is what the thread is doing in the scene. Designed on 2026-09-13 (`docs/development/plot-grid.md`), built in eight increments.
 
