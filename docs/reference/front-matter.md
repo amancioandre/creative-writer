@@ -6,8 +6,8 @@ Every property the plugin reads or writes. All are optional.
 
 | Key | Values | Effect |
 |---|---|---|
-| `creative-writer` | `true` / `false` | Force the editor features on or off for this note, whatever the *Notes* mode says. `false` also keeps the note out of the [story map](/guide/story-map#what-is-read) and timeline — the right line for memos, research and reviews. Written by *Toggle Creative Writer for this note*. |
-| `story-order` | number, e.g. `3` | Where this note falls in the manuscript. Notes with it come first, by number; the rest follow in path order. Used by the story map, timeline, [threads](/guide/story-threads#the-axis) and the [manuscript](/guide/manuscript). |
+| `creative-writer` | `true` / `false` | Force the editor features on or off for this note, whatever the *Notes* mode says. `false` also keeps the note out of the [story map](/guide/story-map#what-is-read), the plot grid, the threads and the manuscript page — the right line for memos, research and reviews. Written by *Toggle for this note*. |
+| `story-order` | number, e.g. `3` | Where this note falls in the manuscript. Notes with it come first, by number; the rest follow in path order. Used by the story map, the [plot grid](/guide/plot-grid), the [threads](/guide/story-threads#the-axis) and the [manuscript](/guide/manuscript). |
 | `manuscript` | `true` / `false` | `false` keeps a note off the [manuscript](/guide/manuscript) page: an outline, research, the project note itself. `true` puts a typed note (a character sheet, say) on it. Notes with no prose are never on it. |
 
 ## Project note
@@ -17,7 +17,7 @@ The note whose front matter declares a [project](/guide/projects). Any note in t
 | Key | Values | Effect |
 |---|---|---|
 | `writing-target` | words, e.g. `80000` | Makes the note's folder a project with a word goal. |
-| `story` | `true` | Makes the note's folder a project with **no** goal — a book you are reading and mapping, or a map sketched before the draft. The story map and timeline see it; the writing desk does not. Either key is enough; `writing-target` adds the goal on top. |
+| `story` | `true` | Makes the note's folder a project with **no** goal — a book you are reading and mapping, or a map sketched before the draft. The story map, the plot grid and the threads see it; the writing desk does not. Either key is enough; `writing-target` adds the goal on top. |
 | `writing-deadline` | `YYYY-MM-DD` | Pace and verdict against a date. |
 | `writing-daily` | words, e.g. `500` | A per-project daily goal with its own streak. |
 | `writing-name` | text | Display name instead of the folder name. |
@@ -54,7 +54,7 @@ aliases: []
 
 ## Writing log note
 
-`Creative Writer/Writing log.md` (or the path in Settings → Goals) carries `creative-writer: false` and `creative-writer-log: 1`, a line of explanation and one JSON block. Safe to edit; deleting it starts the log afresh.
+`Creative Writer/Writing log.md` (or the path in Settings → Stories and goals) carries `creative-writer: false` and `creative-writer-log: 1`, a line of explanation and one JSON block. Safe to edit; deleting it starts the log afresh.
 
 ## Story map data note
 
@@ -63,13 +63,11 @@ aliases: []
 ```yaml
 ---
 creative-writer: false
-creative-writer-storymap: 3
+creative-writer-storymap: 4
 ---
 ```
 
-followed by a short explanation and one ```` ```json ```` block: relation readings and fact readings per scene, the model's verdict per contradiction, sentence pairs the embedding model found alike, contradictions you dismissed, and pinned node positions. The flag keeps the plugin from reading its own note as a chapter; a version-1 or version-2 note (before facts, or before intents and echoes, existed) loads as is. Safe to delete — you would re-run the readings.
-
-The story map data note (`Story map.md`) also carries the plot grid's readings under a `grid` key, one per cell the model read, with its state: open, dismissed, or none. Version 4 of the note.
+followed by a short explanation and one ```` ```json ```` block: relation readings and fact readings per scene, the model's verdict per contradiction, sentence pairs the embedding model found alike, contradictions you dismissed, pinned node positions, and under a `grid` key the [plot grid](/guide/plot-grid#reading-with-the-model)'s readings, one per cell the model read, each with its state (open, dismissed, or none). The flag keeps the plugin from reading its own note as a chapter; a note from an earlier version (before facts, intents and echoes, or the grid existed) loads as is. Safe to delete — you would re-run the readings.
 
 ## Plot grid snapshot
 
@@ -92,7 +90,7 @@ creative-writer-threads: 1
 ---
 ```
 
-and adds one `## heading` per thread and one `- [[Note#Heading]] — note` line per scene. A line may start with `plant:`, `touch:`, `payoff:` or `reversal:` and carry one `"quoted sentence"` as its anchor ([directed threads](/guide/story-threads#directed-threads)). Edit it freely, or write it from scratch without the front matter — a note named `Story threads` is never read as a chapter either way.
+and adds one `## heading` per thread and one `- [[Note#Heading]] — note` line per scene. A heading may carry a kind as its prefix, `## Arc: [[Anna]]`, `## Theme: …` or `## Subplot: …`; without one it is a free thread ([plot grid](/guide/plot-grid#reading-it)). A line may start with `plant:`, `touch:`, `payoff:` or `reversal:` and, under an arc, `want:`, `lie:`, `turn:` or `truth:`, and carry one `"quoted sentence"` as its anchor ([directed threads](/guide/story-threads#directed-threads)). The plot grid writes the same lines from its cells. Edit it freely, or write it from scratch without the front matter — a note named `Story threads` is never read as a chapter either way.
 
 ## Writer
 

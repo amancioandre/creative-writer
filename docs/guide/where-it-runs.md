@@ -2,10 +2,10 @@
 
 Creative Writer supports writing the story — not the journal, the meeting notes or the research beside it. One scope rule decides which notes are *the story*, and every feature follows it:
 
-- the editor features — typewriter scrolling, current line, focus fade, rhythm, style checks, readability — run only there;
+- the editor features — typewriter scrolling, current line, focus fade, rhythm, the lenses, readability — run only there;
 - the [writing desk](/guide/writing-desk) counts words added and cut only there, for the daily goal, the streak and the heatmap;
 - [project](/guide/projects) totals and per-project daily goals count only notes that are both in the project folder and in scope;
-- the [story map](/guide/story-map), timeline and threads read only notes in scope.
+- the [story map](/guide/story-map), plot grid, threads and manuscript read only notes in scope.
 
 The plugin's own notes — the writing log, `Story map.md`, `Story threads.md` — are never counted or read, whatever the mode.
 
@@ -15,7 +15,7 @@ A declared [project](/guide/projects) — a folder (or single note) with `writin
 
 ## Four modes
 
-Settings → Creative Writer → **Notes** decides what is in *besides* the projects. The setting shows how many of the vault's notes the current rule takes in.
+Settings → Where it runs → **Notes** decides what is in *besides* the projects. The setting shows how many of the vault's notes the current rule takes in.
 
 | Mode | Runs in |
 |---|---|
@@ -48,5 +48,5 @@ The writing log records every note it was shown; the desk reads it *through* the
 
 ## Commands
 
-- **Toggle Creative Writer (everywhere)** flips the master switch (*Enabled*) for the whole vault.
-- **Toggle Creative Writer for this note** writes `creative-writer: true` or `false` into the active note's front matter, depending on whether the plugin is currently active there.
+- **Toggle everywhere** flips the master switch (*Enabled*) for the whole vault.
+- **Toggle for this note** writes `creative-writer: true` or `false` into the active note's front matter, depending on whether the plugin is currently active there.

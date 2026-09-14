@@ -1,16 +1,16 @@
 # Zen Mode & focus
 
-Four features that change how the page looks while you write. All are toggles in Settings → Creative Writer; none of them touch the text.
+Four features that change how the page looks while you write. All are toggles under Settings → Writing; none of them touch the text, and none is a lens: they stay on under every [lens](/guide/lenses).
 
 ## Zen Mode
 
 **Toggle Zen Mode** hides the ribbon, the tab headers, both sidebars, the status bar and the title bar, and stretches the editor to the window. Inside the note it also hides the properties block and the backlinks footer, and fades the note title (it returns to full strength while you edit it). Toggle again to bring everything back. The plugin adds one class to `<body>` and removes it on unload, so a crash or a reload never leaves you stuck without chrome.
 
-**Fullscreen in Zen Mode** (off by default) also asks the window to go fullscreen when Zen Mode turns on.
+**Zen Mode goes fullscreen** (off by default) also asks the window to go fullscreen when Zen Mode turns on.
 
 Zen Mode admits one indicator: move the mouse and a small line inside the page says today's words and the way out (*Esc leaves Zen Mode*), then fades two seconds later; it never appears while you type. Escape, pressed on the page while no menu, prompt or suggestion is open, leaves Zen Mode.
 
-Because the writing desk, story map and timeline live in leaves, Zen Mode hides them too — they are *about* the work, not the work.
+Because the writing desk, the writer board, the story map, the plot grid, the threads and the manuscript live in leaves, Zen Mode hides them too — they are *about* the work, not the work. Zen Mode also shows no [lens](/guide/lenses): the page is plain, and the rhythm tint becomes a meter in the margin.
 
 ## Typewriter scrolling
 

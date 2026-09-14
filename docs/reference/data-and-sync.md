@@ -4,29 +4,31 @@ What the plugin writes, where, and what travels between your machines.
 
 | File | Where | Holds | Syncs with Obsidian Sync? |
 |---|---|---|---|
-| `data.json` | `.obsidian/plugins/creative-writer/` | Settings, including the story map's filters, colours, display and forces; the Claude key and spend | Only if *Settings → Sync → Installed community plugins* is on. |
-| `Creative Writer/Writing log.md` (path in Settings → Goals) | Inside the vault | The writing log: per day, per file, words added and cut — the streaks and the heatmap | **Yes** — a Markdown note. |
+| `data.json` | `.obsidian/plugins/creative-writer/` | Settings, including the lens that is on, the story map's filters, colours, display and forces, the threads' and the plot grid's layout; the Claude key and spend | Only if *Settings → Sync → Installed community plugins* is on. |
+| `Creative Writer/Writing log.md` (path in Settings → Stories and goals) | Inside the vault | The writing log: per day, per file, words added and cut — the streaks and the heatmap | **Yes** — a Markdown note. |
 | `progress.json` | `.obsidian/plugins/creative-writer/` | The log's old home (before 0.4). Imported into the note once, then left untouched. | No — and no longer needed. |
-| `Story map.md` | Inside each project folder | Model readings per scene — relationships, references, events, and (separately, with their own hash) facts — the model's verdict on what each contradiction means, the sentence pairs the embedding model found alike (pairs only, never vectors), plus the contradictions you dismissed in the threads view and where you pinned nodes by hand | **Yes** — it is a Markdown note, and every sync method carries Markdown. |
-| `Story threads.md` | Inside each project folder | The threads you draw by hand: `## heading` per thread, `- [[Note#Heading]] — note` per scene, with an optional `plant:` / `payoff:` / `reversal:` role and a `"quoted"` anchor; also where *This is a reversal* writes | **Yes** — and it is prose you can edit. |
+| `Story map.md` | Inside each project folder | Model readings per scene — relationships, references, events, and (separately, with their own hash) facts — the model's verdict on what each contradiction means, the sentence pairs the embedding model found alike (pairs only, never vectors), the [plot grid](/guide/plot-grid#reading-with-the-model)'s readings per cell with whether you dismissed them, plus the contradictions you dismissed in the threads view and where you pinned nodes by hand | **Yes** — it is a Markdown note, and every sync method carries Markdown. |
+| `Story threads.md` | Inside each project folder | The threads you draw by hand, from the threads view or a plot grid cell: `## heading` per thread (`Arc:`, `Theme:`, `Subplot:` or none), `- [[Note#Heading]] — note` per scene, with an optional role (`plant:` / `payoff:` / `reversal:`, or `want:` / `lie:` / `turn:` / `truth:` under an arc) and a `"quoted"` anchor; also where *This is a reversal* and *Keep as a motif* write | **Yes** — and it is prose you can edit. |
 | `<Name> (manuscript).md` | Inside the project folder, only when you export | A snapshot of the [manuscript](/guide/manuscript) as one note; flagged so it is never read back | **Yes** — a Markdown note; delete it freely. |
+| `Plot grid.md` · `Plot grid · <date>.md` | Beside the project's notes, only when you export or snapshot | The [plot grid](/guide/plot-grid#before-the-draft-and-after-it) as a markdown table: the export refreshed in place, a snapshot dated and kept; both flagged `creative-writer-grid-snapshot` so they are never read back | **Yes** — Markdown notes; delete them freely. |
 | `Writer.writer` | The stories folder (Settings → Writer) or the vault root; found by extension wherever you move it | The writer board's framework, colours, card and group positions, named edges and view. Cards, stories and uses are rebuilt from your notes. See the [writer protocol](/reference/writer-file). | **Only with *Sync all other types* on** in Selective sync. Without it the board still works on each machine; positions and edge names differ. |
 | Entity notes, `## Relationships` lines, `story-ignore`, `aliases`, `story-order` | Your notes | Every decision you make in the story map and threads, including nodes, relationships and threads you draw | Yes — they are your notes. |
 
 ## The principle
 
-Writer-owned facts go in notes and front matter. Machine-owned facts that cannot be recomputed go in a Markdown note beside the notes they describe. Nothing derived is stored: the story map, timeline and manuscript page are pure functions of the vault, so two machines with the same notes draw the same map — the layout even starts from the same deterministic positions.
+Writer-owned facts go in notes and front matter. Machine-owned facts that cannot be recomputed go in a Markdown note beside the notes they describe. Nothing derived is stored: the story map, the plot grid, the threads and the manuscript page are pure functions of the vault, so two machines with the same notes draw the same map — the layout even starts from the same deterministic positions.
 
 ## Cross-device caveats
 
 - **The writing log syncs, last-writer-wins.** It is written at most every ten seconds while you write and on unload. If both machines write on the same day *before* syncing, whichever saves last keeps its version of that day; the other machine's words for that day are lost. Writing on one machine at a time — the normal case — is safe, and per-file baselines are re-read when a note opens, so a chapter synced from the other machine is never counted as new words.
-- **`Story map.md` conflicts** are rare — it changes when you run a reading, pin a node or dismiss a contradiction — and harmless: the loser's readings are simply re-run on the next *Read project*, because unchanged scenes are recognised by hash, a lost pin is one drag away, and a lost dismissal is one click.
+- **`Story map.md` conflicts** are rare — it changes when you run a reading, pin a node, dismiss a contradiction or dismiss a grid reading — and harmless: the loser's readings are simply re-run on the next read, because unchanged scenes are recognised by hash, a lost pin is one drag away, and a lost dismissal is one click.
 - **`Story threads.md`** is an ordinary note; a conflict there is resolved the way you resolve any note conflict.
 - **Map preferences** (colours, forces) follow `data.json`, so they sync only with plugin sync on. They are cosmetic; the story data never depends on them.
 
 ## Deleting things
 
-- Delete `Story map.md` → the model layers, the fact threads and the dismissals vanish until you read again; nothing else is affected.
-- Delete `Story threads.md` → your hand-drawn threads are gone; names and facts still draw.
+- Delete `Story map.md` → the model layers, the fact threads, the grid's readings and the dismissals vanish until you read again; nothing else is affected.
+- Delete `Story threads.md` → your hand-drawn threads are gone, and the plot grid has no columns until you add one; names and facts still draw.
+- Delete `Plot grid.md` or a snapshot → nothing; they are never read back.
 - Delete `Writing log.md` → the log starts empty (the old `progress.json`, if any, is imported again); projects still show totals, which come from the vault.
 - Reset settings → the log note is untouched; it is a separate file precisely so a settings reset never erases a year of history.

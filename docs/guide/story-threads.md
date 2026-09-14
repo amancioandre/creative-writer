@@ -12,7 +12,7 @@ The layout is borrowed from *BibViz*, a chart of the Bible's internal contradict
 
 Every **scene** (a heading and its prose) is a slot along the bottom, as wide as its share of the words — the axis *is* the length histogram. A bar hangs under each slot, taller for longer scenes; slots alternate shade at every note boundary so chapters read as bands; bookmarked scenes get a yellow edge. Hover a bar for the note, heading and word count; click it for its card; double-click to jump to it in the editor.
 
-Scenes run in **manuscript order**: notes by path, unless a note says where it belongs with `story-order: 3` in its front matter. Ordered notes come first, by number; the rest follow in path order. The story map and timeline use the same order, so the three views always agree.
+Scenes run in **manuscript order**: notes by path, unless a note says where it belongs with `story-order: 3` in its front matter. Ordered notes come first, by number; the rest follow in path order. The story map, the plot grid and the manuscript page use the same order, so the views always agree.
 
 ## Threads
 
@@ -60,7 +60,9 @@ Click a scene's bar, and its card ends with **Add to a thread**: pick an existin
 - [[Chapter 41#The reading]] — payoff
 ```
 
-Write it by hand if you prefer — one `## heading` per thread, one list line per scene, wikilinks or markdown links, `—`, `:` or `-` before the note. A link with no heading means the note's first scene. The view draws each thread as arcs; a link that points at no scene is marked on the chart with a small warning where the thread last touched a scene, listed in the panel as broken and kept on the thread's card; each carries **Fix**, which opens the note at that line. **Remove** on an arc's card takes a stop out, with an **Undo** in the status line that writes it back; **Threads note** in the panel opens the file. Obsidian keeps the links current when you rename a chapter.
+Write it by hand if you prefer — one `## heading` per thread, one list line per scene, wikilinks or markdown links, `—`, `:` or `-` before the note. A link with no heading means the note's first scene. The [plot grid](/guide/plot-grid#writing-in-it) writes the same lines from its cells, one column per heading, so the two views are one note read two ways.
+
+A heading's prefix gives the thread a **kind**: `## Arc: [[Anna]]` follows one character, `## Theme: …` is an argument the book makes, `## Subplot: …` a line of events, and a heading with no prefix is a free thread, as every thread ever written was. The chart draws all four alike; the kinds group the grid's columns. See [Plot grid](/guide/plot-grid#reading-it). The view draws each thread as arcs; a link that points at no scene is marked on the chart with a small warning where the thread last touched a scene, listed in the panel as broken and kept on the thread's card; each carries **Fix**, which opens the note at that line. **Remove** on an arc's card takes a stop out, with an **Undo** in the status line that writes it back; **Threads note** in the panel opens the file. Obsidian keeps the links current when you rename a chapter.
 
 ## Directed threads
 
@@ -79,6 +81,7 @@ A thread with roles on its stops. After the separator, a line may name what the 
 | `payoff:` | The scene that keeps the promise. |
 | `reversal:` | The scene that deliberately overturns what the plant said. What **This is a reversal** writes. |
 | `touch:` | Any other scene the thread passes through. A line with no word is a touch, so every thread you wrote before still reads the same. |
+| `want:` · `lie:` · `turn:` · `truth:` | Under an `Arc:` heading only: what the character wants, the lie they believe, the scene that turns them, the truth they arrive at. The [plot grid](/guide/plot-grid#reading-it) draws each as its own glyph. |
 
 One `"quoted sentence"` on the line is the stop's **anchor**: the quote is looked up in the scene (case, emphasis marks and curly quotes aside), and the stop becomes that sentence rather than the whole heading. Nothing is written into your chapter to hold the place. A quote that no longer matches is listed in the panel as *no longer in* the scene and flagged on the card until you fix it, like a dead link.
 
@@ -120,8 +123,7 @@ Strips share the slots exactly, so a spike lines up with the scene above it at e
 
 | Section | What |
 |---|---|
-| *Head* | Project dropdown; a search box over thread labels. |
-| *Head* | The project, a search, one line (*12 scenes · 5 arcs · 1 contradiction*), **Fit**, **Threads note**, the **⋯** menu (zoom, fit, the note and the three readings, each naming its command), and the jumps to the sibling panels (the story map among them). |
+| *Head* | The project, a search over thread labels, one line (*12 scenes · 5 arcs · 1 contradiction*), **Fit**, **Threads note**, the **⋯** menu (zoom, fit, the note and the three readings, each naming its command), and the jumps to the sibling panels (the story map and the plot grid among them). |
 | *Side column* | **Read project for facts** / **Stop**, the one filled button; **Read contradictions for intent** and **Read project for echoes** beneath it. |
 | **Threads** | A toggle per kind with counts; *Follow one name…*; any broken links in your threads. |
 | **Contradictions** | Open and dismissed counts; *Only contradictions*; *Show dismissed*. |
@@ -131,4 +133,4 @@ Strips share the slots exactly, so a spike lines up with the scene above it at e
 
 ## Sync
 
-The view is a pure function of the vault: the same notes draw the same threads on any machine. Three things persist, all as Markdown in the project folder: fact readings and dismissed contradictions in `Story map.md`, and your own threads in `Story threads.md`. See [Files & sync](/reference/data-and-sync).
+The view is a pure function of the vault: the same notes draw the same threads on any machine. What persists is Markdown in the project folder: the model's readings (facts, intents, echoes, and the plot grid's) and dismissed contradictions in `Story map.md`, and your own threads in `Story threads.md`. See [Files & sync](/reference/data-and-sync).

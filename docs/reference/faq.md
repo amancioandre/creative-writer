@@ -5,8 +5,11 @@
 **Nothing is tinted or faded in my note.**
 Check *Enabled* in settings, the *Notes* mode ([Where it runs](/guide/where-it-runs)), and the note's own `creative-writer:` line. Reading view has no editor; switch to Live Preview or Source.
 
-**A paragraph has no rhythm underlines.**
-Rhythm only colours the paragraph the cursor is in.
+**A paragraph has no rhythm tint.**
+Rhythm only colours the paragraph the cursor is in. Under the dialogue and accents lenses the rhythm tint is hidden, and *Rhythm tint underneath* off (Settings → Lenses) hides it under every lens.
+
+**The style checks have disappeared.**
+Another lens is on. The status bar says which (*Lens: words*, *No lens*); click it and pick *Style checks*, or run **Lens: style checks**. One lens is on at a time, and Zen Mode shows none. See [Lenses](/guide/lenses).
 
 **A finding is wrong.**
 Each rule's known misses are listed in [Style checks](/guide/style-checks). Anything not listed there is a bug worth an issue with the sentence.
@@ -40,7 +43,7 @@ Her note must be typed (`type: character` or a `Characters/` folder). If the pro
 The scene changed since the model read it. Re-read the note (or the project — unchanged scenes are skipped).
 
 **Read project with model says it needs a local model.**
-Settings → Model assistant → Model → Local (Ollama). The story reading and the myth report are local-only.
+Settings → Model assistant → Model → Local (Ollama). The story map's reading, the threads' three readings (facts, intent, echoes) and the myth report are local-only. The plot grid's readings are the exception: they run on Ollama or Claude.
 
 **The layout is a blob / too spread out.**
 Panel → Forces. Raise repulsion or link distance to spread; raise centre pull to gather. *Shake* re-settles; *Fit* frames.

@@ -4,7 +4,7 @@
 
 ## Today
 
-The headline is the decision, not the count: *120 to go* against your **Daily word goal** (Settings → Goals; default 500), or *Goal met*; a two-word verdict beside it (*Not started*, *Under way*, *Halfway*, *Done today*, *Revision day*); the count itself on the line beneath, *380 of 500 · 60 cut*, and the bar. Deletions are tracked on their own so a revision day still counts as work: when cutting outweighs adding, the desk says *Revision day* and the streak counts it when the goal is 0.
+The headline is the decision, not the count: *120 to go* against your **Daily word goal** (Settings → Stories and goals; default 500), or *Goal met*; a two-word verdict beside it (*Not started*, *Under way*, *Halfway*, *Done today*, *Revision day*); the count itself on the line beneath, *380 of 500 · 60 cut*, and the bar. Deletions are tracked on their own so a revision day still counts as work: when cutting outweighs adding, the desk says *Revision day* and the streak counts it when the goal is 0.
 
 Below, on one line: the current streak, the best, this week's total.
 
@@ -41,4 +41,4 @@ Each project declared in front matter reads as a column: its name, the total aga
 
 ## Where the log lives
 
-In a note — `Creative Writer/Writing log.md` by default; change the path under Settings → Goals → *Writing log note* — so it syncs with the vault and your streak is the same on every machine. The note is flagged `creative-writer: false` so the plugin never counts it, and edits to it are never logged. A log from an earlier version (`progress.json` in the plugin folder) is imported the first time the note is missing. See [Files & sync](/reference/data-and-sync).
+In a note — `Creative Writer/Writing log.md` by default; change the path under Settings → Stories and goals → *Writing log note* — so it syncs with the vault and your streak is the same on every machine. The note is flagged `creative-writer: false` so the plugin never counts it, and edits to it are never logged. A log from an earlier version (`progress.json` in the plugin folder) is imported the first time the note is missing. See [Files & sync](/reference/data-and-sync).

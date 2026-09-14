@@ -1,8 +1,8 @@
 # Reading a project
 
-The offline pass knows *who* shares a scene. A local model can say *how*: the relationships between the people in a scene, the outside references the scene is invoking, and what happens. This is the **References** layer of the [story map](/guide/story-map), the labelled edges in its **Scenes** layer, and the event lines in the [timeline](/guide/story-timeline).
+The offline pass knows *who* shares a scene. A local model can say *how*: the relationships between the people in a scene, the outside references the scene is invoking, and what happens. This is the **References** layer of the [story map](/guide/story-map), the labelled edges in its **Scenes** layer, and the **Plot** column of the [plot grid](/guide/plot-grid).
 
-Needs **Local (Ollama)** as the model. `deepseek-r1:14b` is recommended.
+Needs **Local (Ollama)** as the model, as do the threads' readings below. `deepseek-r1:14b` is recommended. The [plot grid](/guide/plot-grid#reading-with-the-model)'s readings are the one exception and run on Ollama or Claude.
 
 ## Running it
 
@@ -35,6 +35,10 @@ Readings are stored in `Story map.md` inside the project folder — see [Files &
 ## Reading for intent, and for echoes
 
 Two more readings live in the [story threads](/guide/story-threads) view and follow the same rules — local only, on command, saved as they go, skipped where nothing changed: [reading for intent](/guide/story-threads#reading-for-intent), which asks what each open contradiction means, and [reading for echoes](/guide/story-threads#echoes), which embeds every sentence and keeps the pairs that say the same thing.
+
+## Reading the plot grid
+
+The [plot grid](/guide/plot-grid#reading-with-the-model) asks a narrower question, column by column: what is this thread doing in this scene? The answer is a **reading**, a note of at most twenty words with the verbatim quote that made the model think so, kept in `Story map.md` under a `grid` key and shown as a sparkle in the empty cell. It is never a stop and never a line in a chapter: you write the cell in your own words, or dismiss it. *Check this column against the draft…* asks, for each plan, whether it is on the page and offers the quote as the anchor; *Propose columns…* asks, over the events already read, which threads deserve a column. Same rules: no quote, no reading; scenes unchanged since their last reading are skipped; Ollama or Claude, Claude against the daily cap.
 
 ## Reading for facts
 

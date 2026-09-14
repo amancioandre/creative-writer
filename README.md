@@ -31,7 +31,9 @@ Settings → Writing → Paragraph rhythm · Settings → Lenses (the style chec
 
 ### Lenses
 
-A lens is a reading pass: it colours every open note one way at a time, so a tint always means one thing. **Style checks** is one lens; **Dialogue** is another (speech and thought tinted, narration dimmed, by the conventions of the project: quotes, single quotes or dash lines, a whole italic paragraph as a thought); **Accents** is a third (inside each speaker's own lines, the words their character note says they use and never say); **Words** is a fourth: your own overused words from a note of your own (`Creative Writer/Bad words.md`, one heading per category), tinted by category wherever they occur, a project able to keep its own list with `bad-words:` in its project note. The status bar shows the lens and cycles it on a click; every lens is a command under the `Lens:` prefix. Zen Mode shows no lens.
+A lens is a reading pass: it colours every open note one way at a time, so a tint always means one thing. **Style checks** is one lens. **Dialogue** is another: speech and thought tinted, narration dimmed, by the conventions of the project (double or single quotes or dash lines; a sentence or paragraph in italics as a thought), and with a cast each line takes its speaker's colour when a dialogue tag, a name in the paragraph or your own pin says who spoke. A grey line is a guess: hover it and a box offers the cast, and a click pins the speaker as a hidden `%% Name %%` comment. **Accents** is a third: inside each speaker's own lines, the words their character note says they use and never say. **Words** is a fourth: your own overused words from a note of your own (`Creative Writer/Bad words.md`, one heading per category), tinted by category wherever they occur, a project able to keep its own list with `bad-words:` in its project note. Every hover card can act, too: *Not a cliché here*, *Remove "then" from Stage direction*, a word into a character's accent. The status bar shows the lens and opens a menu of the others on a click; every lens is a command under the `Lens:` prefix. Zen Mode shows no lens.
+
+Settings → Lenses
 
 ### Story map
 
@@ -45,9 +47,15 @@ Every scene in reading order down the side, your threads across the top, and in 
 
 `Open plot grid`
 
+### Story threads
+
+The manuscript as one line and everything that ties one part of it to another as an arc over it: the threads you draw by hand in `Story threads.md` (a clue, a motif, a promise with its `plant:` and `payoff:`), the facts a local model read from each scene, and the **echoes** an offline finder hears across the book, a phrase reached for once too often or a sentence rewritten two scenes later. Two scenes that state a different value for the same fact are joined by a red arc; the card says whether it is a slip or a reversal the story means, and keeps the reversal as a thread of yours.
+
+`Open story threads`
+
 ### Manuscript: the whole story on one page
 
-Every prose note of a project stitched into one read-only page in reading order, with the folder tree as its outline: `Part One/03 Chapter Three.md` reads as *Part One › Chapter Three*, sort prefixes stripped, the note's own scene headings nested underneath. Select a paragraph and the editor follows; press Enter or double-click and you are in the editor at that sentence. Arrow keys walk the paragraphs, Alt+arrows the chapters. Characters, places, research and outlines stay off the page; typing in a chapter beside it redraws that chapter alone. A pane beside the page holds the selected paragraph's `%% comments %%`, colour-coded by tag, and one field: type `CHECK: was it a coat?`, press Enter, and the comment lands at the end of that paragraph in the note. Every comment of the draft is listed in reading order; hover a marked paragraph for its comments. The tag word is tinted in the editor too. A ruler at the top shows the shape of the book, a segment per section coloured by readability and underlined when it changed today; switch the story on and each section carries its cast in the map's colours, with the model's contradictions as red marks in the gutter. Nothing is stored; **Export** writes the page as one note beside the project when you want a file to send on.
+Every prose note of a project stitched into one read-only page in reading order, with the folder tree as its outline: `Part One/03 Chapter Three.md` reads as *Part One › Chapter Three*, sort prefixes stripped, the note's own scene headings nested underneath. Select a paragraph and the editor follows; press Enter or double-click and you are in the editor at that sentence. Arrow keys walk the paragraphs, Alt+arrows the chapters. Characters, places, research and outlines stay off the page; typing in a chapter beside it redraws that chapter alone. A pane beside the page holds the selected paragraph's `%% comments %%`, colour-coded by tag, and one field: type `CHECK: was it a coat?`, press Enter, and the comment lands at the end of that paragraph in the note. Every comment of the draft is listed in reading order; hover a marked paragraph for its comments. The tag word is tinted in the editor too. A ruler at the top shows the shape of the book, a segment per section coloured by readability and underlined when it changed today; switch the story on and each section carries its cast in the map's colours, with the model's contradictions as red marks in the gutter; switch the voices on and each sentence of speech takes its speaker's colour, with the same speaker box as the editor, so a whole book can be proof-read and pinned in one pass. Nothing is stored; **Export** writes the page as one note beside the project when you want a file to send on.
 
 `Open manuscript` or the ribbon icon · Settings → Manuscript
 
@@ -65,9 +73,9 @@ Words added *and cut* today against a daily goal, a streak, this week's total an
 
 ### Local model assistant — optional, on command, never by default
 
-If [Ollama](https://ollama.com) is running on your machine, the plugin can read a paragraph for contextual findings (clichés in context, tired metaphors, passives hiding an agent), a selection for mythic patterns and archetypes, or a chapter for relationships and references. Nothing leaves your computer, and nothing runs unless you ask. The offline rules beat a local 7B at every mechanical check ([eval results](eval/RESULTS.md)), which is why the model is a second opinion, not the default.
+If [Ollama](https://ollama.com) is running on your machine, the plugin can read a paragraph for contextual findings (clichés in context, tired metaphors, passives hiding an agent), a selection for mythic patterns and archetypes, a chapter for relationships, references and the facts it states, the book for the sentences that say the same thing twice, or a plot grid column for what a thread is doing in each scene. Nothing leaves your computer, and nothing runs unless you ask. Every claim must quote the page, or it is dropped. The offline rules beat a local 7B at every mechanical check ([eval results](eval/RESULTS.md)), which is why the model is a second opinion, not the default. Claude can be chosen instead for the paragraph findings and the plot grid, with an API key of your own and a daily spending cap; the story readings stay local.
 
-`Analyse paragraph with model` · `Analyse selection for myth and archetype`
+`Analyse paragraph with model` · `Analyse selection for myth and archetype` · `Read this note with model (story map)`
 
 ### Where it runs
 
@@ -87,7 +95,7 @@ Install [Harper](https://writewithharper.com) alongside — it is the intended c
 
 ## Privacy
 
-No network requests. The only exception is the optional model assistant, which talks to the Ollama address you configure (default `localhost`). Progress and story-map readings are stored as plain Markdown notes in your vault.
+No network requests. The only exception is the optional model assistant, which talks to the Ollama address you configure (default `localhost`), or to Anthropic's API if you choose Claude and give it a key. Progress, story readings and the plot grid's readings are stored as plain Markdown notes in your vault.
 
 ## FAQ
 

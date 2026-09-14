@@ -17,4 +17,4 @@ Creative Writer once had a "weak words" check for intensifiers and filler; it wa
 
 ## On the page
 
-Both plugins decorate the editor. Harper **underlines**; Creative Writer **tints** the background and sets `text-decoration-color` for rhythm. The marks can sit on the same span and stay readable. Neither plugin knows the other is there; there is nothing to configure.
+Both plugins decorate the editor. Harper **underlines**; Creative Writer **tints** the background, a faint wash for rhythm and a stronger one for a lens's findings. The marks can sit on the same span and stay readable. Neither plugin knows the other is there; there is nothing to configure.

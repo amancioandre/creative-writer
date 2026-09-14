@@ -4,6 +4,8 @@ Every sentence of the paragraph you are in sits on a faint tint whose colour run
 
 The tint is deliberately quiet, a wash behind the words rather than a line under them. Underlines are already taken: Obsidian's spellcheck, [Harper](https://writewithharper.com) and links all draw them, and a sentence that carried all three plus a rhythm rule was unreadable. Style checks tint too, at a stronger alpha, so a cliché inside a long sentence reads as the darker patch on the warmer ground.
 
+Rhythm is not a [lens](/guide/lenses): it stays under whichever lens is on, unless **Rhythm tint underneath** (Settings → Lenses) is off. The dialogue and accents lenses are the exception and hide it regardless, so that a colour there means one thing.
+
 ## In Zen Mode
 
 Zen Mode keeps the page plain. Rhythm leaves the text and moves to the margin: one bar per sentence, stacked down from the top of the paragraph you are in, all starting at the same x and growing towards the text with the sentence's tier. The meter reads as the paragraph's shape at a glance, and the words carry no colour at all. Turn rhythm off and the meter goes with it.

@@ -14,18 +14,18 @@ The board's layout lives in one `Writer.writer` file. Obsidian Sync carries it o
 - **Cards** are your notes. A note is on the board when it carries a tag under the prefix, `#writer/theme` inline or `tags: [writer/theme]` in its front matter. A note in several groups is drawn once, in its first, with a colour chip per group. Zoom in past about 85% and each card shows its first lines.
 - **Lines** join cards whose notes link to each other. Select a card and its lines light up.
 
-The frameworks are deliberately *macro*. Save the Cat and the Hero's Journey structure one story; the writer level sits beneath every story. Story-level structure stays where it lives: the project folder, the [story map](/guide/story-map), the [timeline](/guide/story-timeline) and the [threads](/guide/story-threads).
+The frameworks are deliberately *macro*. Save the Cat and the Hero's Journey structure one story; the writer level sits beneath every story. Story-level structure stays where it lives: the project folder, the [story map](/guide/story-map), the [plot grid](/guide/plot-grid) and the [threads](/guide/story-threads).
 
 ## The stories band
 
-Above the layers sits every declared [project](/guide/projects) as a story card carrying its identity only: its name, a **stage** chip, the premise, and words against the target. Most recently worked first. Select a story and the side card adds the size of the cast, the last day the writing log saw it change, the fingerprint, a hint when the premise is still missing, the stage, buttons into its map, timeline, threads, manuscript and desk, the note itself, and the idea it grew from.
+Above the layers sits every declared [project](/guide/projects) as a story card carrying its identity only: its name, a **stage** chip, the premise, and words against the target. Most recently worked first. Select a story and the side card adds the size of the cast, the last day the writing log saw it change, the fingerprint, a hint when the premise is still missing, the stage, buttons into its map, plot grid, threads, manuscript and desk, the note itself, and the idea it grew from.
 
 **Stages** are `development`, `drafting`, `revising`, `finished` and `shelved`, set from the side card and written as `writing-stage` in the project note. Leave it unset and the plugin infers: *finished* once the target is met, *drafting* once any prose exists, *in development* before. The premise comes from `writing-premise`; the idea link from `writing-idea`.
 
 Below the cards, two kinds of pill:
 
 - **Idea** pills are premise cards with no story yet. Select one and its side card offers **Make this a story…**: a name, a folder (the [stories folder](/reference/settings#writer) by default), and Create. A folder is scaffolded with Characters, Places, Items, three acts, `_Work`, and a project note carrying `story: true`, the stage, the premise (the idea's first sentence) and a link back to the idea; the idea note gets `writer-story` and stays where it is, tag and all. If any note in the vault carries `story-template: true`, its folder is copied instead, with `{{name}}` replaced in file names and text. **New story…** in the panel does the same from nothing.
-- **Unfiled** pills are folders directly under the stories folder that hold prose but declare no project, so the map, timeline, threads and desk cannot see them. Select one and **Declare a story** writes `story: true` into its namesake note, or its first note.
+- **Unfiled** pills are folders directly under the stories folder that hold prose but declare no project, so the map, plot grid, threads and desk cannot see them. Select one and **Declare a story** writes `story: true` into its namesake note, or its first note.
 
 ## Uses and lines
 

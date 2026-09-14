@@ -58,7 +58,7 @@ Every panel of the plugin wears the same shell: a head with the project, a searc
 |---|---|
 | *Head* | Project dropdown; a search box — matching names stay, with their direct neighbours for context. |
 | *Key* | In the corner of the map, the kinds on it now, each in its colour. |
-| *Head* | **Add** a node; **Fit**; **Shake**; **Show all** when a focus is active; the **⋯** menu, which repeats these and the model reading as rows that name their commands; the jumps to the desk, board, [timeline](/guide/story-timeline), [threads](/guide/story-threads) and manuscript. |
+| *Head* | **Add** a node; **Fit**; **Shake**; **Show all** when a focus is active; the **⋯** menu, which repeats these and the model reading as rows that name their commands; the jumps to the desk, board, [plot grid](/guide/plot-grid), [threads](/guide/story-threads) and manuscript. |
 | *Side column* | **Read project with model** (see [Reading a project](/guide/model-reading)), the one filled button, with its cost beneath; then the folded groups below, each header showing its value. Kinds absent from the project fold into one line. |
 | **Filters** | Toggle each layer; *Hide loners* removes nodes with no visible edge. |
 | **Kinds & colours** | A colour swatch and a toggle per kind, with counts; *Reset colours*. |
@@ -104,7 +104,7 @@ Nothing on the map is a drawing that lives only on the map. A node you add is a 
 
 **Double-click the background** (or **Add** in the panel): type a name, pick a kind. A typed note is created in the project's `Characters/`, `Places/`, `Items/`, `Factions/` or `Events/` folder, exactly as when you promote an unnamed node, and appears under the cursor, pinned.
 
-A blank map is a folder with one note in it saying `story: true` — no target, no prose, nothing for the writing desk to pace. That is the right project note for a book you are reading rather than writing, too: the map, the model reading and the timeline all work on it; the word goal simply never appears.
+A blank map is a folder with one note in it saying `story: true` — no target, no prose, nothing for the writing desk to pace. That is the right project note for a book you are reading rather than writing, too: the map, the model reading, the plot grid and the threads all work on it; the word goal simply never appears.
 
 **Rename** in the card renames the note; Obsidian updates every link to it, including relationship lines. **Delete** asks twice, disarms by itself after five seconds, and moves the note to the trash; **Undo** in the status line writes the note back whole.
 
@@ -142,4 +142,4 @@ Prose-less headings (outlines, checklists) are skipped. Notes are read in path o
 
 ## Sync
 
-Nothing derived is stored — the same notes draw the same map on any machine, and the layout starts deterministically so a story opens the same way everywhere. Relationships you draw are lines in your notes. Only two things persist in `Story map.md` inside the project folder: model readings, and where you pinned nodes by hand. The note travels with the folder through Obsidian Sync or any other method. See [Files & sync](/reference/data-and-sync).
+Nothing derived is stored — the same notes draw the same map on any machine, and the layout starts deterministically so a story opens the same way everywhere. Relationships you draw are lines in your notes. Only two kinds of thing persist in `Story map.md` inside the project folder: model readings (the map's, the threads' and the plot grid's), and where you pinned nodes by hand. The note travels with the folder through Obsidian Sync or any other method. See [Files & sync](/reference/data-and-sync).

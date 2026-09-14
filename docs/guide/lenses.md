@@ -50,7 +50,7 @@ The [manuscript page](/guide/manuscript) has the same tints and the same box und
 
 Switch **Speaker colours** off for one colour and no attribution.
 
-The dialogue lens hides the rhythm tint whatever the *Rhythm tint underneath* setting says: a colour here means one thing.
+The dialogue and accents lenses hide the rhythm tint whatever the *Rhythm tint underneath* setting says: a colour here means one thing.
 
 ## Accents
 

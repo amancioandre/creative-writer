@@ -1,6 +1,6 @@
 # Structuring a story project
 
-The story map, the timeline and the project targets all read the same thing: **a folder** whose notes are your story. What is in that folder shapes what you see, so it pays to keep the story and the work *about* the story apart.
+The story map, the plot grid, the threads, the manuscript page and the project targets all read the same thing: **a folder** whose notes are your story. What is in that folder shapes what you see, so it pays to keep the story and the work *about* the story apart.
 
 ## The shape that works
 
@@ -26,11 +26,12 @@ Rules of thumb:
 
 - **Typed notes are the cast.** A note is a character, place, item, faction or event when its front matter says `type: character` (or `place`, `location`, `item`, `faction`, `event`), or when it sits in a folder named like one (`Characters/`, `People/`, `Cast/`, `Places/`, `Locations/`, `World/`, `Items/`, `Factions/`, `Events/`). Typed notes are never read as scenes — their prose does not create edges.
 - **`aliases:`** (Obsidian's own property) tells the map that "Marti" is Marta. A unique surname or given name resolves on its own; an ambiguous one ("Kovács" when there are two) does not.
-- **Every other note in the folder is story.** Its headings become scenes; the names in its prose become mentions, co-occurrences and timeline dots. Prose-less headings (outlines, checklists) are skipped.
+- **Every other note in the folder is story.** Its headings become scenes; the names in its prose become mentions, co-occurrences and the plot grid's cast dots. Prose-less headings (outlines, checklists) are skipped.
 - **Names that recur three times without a note become dashed *candidates*.** Click one in the map and say what it is: **Character · Place · Item · Faction · Event** creates the typed note in the matching folder; **Alias of…** adds the name to an existing note's `aliases` ("Marti" → Marta, "Tikka" → the rifle you already made); **Not a name** writes it to the project note as `story-ignore` (undo from the panel's *Ignored names*). Brands and gear are *items* — a rifle in a hunting story carries continuity, so give it a note rather than ignoring it; a brand that is genuinely a character in your story can be one. Pronouns, verbs, adjectives, numbers and dialogue openers are vetoed by a part-of-speech check before they ever become candidates.
-- **Opt work notes out with `creative-writer: false`.** Memos, research, review guides and model transcripts talk *about* the cast in ways that are not scenes ("Act III is stateless", "check it against Stand by Me"). That front matter line removes the note from the story map and timeline (it also switches the editor features off for that note, which is usually what you want in a memo). A `_Work/` or `memos/` folder makes this a habit; the flag is what matters, not the folder name.
+- **Opt work notes out with `creative-writer: false`.** Memos, research, review guides and model transcripts talk *about* the cast in ways that are not scenes ("Act III is stateless", "check it against Stand by Me"). That front matter line removes the note from the story map, the plot grid, the threads and the manuscript page (it also switches the editor features off for that note, which is usually what you want in a memo). A `_Work/` or `memos/` folder makes this a habit; the flag is what matters, not the folder name.
 - **Project targets count the folder minus what you opted out** (`writing-target`, `writing-daily`): a note with `creative-writer: false` adds nothing to the total, the daily goal or the streak. The plugin's own `Story map.md` and `Story threads.md` never count either.
-- **`Story map.md`** appears in the project folder after the first model reading. It holds only what the model inferred (relationships, references, events per scene) and travels with the folder through Obsidian Sync. Safe to delete; you would re-run the reading.
+- **`Story map.md`** appears in the project folder after the first model reading. It holds what the model inferred (relationships, references, events and facts per scene, the plot grid's readings), the contradictions you dismissed and the nodes you pinned, and travels with the folder through Obsidian Sync. Safe to delete; you would re-run the readings.
+- **`Story threads.md`** is yours: one `## heading` per thread, one line per scene it touches, written by hand, from the threads view or from a plot grid cell. See [Story threads](/guide/story-threads#drawing-threads-yourself).
 
 ## A smaller shape
 
@@ -48,5 +49,5 @@ The Bear Hunt/
 ## What the map cannot do for you
 
 - It does not know that "the boy" is Zak. Mentions are names; pronouns and epithets are invisible to the offline pass. The model reading (*Read project with model*) sees them, but only reports relationships between names it was given.
-- It does not split scenes at `---` or blank lines — only at headings. Give each scene a heading and the timeline gets a row.
+- It does not split scenes at `---` or blank lines — only at headings. Give each scene a heading and the plot grid gets a row.
 - It reads Markdown prose, not Canvas files.

@@ -17,7 +17,7 @@ A project with no target is a folder you want to *map* but not *pace* — the no
 
 ```yaml
 ---
-story: true                    # a project for the story map and timeline; the writing desk leaves it alone
+story: true                    # a project for the story map, plot grid and threads; the writing desk leaves it alone
 ---
 ```
 
@@ -29,15 +29,18 @@ Every Markdown note whose path starts with the folder (or, with `writing-scope: 
 
 ## The pace line
 
-In the writing desk, each project shows total / target, a bar, and one sentence:
+In the writing desk, each project reads as a column: total against target, a bar, a verdict with a coloured dot and one clause on the pace, then *Projected* and *Deadline* on their own lines:
 
 | Verdict | When | Says |
 |---|---|---|
 | **Done** | total ≥ target | Target reached. |
 | **Stalled** | nothing added in the last 7 days | Nothing added this week, plus the daily rate that would still make the deadline. |
+| **Deadline passed** | the deadline is behind you and the target is not met | *Deadline Mon 7 Sept has passed with 2,768 words to go*, then either *Nothing added this week* or your current rate; no daily count is promised for a date already gone. Takes the place of Stalled and Behind. |
 | **No deadline** | no `writing-deadline` | Your last-7-day rate and the projected finish date. |
 | **On track** | projected finish ≤ deadline | Words a day needed vs. writing, projected finish, deadline. |
-| **Behind** | projected finish > deadline (or deadline passed) | Same numbers, with the gap spelled out. |
+| **Behind** | projected finish > deadline | Same numbers, with the gap spelled out. |
+
+Dates read as *Mon 7 Sept*, never as `2026-09-07`.
 
 "Writing N a day" is the average over the last seven days from the writing log, so a fortnight of silence shows as stalled rather than as a very late finish date.
 
@@ -45,4 +48,4 @@ With `writing-daily`, the project also gets *Today N of M* with its own streak, 
 
 ## Several projects
 
-Any number of folders can be projects; a note can even declare one on a single file with `writing-scope: note`. The story map and timeline pick the project of the active note (the narrowest folder that contains it) and let you switch from a dropdown.
+Any number of folders can be projects; a note can even declare one on a single file with `writing-scope: note`. The story map, the plot grid, the threads and the manuscript pick the project of the active note (the narrowest folder that contains it) and let you switch from a dropdown.

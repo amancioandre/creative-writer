@@ -2,7 +2,7 @@ import { defineConfig } from "vitepress";
 
 export default defineConfig({
   title: "Creative Writer",
-  description: "An Obsidian plugin for creative writing: Zen Mode, typewriter scrolling, focus fade, paragraph rhythm, offline style checks, a writing desk, and a story map.",
+  description: "An Obsidian plugin for creative writing: Zen Mode, typewriter scrolling, focus fade, paragraph rhythm, reading lenses with offline style checks, a writing desk, a story map, a plot grid and the story threads.",
   base: "/creative-writer/",
   lang: "en-GB",
   lastUpdated: true,

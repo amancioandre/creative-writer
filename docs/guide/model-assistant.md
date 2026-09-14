@@ -23,6 +23,10 @@ On the labelled corpus, a 7B local model scores far below the offline rules (F1 
 - **Analyse paragraph with model** — reads the paragraph under the cursor. Findings are tinted like rule findings; the status bar shows which model is working.
 - **Analyse automatically** (off by default) runs the model after a pause in typing (**Pause before analysing**, default 1500 ms). Results are cached by paragraph text, an edit aborts the in-flight call, and stale results are never shown.
 
+## Where else the model reads
+
+Everything below is on command, saved as it goes, and validated the same way. The [myth report](/guide/myth), the [story map's reading](/guide/model-reading) for relationships, references and events, and the [story threads'](/guide/story-threads) readings for facts, intent and echoes need **Local (Ollama)**. The [plot grid's](/guide/plot-grid#reading-with-the-model) readings, its check of a column against the draft and its proposed columns run on Ollama or Claude, Claude against the same daily cap. The [writer board](/guide/writer#privacy) never reaches a model.
+
 ## How findings are validated
 
 The model returns quotes, never character offsets — models are unreliable at arithmetic. A finding is kept only if its quoted span is actually in the paragraph and lands on token boundaries; anything else is dropped. The same principle guards the myth report and the story-map reading: **no quote, no claim.**
