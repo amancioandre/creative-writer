@@ -3,6 +3,7 @@ import { ARC_ROLES, THREAD_ROLES, type StopRole } from "../threads/Thread";
 import type { ColumnKind } from "../threads/StoryThreadsNote";
 
 const MAX_TEXT = 200;
+const ALL_ROLES: readonly StopRole[] = [...THREAD_ROLES, ...ARC_ROLES];
 const MAX_QUOTE = 300;
 
 /** A reading the model gave for one cell, kept only when its quote is on the page and its role is one the column allows. */
@@ -21,6 +22,8 @@ export function validateGridReading(raw: unknown, prose: string, kind: ColumnKin
   const evidence = typeof o.evidence === "string" ? o.evidence.trim().slice(0, MAX_QUOTE) : "";
   if (!text || !evidence || !quoteAppears(prose, evidence)) return null;
   const roles: readonly StopRole[] = kind === "arc" ? ARC_ROLES : THREAD_ROLES;
+  // A small model sometimes answers with the label where the note should be: "plant" is a role, not a reading.
+  if ((ALL_ROLES as readonly string[]).includes(text.toLowerCase().replace(/[.:]$/, ""))) return null;
   const word = typeof o.role === "string" ? o.role.trim().toLowerCase() : "";
   const role = roles.find((x) => x === word) ?? null;
   return { text, role: role === "touch" ? null : role, evidence };

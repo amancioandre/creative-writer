@@ -116,6 +116,8 @@ describe("buildPlotGrid", () => {
     expect([grid.cells, grid.filled, grid.verified, grid.broken]).toEqual([16, 7, 3, 1]);
     expect(buildPlotGrid(EMPTY_GRAPH, EMPTY_THREAD_MODEL).columns).toEqual([]);
     expect(gridRows({ ...EMPTY_GRAPH, headings: [{ path: "a.md", title: "", line: 0 }] })).toEqual([]);
+    // The project note's own prose is the container, not a scene.
+    expect(buildPlotGrid(graph, model, { notePath: "Novel/One.md" }).rows.map((r) => r.scene.title)).toEqual(["The reading"]);
     expect(gridRows({ ...EMPTY_GRAPH, timeline: [{ scene: { path: "a.md", title: "S", line: 0 }, words: 3, bookmarked: true, present: [], events: [] }] })[0]).toMatchObject({ index: 0, words: 3, bookmarked: true, outline: false });
   });
 });

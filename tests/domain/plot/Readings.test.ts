@@ -23,6 +23,9 @@ describe("validateGridReading", () => {
     expect(validateGridReading({ reading: { text: "x", role: "", evidence: "she burned it" } }, prose, "subplot")).toBeNull();
     expect(validateGridReading({ reading: { text: "", role: "", evidence: "the porter" } }, prose, "subplot")).toBeNull();
     expect(validateGridReading("nonsense", prose, "subplot")).toBeNull();
+    // The label where the note should be is not a reading.
+    expect(validateGridReading({ reading: { text: "plant", role: "", evidence: "the porter" } }, prose, "subplot")).toBeNull();
+    expect(validateGridReading({ reading: { text: "Want.", role: "want", evidence: "the porter" } }, prose, "arc")).toBeNull();
   });
 
   it("a check is found only with a quote that is on the page", () => {

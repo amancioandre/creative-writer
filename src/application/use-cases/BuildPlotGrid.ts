@@ -13,12 +13,12 @@ export class BuildPlotGrid {
 
   async execute(project: ProjectSpec): Promise<PlotGrid> {
     const { graph, model, file, hashes } = await this.threads.executeWithGraph(project);
-    return buildPlotGrid(graph, model, { pov: project.plotPov, time: project.plotTime, theme: project.plotTheme }, { readings: file.grid, hashes });
+    return buildPlotGrid(graph, model, { pov: project.plotPov, time: project.plotTime, theme: project.plotTheme, notePath: project.notePath }, { readings: file.grid, hashes });
   }
 
   /** The grid with the graph it was built on, for a pass that needs both. */
   async executeWithGraph(project: ProjectSpec): Promise<{ grid: PlotGrid; graph: StoryGraph }> {
     const { graph, model, file, hashes } = await this.threads.executeWithGraph(project);
-    return { grid: buildPlotGrid(graph, model, { pov: project.plotPov, time: project.plotTime, theme: project.plotTheme }, { readings: file.grid, hashes }), graph };
+    return { grid: buildPlotGrid(graph, model, { pov: project.plotPov, time: project.plotTime, theme: project.plotTheme, notePath: project.notePath }, { readings: file.grid, hashes }), graph };
   }
 }

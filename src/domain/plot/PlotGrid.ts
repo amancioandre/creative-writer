@@ -49,6 +49,8 @@ export interface SpecialColumns {
   readonly pov?: string;
   readonly time?: string;
   readonly theme?: string;
+  /** The project note's path: its own prose is the container, not a scene of the story. */
+  readonly notePath?: string;
 }
 
 export interface GridColumn {
@@ -127,7 +129,7 @@ const KIND_ORDER: Record<ColumnKind, number> = { arc: 0, theme: 1, subplot: 2, f
  * model, whose refs already carry each stop's anchor.
  */
 export function buildPlotGrid(graph: StoryGraph, model: ThreadModel, special: SpecialColumns = {}, read: GridReadings = NO_READINGS): PlotGrid {
-  const bare = gridRows(graph);
+  const bare = gridRows(graph, special.notePath);
   const rowIndex = new Map(bare.map((r) => [sceneKey(r.scene), r.index]));
   const writer = model.threads.filter((t) => t.kind === "writer");
   const same = (a: string, b: string | undefined) => !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
@@ -155,11 +157,12 @@ export function buildPlotGrid(graph: StoryGraph, model: ThreadModel, special: Sp
 }
 
 /** The timeline's rows, and between them the headings the timeline left out for having no prose. */
-export function gridRows(graph: StoryGraph): GridRow[] {
+export function gridRows(graph: StoryGraph, notePath?: string): GridRow[] {
   const byKey = new Map(graph.timeline.map((r) => [sceneKey(r.scene), r]));
   const headings = graph.headings ?? graph.timeline.map((r) => r.scene);
   const rows: GridRow[] = [];
   for (const scene of headings) {
+    if (notePath && scene.path === notePath) continue;
     const row = byKey.get(sceneKey(scene));
     if (row) { rows.push({ scene: row.scene, index: rows.length, words: row.words, bookmarked: row.bookmarked, present: row.present, events: row.events, outline: false, pov: null }); continue; }
     // Prose before the first heading that has no prose is not a scene of anything.

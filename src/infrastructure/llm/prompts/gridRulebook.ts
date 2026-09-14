@@ -1,6 +1,6 @@
 import type { ColumnBrief } from "../../../application/ports/ColumnAnalyser";
 
-export const GRID_RULEBOOK_VERSION = "2026-09-13.1";
+export const GRID_RULEBOOK_VERSION = "2026-09-13.2";
 
 /**
  * The reader's prompt for one column of the plot grid. It asks the one
@@ -14,7 +14,9 @@ export const GRID_RULEBOOK_VERSION = "2026-09-13.1";
 export const GRID_RULEBOOK = `You are a careful reader helping a novelist fill one column of their plot grid. The grid has a row per scene and a column per thread of the book: a character's arc, a theme, a subplot. You are given one scene, the names known to be in it, the column, and the notes the writer has already made in that column for other scenes, which show their voice. You say what this thread is doing in this scene, in that voice: one short note, and the verbatim quote that made you think so.
 
 Return JSON only, an object with one key:
-- "reading": null, or {"text", "role", "evidence"}. "text" is the note, at most twenty words, in the writer's voice, present tense, no name of the thread repeated. "role" is one of the words allowed for this column, or "" when none fits. "evidence" is a short verbatim quote from the scene.
+- "reading": null, or {"role", "text", "evidence"}. "role" is one of the words allowed for this column, or "" when none fits; it is a label, never the note. "text" is the note itself: what the thread does here, at most twenty words, in the writer's voice, present tense, the thread's name not repeated. "evidence" is a short verbatim quote from the scene.
+
+For example, for a subplot column called "The letter" and a scene where a character puts a letter away unread, a good answer is {"reading": {"role": "plant", "text": "pockets it unread and says nothing", "evidence": "put it in her coat without reading it"}}. A bad answer puts the role word in "text".
 
 The kinds of column, and the question each asks:
 - arc: what does this scene do to the character's want — set it up, act on the lie, turn it, or arrive at the truth? Roles: want, lie, turn, truth.
@@ -35,7 +37,7 @@ export const GRID_SCHEMA = {
     reading: {
       anyOf: [
         { type: "null" },
-        { type: "object", properties: { text: { type: "string" }, role: { type: "string" }, evidence: { type: "string" } }, required: ["text", "role", "evidence"], additionalProperties: false },
+        { type: "object", properties: { role: { type: "string" }, text: { type: "string" }, evidence: { type: "string" } }, required: ["role", "text", "evidence"], additionalProperties: false },
       ],
     },
   },
