@@ -186,29 +186,31 @@ import { paceLine, prettyDay } from "../../../src/infrastructure/obsidian/views/
 import { projectStatus } from "../../../src/domain/progress/Project";
 
 describe("paceLine", () => {
+  // ICU builds differ on the comma after the weekday ("Mon, 7 Sept" here, "Mon 7 Sept" on CI's Node); the words are what the test is about.
+  const plain = (s: string) => s.replace(/,/g, "");
   const spec = { name: "Camp", scope: "Camp/", targetWords: 3000, deadline: "2026-09-07", dailyWords: 100, notePath: "Camp/Project.md", ignoredNames: [] };
 
   it("names dates for a reader, never as ISO strings", () => {
-    expect(prettyDay("2026-09-07", "en-GB", 2026)).toBe("Mon, 7 Sept");
-    expect(prettyDay("2027-06-05", "en-GB", 2026)).toBe("Sat, 5 Jun 2027");
+    expect(plain(prettyDay("2026-09-07", "en-GB", 2026))).toBe("Mon 7 Sept");
+    expect(plain(prettyDay("2027-06-05", "en-GB", 2026))).toBe("Sat 5 Jun 2027");
     expect(prettyDay("not-a-day", "en-GB")).toBe("not-a-day");
   });
 
   it("says a deadline has passed when nothing was added this week, instead of promising to make it", () => {
     const stalled = projectStatus(spec, 232, [0, 0, 0, 0, 0, 0, 0], "2026-09-13");
     expect(stalled.verdict).toBe("stalled");
-    expect(paceLine(stalled, "en-GB")).toBe("Deadline Mon, 7 Sept has passed with 2,768 words to go. Nothing added this week.");
+    expect(plain(paceLine(stalled, "en-GB"))).toBe("Deadline Mon 7 Sept has passed with 2768 words to go. Nothing added this week.");
   });
 
   it("still projects a stalled project whose deadline is ahead", () => {
     const stalled = projectStatus(spec, 232, [0, 0, 0, 0, 0, 0, 0], "2026-09-01");
-    expect(paceLine(stalled, "en-GB")).toBe("Nothing added this week. 461 words a day would still make Mon, 7 Sept.");
+    expect(plain(paceLine(stalled, "en-GB"))).toBe("Nothing added this week. 461 words a day would still make Mon 7 Sept.");
   });
 
   it("names the projected day and the deadline on the other verdicts", () => {
     const behind = projectStatus(spec, 232, [10], "2026-09-01");
-    expect(paceLine(behind, "en-GB")).toContain("after the Mon, 7 Sept deadline");
+    expect(plain(paceLine(behind, "en-GB"))).toContain("after the Mon 7 Sept deadline");
     const noDeadline = projectStatus({ ...spec, deadline: null }, 232, [100], "2026-09-01");
-    expect(paceLine(noDeadline, "en-GB")).toBe("Writing 100 a day; at this pace done around Tue, 29 Sept.");
+    expect(plain(paceLine(noDeadline, "en-GB"))).toBe("Writing 100 a day; at this pace done around Tue 29 Sept.");
   });
 });
