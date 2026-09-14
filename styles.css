@@ -440,23 +440,28 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-tl-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .czm-tl-head .czm-map-search { max-width: 200px; }
 .czm-tl-wrap { overflow: auto; flex: 1; min-height: 0; }
-.czm-tl-table { border-collapse: separate; border-spacing: 0; font-size: var(--font-ui-smaller); }
+.czm-tl-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--font-ui-smaller); }
 .czm-tl-table th, .czm-tl-table td { padding: 2px 4px; text-align: left; font-weight: normal; }
 .czm-tl-table thead th { position: sticky; top: 0; background: var(--background-primary); z-index: 2; }
 .czm-tl-table thead th.czm-tl-corner { left: 0; z-index: 3; }
-.czm-tl-col { vertical-align: bottom; max-width: 26px; height: 110px; }
-.czm-tl-col span { display: inline-block; writing-mode: vertical-rl; transform: rotate(180deg); max-height: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--czm-kind, var(--text-muted)); }
+/* Cast names read horizontally on the sticky header; the row scrolls sideways when the cast is wide. */
+.czm-tl-col { vertical-align: bottom; min-width: 96px; max-width: 160px; }
+.czm-tl-filler { width: 100%; padding: 0; }
+.czm-tl-col span { display: block; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--czm-kind, var(--text-muted)); font-weight: 600; }
+.czm-tl-note-total { margin-left: 10px; font-weight: normal; color: var(--text-muted); font-family: var(--font-monospace); }
 .is-link { cursor: pointer; }
 .is-link:hover { text-decoration: underline; }
 .czm-tl-note th { position: sticky; left: 0; background: var(--background-secondary); font-weight: 600; padding-top: 6px; }
 .czm-tl-scene-head { position: sticky; left: 0; background: var(--background-primary); cursor: pointer; white-space: nowrap; min-width: 180px; z-index: 1; }
-.czm-tl-scene-head:hover, .czm-tl-scene-head:focus-visible { background: var(--background-modifier-hover); outline: none; }
+.czm-tl-scene-head:hover { background: var(--background-modifier-hover); }
+.czm-tl-scene-head:focus-visible { background: var(--background-modifier-hover); outline: 2px solid var(--text-accent); outline-offset: -2px; }
 .czm-tl-scene-head .czm-map-row-meta { margin-left: 8px; }
 .czm-tl-events { white-space: normal; max-width: 260px; opacity: 0.6; font-size: var(--font-ui-smaller); }
 .czm-tl-scene:hover td { background: var(--background-modifier-hover); }
-.czm-tl-dot { width: 22px; text-align: center; }
-.czm-tl-dot::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--background-modifier-border); opacity: 0.35; }
-.czm-tl-dot.is-on::before { background: var(--czm-kind, var(--text-muted)); opacity: 1; }
+/* Absence is nothing; the row rule carries the eye. Presence is a dot in the kind's colour. */
+.czm-tl-dot { text-align: center; }
+.czm-tl-scene td, .czm-tl-scene th { border-bottom: 1px solid color-mix(in srgb, var(--background-modifier-border) 60%, transparent); }
+.czm-tl-dot.is-on::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--czm-kind, var(--text-muted)); }
 .czm-map-exits { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 4px 0; }
 .czm-map-exits button { font-size: var(--font-ui-smaller); padding: 3px 6px; height: auto; border-left: 3px solid var(--czm-kind, var(--text-muted)); }
 .czm-map-alias { display: flex; gap: 4px; margin: 4px 0; }
@@ -697,3 +702,5 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-ms-marks-key { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0 0 8px; font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .czm-ms-marks-key-item { display: inline-flex; align-items: center; gap: 6px; }
 .czm-ms-marks-key .czm-ms-mark { cursor: default; }
+.czm-th-axis-label { fill: var(--text-muted); font-size: var(--font-ui-smaller); pointer-events: none; }
+.czm-th-axis-note { fill: var(--text-normal); font-size: var(--font-ui-smaller); font-weight: 600; pointer-events: none; }

@@ -76,7 +76,9 @@ export class StoryTimelineView extends ItemView {
     search.addEventListener("input", () => { this.query = search.value; this.render(); const again = this.contentEl.querySelector<HTMLInputElement>(".czm-map-search"); if (again) { again.focus(); again.setSelectionRange(again.value.length, again.value.length); } });
 
     if (!this.project) { shell.setState("No project"); shell.empty("No project yet — put story: true (or writing-target: 50000) in a note's front matter and its folder becomes one."); return; }
-    const rows = this.graph.timeline;
+    // The project note is the container, not a scene of the story.
+    const notePath = this.project.notePath;
+    const rows = this.graph.timeline.filter((r) => r.scene.path !== notePath);
     const q = this.query.trim().toLowerCase();
     const settings = this.source.settings();
     const columns = this.graph.entities
@@ -96,15 +98,22 @@ export class StoryTimelineView extends ItemView {
       const span = th.createSpan({ text: c.name });
       if (c.path) { span.addClass("is-link"); onActivate(span, () => this.source.openNote(c.path!)); }
     }
+    // A filler column takes the slack, so the cast columns stay close together however wide the pane.
+    thead.createEl("th", { cls: "czm-tl-filler" });
     const tbody = table.createEl("tbody");
     let lastPath = "";
     for (const row of rows) {
       if (row.scene.path !== lastPath) {
         lastPath = row.scene.path;
         const tr = tbody.createEl("tr", { cls: "czm-tl-note" });
-        const th = tr.createEl("th", { attr: { colspan: String(columns.length + 1) } });
+        const th = tr.createEl("th", { attr: { colspan: String(columns.length + 2) } });
         const link = th.createSpan({ text: basenameOf(row.scene.path), cls: "is-link" });
         onActivate(link, () => this.source.openNote(row.scene.path));
+        // The one structural question the row can answer: how much of the book, and how much of the cast, this chapter holds.
+        const chapter = rows.filter((r) => r.scene.path === row.scene.path);
+        const words = chapter.reduce((n, r) => n + r.words, 0);
+        const names = new Set(chapter.flatMap((r) => r.present).filter((id) => columns.some((c) => c.id === id))).size;
+        th.createSpan({ text: `${chapter.length} scene${chapter.length === 1 ? "" : "s"} · ${words.toLocaleString()} words · ${names} of the cast`, cls: "czm-tl-note-total" });
       }
       const tr = tbody.createEl("tr", { cls: "czm-tl-scene" });
       const th = tr.createEl("th", { cls: "czm-tl-scene-head", attr: { role: "button", tabindex: "0" } });
@@ -122,6 +131,7 @@ export class StoryTimelineView extends ItemView {
           td.title = `${c.name} · ${row.scene.title || basenameOf(row.scene.path)}`;
         }
       }
+      tr.createEl("td", { cls: "czm-tl-filler" });
     }
   }
 }

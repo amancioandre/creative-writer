@@ -95,6 +95,16 @@ describe("StoryThreadsView", () => {
     // The kind toggles carry the arcs' own colours as swatches.
     expect(setting("czm-set-thread-writer").settingEl.classList.contains("czm-th-kind-writer")).toBe(true);
     expect(el.querySelector(".czm-th-broken")!.textContent).toContain("Nine#Nowhere");
+    // The axis names its scenes and its chapters.
+    expect([...el.querySelectorAll(".czm-th-axis-label")].map((t) => t.textContent)).toEqual(["Camp", "Creek", "Return", "Night"]);
+    expect([...el.querySelectorAll(".czm-th-axis-note")].map((t) => t.textContent)).toEqual(["One", "Two"]);
+  });
+
+  it("cuts a title to the width it has", async () => {
+    const { fitText } = await import("../../../src/infrastructure/obsidian/views/StoryThreadsView");
+    expect(fitText("The station at dawn", 200)).toBe("The station at dawn");
+    expect(fitText("The station at dawn", 50)).toBe("The sta…");
+    expect(fitText("Camp", 8)).toBe("");
   });
 
   it("switches entity threads on from the panel, colours them by kind, and persists the choice", async () => {

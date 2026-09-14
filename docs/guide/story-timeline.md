@@ -4,9 +4,9 @@
 
 ## Reading it
 
-- **Rows** are scenes — headings with prose under them — grouped under their chapter. Click a chapter name to open the note, a scene to put the cursor on its heading. ★ marks a bookmarked heading. The word count sits beside each scene.
-- **Columns** are the cast: characters and unnamed candidates first, then factions, places, items and events, each in its kind's colour, sorted by how often they are mentioned. Click a name to open its note. The *Kinds* toggles in the story map panel apply here too.
-- **Dots** mark presence: the entity is mentioned in that scene. A column with a long gap is a character who has vanished; a row with one dot is a scene where someone is alone.
+- **Rows** are scenes — headings with prose under them — grouped under their chapter, whose row says how many scenes, words and members of the cast it holds. Click a chapter name to open the note, a scene to put the cursor on its heading. ★ marks a bookmarked heading. The word count sits beside each scene. The project note itself is not a scene.
+- **Columns** are the cast, named across a header row that stays put: characters and unnamed candidates first, then factions, places, items and events, each in its kind's colour, sorted by how often they are mentioned. The matrix takes the whole pane and scrolls sideways when the cast is wide. Click a name to open its note. The *Kinds* toggles in the story map panel apply here too.
+- **Dots** mark presence: the entity is mentioned in that scene; absence is blank. A column with a long gap is a character who has vanished; a row with one dot is a scene where someone is alone.
 - **Events** — once a scene has been [read by the model](/guide/model-reading), its events appear as a line under the scene title ("Marta confesses the theft to Ilse").
 
 The first column and the header row stay put while you scroll, so a long manuscript with a big cast is still legible. The search box filters the cast.

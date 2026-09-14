@@ -40,7 +40,9 @@ describe("StoryTimelineView", () => {
     await v.onOpen();
     const el = v.contentEl;
     expect([...el.querySelectorAll(".czm-tl-col span")].map((s) => s.textContent)).toEqual(["Ilse", "Marta Kovács", "Lisbon"]);
-    expect([...el.querySelectorAll(".czm-tl-note th")].map((s) => s.textContent)).toEqual(["One", "Two"]);
+    expect([...el.querySelectorAll(".czm-tl-note .is-link")].map((s) => s.textContent)).toEqual(["One", "Two"]);
+    // A chapter row says how much of the book and of the cast it holds.
+    expect([...el.querySelectorAll(".czm-tl-note-total")].map((s) => s.textContent)).toEqual(["2 scenes · 14 words · 3 of the cast", "1 scene · 5 words · 2 of the cast"]);
     const scenes = el.querySelectorAll(".czm-tl-scene");
     expect(scenes).toHaveLength(3);
     expect(scenes[0]!.querySelectorAll(".czm-tl-dot.is-on")).toHaveLength(3);
@@ -50,6 +52,14 @@ describe("StoryTimelineView", () => {
     expect(calls.revealed).toEqual(["Return"]);
     (el.querySelector(".czm-tl-col span") as HTMLElement).click();
     expect(calls.opened).toEqual(["Novel/Characters/Ilse.md"]);
+  });
+
+  it("does not list the project note as a scene", async () => {
+    const { v } = open({ projects: () => [{ ...novel, notePath: "Novel/Two.md" }], activeProject: () => ({ ...novel, notePath: "Novel/Two.md" }) });
+    await v.onOpen();
+    expect([...v.contentEl.querySelectorAll(".czm-tl-note .is-link")].map((s) => s.textContent)).toEqual(["One"]);
+    expect(v.contentEl.querySelectorAll(".czm-tl-scene")).toHaveLength(2);
+    expect(v.contentEl.querySelector(".czm-shell-state-text")!.textContent).toBe("2 scenes · 3 in the cast");
   });
 
   it("filters the cast", async () => {

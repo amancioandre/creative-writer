@@ -114,7 +114,7 @@ Under the bars, on the same axis, run small bar charts — one value per scene, 
 | Open threads (yours) | Hand-drawn threads that have started and not yet reached their last stop — what the reader is carrying. A plant counts as open until its payoff. |
 | Echoes | Where the echoes land. A summary only; the pair is the finding. |
 
-Strips share the slots exactly, so a spike lines up with the scene above it at every zoom.
+Strips share the slots exactly, so a spike lines up with the scene above it at every zoom. Under the bars the axis names its scenes, a title under every bar wide enough for one (zoom in for the rest), and each chapter at its first bar.
 
 ## The panel
 

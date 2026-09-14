@@ -52,6 +52,11 @@ const KIND_TITLE: Record<ThreadKind, string> = { entity: "Where names appear", f
 const KIND_CHIP: Record<ThreadKind, string> = { entity: "Name", fact: "Fact", writer: "Yours", echo: "Echo" };
 const MIN_ZOOM = 1, MAX_ZOOM = 8;
 const AXIS_GAP = 6;
+/** Two rows under the bars: the scene titles, and the chapter names where a chapter starts. */
+const AXIS_LABEL_HEIGHT = 38;
+/** A slot narrower than this carries no title of its own; the chapter name still says where it is. */
+const MIN_LABELLED_SLOT = 40;
+const CHAR_W = 6.2;
 const BOTTOM_PAD = 8;
 
 type Selection = { kind: "arc"; arc: ArcPath } | { kind: "scene"; index: number } | null;
@@ -239,7 +244,7 @@ export class StoryThreadsView extends ItemView {
     const contradictions = this.visibleContradictions(threads);
     this.arcs = layoutArcs(threads, contradictions, slots, baseY, o);
     const strips = this.model.strips.filter((s) => this.settings.strips[s.id] !== false);
-    const stripTop = baseY + o.barMax + AXIS_GAP;
+    const stripTop = baseY + o.barMax + AXIS_GAP + AXIS_LABEL_HEIGHT;
     const { rows, bars, height } = layoutStrips(strips, slots, stripTop, o);
     const total = stripTop + height + BOTTOM_PAD;
     this.svg.setAttribute("width", f(contentWidth));
@@ -267,6 +272,29 @@ export class StoryThreadsView extends ItemView {
       onActivate(rect, (ev) => { ev.stopPropagation(); this.select(this.selection?.kind === "scene" && this.selection.index === slot.index ? null : { kind: "scene", index: slot.index }); }, { role: false });
       rect.addEventListener("dblclick", (ev) => { ev.stopPropagation(); this.source.reveal(scene.ref); });
       this.axisG.appendChild(rect);
+    }
+    // The axis names its scenes: a title under every bar wide enough for one, and the chapter at each chapter's first bar.
+    const titleY = baseY + o.barMax + AXIS_GAP + 11, noteY = titleY + 15;
+    let lastNote: string | null = null;
+    for (const slot of slots) {
+      const scene = this.model.scenes[slot.index]!;
+      const width = slot.x1 - slot.x0 - 4;
+      if (width >= MIN_LABELLED_SLOT) {
+        const t = document.createElementNS(SVG, "text");
+        t.setAttribute("class", "czm-th-axis-label");
+        t.setAttribute("x", f(slot.x0 + 2)); t.setAttribute("y", f(titleY));
+        t.textContent = fitText(scene.ref.title || "(opening)", width);
+        this.axisG.appendChild(t);
+      }
+      if (scene.note !== lastNote) {
+        lastNote = scene.note;
+        const n = document.createElementNS(SVG, "text");
+        n.setAttribute("class", "czm-th-axis-note");
+        n.setAttribute("x", f(slot.x0 + 2)); n.setAttribute("y", f(noteY));
+        const span = slots.filter((s) => this.model.scenes[s.index]!.note === scene.note);
+        n.textContent = fitText(basenameOf(scene.note), (span[span.length - 1]!.x1 - slot.x0) - 4);
+        this.axisG.appendChild(n);
+      }
     }
 
     // Arcs, in paint order; the layout already put contradictions last.
@@ -860,6 +888,13 @@ this.renderPanel(); this.renderCard();
       await this.show(project, true);
     });
   }
+}
+
+/** Cuts a label to what fits in `width` pixels of small text, with an ellipsis. */
+export function fitText(text: string, width: number): string {
+  const max = Math.floor(width / CHAR_W);
+  if (max < 2) return "";
+  return text.length <= max ? text : `${text.slice(0, Math.max(1, max - 1)).trimEnd()}…`;
 }
 
 /** "Chapter 3#The station" — how a scene is named in `Story threads.md`. */
