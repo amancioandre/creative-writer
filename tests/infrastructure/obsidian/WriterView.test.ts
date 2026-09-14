@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Setting, WorkspaceLeaf } from "obsidian";
-import { WRITER_VIEW_TYPE, WriterView, type WriterSource } from "../../../src/infrastructure/obsidian/views/WriterView";
+import { WRITER_VIEW_TYPE, WriterView, pillText, type WriterSource } from "../../../src/infrastructure/obsidian/views/WriterView";
 import { type WriterNote, buildBoard } from "../../../src/domain/writer/Board";
 import { EMPTY_WRITER_FILE, type WriterFile, placeGroup } from "../../../src/domain/writer/WriterFile";
 import { CARD_H, CARD_W, GROUP_HEAD, GROUP_PAD, layoutBoard } from "../../../src/domain/writer/Layout";
@@ -91,7 +91,7 @@ describe("WriterView", () => {
     expect(card(el, "sources/Invictus.md").querySelectorAll(".czm-writer-chip").length).toBe(2);
     expect(card(el, "sources/Invictus.md").querySelector(".czm-writer-card-title")!.textContent).toBe("Invictus");
     expect(el.querySelectorAll(".czm-writer-edge").length).toBe(1);
-    expect(el.querySelectorAll(".czm-writer-layer").length).toBe(7); // six layers and the stories band
+    expect(el.querySelectorAll(".czm-writer-layer").length).toBe(3); // Wish list, Inspirations and References hold several groups; a one-group layer says its name once, on the group
   });
   it("selects a card on click, shows its groups and links in the side card, and opens the note on double click", async () => {
     const { el, calls } = await open();
@@ -240,7 +240,7 @@ describe("WriterView", () => {
     const wish = Setting.created.find((s) => s.name === "Wish list")!;
     wish.toggle!.onChangeCb(false);
     expect(card(el, "notes/Courage.md")).toBeNull();
-    expect(el.querySelectorAll(".czm-writer-layer").length).toBe(6);
+    expect(el.querySelectorAll(".czm-writer-layer").length).toBe(2);
   });
   it("shows the empty-board hint when nothing is tagged, and restores a saved view instead of fitting", async () => {
     const { el } = await open({}, []);
@@ -273,8 +273,10 @@ describe("WriterView", () => {
     expect(story.querySelector(".czm-writer-card-title")!.textContent).toBe("The Bear Hunt");
     expect(story.querySelector(".czm-writer-stage")!.textContent).toBe("Drafting");
     expect(story.querySelector(".czm-writer-story-premise")!.textContent).toBe("A man hunts a bear.");
-    expect(story.querySelector(".czm-writer-story-meta")!.textContent).toBe("120 / 1,000 words · 3 in the cast · worked 2026-09-01");
+    expect(story.querySelector(".czm-writer-story-meta")!.textContent).toBe("120 / 1,000 words");
+    expect(story.querySelector(".czm-writer-story-print")).toBeNull();
     expect(el.querySelector(".czm-writer-band-name")!.textContent).toBe("Stories · 1");
+    expect(el.querySelector(".czm-writer-band .czm-writer-layer")).toBeNull();
     expect([...el.querySelectorAll(".czm-writer-pill text")].map((t) => t.textContent)).toEqual(["Idea · Other", "Unfiled · Loose"]);
   });
   it("selects a story: stage select, view buttons, links to the idea it grew from; double click opens the note", async () => {
@@ -340,11 +342,13 @@ describe("WriterView", () => {
   it("shows uses on cards and side cards, marks recurring ones, and lists what a story draws on", async () => {
     const uses = new Map([["notes/Courage.md", ["The Bear Hunt", "Horse"]], ["sources/Invictus.md", ["The Bear Hunt"]]]);
     const { el } = await open({}, baseNotes, undefined, { stories: [bearCard], ideas: [], unfiled: [], uses });
-    expect(card(el, "notes/Courage.md").querySelector(".czm-writer-uses")!.textContent).toBe("2 stories");
-    expect(card(el, "notes/Courage.md").querySelector(".czm-writer-uses")!.classList.contains("is-recurring")).toBe(true);
-    expect(card(el, "sources/Invictus.md").querySelector(".czm-writer-uses")!.classList.contains("is-recurring")).toBe(false);
-    expect(card(el, "notes/Wild.md").querySelector(".czm-writer-uses")).toBeNull();
+    expect(el.querySelector(".czm-writer-card .czm-writer-uses")).toBeNull();
+    press(card(el, "sources/Invictus.md")); release(card(el, "sources/Invictus.md"));
+    expect(el.querySelector(".czm-map-card .czm-writer-uses")!.textContent).toBe("1 story");
+    expect(el.querySelector(".czm-map-card .czm-writer-uses")!.classList.contains("is-recurring")).toBe(false);
     press(card(el, "notes/Courage.md")); release(card(el, "notes/Courage.md"));
+    expect(el.querySelector(".czm-map-card .czm-writer-uses")!.textContent).toBe("2 stories · recurring");
+    expect(el.querySelector(".czm-map-card .czm-writer-uses")!.classList.contains("is-recurring")).toBe(true);
     expect([...el.querySelectorAll(".czm-writer-use-row .czm-map-row-name")].map((r) => r.textContent)).toEqual(["The Bear Hunt", "Horse"]);
     (el.querySelector(".czm-writer-use-row") as HTMLElement).click();
     expect(el.querySelector(".czm-writer-story.is-selected")).not.toBeNull();
@@ -378,19 +382,20 @@ describe("WriterView", () => {
     expect(s.el.querySelector(".czm-writer-side .czm-map-kind")!.textContent).toBe("The notes no longer link");
     expect(s.el.querySelector(".czm-writer-edge-input")).toBeNull();
   });
-  it("shows the fingerprint on a story, adopts a voice from its side card, and lists adopters and the blended fingerprint on the voice card", async () => {
+  it("shows the fingerprint and the meta on a story's side card, adopts a voice from its side card, and lists adopters and the blended fingerprint on the voice card", async () => {
     const voice = note("voices/The Narrator.md", ["#writer/voice"], [], "I am the Narrator.");
     const { el, calls } = await open({}, [...baseNotes, voice], undefined, { stories: [bearCard], ideas: [], unfiled: [], uses: new Map() });
-    expect(el.querySelector(".czm-writer-story-print")!.textContent).toBe("ease 72 · grade 6 · variety 0.41 · dialogue 18%");
     const story = el.querySelector<SVGGElement>(".czm-writer-story")!;
     press(story); release(story);
+    expect(el.querySelector(".czm-writer-side .czm-writer-print")!.textContent).toBe("ease 72 · grade 6 · variety 0.41 · dialogue 18%");
+    expect(el.querySelector(".czm-writer-side .czm-map-hint")!.textContent).toBe("120 / 1,000 words · 3 in the cast · worked 2026-09-01");
     const select = el.querySelector<HTMLSelectElement>(".czm-writer-voice-select")!;
     expect([...select.options].map((o) => o.value)).toEqual(["", "voices/The Narrator.md"]);
     select.value = "voices/The Narrator.md";
     select.dispatchEvent(new Event("change"));
     await tick(); await tick();
     expect(calls.voices).toEqual(["The Bear Hunt: voices/The Narrator.md"]);
-    expect(el.querySelector(".czm-writer-story-meta")!.textContent).toContain("voice The Narrator");
+    expect(el.querySelector(".czm-writer-side .czm-map-hint")!.textContent).toContain("voice The Narrator");
     press(card(el, "voices/The Narrator.md")); release(card(el, "voices/The Narrator.md"));
     expect([...el.querySelectorAll(".czm-writer-adopter .czm-map-row-name")].map((r) => r.textContent)).toEqual(["The Bear Hunt"]);
     expect(el.querySelector(".czm-writer-voice-print")!.textContent).toContain("ease 72");
@@ -399,15 +404,16 @@ describe("WriterView", () => {
     const book = note("sources/The Road.md", ["#writer/reading"], ["analyses/the-road.md"], "", { reading: "reading" });
     const analysis = note("analyses/the-road.md", ["#writer/craft"]);
     const { el, calls } = await open({}, [...baseNotes, book, analysis]);
-    expect(card(el, "sources/The Road.md").querySelector(".czm-writer-reading")!.textContent).toBe("Reading");
+    expect(card(el, "sources/The Road.md").querySelector(".czm-writer-reading")).toBeNull();
     press(card(el, "sources/The Road.md")); release(card(el, "sources/The Road.md"));
+    expect(el.querySelector(".czm-map-card .czm-writer-reading")!.textContent).toBe("Reading");
     const select = el.querySelector<HTMLSelectElement>(".czm-writer-reading-select")!;
     expect(select.value).toBe("reading");
     select.value = "read";
     select.dispatchEvent(new Event("change"));
     await tick(); await tick();
     expect(calls.reading).toEqual(["sources/The Road.md: read"]);
-    expect(card(el, "sources/The Road.md").querySelector(".czm-writer-reading")!.textContent).toBe("Read");
+    expect(el.querySelector(".czm-map-card .czm-writer-reading")!.textContent).toBe("Read");
     expect(el.querySelector(".czm-writer-analysis .czm-map-row-name")!.textContent).toBe("the-road");
   });
 });
@@ -592,5 +598,12 @@ describe("WriterView group keys", () => {
     expect(el.querySelector(".czm-writer-help")!.textContent).toContain("Alt + [ ]");
     (el.querySelector(".czm-writer-help-close") as HTMLElement).click();
     expect(el.querySelector(".czm-writer-help")!.classList.contains("is-open")).toBe(false);
+  });
+});
+
+describe("pillText", () => {
+  it("keeps text that fits and cuts the rest with an ellipsis at the pill's width", () => {
+    expect(pillText("Idea · Other", 320)).toBe("Idea · Other");
+    expect(pillText("Idea · Sentient AI engineers humans for diversity of thought", 320)).toBe("Idea · Sentient AI engineers humans for d…");
   });
 });

@@ -690,11 +690,11 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-writer-stage.czm-writer-stage-finished { background: #7a9e7e; }
 .czm-writer-stage.czm-writer-stage-shelved { background: #8a8a8a; }
 .czm-writer-story-premise { font-size: 12px; line-height: 1.3; color: var(--text-normal); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.czm-writer-story-premise.is-missing { color: var(--text-faint); font-style: italic; }
+.czm-writer-excerpt.is-missing { color: var(--text-faint); font-style: italic; }
 .czm-writer-story-meta { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: auto; }
 .czm-writer-pill { cursor: pointer; }
 .czm-writer-pill rect { fill: var(--background-primary); stroke: var(--text-muted); stroke-width: 1.2; }
-.czm-writer-pill-idea rect { stroke: #c25c5c; }
+.czm-writer-pill-idea rect { stroke: var(--text-accent); }
 .czm-writer-pill text { font-size: 12px; fill: var(--text-normal); user-select: none; pointer-events: none; }
 .czm-writer-pill:hover rect, .czm-writer-pill.is-selected rect { stroke-width: 2.5; }
 .czm-writer-pill.is-selected rect { stroke: var(--text-normal); }
@@ -702,7 +702,7 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-writer-promote input { width: 100%; box-sizing: border-box; }
 .czm-writer-stage-select { width: 100%; }
 /* Uses and named lines. */
-.czm-writer-uses { font-size: 10px; padding: 0 6px; border-radius: 8px; border: 1px solid var(--text-faint); color: var(--text-muted); margin-left: auto; white-space: nowrap; }
+.czm-writer-uses { font-size: 10px; padding: 0 6px; border-radius: 8px; border: 1px solid var(--text-faint); color: var(--text-muted); white-space: nowrap; }
 .czm-writer-uses.is-recurring { border-color: var(--text-accent); color: var(--text-accent); font-weight: 600; }
 .czm-writer-edge { pointer-events: visibleStroke; cursor: pointer; }
 .czm-writer-edge:hover { opacity: 1; stroke-width: 2.5; }
@@ -717,7 +717,6 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-writer-edge-suggest { grid-template-columns: repeat(2, 1fr); }
 .czm-act-name-line { font-size: var(--font-ui-smaller); padding: 0 6px; height: 20px; line-height: 1; margin-left: 4px; }
 /* Voices, fingerprints and the reading list. */
-.czm-writer-story-print { font-size: 10.5px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 .czm-writer-print, .czm-writer-voice-print { font-variant-numeric: tabular-nums; }
 .czm-writer-reading { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; padding: 0 6px; border-radius: 8px; border: 1px solid var(--text-muted); color: var(--text-muted); white-space: nowrap; }
 .czm-writer-reading-reading { border-color: var(--text-accent); color: var(--text-accent); }

@@ -206,7 +206,10 @@ export interface StoriesBand {
   readonly unfiled: readonly PlacedPill[];
 }
 
-const pillWidth = (label: string) => Math.min(320, Math.max(90, 24 + label.length * 7));
+/** A pill's horizontal padding and the width the view allows per character; the view cuts text that would not fit. */
+export const PILL_PAD = 24;
+export const PILL_CHAR_W = 7;
+const pillWidth = (text: string) => Math.min(320, Math.max(90, PILL_PAD + text.length * PILL_CHAR_W));
 
 /** Lays the band out above a board whose top edge is `top`, left-aligned at x = 0. */
 export function layoutStories(row: StoriesRow, top: number): StoriesBand {
@@ -220,9 +223,9 @@ export function layoutStories(row: StoriesRow, top: number): StoriesBand {
   const pillY = y + h - GROUP_PAD - PILL_H;
   x = GROUP_PAD;
   const ideas: PlacedPill[] = [];
-  for (const c of row.ideas) { const w = pillWidth(c.title); ideas.push({ key: c.path, label: c.title, x, y: pillY, w }); x += w + PILL_GAP; }
+  for (const c of row.ideas) { const w = pillWidth(`Idea · ${c.title}`); ideas.push({ key: c.path, label: c.title, x, y: pillY, w }); x += w + PILL_GAP; }
   const unfiled: PlacedPill[] = [];
-  for (const f of row.unfiled) { const label = f.slice(f.lastIndexOf("/") + 1); const w = pillWidth(label); unfiled.push({ key: f, label, x, y: pillY, w }); x += w + PILL_GAP; }
+  for (const f of row.unfiled) { const label = f.slice(f.lastIndexOf("/") + 1); const w = pillWidth(`Unfiled · ${label}`); unfiled.push({ key: f, label, x, y: pillY, w }); x += w + PILL_GAP; }
   const w = Math.max(rowWidth, x, 2 * STORY_W + CARD_GAP + 2 * GROUP_PAD);
   return { rect: { x: 0, y, w: w + GROUP_PAD - (rowWidth > x ? CARD_GAP : PILL_GAP), h }, stories, ideas, unfiled };
 }

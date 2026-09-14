@@ -6,7 +6,7 @@ import type { ProjectSpec } from "../../../domain/progress/Project";
 import type { WriterSettings } from "../../../domain/settings/Settings";
 import { EMPTY_BOARD, type Board, type Card } from "../../../domain/writer/Board";
 import { FRAMEWORKS, UNSORTED, groupsOf, type GroupDef } from "../../../domain/writer/Framework";
-import { CARD_H, CARD_W, GROUP_HEAD, GROUP_PAD, MIN_GROUP_H, MIN_GROUP_W, PILL_H, STORY_H, STORY_W, type BoardLayout, type PlacedCard, type PlacedGroup, type StoriesBand, cardCentre, groupAt, layoutBoard, layoutStories, reorderedGroup, unionRect } from "../../../domain/writer/Layout";
+import { CARD_H, CARD_W, GROUP_HEAD, GROUP_PAD, MIN_GROUP_H, MIN_GROUP_W, PILL_CHAR_W, PILL_H, PILL_PAD, STORY_H, STORY_W, type BoardLayout, type PlacedCard, type PlacedGroup, type StoriesBand, cardCentre, groupAt, layoutBoard, layoutStories, reorderedGroup, unionRect } from "../../../domain/writer/Layout";
 import { EMPTY_STORIES, READING_LABEL, READING_STATUSES, SETTABLE_STAGES, STAGE_LABEL, type Fingerprint, type ReadingStatus, type Stage, type StoriesRow, type StoryCard, blendFingerprints } from "../../../domain/writer/Stories";
 import { isRecurring } from "../../../domain/writer/Uses";
 import { type Direction, type Spot, endOfRow, lane, laneOf, step, stepCard } from "../../../domain/writer/Navigation";
@@ -246,7 +246,9 @@ export class WriterView extends ItemView {
     for (const layer of this.layout.layers) {
       if (this.hiddenLayers.has(layer.name)) continue;
       const first = layer.groups[0];
-      if (first) {
+      // A layer that is one group of its own name says it once, on the group.
+      const sameName = layer.groups.length === 1 && first?.group.def.name.trim().toLowerCase() === layer.name.trim().toLowerCase();
+      if (first && !sameName) {
         const label = document.createElementNS(SVG, "text");
         label.setAttribute("class", "czm-writer-layer");
         label.setAttribute("x", f(first.rect.x)); label.setAttribute("y", f(first.rect.y - 10));
@@ -325,11 +327,6 @@ export class WriterView extends ItemView {
     const band = this.band;
     const g = document.createElementNS(SVG, "g");
     g.setAttribute("class", "czm-writer-band");
-    const label = document.createElementNS(SVG, "text");
-    label.setAttribute("class", "czm-writer-layer");
-    label.setAttribute("x", f(band.rect.x)); label.setAttribute("y", f(band.rect.y - 10));
-    label.textContent = "Stories";
-    g.appendChild(label);
     const rect = document.createElementNS(SVG, "rect");
     rect.setAttribute("class", "czm-writer-band-rect");
     rect.setAttribute("rx", "10");
@@ -372,11 +369,9 @@ export class WriterView extends ItemView {
     const top = body.createDiv({ cls: "czm-writer-story-top" });
     top.createDiv({ cls: "czm-writer-card-title", text: story.spec.name });
     top.createSpan({ cls: `czm-writer-stage czm-writer-stage-${story.stage}`, text: STAGE_LABEL[story.stage] });
-    body.createDiv({ cls: `czm-writer-story-premise${story.premise ? "" : " is-missing"}`, text: story.premise || "No premise yet: writing-premise in the project note." });
-    body.createDiv({ cls: "czm-writer-story-meta", text: storyMeta(story, story.voice ? this.titleOf(story.voice) : null) });
-    if (story.fingerprint) {
-      body.createDiv({ cls: "czm-writer-story-print", text: fingerprintLine(story.fingerprint), title: "The shape of the prose: reading ease, grade level, sentence-length variety, share of words in dialogue." });
-    }
+    // Identity only: the name, the stage, the premise, and words against the target. The rest waits in the side card.
+    if (story.premise) body.createDiv({ cls: "czm-writer-story-premise", text: story.premise });
+    body.createDiv({ cls: "czm-writer-story-meta", text: storyWords(story) });
     g.appendChild(fo);
     const t = document.createElementNS(SVG, "title");
     t.textContent = `${story.spec.name}: ${STAGE_LABEL[story.stage]}${story.premise ? `\n${story.premise}` : ""}`;
@@ -405,7 +400,7 @@ export class WriterView extends ItemView {
     g.appendChild(rect);
     const text = document.createElementNS(SVG, "text");
     text.setAttribute("x", f(12)); text.setAttribute("y", f(PILL_H / 2 + 4));
-    text.textContent = `${kind === "idea" ? "Idea" : "Unfiled"} · ${pill.label}`;
+    text.textContent = pillText(`${kind === "idea" ? "Idea" : "Unfiled"} · ${pill.label}`, pill.w);
     g.appendChild(text);
     const t = document.createElementNS(SVG, "title");
     t.textContent = kind === "idea" ? `${pill.label}: a premise with no story yet. Select it to make one.` : `${pill.key}: prose with no project declaration. Select it to declare a story.`;
@@ -468,13 +463,6 @@ export class WriterView extends ItemView {
     for (const gid of c.groups) {
       const chip = chips.createSpan({ cls: "czm-writer-chip", title: this.groupName(gid) });
       chip.setCssProps({ "--czm-group": this.colourOf(gid) });
-    }
-    if (c.reading && c.groups.includes("reading")) {
-      chips.createSpan({ cls: `czm-writer-reading czm-writer-reading-${c.reading}`, text: READING_LABEL[c.reading] });
-    }
-    const uses = this.stories.uses.get(c.path) ?? [];
-    if (uses.length) {
-      chips.createSpan({ cls: `czm-writer-uses${isRecurring(this.stories.uses, c.path) ? " is-recurring" : ""}`, text: uses.length === 1 ? "1 story" : `${uses.length} stories`, title: `Used in ${uses.join(", ")}` });
     }
     body.createDiv({ cls: "czm-writer-card-excerpt", text: c.excerpt });
     g.appendChild(fo);
@@ -1158,7 +1146,7 @@ export class WriterView extends ItemView {
     const head = this.card.createDiv({ cls: "czm-map-card-head" });
     head.createSpan({ text: story.spec.name, cls: "czm-map-card-name" });
     head.createSpan({ text: story.spec.scope || "vault root", cls: "czm-map-kind" });
-    if (story.premise) this.card.createEl("p", { text: story.premise, cls: "czm-writer-excerpt" });
+    this.card.createEl("p", story.premise ? { text: story.premise, cls: "czm-writer-excerpt" } : { text: "No premise yet. Add writing-premise to the project note.", cls: "czm-writer-excerpt is-missing" });
     const stageRow = this.card.createDiv({ cls: "czm-map-alias" });
     const select = stageRow.createEl("select", { cls: "dropdown czm-writer-stage-select", attr: { "aria-label": "Stage" } });
     for (const s of SETTABLE_STAGES) { const o = select.createEl("option", { text: STAGE_LABEL[s] }); o.value = s; }
@@ -1166,7 +1154,7 @@ export class WriterView extends ItemView {
     inferred.value = "";
     select.value = story.declared ? story.stage : "";
     select.addEventListener("change", () => void this.source.setStage(story.spec, (select.value || null) as Stage | null).then(() => this.show(), (e: unknown) => this.status.fail(couldNot("write the stage", e))));
-    this.card.createDiv({ text: storyMeta(story, null), cls: "czm-map-hint" });
+    this.card.createDiv({ text: storyMeta(story, story.voice ? this.titleOf(story.voice) : null), cls: "czm-map-hint" });
     if (story.fingerprint) this.card.createDiv({ text: fingerprintLine(story.fingerprint), cls: "czm-map-hint czm-writer-print" });
     const voices = this.board.cards.filter((c) => c.groups.includes("voice"));
     const voiceRow = this.card.createDiv({ cls: "czm-map-alias" });
@@ -1254,6 +1242,9 @@ export class WriterView extends ItemView {
     head.createSpan({ text: c.title, cls: "czm-map-card-name" });
     const chips = head.createDiv({ cls: "czm-writer-chips czm-writer-chips-side" });
     for (const gid of c.groups) { const chip = chips.createSpan({ text: this.groupName(gid), cls: "czm-writer-chip-label" }); chip.style.setProperty("--czm-group", this.colourOf(gid)); }
+    if (c.reading && c.groups.includes("reading")) chips.createSpan({ cls: `czm-writer-reading czm-writer-reading-${c.reading}`, text: READING_LABEL[c.reading] });
+    const uses = this.stories.uses.get(c.path) ?? [];
+    if (uses.length) chips.createSpan({ cls: `czm-writer-uses${isRecurring(this.stories.uses, c.path) ? " is-recurring" : ""}`, text: uses.length === 1 ? "1 story" : `${uses.length} stories${isRecurring(this.stories.uses, c.path) ? " · recurring" : ""}`, title: `Used in ${uses.join(", ")}` });
     if (c.excerpt) this.card.createEl("p", { text: c.excerpt, cls: "czm-writer-excerpt" });
     this.card.createDiv({ text: c.path, cls: "czm-map-hint" });
     const actions = this.card.createDiv({ cls: "czm-map-card-actions" });
@@ -1396,14 +1387,24 @@ export class WriterView extends ItemView {
   }
 }
 
-/** One line under a story: words against the target, the cast, the voice, the last day worked. */
+/** The one figure a story card carries: words against the target. */
+export function storyWords(story: StoryCard): string {
+  return story.target > 0 ? `${story.words.toLocaleString("en")} / ${story.target.toLocaleString("en")} words` : `${story.words.toLocaleString("en")} words`;
+}
+
+/** One line under a story in its side card: words against the target, the cast, the voice, the last day worked. */
 export function storyMeta(story: StoryCard, voice: string | null): string {
-  const parts: string[] = [];
-  parts.push(story.target > 0 ? `${story.words.toLocaleString("en")} / ${story.target.toLocaleString("en")} words` : `${story.words.toLocaleString("en")} words`);
+  const parts: string[] = [storyWords(story)];
   if (story.cast) parts.push(`${story.cast} in the cast`);
   if (voice) parts.push(`voice ${voice}`);
   parts.push(story.lastWorked ? `worked ${story.lastWorked}` : "never logged");
   return parts.join(" · ");
+}
+
+/** A pill's text cut to its width, the way the layout measured it. */
+export function pillText(text: string, width: number): string {
+  const max = Math.floor((width - PILL_PAD) / PILL_CHAR_W);
+  return text.length <= max ? text : `${text.slice(0, Math.max(1, max - 1)).trimEnd()}…`;
 }
 
 /** The fingerprint in one line. */

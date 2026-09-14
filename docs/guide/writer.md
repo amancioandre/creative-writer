@@ -18,7 +18,7 @@ The frameworks are deliberately *macro*. Save the Cat and the Hero's Journey str
 
 ## The stories band
 
-Above the layers sits every declared [project](/guide/projects) as a story card: its name, a **stage** chip, the premise, and one line with words against the target, the size of the cast and the last day the writing log saw it change. Most recently worked first. Select a story and the side card offers the stage, buttons into its map, timeline, threads, manuscript and desk, the note itself, and the idea it grew from.
+Above the layers sits every declared [project](/guide/projects) as a story card carrying its identity only: its name, a **stage** chip, the premise, and words against the target. Most recently worked first. Select a story and the side card adds the size of the cast, the last day the writing log saw it change, the fingerprint, a hint when the premise is still missing, the stage, buttons into its map, timeline, threads, manuscript and desk, the note itself, and the idea it grew from.
 
 **Stages** are `development`, `drafting`, `revising`, `finished` and `shelved`, set from the side card and written as `writing-stage` in the project note. Leave it unset and the plugin infers: *finished* once the target is met, *drafting* once any prose exists, *in development* before. The premise comes from `writing-premise`; the idea link from `writing-idea`.
 
@@ -35,7 +35,7 @@ A story **uses** a card when any note in its folder links to it. A plain `[[wiki
 %% REF: [[Invictus]] %%
 ```
 
-**Reference a writer card** in the editor picks a card and drops that comment at the cursor. Like every comment it stays off the [manuscript](/guide/manuscript) page and out of any export, and `REF` is a built-in comment tag with its own colour. Each card shows how many stories use it; a card used by two or more is **recurring**, the simplest picture of what you keep returning to. A card's side card lists the stories, and a story's side card lists what it **draws on**.
+**Reference a writer card** in the editor picks a card and drops that comment at the cursor. Like every comment it stays off the [manuscript](/guide/manuscript) page and out of any export, and `REF` is a built-in comment tag with its own colour. A card's side card says how many stories use it and lists them; a card used by two or more is **recurring**, the simplest picture of what you keep returning to. A story's side card lists what it **draws on**.
 
 **Lines** join cards whose notes link. Click one, or *Name…* beside a linked card, and give it a name: *inspired by*, *contradicts*, *same theme*, *adopted*, or your own words, with a colour. A pair may carry several names. A line only lives between notes that link; remove the link and the line goes dashed until you restore it or remove the name. Names and colours live in the writer file.
 
@@ -43,11 +43,11 @@ A story **uses** a card when any note in its folder links to it. A plain `[[wiki
 
 A **voice** is a card in the Voices group: a narrator persona you have built. A story adopts one from its side card under *Voice*, which writes `writing-voice` into the project note. The voice's own side card lists the stories that adopted it.
 
-Every story with prose carries a **fingerprint**: reading ease, grade level, sentence-length variety and the share of words inside dialogue, measured over its prose notes. It sits on the story card and in its side card. A voice card shows the fingerprints of the stories that adopted it and the blend of them, weighted by words, so you can see whether the voice on the page matches the voice on the card.
+Every story with prose carries a **fingerprint**: reading ease, grade level, sentence-length variety and the share of words inside dialogue, measured over its prose notes. It sits in the story's side card. A voice card shows the fingerprints of the stories that adopted it and the blend of them, weighted by words, so you can see whether the voice on the page matches the voice on the card.
 
 ## The reading list
 
-A card in the Reading group may carry a status, `reading: to-read`, `reading` or `read`, set from its side card and shown as a chip on the board. When the note links to a card in the Craft group, the side card points at that analysis.
+A card in the Reading group may carry a status, `reading: to-read`, `reading` or `read`, set from and shown on its side card. When the note links to a card in the Craft group, the side card points at that analysis.
 
 ## From the myth analysis
 
