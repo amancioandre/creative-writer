@@ -1,5 +1,5 @@
-import { findDialogue, type DialogueConventions, type DialogueSpan } from "./DialogueSpans";
-import { attributeSpeakers, pinComment, pinOf, type Attribution, type Pin, type Speaker } from "./Speakers";
+import { blankComments, findDialogue, type DialogueConventions, type DialogueSpan } from "./DialogueSpans";
+import { applyPins, attributeParagraphs, knownTo, pinEdit, type Attribution, type Pin, type Speaker } from "./Speakers";
 
 /**
  * Who speaks each paragraph of a note, for the manuscript page: the same
@@ -7,8 +7,11 @@ import { attributeSpeakers, pinComment, pinOf, type Attribution, type Pin, type 
  */
 export interface VoicedBlock {
   readonly spans: readonly DialogueSpan[];
+  readonly pins: readonly Pin[];
   readonly pin: Pin | null;
   readonly attribution: Attribution | null;
+  /** One per span: its own pin, else the paragraph's. */
+  readonly voices: readonly (Attribution | null)[];
 }
 
 export interface BlockText {
@@ -17,23 +20,16 @@ export interface BlockText {
 }
 
 export function attributeBlocks(blocks: readonly BlockText[], conventions: DialogueConventions, roster: readonly Speaker[]): VoicedBlock[] {
-  const paragraphs = blocks.map((b) => {
-    const pin = pinOf(b.text);
-    const body = pin ? " ".repeat(pin.to) + b.text.slice(pin.to) : b.text;
-    return { text: b.text, pin, spans: pin?.notSpeech ? [] : findDialogue(body, conventions) };
-  });
-  const attributions = attributeSpeakers(paragraphs, roster);
-  return paragraphs.map((p, i) => ({ spans: p.spans, pin: p.pin, attribution: attributions[i] ?? null }));
+  const known = knownTo(roster);
+  const paragraphs = blocks.map((b) => ({ text: b.text, ...applyPins(b.text, findDialogue(blankComments(b.text), conventions), known) }));
+  const attributed = attributeParagraphs(paragraphs, roster);
+  return paragraphs.map((p, i) => ({ spans: p.spans, pins: p.pins, pin: p.pin, attribution: attributed[i]?.attribution ?? null, voices: attributed[i]?.spans ?? [] }));
 }
 
-/** A note's text with the pin on one line written, replaced, or removed (`null`). */
-export function pinLine(text: string, line: number, label: string | null): string {
-  const lines = text.split("\n");
-  const at = Math.max(0, Math.min(line, lines.length - 1));
-  const current = lines[at] ?? "";
-  const pin = pinOf(current);
-  const rest = pin ? current.slice(pin.to) : current.replace(/^\s*/, "");
-  const lead = pin ? current.slice(0, pin.from) : current.match(/^\s*/)?.[0] ?? "";
-  lines[at] = label === null ? `${lead}${rest}` : `${lead}${pinComment(label)} ${rest}`;
-  return lines.join("\n");
+/** A block's markdown with a pin written before its span `index` (or replaced, or removed with `null`). */
+export function pinBlock(markdown: string, voiced: VoicedBlock, index: number, label: string | null): string {
+  const span = voiced.spans[index];
+  if (!span) return markdown;
+  const e = pinEdit(voiced.pins, span, label);
+  return markdown.slice(0, e.from) + e.insert + markdown.slice(e.to);
 }

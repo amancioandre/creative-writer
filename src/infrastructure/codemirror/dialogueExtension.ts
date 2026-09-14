@@ -3,8 +3,8 @@ import { Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate
 import { activeChanged, effectiveSettings } from "./activeNote";
 import { settingsChanged } from "./settingsFacet";
 import { findingProviders, type HoverFinding } from "./findingsTooltip";
-import { findDialogue, resolveConventions, type DialogueConventions, type DialogueSpan } from "../../domain/dialogue/DialogueSpans";
-import { attributeSpeakers, isCertain, pinOf, UNATTRIBUTED_COLOUR, type Attribution, type Pin, type Speaker } from "../../domain/dialogue/Speakers";
+import { blankComments, findDialogue, resolveConventions, type DialogueConventions, type DialogueSpan } from "../../domain/dialogue/DialogueSpans";
+import { applyPins, attributeParagraphs, isCertain, knownTo, UNATTRIBUTED_COLOUR, type Attribution, type Pin, type Speaker } from "../../domain/dialogue/Speakers";
 import { speakerBox, type BoxData } from "./speakerBox";
 import { WordMatcher } from "../../domain/words/WordList";
 import { pathInScope } from "../../domain/scope/NoteScope";
@@ -102,25 +102,26 @@ export function paragraphsIn(doc: Text, from: number, to: number): { from: numbe
   return out;
 }
 
-interface AccentHit { readonly from: number; readonly to: number; readonly never: boolean; readonly term: string }
-interface Analysed { readonly from: number; readonly to: number; readonly spans: readonly DialogueSpan[]; readonly attribution: Attribution | null; readonly pin: Pin | null; readonly accents: readonly AccentHit[] }
+interface AccentHit { readonly from: number; readonly to: number; readonly never: boolean; readonly term: string; readonly speaker: Speaker }
+interface Analysed { readonly from: number; readonly to: number; readonly spans: readonly DialogueSpan[]; readonly pins: readonly Pin[]; readonly attribution: Attribution | null; readonly voices: readonly (Attribution | null)[]; readonly accents: readonly AccentHit[] }
 
-/** The accent words inside a speaker's own speech: what they use, and what they never say. Absolute offsets, in order. */
-function accentHits(p: { from: number; text: string; spans: readonly DialogueSpan[] }, speaker: Speaker): AccentHit[] {
-  const { uses, never } = accentsOf(speaker);
-  if (uses.empty && never.empty) return [];
+/** The accent words inside each speaker's own speech: what they use, and what they never say. Absolute offsets, in order; only sentences with a certain speaker. */
+function accentHits(p: { from: number; text: string; spans: readonly DialogueSpan[] }, voices: readonly (Attribution | null)[]): AccentHit[] {
   const out: AccentHit[] = [];
-  for (const s of p.spans) {
-    if (s.kind !== "speech") continue;
+  p.spans.forEach((s, i) => {
+    const a = voices[i];
+    if (s.kind !== "speech" || !a || !isCertain(a.how)) return;
+    const { uses, never } = accentsOf(a.speaker);
+    if (uses.empty && never.empty) return;
     const text = p.text.slice(s.from, s.to);
     const base = p.from + s.from;
     const hits = [
-      ...uses.findAll(text).map((m) => ({ from: base + m.from, to: base + m.to, never: false, term: m.term })),
-      ...never.findAll(text).map((m) => ({ from: base + m.from, to: base + m.to, never: true, term: m.term })),
-    ].sort((a, b) => a.from - b.from || a.to - b.to);
+      ...uses.findAll(text).map((m) => ({ from: base + m.from, to: base + m.to, never: false, term: m.term, speaker: a.speaker })),
+      ...never.findAll(text).map((m) => ({ from: base + m.from, to: base + m.to, never: true, term: m.term, speaker: a.speaker })),
+    ].sort((x, y) => x.from - y.from || x.to - y.to);
     let at = -1;
     for (const h of hits) { if (h.from >= at) { out.push(h); at = h.to; } }
-  }
+  });
   return out;
 }
 
@@ -159,19 +160,19 @@ export function dialogueExtension(pathOf: (state: EditorState) => string | null,
       const path = pathOf(view.state);
       const conventions = conventionsFor(settings, view.state.facet(conventionsFacet), path);
       const doc = view.state.doc;
+      // Comments are blanked, not cut, so a thought paragraph still opens with its italic and offsets hold; the pins are read from them.
+      const roster = settings.dialogue.speakerColours || this.accents ? rosterFor(view.state.facet(rostersFacet), path) : [];
+      const known = knownTo(roster);
       const found = paragraphsIn(doc, 0, doc.length).map((p) => {
         const text = doc.sliceString(p.from, p.to);
-        const pin = pinOf(text);
-        // The pin comment is blanked, not cut, so a thought paragraph still opens with its italic and offsets hold.
-        const body = pin ? " ".repeat(pin.to) + text.slice(pin.to) : text;
-        return { ...p, text, pin, spans: pin?.notSpeech ? [] : findDialogue(body, conventions) };
+        return { ...p, text, ...applyPins(text, findDialogue(blankComments(text), conventions), known) };
       });
-      const roster = settings.dialogue.speakerColours || this.accents ? rosterFor(view.state.facet(rostersFacet), path) : [];
       this.attributed = roster.length > 0;
-      const attributions = this.attributed ? attributeSpeakers(found, roster) : [];
+      const attributed = this.attributed ? attributeParagraphs(found, roster) : [];
       this.paragraphs = found.map((p, i) => {
-        const attribution = attributions[i] ?? null;
-        return { from: p.from, to: p.to, spans: p.spans, attribution, pin: p.pin, accents: this.accents && attribution && isCertain(attribution.how) ? accentHits(p, attribution.speaker) : [] };
+        const a = attributed[i];
+        const voices = a?.spans ?? p.spans.map(() => null);
+        return { from: p.from, to: p.to, spans: p.spans, pins: p.pins, attribution: a?.attribution ?? null, voices, accents: this.accents ? accentHits(p, voices) : [] };
       });
     }
     private decorate(view: EditorView) {
@@ -179,11 +180,11 @@ export function dialogueExtension(pathOf: (state: EditorState) => string | null,
       const dim = effectiveSettings(view.state).dialogue.dimNarration;
       const builder = new RangeSetBuilder<Decoration>();
       for (const p of this.visible(view)) {
-        const a = p.attribution;
-        const marks = marksFor(this.attributed ? (a && isCertain(a.how) ? a.speaker.colour : UNATTRIBUTED_COLOUR) : null);
         let at = p.from;
         let hit = 0;
-        for (const s of p.spans) {
+        p.spans.forEach((s, i) => {
+          const a = p.voices[i] ?? null;
+          const marks = marksFor(this.attributed ? (a && isCertain(a.how) ? a.speaker.colour : UNATTRIBUTED_COLOUR) : null);
           const from = p.from + s.from;
           const to = p.from + s.to;
           if (dim && from > at) builder.add(at, from, narrationMark);
@@ -191,7 +192,7 @@ export function dialogueExtension(pathOf: (state: EditorState) => string | null,
           // Accent words nest inside the speech mark; the builder takes them in order after it.
           for (; hit < p.accents.length && p.accents[hit]!.from < to; hit++) { const h = p.accents[hit]!; builder.add(h.from, h.to, h.never ? neverMark : usesMark); }
           at = to;
-        }
+        });
         if (dim && p.to > at) builder.add(at, p.to, narrationMark);
       }
       this.decorations = builder.finish();
@@ -206,20 +207,22 @@ export function dialogueExtension(pathOf: (state: EditorState) => string | null,
       if (!this.attributed) return [];
       const words: HoverFinding[] = [];
       for (const p of this.visible(view)) {
-        const who = p.attribution?.speaker;
-        if (!who) continue;
         for (const h of p.accents) {
+          const who = h.speaker;
           const f: HoverFinding = { from: h.from, to: h.to, kind: h.never ? "accent-never" : "accent", note: h.never ? `${who.name} never says this · accent-never in the character note` : `${who.name} · accent` };
           words.push(actions ? { ...f, actions: [{ label: `Remove "${h.term}" from ${who.name}'s ${h.never ? "never-say list" : "accent"}`, run: () => actions.editAccent(who, h.never ? "accent-never" : "accent", h.term, false) }] } : f);
         }
       }
       return words;
     }
-    /** The speaker the cursor's paragraph is pinned or attributed to, when certain. */
+    /** The speaker of the sentence at the cursor (else of its paragraph), when certain. */
     speakerAt(view: EditorView): Speaker | null {
       const pos = view.state.selection.main.head;
       const p = this.paragraphs.find((q) => pos >= q.from && pos <= q.to);
-      return p?.attribution && isCertain(p.attribution.how) ? p.attribution.speaker : null;
+      if (!p) return null;
+      const i = p.spans.findIndex((s) => pos >= p.from + s.from && pos <= p.from + s.to);
+      const a = (i >= 0 ? p.voices[i] : null) ?? p.attribution;
+      return a && isCertain(a.how) ? a.speaker : null;
     }
     /** What the speaker box reads; null when there is nothing to tag. */
     boxData(view: EditorView): BoxData | null {

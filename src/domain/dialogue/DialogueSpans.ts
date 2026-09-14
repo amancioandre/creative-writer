@@ -55,6 +55,11 @@ export function parseThoughtMarks(raw: unknown): { thoughts: ThoughtMarks; thoug
   return { thoughts: "custom", thoughtPattern: v };
 }
 
+/** The paragraph with every `%% comment %%` turned to spaces: not prose, but the offsets must hold. */
+export function blankComments(text: string): string {
+  return text.replace(/%%[^%\n]*%%/g, (m) => " ".repeat(m.length));
+}
+
 export function findDialogue(paragraph: string, c: DialogueConventions): DialogueSpan[] {
   const speech = speechSpans(paragraph, c.marks).map(([from, to]) => ({ from, to, kind: "speech" as const }));
   const thoughts = thoughtSpans(paragraph, c)

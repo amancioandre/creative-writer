@@ -2,7 +2,7 @@ import { tokenize } from "../style/Tokenizer";
 import { DIALOGUE_TAGS } from "../style/lexicon/adverbExceptions";
 import { NameLookup, aliasesOf, basenameOf, entityKindOf, normalise, type EntityNote } from "../story/EntityIndex";
 import { pathInScope } from "../scope/NoteScope";
-import type { DialogueSpan } from "./DialogueSpans";
+import { blankComments, type DialogueSpan } from "./DialogueSpans";
 
 /**
  * Who is speaking. The cast comes from character notes (name, aliases and
@@ -89,30 +89,84 @@ export function isCertain(how: AttributionHow): boolean {
 }
 
 /**
- * The writer's pin: a hidden comment at the start of the paragraph,
- * `%% Tomas %%`, written by the tag box, never rendered, stripped from
- * the export. `%% not speech %%` says the quotes are not dialogue.
+ * The writer's pin: a hidden comment right before a sentence of speech,
+ * `%% Tomas %% “Aye.”`, or at the start of the paragraph, written by the
+ * tag box, never rendered, stripped from the export. `%% not speech %%`
+ * says the quotes that follow are not dialogue. Any other comment in the
+ * paragraph is left alone: only a short label with no colon, standing
+ * where a pin stands, is a pin.
  */
 export interface Pin {
   readonly from: number;
+  /** Takes the spaces after the comment with it, so replacing or removing the pin leaves the sentence clean. */
   readonly to: number;
   readonly label: string;
   readonly notSpeech: boolean;
 }
 
 export const NOT_SPEECH = "not speech";
-const PIN = /^(\s*)%%\s*([^%\n]+?)\s*%%[ \t]*/;
+const PIN_ANY = /%%\s*([^%\n]+?)\s*%%[ \t]*/g;
 
+/** Whether a comment's text is a name: "not speech", a name the cast knows, or a short one (two words at most) with no colon. */
+export type Known = (label: string) => boolean;
+
+function looksLikePin(label: string, known?: Known): boolean {
+  const l = label.trim();
+  if (l.toLowerCase() === NOT_SPEECH) return true;
+  if (l.includes(":")) return false;
+  return (known?.(l) ?? false) || l.split(/\s+/).length <= 2;
+}
+
+/** A predicate for the names a cast answers to, for reading pins. */
+export function knownTo(roster: readonly Speaker[]): Known {
+  const lookup = new NameLookup<Speaker>();
+  for (const s of roster) for (const label of [s.name, ...s.aliases]) lookup.add(label, s);
+  return (label) => lookup.resolve(label) !== null;
+}
+
+/** The pins of a paragraph: at its start, or right before one of its spans. Any other comment is left alone. */
+export function pinsIn(text: string, spans: readonly DialogueSpan[], known?: Known): Pin[] {
+  const out: Pin[] = [];
+  for (const m of text.matchAll(PIN_ANY)) {
+    const from = m.index;
+    const to = from + m[0].length;
+    const label = m[1]!;
+    const atStart = text.slice(0, from).trim() === "";
+    if ((atStart || spans.some((s) => s.from === to)) && looksLikePin(label, known)) out.push({ from, to, label, notSpeech: label.trim().toLowerCase() === NOT_SPEECH });
+  }
+  return out;
+}
+
+/** The pin at the start of the paragraph, when there is one. */
 export function pinOf(text: string): Pin | null {
-  const m = PIN.exec(text);
-  if (!m) return null;
-  const label = m[2]!;
-  // `to` takes the spaces after the comment with it, so replacing or removing the pin leaves the paragraph clean.
-  return { from: m[1]!.length, to: m[0].length, label, notSpeech: label.trim().toLowerCase() === NOT_SPEECH };
+  const first = pinsIn(text, [])[0];
+  return first && text.slice(0, first.from).trim() === "" ? first : null;
+}
+
+/** The pin standing right before a span. */
+export function pinBefore(pins: readonly Pin[], span: { readonly from: number }): Pin | null {
+  return pins.find((p) => p.to === span.from) ?? null;
 }
 
 export function pinComment(label: string): string {
   return `%% ${label} %%`;
+}
+
+/** The one change that pins `label` on a span, replacing a pin already there; `null` takes it away. Offsets relative to the paragraph. */
+export function pinEdit(pins: readonly Pin[], span: { readonly from: number }, label: string | null): { from: number; to: number; insert: string } {
+  const existing = pinBefore(pins, span);
+  const insert = label === null ? "" : `${pinComment(label)} `;
+  return existing ? { from: existing.from, to: existing.to, insert } : { from: span.from, to: span.from, insert };
+}
+
+/** A paragraph's spans with the writer's pins read: a `not speech` pin drops the sentence after it; the rest stay. */
+export function applyPins(text: string, spans: readonly DialogueSpan[], known?: Known): { spans: DialogueSpan[]; pins: Pin[]; pin: Pin | null } {
+  const pins = pinsIn(text, spans, known);
+  const start = pins.find((p) => text.slice(0, p.from).trim() === "") ?? null;
+  const kept = spans.filter((s) => !pinBefore(pins, s)?.notSpeech);
+  // The paragraph's own pin: at its start, or before its first sentence; a pin deeper in speaks for its sentence only.
+  const pin = start ?? (kept[0] ? pinBefore(pins, kept[0]) : null);
+  return { spans: kept, pins, pin };
 }
 
 export interface Attribution {
@@ -126,8 +180,16 @@ export const UNATTRIBUTED_NOTE = "speaker not found · no tag or name in this pa
 export interface SpokenParagraph {
   readonly text: string;
   readonly spans: readonly DialogueSpan[];
-  /** The writer's pin, when the paragraph opens with one. */
+  /** The paragraph's pin: at its start, or before its first span. */
   readonly pin?: Pin | null;
+  /** Every pin in the paragraph, for the spans that carry their own. */
+  readonly pins?: readonly Pin[];
+}
+
+/** A paragraph's attribution, and each span's: a span pinned on its own keeps its own speaker. */
+export interface ParagraphAttribution {
+  readonly attribution: Attribution | null;
+  readonly spans: readonly (Attribution | null)[];
 }
 
 const SCENE_BREAK = /^\s*(?:#{1,6}\s|\*\s*\*\s*\*|---+\s*$|___+\s*$)/;
@@ -144,6 +206,10 @@ const MAX_GAP = 2;
  * starts over.
  */
 export function attributeSpeakers(paragraphs: readonly SpokenParagraph[], roster: readonly Speaker[]): (Attribution | null)[] {
+  return attributeParagraphs(paragraphs, roster).map((p) => p.attribution);
+}
+
+export function attributeParagraphs(paragraphs: readonly SpokenParagraph[], roster: readonly Speaker[]): ParagraphAttribution[] {
   const lookup = new NameLookup<Speaker>();
   for (const s of roster) for (const label of [s.name, ...s.aliases]) lookup.add(label, s);
   // A pin naming someone with no character note is a speaker too, with a colour of their own for the note.
@@ -168,11 +234,14 @@ export function attributeSpeakers(paragraphs: readonly SpokenParagraph[], roster
   let gap = 0;
   const seen = (s: Speaker) => { if (!present.includes(s)) present.push(s); };
 
-  return paragraphs.map((p) => {
-    if (SCENE_BREAK.test(p.text)) { history = []; present = []; gap = 0; return null; }
+  const bySpan = (p: SpokenParagraph, attribution: Attribution | null): (Attribution | null)[] =>
+    p.spans.map((s) => { const pin = p.pins ? pinBefore(p.pins, s) : null; return pin && !pin.notSpeech ? { speaker: pinned(pin.label), how: "pinned" as const } : attribution; });
+
+  return paragraphs.map((p): ParagraphAttribution => {
+    if (SCENE_BREAK.test(p.text)) { history = []; present = []; gap = 0; return { attribution: null, spans: [] }; }
     const named = namesInNarration(p, lookup);
     for (const n of named) seen(n.speaker);
-    if (p.spans.length === 0) { gap += 1; return null; }
+    if (p.spans.length === 0) { gap += 1; return { attribution: null, spans: [] }; }
     const speaks = p.spans.some((s) => s.kind === "speech");
     let result: Attribution | null = null;
     const tagged = named.filter((n) => n.tagged);
@@ -187,8 +256,12 @@ export function attributeSpeakers(paragraphs: readonly SpokenParagraph[], roster
       if (turn && (named.length === 0 || named.some((n) => n.speaker === turn))) result = { speaker: turn, how: "turns" };
     }
     gap = 0;
-    if (result) { seen(result.speaker); if (speaks) history.push(result.speaker); }
-    return result;
+    const spans = bySpan(p, result);
+    // The last voice of the paragraph is the one the next turn answers.
+    const last = [...spans].reverse().find((a): a is Attribution => a !== null) ?? result;
+    if (last) seen(last.speaker);
+    if (last && speaks) history.push(last.speaker);
+    return { attribution: result, spans };
   });
 }
 
@@ -198,9 +271,11 @@ interface Named { readonly speaker: Speaker; readonly tagged: boolean }
 export function namesInNarration(p: SpokenParagraph, lookup: NameLookup<Speaker>): Named[] {
   const out: Named[] = [];
   let at = 0;
+  // Comments are not narration: a pin's name must not read as a name in the paragraph.
+  const text = blankComments(p.text);
   const segments: { from: number; text: string }[] = [];
-  for (const s of p.spans) { if (s.from > at) segments.push({ from: at, text: p.text.slice(at, s.from) }); at = s.to; }
-  if (at < p.text.length) segments.push({ from: at, text: p.text.slice(at) });
+  for (const s of p.spans) { if (s.from > at) segments.push({ from: at, text: text.slice(at, s.from) }); at = s.to; }
+  if (at < text.length) segments.push({ from: at, text: text.slice(at) });
   for (const seg of segments) {
     const tokens = tokenize(seg.text);
     for (let i = 0; i < tokens.length; i++) {

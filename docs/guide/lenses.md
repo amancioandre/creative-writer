@@ -38,15 +38,15 @@ The page colours only what it is sure of, and leaves the rest to you:
 
 - **dialogue tag**: a name next to a speech verb in the paragraph, *“Yes, well,” Tomas said.* Certain.
 - **named in the paragraph**: the one character named outside the quotes, *“You came alone?” Tomas did not look up.* An action beat is as good as a tag. Certain.
-- **pinned by you**: the speaker box's choice, kept as a hidden comment at the start of the paragraph, `%% Tomas %%`. Certain.
+- **pinned by you**: the speaker box's choice, kept as a hidden comment right before the sentence, `%% Tomas %% “Aye.”`. Certain. A sentence pinned on its own keeps its speaker even when the rest of the paragraph is someone else's.
 - **turn-taking**: the voice before the last one in a two-voice exchange, or, when only one voice has spoken, the one other character named in the scene. A guess: the line stays grey, and the guess is the box's first offer.
 - **speaker not found**: grey. More than two narration paragraphs since the last line, or a heading or scene break, starts the exchange over.
 
 ### The speaker box
 
-Hover a grey line and the box appears: the cast as chips in their colours, *Not speech* for quotes that are not dialogue (a sign, a title), *Unpin* when the line is pinned. Click a chip and the pin is written, a hidden comment Obsidian never renders and the manuscript export strips; Ctrl+Z takes it back like any edit. When the cursor rests in a line nobody is sure about, the box opens by itself, passive, so a click is enough while you read with the keyboard; **Tag box opens by itself** under Settings → Lenses turns that off. The command **Dialogue: tag the speaker** opens the box armed: the arrows choose, Enter pins, Escape closes. Bind it to a key and a two-voice scene is one keystroke a line, since a pin feeds the turns after it.
+Hover a grey sentence and the box appears: the cast as chips in their colours, *Not speech* for quotes that are not dialogue (a sign, a title), *Unpin* when the sentence is pinned. Click a chip and the pin is written right before that sentence, a hidden comment Obsidian never renders and the manuscript export strips; Ctrl+Z takes it back like any edit. Only a short name, or one the cast knows, standing before a sentence is read as a pin; your other comments are left alone. When the cursor rests in a line nobody is sure about, the box opens by itself, passive, so a click is enough while you read with the keyboard; **Tag box opens by itself** under Settings → Lenses turns that off. The command **Dialogue: tag the speaker** opens the box armed: the arrows choose, Enter pins, Escape closes. Bind it to a key and a two-voice scene is one keystroke a line, since a pin feeds the turns after it.
 
-The [manuscript page](/guide/manuscript) has the same box under its **Voices** toggle, a stripe per paragraph instead of tints, so a whole book can be read and pinned in one pass.
+The [manuscript page](/guide/manuscript) has the same tints and the same box under its **Voices** toggle, so a whole book can be read and pinned in one pass.
 
 Switch **Speaker colours** off for one colour and no attribution.
 

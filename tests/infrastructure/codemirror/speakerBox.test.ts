@@ -12,11 +12,15 @@ const chips = (h: Harness) => Array.from(box(h)?.querySelectorAll<HTMLElement>("
 const key = (h: Harness, k: string) => h.view.contentDOM.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
 
 describe("pinChange", () => {
-  const p = (text: string, pin: BoxParagraph["pin"]): BoxParagraph => ({ from: 10, to: 10 + text.length, spans: [], attribution: null, pin });
-  it("writes a pin before the paragraph, replaces one that is there, and removes one with its space", () => {
-    expect(pinChange(p("“Yes.”", null), "Mara")).toEqual({ from: 10, to: 10, insert: "%% Mara %% " });
-    expect(pinChange(p("%% Mara %% “Yes.”", { from: 0, to: 11, label: "Mara", notSpeech: false }), "Tomas")).toEqual({ from: 10, to: 21, insert: "%% Tomas %% " });
-    expect(pinChange(p("%% Mara %% “Yes.”", { from: 0, to: 11, label: "Mara", notSpeech: false }), null)).toEqual({ from: 10, to: 21, insert: "" });
+  const span = (from: number, to: number) => ({ from, to, kind: "speech" as const });
+  const p = (spans: BoxParagraph["spans"], pins: BoxParagraph["pins"]): BoxParagraph => ({ from: 10, to: 60, spans, pins, attribution: null, voices: spans.map(() => null) });
+  it("writes a pin before the sentence, replaces one that is there, and removes one with its space", () => {
+    expect(pinChange(p([span(16, 22)], []), 0, "Mara")).toEqual({ from: 26, to: 26, insert: "%% Mara %% " });
+    const pinned = p([span(11, 17)], [{ from: 0, to: 11, label: "Mara", notSpeech: false }]);
+    expect(pinChange(pinned, 0, "Tomas")).toEqual({ from: 10, to: 21, insert: "%% Tomas %% " });
+    expect(pinChange(pinned, 0, null)).toEqual({ from: 10, to: 21, insert: "" });
+    // A paragraph pinned "not speech" has no sentence left; the pin itself is the target.
+    expect(pinChange(p([], [{ from: 0, to: 17, label: "not speech", notSpeech: true }]), -1, null)).toEqual({ from: 10, to: 27, insert: "" });
   });
 });
 
@@ -38,6 +42,14 @@ describe("speaker box", () => {
     expect(box(h)).toBeNull();
     const styles = Array.from(h.view.dom.querySelectorAll<HTMLElement>(".czm-speech")).map((m) => m.getAttribute("style"));
     expect(styles).toEqual(["--czm-speech: #222222", "--czm-speech: #222222"]);
+  });
+
+  it("puts the pin right before the sentence it names, not at the start of the paragraph", () => {
+    h = mount("Mara looked up. “Yes.”", ext(), { lens: "dialogue" });
+    h.moveCursor(20);
+    h.view.dispatch({ effects: tagSpeaker.of(null) });
+    key(h, "Enter");
+    expect(h.view.state.doc.toString()).toBe("Mara looked up. %% Mara %% “Yes.”");
   });
 
   it("a click on a chip pins too, and Unpin takes the comment away", () => {

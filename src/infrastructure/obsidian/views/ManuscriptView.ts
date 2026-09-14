@@ -15,7 +15,8 @@ import { EMPTY_FACTS, NO_SECTION, easeLevel, type CastMember, type GutterMark, t
 import type { EntityKind } from "../../../domain/story/StoryGraph";
 import type { DialogueConventions } from "../../../domain/dialogue/DialogueSpans";
 import { HOW_LABELS, NOT_SPEECH, UNATTRIBUTED_COLOUR, isCertain, type Speaker } from "../../../domain/dialogue/Speakers";
-import { attributeBlocks, type VoicedBlock } from "../../../domain/dialogue/Voices";
+import { attributeBlocks, pinBlock, type VoicedBlock } from "../../../domain/dialogue/Voices";
+import { pinBefore } from "../../../domain/dialogue/Speakers";
 
 export const MANUSCRIPT_VIEW_TYPE = "creative-writer-manuscript";
 
@@ -50,9 +51,9 @@ export interface ManuscriptSource {
   /** A candidate that is not a name: added to the project's `story-ignore`. */
   ignore(project: ProjectSpec, name: string): Promise<void>;
   /** The cast and the conventions the dialogue lens uses for this project, for the voices on the page. */
-  voices(project: ProjectSpec): { roster: readonly Speaker[]; conventions: DialogueConventions };
-  /** Pins who speaks the paragraph at `line` as a hidden comment in the note; null takes the pin away. */
-  pinSpeaker(path: string, line: number, label: string | null): Promise<void>;
+  voices(project: ProjectSpec): { roster: readonly Speaker[]; conventions: DialogueConventions; dimNarration: boolean };
+  /** Replaces the note's lines `from`..`to` (inclusive) with `text`: how a pin lands before a sentence. */
+  replaceLines(path: string, from: number, to: number, text: string): Promise<void>;
 }
 
 interface Rendered { readonly el: HTMLElement; readonly key: string }
@@ -254,7 +255,7 @@ export class ManuscriptView extends ItemView {
     toggle("ruler", "Ruler: one segment per section, wide by words, coloured by readability, marked when it changed today", settings.showRuler, "ruler");
     toggle("users", "Story: who is in each section and scene, and the model's contradictions in the gutter", settings.showStory, "story");
     toggle("repeat", "Echoes: repeated phrases marked in the gutter, each naming another place the words occur", settings.showEchoes, "echoes");
-    toggle("quote", "Voices: who speaks each paragraph, a stripe in the speaker's colour; grey when nobody is sure. Hover, or press v, to pin", settings.showVoices, "voices");
+    toggle("quote", "Voices: speech tinted by who is speaking, grey when nobody is sure. Hover a sentence, or press v, to pin", settings.showVoices, "voices");
     const exportBtn = tools.createEl("button", { cls: "clickable-icon czm-ms-tool czm-ms-export", attr: { "aria-label": "Export as one note beside the project (comments left out)", title: "Export as one note beside the project (comments left out)" } });
     setIcon(exportBtn, "file-output");
     exportBtn.addEventListener("click", () => this.run("export"));
@@ -370,65 +371,77 @@ export class ManuscriptView extends ItemView {
     }
   }
 
-  /** A stripe per spoken paragraph in its speaker's colour, grey when nobody is sure; the analysis is the dialogue lens's, over the page's blocks in order. */
+  /**
+   * The voices on the page: each sentence of speech tinted in its speaker's colour, grey when nobody is sure, as the
+   * editor does it; the analysis is the dialogue lens's, over the page's blocks in order. The tints are laid over the
+   * rendered text by finding each sentence in it, so a sentence the renderer changed beyond recognition stays plain.
+   */
   private decorateVoices(settings: ManuscriptSettings): void {
     const page = this.page;
     if (!page) return;
-    for (const old of page.querySelectorAll<HTMLElement>(".czm-ms-block.is-voiced")) { old.classList.remove("is-voiced"); old.style.removeProperty("--czm-speech"); this.voiced.delete(old); }
+    for (const old of page.querySelectorAll<HTMLElement>(".czm-ms-block.is-voiced, .czm-ms-block.is-narration")) { old.classList.remove("is-voiced", "is-narration"); this.voiced.delete(old); }
+    for (const wrap of page.querySelectorAll<HTMLElement>(".czm-ms-block .czm-speech, .czm-ms-block .czm-thought, .czm-ms-block .czm-narration")) unwrap(wrap);
     if (!settings.showVoices || !this.project) return;
-    const { roster, conventions } = this.source.voices(this.project);
+    const { roster, conventions, dimNarration } = this.source.voices(this.project);
     for (const item of this.manuscript.items) {
       if (item.kind !== "note") continue;
       const voiced = attributeBlocks(item.blocks.map((b) => ({ text: b.heading ? `# ${b.headingText}` : b.markdown })), conventions, roster);
       item.blocks.forEach((block, i) => {
         const v = voiced[i]!;
-        if (v.spans.length === 0 && !v.pin) return;
         const el = this.blockAt(item.path, block.from);
         if (!el) return;
+        if (v.spans.length === 0 && v.pins.length === 0) { if (dimNarration && block.kind === "paragraph") el.classList.add("is-narration"); return; }
         el.classList.add("is-voiced");
-        el.style.setProperty("--czm-speech", v.attribution && isCertain(v.attribution.how) ? v.attribution.speaker.colour : UNATTRIBUTED_COLOUR);
         this.voiced.set(el, v);
+        tintSentences(el, block.markdown, v, dimNarration);
       });
     }
   }
 
-  /** The speaker chips in the hover box: the cast, "not speech", "unpin"; a click writes the pin into the note. */
-  private renderVoice(pop: HTMLElement, el: HTMLElement, ref: BlockRef): void {
+  /** The speaker chips in the hover box for one sentence: the cast, "not speech", "unpin"; a click writes the pin before the sentence. */
+  private renderVoice(pop: HTMLElement, el: HTMLElement, ref: BlockRef, index: number): void {
     const v = this.voiced.get(el);
     const project = this.project;
     if (!v || !ref.block || !project) return;
     const { roster } = this.source.voices(project);
     const box = pop.createDiv({ cls: "czm-speaker-box" });
-    const a = v.attribution;
+    const span = v.spans[index];
+    const pin = span ? pinBefore(v.pins, span) : v.pins.find((x) => x.notSpeech) ?? null;
+    const a = v.voices[index] ?? null;
     const head = box.createDiv({ cls: "czm-speaker-box-head" });
-    if (v.pin?.notSpeech) head.setText("Not speech · pinned by you");
+    if (pin?.notSpeech) head.setText("Not speech · pinned by you");
     else if (a && isCertain(a.how)) head.setText(`${a.speaker.name} · ${HOW_LABELS[a.how]}`);
     else if (a) head.setText(`Speaker not certain · guess: ${a.speaker.name} (${HOW_LABELS[a.how]})`);
     else head.setText("Speaker not found");
     const chips: { label: string; colour: string | null; pin: string | null }[] = roster.map((s) => ({ label: s.name, colour: s.colour, pin: s.name }));
     if (a && !roster.some((s) => s.id === a.speaker.id)) chips.push({ label: a.speaker.name, colour: a.speaker.colour, pin: a.speaker.name });
     chips.push({ label: "Not speech", colour: null, pin: NOT_SPEECH });
-    if (v.pin) chips.push({ label: "Unpin", colour: null, pin: null });
+    if (pin) chips.push({ label: "Unpin", colour: null, pin: null });
     const row = box.createDiv({ cls: "czm-speaker-box-chips" });
-    const line = ref.block.from;
+    const { path } = ref;
+    const block = ref.block;
     for (const c of chips) {
       const chip = row.createEl("button", { cls: "czm-speaker-chip", attr: { type: "button", tabindex: "-1" } });
       if (c.colour) chip.createSpan({ cls: "czm-speaker-chip-dot" }).setCssProps({ "--czm-speech": c.colour });
       chip.createSpan({ text: c.label });
-      const isPinned = v.pin ? (v.pin.notSpeech ? c.pin === NOT_SPEECH : c.pin === v.pin.label) : false;
+      const isPinned = pin ? (pin.notSpeech ? c.pin === NOT_SPEECH : c.pin === pin.label) : false;
       chip.classList.toggle("is-pinned", isPinned);
       // The page keeps its focus through a click on a chip, so the box does not close under the pointer.
       chip.addEventListener("mousedown", (ev) => ev.preventDefault());
-      chip.addEventListener("click", () => { this.hidePop(); void this.source.pinSpeaker(ref.path, line, c.pin).then(() => this.refresh()); });
+      chip.addEventListener("click", () => {
+        this.hidePop();
+        const text = span ? pinBlock(block.markdown, v, index, c.pin) : block.markdown.slice(0, pin!.from) + (c.pin === null ? "" : `%% ${c.pin} %% `) + block.markdown.slice(pin!.to);
+        void this.source.replaceLines(path, block.from, block.to, text).then(() => this.refresh());
+      });
     }
     box.createDiv({ cls: "czm-speaker-box-hint", text: "Click a name to pin it · v on the page for the keys" });
   }
 
-  /** `v` on the page: the speaker chips of the selected paragraph take the keyboard; ← → move, Enter pins, Escape returns. */
+  /** `v` on the page: the speaker chips of the selected paragraph's first sentence take the keyboard; ← → move, Enter pins, Escape returns. */
   private focusVoice(current: HTMLElement): void {
     if (!this.voiced.get(current)) return;
     if (!this.active) this.select(current, false);
-    this.showPopFor(current);
+    this.showPopFor(current, 0);
     const chips = [...(this.pop?.querySelectorAll<HTMLElement>(".czm-speaker-chip") ?? [])];
     const first = chips.find((c) => c.classList.contains("is-pinned")) ?? chips[0];
     if (!first) return;
@@ -858,16 +871,20 @@ export class ManuscriptView extends ItemView {
   // --- hover box ----------------------------------------------------------------------------------------------
 
   private onHover(ev: MouseEvent): void {
-    const el = (ev.target as HTMLElement).closest<HTMLElement>(".czm-ms-block");
+    const target = ev.target as HTMLElement;
+    const el = target.closest<HTMLElement>(".czm-ms-block");
     if (this.hoverTimer !== null) { window.clearTimeout(this.hoverTimer); this.hoverTimer = null; }
     const ref = el ? this.refs.get(el) : undefined;
     if (!el || !ref?.block || (ref.block.annotations.length === 0 && this.conflictsFor(ref.path, ref.block).length === 0 && !this.voiced.get(el))) { this.hidePop(); return; }
-    if (this.pop?.dataset.for === keyOf(ref) && !this.pop.hidden) return;
+    // The sentence under the pointer, else the paragraph's first.
+    const sentence = target.closest<HTMLElement>("[data-czm-span]");
+    const index = sentence ? Number(sentence.dataset.czmSpan) : 0;
+    if (this.pop?.dataset.for === keyOf(ref) && this.pop.dataset.span === String(index) && !this.pop.hidden) return;
     // Intent, not passage: crossing three paragraphs on the way somewhere should not flash three boxes.
-    this.hoverTimer = window.setTimeout(() => { this.hoverTimer = null; this.showPopFor(el); }, HOVER_DELAY_MS);
+    this.hoverTimer = window.setTimeout(() => { this.hoverTimer = null; this.showPopFor(el, index); }, HOVER_DELAY_MS);
   }
 
-  private showPopFor(el: HTMLElement | null): void {
+  private showPopFor(el: HTMLElement | null, index = 0): void {
     const ref = el ? this.refs.get(el) : undefined;
     const pop = this.pop, body = this.body, page = this.page;
     const conflicts = el && ref?.block ? this.conflictsFor(ref.path, ref.block) : [];
@@ -875,11 +892,12 @@ export class ManuscriptView extends ItemView {
     if (!el || !ref?.block || (ref.block.annotations.length === 0 && conflicts.length === 0 && !voice) || !pop || !body || !page) { this.hidePop(); return; }
     pop.empty();
     pop.dataset.for = keyOf(ref);
+    pop.dataset.span = String(index);
     pop.classList.toggle("has-voice", !!voice);
     const item = { title: ref.title, path: ref.path };
     this.renderRows(pop, ref.block.annotations.map((a) => ({ item, a })), this.source.settings().tags, false);
     this.renderConflicts(pop, conflicts);
-    if (voice) this.renderVoice(pop, el, ref);
+    if (voice) this.renderVoice(pop, el, ref, index);
     for (const r of pop.querySelectorAll<HTMLElement>(".czm-ms-cm-row")) r.tabIndex = -1;
     pop.hidden = false;
     // Beside the page in the margin when there is room, else under the paragraph; never past the bottom.
@@ -894,8 +912,59 @@ export class ManuscriptView extends ItemView {
 
   private hidePop(): void {
     if (this.hoverTimer !== null) { window.clearTimeout(this.hoverTimer); this.hoverTimer = null; }
-    if (this.pop) { this.pop.hidden = true; delete this.pop.dataset.for; }
+    if (this.pop) { this.pop.hidden = true; delete this.pop.dataset.for; delete this.pop.dataset.span; }
   }
+}
+
+/** Lays the sentence tints over a rendered block: each span found in the rendered text, wrapped text node by text node. */
+function tintSentences(el: HTMLElement, markdown: string, v: VoicedBlock, dim: boolean): void {
+  const rendered = el.textContent ?? "";
+  let pos = 0;
+  v.spans.forEach((s, i) => {
+    const plain = stripInlineMarkup(markdown.slice(s.from, s.to)).replace(/\s+/g, " ").trim();
+    if (!plain) return;
+    const re = new RegExp(plain.split(" ").map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+"), "g");
+    re.lastIndex = pos;
+    const m = re.exec(rendered);
+    if (!m) return;
+    const a = v.voices[i] ?? null;
+    const colour = a && isCertain(a.how) ? a.speaker.colour : UNATTRIBUTED_COLOUR;
+    if (dim && m.index > pos) wrapText(el, pos, m.index, "czm-narration", null, null);
+    wrapText(el, m.index, m.index + m[0].length, s.kind === "speech" ? "czm-speech" : "czm-thought", colour, i);
+    pos = m.index + m[0].length;
+  });
+  if (dim && rendered.length > pos) wrapText(el, pos, rendered.length, "czm-narration", null, null);
+}
+
+/** Wraps the characters `start`..`end` of an element's text in spans, one per text node touched, splitting nodes at the edges. */
+function wrapText(root: HTMLElement, start: number, end: number, cls: string, colour: string | null, index: number | null): void {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes: { node: Text; at: number }[] = [];
+  let at = 0;
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) { nodes.push({ node: n as Text, at }); at += (n as Text).data.length; }
+  for (const { node, at: from } of nodes) {
+    const to = from + node.data.length;
+    if (to <= start || from >= end) continue;
+    let target = node;
+    if (start > from) target = target.splitText(start - from);
+    if (end < to) target.splitText(end - Math.max(start, from));
+    const parent = target.parentElement;
+    if (!parent) continue;
+    const wrap = parent.createSpan({ cls });
+    if (colour) wrap.setCssProps({ "--czm-speech": colour });
+    if (index !== null) wrap.dataset.czmSpan = String(index);
+    parent.insertBefore(wrap, target);
+    wrap.appendChild(target);
+  }
+}
+
+/** Takes a tint wrapper away, its text back where it was. */
+function unwrap(wrap: HTMLElement): void {
+  const parent = wrap.parentNode;
+  if (!parent) return;
+  while (wrap.firstChild) parent.insertBefore(wrap.firstChild, wrap);
+  wrap.remove();
+  parent.normalize();
 }
 
 function keyOf(ref: BlockRef): string {

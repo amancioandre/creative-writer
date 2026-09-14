@@ -13,7 +13,7 @@ const novel: ProjectSpec = { name: "Novel", scope: "Novel/", targetWords: 1, dea
 const seg = new IntlSentenceSegmenter();
 
 function open(notes: ManuscriptNote[], overrides: Partial<ManuscriptSource> = {}) {
-  const calls = { revealed: [] as [string, number, number, boolean][], links: [] as string[], renders: 0, exported: [] as string[], comments: [] as [string, number, string][], resolved: [] as [string, number, number][], facts: [] as [string[], boolean][], promoted: [] as [string, string][], ignored: [] as string[], builds: 0, pins: [] as [string, number, string | null][] };
+  const calls = { revealed: [] as [string, number, number, boolean][], links: [] as string[], renders: 0, exported: [] as string[], comments: [] as [string, number, string][], resolved: [] as [string, number, number][], facts: [] as [string[], boolean][], promoted: [] as [string, string][], ignored: [] as string[], builds: 0, replaced: [] as [string, number, number, string][] };
   let settings: ManuscriptSettings = DEFAULT_MANUSCRIPT;
   const src: ManuscriptSource = {
     projects: () => [novel],
@@ -32,8 +32,8 @@ function open(notes: ManuscriptNote[], overrides: Partial<ManuscriptSource> = {}
     storyColors: () => DEFAULT_STORY_COLORS,
     promote: async (_p, name, kind) => { calls.promoted.push([name, kind]); return `Novel/Characters/${name}.md`; },
     ignore: async (_p, name) => { calls.ignored.push(name); },
-    voices: () => ({ roster: [{ id: "m", name: "Mara", aliases: [], colour: "#111111", accent: [], accentNever: [] }, { id: "t", name: "Tomas", aliases: [], colour: "#222222", accent: [], accentNever: [] }], conventions: DEFAULT_CONVENTIONS }),
-    pinSpeaker: async (p, l, label) => { calls.pins.push([p, l, label]); },
+    voices: () => ({ roster: [{ id: "m", name: "Mara", aliases: [], colour: "#111111", accent: [], accentNever: [] }, { id: "t", name: "Tomas", aliases: [], colour: "#222222", accent: [], accentNever: [] }], conventions: DEFAULT_CONVENTIONS, dimNarration: true }),
+    replaceLines: async (p, from, to, text) => { calls.replaced.push([p, from, to, text]); },
     jumpTo: () => undefined,
     ...overrides,
   };
@@ -432,12 +432,17 @@ describe("ManuscriptView — voices", () => {
   const talk = "Mara came in.\n\n“You came alone?” Tomas did not look up.\n\n“Yes.”\n\n%% not speech %% “A sign on the door.”\n\nRain.";
   const voiced = (overrides: Partial<ManuscriptSource> = {}) => open([{ path: "Novel/Part One/01 Chapter One.md", frontmatter: {}, text: talk }], { settings: () => ({ ...DEFAULT_MANUSCRIPT, showVoices: true }), ...overrides });
 
-  it("stripes each spoken paragraph in its speaker's colour, grey when nobody is sure, and leaves narration alone", async () => {
+  it("tints each sentence of speech in its speaker's colour, grey when nobody is sure, and dims the narration", async () => {
     const { v } = voiced();
     await v.onOpen();
     const blocks = [...v.contentEl.querySelectorAll<HTMLElement>(".czm-ms-block")];
     expect(blocks.map((b) => b.classList.contains("is-voiced"))).toEqual([false, true, true, true, false]);
-    expect(blocks.map((b) => b.style.getPropertyValue("--czm-speech"))).toEqual(["", "#222222", "#8a8a8a", "#8a8a8a", ""]);
+    expect(blocks.map((b) => b.classList.contains("is-narration"))).toEqual([true, false, false, false, true]);
+    const speech = [...v.contentEl.querySelectorAll<HTMLElement>(".czm-ms-block .czm-speech")];
+    expect(speech.map((s) => [s.textContent, s.style.getPropertyValue("--czm-speech"), s.dataset.czmSpan])).toEqual([["“You came alone?”", "#222222", "0"], ["“Yes.”", "#8a8a8a", "0"]]);
+    // The paragraph pinned "not speech" is narration through and through (the fake renderer keeps the comment text).
+    expect([...v.contentEl.querySelectorAll<HTMLElement>(".czm-ms-block .czm-narration")].map((n) => n.textContent)).toEqual([" Tomas did not look up.", "%% not speech %% “A sign on the door.”"]);
+    expect(blocks[1]!.textContent).toBe("“You came alone?” Tomas did not look up.");
   });
 
   it("shows the speaker chips in the hover box and pins from a click", async () => {
@@ -453,7 +458,7 @@ describe("ManuscriptView — voices", () => {
     const chips = [...pop.querySelectorAll<HTMLButtonElement>(".czm-speaker-chip")];
     expect(chips.map((c) => c.textContent)).toEqual(["Mara", "Tomas", "Not speech"]);
     chips[1]!.click();
-    expect(calls.pins).toEqual([["Novel/Part One/01 Chapter One.md", 4, "Tomas"]]);
+    expect(calls.replaced).toEqual([["Novel/Part One/01 Chapter One.md", 4, 4, "%% Tomas %% “Yes.”"]]);
     expect(pop.hidden).toBe(true);
   });
 
@@ -472,12 +477,24 @@ describe("ManuscriptView — voices", () => {
     key(chips[2]!, "ArrowRight");
     expect(document.activeElement).toBe(chips[3]);
     (document.activeElement as HTMLButtonElement).click();
-    expect(calls.pins).toEqual([["Novel/Part One/01 Chapter One.md", 6, null]]);
+    expect(calls.replaced).toEqual([["Novel/Part One/01 Chapter One.md", 6, 6, "“A sign on the door.”"]]);
   });
 
-  it("draws no stripes with voices off", async () => {
-    const { v } = open([{ path: "Novel/Part One/01 Chapter One.md", frontmatter: {}, text: talk }]);
+  it("pins the sentence under the pointer, not the paragraph's first, and tints nothing with voices off", async () => {
+    const two = "Mara came in.\n\n“You came alone?” Tomas did not look up. “Well?”";
+    const { v, calls } = open([{ path: "Novel/Part One/01 Chapter One.md", frontmatter: {}, text: two }], { settings: () => ({ ...DEFAULT_MANUSCRIPT, showVoices: true }) });
     await v.onOpen();
-    expect(v.contentEl.querySelectorAll(".is-voiced")).toHaveLength(0);
+    const second = v.contentEl.querySelectorAll<HTMLElement>(".czm-ms-block .czm-speech")[1]!;
+    expect(second.textContent).toBe("“Well?”");
+    second.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 250));
+    const pop = v.contentEl.querySelector<HTMLElement>(".czm-ms-pop")!;
+    expect(pop.dataset.span).toBe("1");
+    pop.querySelectorAll<HTMLButtonElement>(".czm-speaker-chip")[0]!.click();
+    expect(calls.replaced).toEqual([["Novel/Part One/01 Chapter One.md", 2, 2, "“You came alone?” Tomas did not look up. %% Mara %% “Well?”"]]);
+    v.contentEl.remove();
+    const { v: off } = open([{ path: "Novel/Part One/01 Chapter One.md", frontmatter: {}, text: talk }]);
+    await off.onOpen();
+    expect(off.contentEl.querySelectorAll(".is-voiced, .czm-speech")).toHaveLength(0);
   });
 });

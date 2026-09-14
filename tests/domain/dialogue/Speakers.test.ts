@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { SPEAKER_PALETTE, attributeSpeakers, buildRoster, isCertain, pinComment, pinOf, type Speaker, type SpokenParagraph } from "../../../src/domain/dialogue/Speakers";
+import { SPEAKER_PALETTE, applyPins, attributeParagraphs, attributeSpeakers, buildRoster, isCertain, knownTo, pinComment, pinEdit, pinOf, pinsIn, type Speaker, type SpokenParagraph } from "../../../src/domain/dialogue/Speakers";
 import { DEFAULT_CONVENTIONS, findDialogue } from "../../../src/domain/dialogue/DialogueSpans";
 
 const notes = [
@@ -95,6 +95,35 @@ describe("pins", () => {
     expect(isCertain("tag")).toBe(true);
     expect(isCertain("named")).toBe(true);
     expect(isCertain("turns")).toBe(false);
+  });
+  it("finds a pin at the start or right before a sentence, and leaves other comments alone", () => {
+    const text = "%% TODO: cut %% Mara looked up. %% Tomas %% “Aye.” %% remember the lamp %% “No.” %% the Roarthian %% “Aye.”";
+    const spans = findDialogue(text, DEFAULT_CONVENTIONS);
+    // Two words or fewer read as a name even with no note; longer needs the cast to know it; a colon is never a pin.
+    expect(pinsIn(text, spans).map((p) => p.label)).toEqual(["Tomas", "the Roarthian"]);
+    const longer = "%% Tomas of the Gate %% “Aye.” %% remember the lamp %% “No.”";
+    const roarth = { ...roster[1]!, aliases: ["Tomas of the Gate"] };
+    expect(pinsIn(longer, findDialogue(longer, DEFAULT_CONVENTIONS)).map((p) => p.label)).toEqual([]);
+    expect(pinsIn(longer, findDialogue(longer, DEFAULT_CONVENTIONS), knownTo([roarth])).map((p) => p.label)).toEqual(["Tomas of the Gate"]);
+    expect(pinsIn("%% Mara %% _A thought._", [])[0]!.label).toBe("Mara");
+    const applied = applyPins("%% not speech %% “A sign.” “Real.”", findDialogue("                 “A sign.” “Real.”", DEFAULT_CONVENTIONS));
+    expect(applied.spans.map((s) => s.from)).toEqual([27]);
+    expect(applyPins("%% not speech %% _A thought._", findDialogue("                 _A thought._", DEFAULT_CONVENTIONS)).spans).toEqual([]);
+  });
+  it("edits the pin before a sentence: written, replaced, removed", () => {
+    const text = "Mara looked up. %% Tomas %% “Aye.” “No.”";
+    const spans = findDialogue(text, DEFAULT_CONVENTIONS);
+    const pins = pinsIn(text, spans);
+    expect(pinEdit(pins, spans[0]!, "Mara")).toEqual({ from: 16, to: 28, insert: "%% Mara %% " });
+    expect(pinEdit(pins, spans[0]!, null)).toEqual({ from: 16, to: 28, insert: "" });
+    expect(pinEdit(pins, spans[1]!, "Mara")).toEqual({ from: spans[1]!.from, to: spans[1]!.from, insert: "%% Mara %% " });
+  });
+  it("a sentence pinned on its own keeps its speaker, and the last voice takes the turn", () => {
+    const text = "“Go,” Tomas said. %% Mara %% “No.”";
+    const p = { text, ...applyPins(text, findDialogue(text, DEFAULT_CONVENTIONS)) };
+    const [out] = attributeParagraphs([p, para("“Fine.”")], roster);
+    expect(out!.spans.map((a) => `${a!.speaker.name}/${a!.how}`)).toEqual(["Tomas/tag", "Mara/pinned"]);
+    expect(attributeParagraphs([p, para("“Fine.”")], roster)[1]!.attribution?.speaker.name).toBe("Tomas");
   });
   it("a pin wins over everything, feeds the turns after it, and an unknown name becomes a speaker with its own colour", () => {
     const texts = ["%% Mara %% “Yes,” Tomas said.", "“No.”", "%% The Keeper %% “Out.”", "%% The Keeper %% “Now.”"];

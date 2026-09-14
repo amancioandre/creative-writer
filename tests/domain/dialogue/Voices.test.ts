@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { attributeBlocks, pinLine } from "../../../src/domain/dialogue/Voices";
+import { attributeBlocks, pinBlock } from "../../../src/domain/dialogue/Voices";
 import { DEFAULT_CONVENTIONS } from "../../../src/domain/dialogue/DialogueSpans";
 import type { Speaker } from "../../../src/domain/dialogue/Speakers";
 
@@ -12,18 +12,20 @@ describe("attributeBlocks", () => {
     ], DEFAULT_CONVENTIONS, roster);
     expect(out.map((b) => [b.spans.length, b.attribution ? `${b.attribution.speaker.name}/${b.attribution.how}` : null])).toEqual([[0, null], [1, "Tomas/named"], [1, "Mara/turns"], [0, null], [1, "Mara/pinned"], [0, null]]);
     expect(out[5]!.pin?.notSpeech).toBe(true);
+    expect(out[4]!.voices[0]?.how).toBe("pinned");
   });
 });
 
-describe("pinLine", () => {
-  const note = "# One\n\n“Yes.”\n\n  %% Mara %% “No.”";
-  it("writes, replaces and removes a pin on one line, keeping indentation", () => {
-    expect(pinLine(note, 2, "Tomas").split("\n")[2]).toBe("%% Tomas %% “Yes.”");
-    expect(pinLine(note, 4, "Tomas").split("\n")[4]).toBe("  %% Tomas %% “No.”");
-    expect(pinLine(note, 4, null).split("\n")[4]).toBe("  “No.”");
-    expect(pinLine(note, 2, null)).toBe(note);
-  });
-  it("clamps the line", () => {
-    expect(pinLine("a", 9, "Mara")).toBe("%% Mara %% a");
+describe("pinBlock", () => {
+  it("writes, replaces and removes the pin before a block's sentence", () => {
+    const md = "Mara looked up. “Yes.” “No.”";
+    const [v] = attributeBlocks([{ text: md }], DEFAULT_CONVENTIONS, roster);
+    expect(pinBlock(md, v!, 1, "Tomas")).toBe("Mara looked up. “Yes.” %% Tomas %% “No.”");
+    const pinned = pinBlock(md, v!, 0, "Tomas");
+    expect(pinned).toBe("Mara looked up. %% Tomas %% “Yes.” “No.”");
+    const [w] = attributeBlocks([{ text: pinned }], DEFAULT_CONVENTIONS, roster);
+    expect(pinBlock(pinned, w!, 0, "Mara")).toBe("Mara looked up. %% Mara %% “Yes.” “No.”");
+    expect(pinBlock(pinned, w!, 0, null)).toBe(md);
+    expect(pinBlock(md, v!, 9, "Mara")).toBe(md);
   });
 });
