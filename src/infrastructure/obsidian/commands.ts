@@ -68,6 +68,7 @@ export const COMMANDS = {
   "manuscript-ruler": "Manuscript: toggle the ruler",
   "manuscript-story": "Manuscript: toggle story marks",
   "manuscript-echoes": "Manuscript: toggle echoes",
+  "manuscript-voices": "Manuscript: toggle voices",
   "export-manuscript": "Export manuscript to a note",
 } as const;
 

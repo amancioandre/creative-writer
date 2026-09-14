@@ -52,6 +52,8 @@ import { EMPTY_WORD_LISTS, wordListsFacet, wordsExtension } from "./infrastructu
 import { lensExtension } from "./infrastructure/codemirror/lensExtension";
 import { conventionsFacet, dialogueExtension, rostersFacet, type ConventionsByScope, type RostersByScope } from "./infrastructure/codemirror/dialogueExtension";
 import { buildRoster } from "./domain/dialogue/Speakers";
+import { resolveConventions } from "./domain/dialogue/DialogueSpans";
+import { pinLine } from "./domain/dialogue/Voices";
 import type { EntityNote } from "./domain/story/EntityIndex";
 import { loadWordLists } from "./infrastructure/obsidian/VaultWordLists";
 import { lensMenu } from "./infrastructure/obsidian/lensMenu";
@@ -629,6 +631,9 @@ export default class CreativeZenModePlugin extends Plugin {
       exportNote,
       appendComment: (path, line, comment) => this.appendComment(path, line, comment),
       toggleResolved: (path, line, ch) => this.editNote(path, (text) => toggleResolved(text, line, ch)),
+      // The same cast and conventions the dialogue lens uses, so the page and the editor agree on who speaks.
+      voices: (project) => ({ roster: this.projectRosters()[project.scope] ?? [], conventions: resolveConventions(this.current.dialogue, this.projectConventions()[project.scope]) }),
+      pinSpeaker: (path, line, label) => this.editNote(path, (text) => pinLine(text, line, label)),
       // Readability from the same profiler as the desk, today's words from the log, cast and contradictions from the map and threads.
       facts: async (project, paths, story, echoes = false) => {
         const texts = new Map((await projectNotes.notes(project)).map((n) => [n.path, n.text ?? ""]));
@@ -651,7 +656,7 @@ export default class CreativeZenModePlugin extends Plugin {
       ignore: (project, name) => this.editList(project.notePath, "story-ignore", (list) => [...list.filter((n) => n !== name), name]),
     }));
     this.addCommand({ id: "open-manuscript", name: COMMANDS["open-manuscript"], callback: () => void this.openManuscript(null) });
-    this.viewCommands(ManuscriptView, [["manuscript-prose-only", "prose-only"], ["manuscript-comments", "comments"], ["manuscript-ruler", "ruler"], ["manuscript-story", "story"], ["manuscript-echoes", "echoes"]]);
+    this.viewCommands(ManuscriptView, [["manuscript-prose-only", "prose-only"], ["manuscript-comments", "comments"], ["manuscript-ruler", "ruler"], ["manuscript-story", "story"], ["manuscript-echoes", "echoes"], ["manuscript-voices", "voices"]]);
     this.addCommand({
       id: "return-to-manuscript",
       name: "Return to manuscript",

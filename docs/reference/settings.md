@@ -72,6 +72,7 @@ Three groups for the [manuscript](/guide/manuscript) page. *Prose only* and the 
 | Story on the page | off | Cast lines and scene cast in the map's colours, the model's contradictions and the anchored stops of directed threads in the gutter. Builds the story map on each refresh, so it is off by default. |
 | Echoes on the page | off | The echo finder's repeated phrases as marks in the gutter, each naming another place the words occur. Builds the story threads on each refresh. |
 | Echo sensitivity | Medium | How many [echoes](/guide/story-threads#echoes) the page and the story threads view hear: *Low* reports only the plainest repeats (four-word phrases, near-identical sentences), *Medium* three-word phrases and sentences six content words long that are 60% alike, *High* shorter phrases and looser sentences. One choice instead of a knob per threshold. |
+| Voices on the page | off | Who speaks each paragraph, a stripe in the speaker's colour, grey when nobody is sure; the hover box pins. Also a toggle at the top of the page. |
 | Reading speed | 250 | Words per minute behind the reading time at the top of the page and beside each section. 100 to 600; adults read prose at about 250. |
 
 ## Stories and goals

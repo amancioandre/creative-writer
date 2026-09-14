@@ -961,3 +961,7 @@ body.czm-zen .cm-line .czm-accent-uses, body.czm-zen .cm-line .czm-accent-never 
 .czm-speaker-chip.is-pinned { color: var(--text-normal); background: color-mix(in srgb, var(--interactive-accent) 18%, transparent); }
 .czm-speaker-chip-dot { width: 8px; height: 8px; border-radius: 2px; background: var(--czm-speech, #8a8a8a); }
 .czm-speaker-box-hint { margin-top: 4px; font-size: var(--font-ui-smaller); color: var(--text-faint); }
+/* Voices on the manuscript page: a stripe per spoken paragraph in the speaker's colour, grey when nobody is sure; the hover box pins. */
+.czm-ms-block.is-voiced { box-shadow: inset 3px 0 0 var(--czm-speech, var(--text-faint)); }
+.czm-ms-pop.has-voice { pointer-events: auto; }
+.czm-ms-pop .czm-speaker-box { padding: 4px 6px; }

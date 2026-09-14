@@ -166,16 +166,18 @@ export interface ManuscriptSettings extends ManuscriptOptions {
   readonly readingSpeed: number;
   /** The echo finder's phrases as marks in the gutter, each naming another place the words occur. Costs a threads build. */
   readonly showEchoes: boolean;
+  /** Who speaks each paragraph, as a stripe in the speaker's colour; grey when nobody is sure. The hover box pins. */
+  readonly showVoices: boolean;
 }
 
 export const DEFAULT_MANUSCRIPT: ManuscriptSettings = {
   folderDepth: 2, noteTitles: true, stripPrefix: DEFAULT_STRIP_PREFIX, demoteHeadings: true, proseOnly: false,
-  showComments: true, tintTags: true, tags: DEFAULT_TAGS, showRuler: true, showStory: false, readingSpeed: DEFAULT_READING_SPEED, showEchoes: false,
+  showComments: true, tintTags: true, tags: DEFAULT_TAGS, showRuler: true, showStory: false, readingSpeed: DEFAULT_READING_SPEED, showEchoes: false, showVoices: false,
 };
 
 export function normalizeManuscript(raw: unknown): ManuscriptSettings {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  const bool = (key: "noteTitles" | "demoteHeadings" | "proseOnly" | "showComments" | "tintTags" | "showRuler" | "showStory" | "showEchoes") => (typeof r[key] === "boolean" ? r[key] : DEFAULT_MANUSCRIPT[key]);
+  const bool = (key: "noteTitles" | "demoteHeadings" | "proseOnly" | "showComments" | "tintTags" | "showRuler" | "showStory" | "showEchoes" | "showVoices") => (typeof r[key] === "boolean" ? r[key] : DEFAULT_MANUSCRIPT[key]);
   return {
     folderDepth: typeof r.folderDepth === "number" && Number.isFinite(r.folderDepth) ? clampInt(r.folderDepth, 0, 6) : DEFAULT_MANUSCRIPT.folderDepth,
     noteTitles: bool("noteTitles"),
@@ -188,6 +190,7 @@ export function normalizeManuscript(raw: unknown): ManuscriptSettings {
     showRuler: bool("showRuler"),
     showStory: bool("showStory"),
     showEchoes: bool("showEchoes"),
+    showVoices: bool("showVoices"),
     readingSpeed: typeof r.readingSpeed === "number" && Number.isFinite(r.readingSpeed) ? clampInt(r.readingSpeed, MIN_READING_SPEED, MAX_READING_SPEED) : DEFAULT_MANUSCRIPT.readingSpeed,
   };
 }

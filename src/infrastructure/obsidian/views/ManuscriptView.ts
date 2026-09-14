@@ -1,7 +1,7 @@
 import { ItemView, Menu, Notice, setIcon, type WorkspaceLeaf } from "obsidian";
 import { overflowButton, renderJumps, type MenuEntry, type PanelId } from "./PanelShell";
 
-export type ManuscriptAction = "prose-only" | "comments" | "ruler" | "story" | "echoes" | "export";
+export type ManuscriptAction = "prose-only" | "comments" | "ruler" | "story" | "echoes" | "voices" | "export";
 import { onActivate } from "./keys";
 import type { ProjectSpec } from "../../../domain/progress/Project";
 import { EMPTY_MANUSCRIPT, type Manuscript, type ManuscriptBlock, type NoteItem } from "../../../domain/manuscript/Manuscript";
@@ -13,6 +13,9 @@ import type { Sentence } from "../../../domain/rhythm/Sentence";
 import type { ManuscriptSettings } from "../../../domain/settings/Settings";
 import { EMPTY_FACTS, NO_SECTION, easeLevel, type CastMember, type GutterMark, type StoryFacts } from "../../../domain/manuscript/StoryFacts";
 import type { EntityKind } from "../../../domain/story/StoryGraph";
+import type { DialogueConventions } from "../../../domain/dialogue/DialogueSpans";
+import { HOW_LABELS, NOT_SPEECH, UNATTRIBUTED_COLOUR, isCertain, type Speaker } from "../../../domain/dialogue/Speakers";
+import { attributeBlocks, type VoicedBlock } from "../../../domain/dialogue/Voices";
 
 export const MANUSCRIPT_VIEW_TYPE = "creative-writer-manuscript";
 
@@ -46,6 +49,10 @@ export interface ManuscriptSource {
   promote(project: ProjectSpec, name: string, kind: EntityKind): Promise<string>;
   /** A candidate that is not a name: added to the project's `story-ignore`. */
   ignore(project: ProjectSpec, name: string): Promise<void>;
+  /** The cast and the conventions the dialogue lens uses for this project, for the voices on the page. */
+  voices(project: ProjectSpec): { roster: readonly Speaker[]; conventions: DialogueConventions };
+  /** Pins who speaks the paragraph at `line` as a hidden comment in the note; null takes the pin away. */
+  pinSpeaker(path: string, line: number, label: string | null): Promise<void>;
 }
 
 interface Rendered { readonly el: HTMLElement; readonly key: string }
@@ -92,6 +99,8 @@ export class ManuscriptView extends ItemView {
   private focusComposer = false;
   private readonly rendered = new Map<string, Rendered>();
   private readonly refs = new WeakMap<HTMLElement, BlockRef>();
+  /** Who speaks each block, while voices are on. */
+  private readonly voiced = new WeakMap<HTMLElement, VoicedBlock>();
 
   constructor(leaf: WorkspaceLeaf, private readonly source: ManuscriptSource) {
     super(leaf);
@@ -118,9 +127,14 @@ export class ManuscriptView extends ItemView {
       this.page.addEventListener("dblclick", (ev) => this.onDoubleClick(ev));
       this.page.addEventListener("keydown", (ev) => this.onPageKey(ev));
       this.page.addEventListener("mouseover", (ev) => this.onHover(ev));
-      this.page.addEventListener("mouseleave", () => this.hidePop());
+      // Into the box is not away: the chips in it are there to be clicked.
+      const intoPop = (ev: { relatedTarget: EventTarget | null }) => ev.relatedTarget instanceof Node && !!this.pop?.contains(ev.relatedTarget);
+      this.page.addEventListener("mouseleave", (ev) => { if (!intoPop(ev)) this.hidePop(); });
       this.page.addEventListener("focusin", (ev) => this.showPopFor((ev.target as HTMLElement).closest<HTMLElement>(".czm-ms-block")));
-      this.page.addEventListener("focusout", () => this.hidePop());
+      this.page.addEventListener("focusout", (ev) => { if (!intoPop(ev)) this.hidePop(); });
+      this.pop.addEventListener("mouseleave", (ev) => { if (!(ev.relatedTarget instanceof Node && this.page?.contains(ev.relatedTarget))) this.hidePop(); });
+      this.pop.addEventListener("focusout", (ev) => { if (!intoPop(ev) && !(ev.relatedTarget instanceof Node && this.page?.contains(ev.relatedTarget))) this.hidePop(); });
+      this.pop.addEventListener("keydown", (ev) => this.onPopKey(ev));
       if (typeof ResizeObserver === "function") {
         const ro = new ResizeObserver(() => root.classList.toggle("is-narrow", root.clientWidth > 0 && root.clientWidth < NARROW_WIDTH));
         ro.observe(root);
@@ -240,6 +254,7 @@ export class ManuscriptView extends ItemView {
     toggle("ruler", "Ruler: one segment per section, wide by words, coloured by readability, marked when it changed today", settings.showRuler, "ruler");
     toggle("users", "Story: who is in each section and scene, and the model's contradictions in the gutter", settings.showStory, "story");
     toggle("repeat", "Echoes: repeated phrases marked in the gutter, each naming another place the words occur", settings.showEchoes, "echoes");
+    toggle("quote", "Voices: who speaks each paragraph, a stripe in the speaker's colour; grey when nobody is sure. Hover, or press v, to pin", settings.showVoices, "voices");
     const exportBtn = tools.createEl("button", { cls: "clickable-icon czm-ms-tool czm-ms-export", attr: { "aria-label": "Export as one note beside the project (comments left out)", title: "Export as one note beside the project (comments left out)" } });
     setIcon(exportBtn, "file-output");
     exportBtn.addEventListener("click", () => this.run("export"));
@@ -256,6 +271,7 @@ export class ManuscriptView extends ItemView {
       case "ruler": set({ ...s, showRuler: !s.showRuler }); break;
       case "story": set({ ...s, showStory: !s.showStory }); break;
       case "echoes": set({ ...s, showEchoes: !s.showEchoes }); break;
+      case "voices": set({ ...s, showVoices: !s.showVoices }); break;
       case "export": this.export(); break;
     }
   }
@@ -280,6 +296,7 @@ export class ManuscriptView extends ItemView {
       { label: "Ruler", icon: "ruler", command: "manuscript-ruler", checked: s.showRuler, onClick: () => this.run("ruler") },
       { label: "Story marks", icon: "users", command: "manuscript-story", checked: s.showStory, onClick: () => this.run("story") },
       { label: "Echoes", icon: "repeat", command: "manuscript-echoes", checked: s.showEchoes, onClick: () => this.run("echoes") },
+      { label: "Voices", icon: "quote", command: "manuscript-voices", checked: s.showVoices, onClick: () => this.run("voices") },
       "-",
       { label: "Export as one note", icon: "file-output", command: "export-manuscript", disabled: !this.project, onClick: () => this.run("export") },
     ];
@@ -328,11 +345,12 @@ export class ManuscriptView extends ItemView {
 
   // --- story on the page --------------------------------------------------------------------------------------
 
-  /** Cast lines under the titles and contradiction marks in the gutter: laid over the cached note elements on every render. */
+  /** Cast lines under the titles, contradiction marks in the gutter, and the voice stripes: laid over the cached note elements on every render. */
   private decorate(settings: ManuscriptSettings): void {
     const page = this.page;
     if (!page) return;
     for (const old of page.querySelectorAll(".czm-ms-cast, .czm-ms-mark.is-story")) old.remove();
+    this.decorateVoices(settings);
     if (!settings.showStory && !settings.showEchoes) return;
     for (const noteEl of page.querySelectorAll<HTMLElement>(".czm-ms-note")) {
       if (!settings.showStory) break;
@@ -350,6 +368,82 @@ export class ManuscriptView extends ItemView {
       // The mark is the way to the other end: a click or Enter takes the page there, the editor following.
       onActivate(mark, (ev) => { ev.stopPropagation(); this.goTo(c.otherPath, c.otherLine); });
     }
+  }
+
+  /** A stripe per spoken paragraph in its speaker's colour, grey when nobody is sure; the analysis is the dialogue lens's, over the page's blocks in order. */
+  private decorateVoices(settings: ManuscriptSettings): void {
+    const page = this.page;
+    if (!page) return;
+    for (const old of page.querySelectorAll<HTMLElement>(".czm-ms-block.is-voiced")) { old.classList.remove("is-voiced"); old.style.removeProperty("--czm-speech"); this.voiced.delete(old); }
+    if (!settings.showVoices || !this.project) return;
+    const { roster, conventions } = this.source.voices(this.project);
+    for (const item of this.manuscript.items) {
+      if (item.kind !== "note") continue;
+      const voiced = attributeBlocks(item.blocks.map((b) => ({ text: b.heading ? `# ${b.headingText}` : b.markdown })), conventions, roster);
+      item.blocks.forEach((block, i) => {
+        const v = voiced[i]!;
+        if (v.spans.length === 0 && !v.pin) return;
+        const el = this.blockAt(item.path, block.from);
+        if (!el) return;
+        el.classList.add("is-voiced");
+        el.style.setProperty("--czm-speech", v.attribution && isCertain(v.attribution.how) ? v.attribution.speaker.colour : UNATTRIBUTED_COLOUR);
+        this.voiced.set(el, v);
+      });
+    }
+  }
+
+  /** The speaker chips in the hover box: the cast, "not speech", "unpin"; a click writes the pin into the note. */
+  private renderVoice(pop: HTMLElement, el: HTMLElement, ref: BlockRef): void {
+    const v = this.voiced.get(el);
+    const project = this.project;
+    if (!v || !ref.block || !project) return;
+    const { roster } = this.source.voices(project);
+    const box = pop.createDiv({ cls: "czm-speaker-box" });
+    const a = v.attribution;
+    const head = box.createDiv({ cls: "czm-speaker-box-head" });
+    if (v.pin?.notSpeech) head.setText("Not speech · pinned by you");
+    else if (a && isCertain(a.how)) head.setText(`${a.speaker.name} · ${HOW_LABELS[a.how]}`);
+    else if (a) head.setText(`Speaker not certain · guess: ${a.speaker.name} (${HOW_LABELS[a.how]})`);
+    else head.setText("Speaker not found");
+    const chips: { label: string; colour: string | null; pin: string | null }[] = roster.map((s) => ({ label: s.name, colour: s.colour, pin: s.name }));
+    if (a && !roster.some((s) => s.id === a.speaker.id)) chips.push({ label: a.speaker.name, colour: a.speaker.colour, pin: a.speaker.name });
+    chips.push({ label: "Not speech", colour: null, pin: NOT_SPEECH });
+    if (v.pin) chips.push({ label: "Unpin", colour: null, pin: null });
+    const row = box.createDiv({ cls: "czm-speaker-box-chips" });
+    const line = ref.block.from;
+    for (const c of chips) {
+      const chip = row.createEl("button", { cls: "czm-speaker-chip", attr: { type: "button", tabindex: "-1" } });
+      if (c.colour) chip.createSpan({ cls: "czm-speaker-chip-dot" }).setCssProps({ "--czm-speech": c.colour });
+      chip.createSpan({ text: c.label });
+      const isPinned = v.pin ? (v.pin.notSpeech ? c.pin === NOT_SPEECH : c.pin === v.pin.label) : false;
+      chip.classList.toggle("is-pinned", isPinned);
+      // The page keeps its focus through a click on a chip, so the box does not close under the pointer.
+      chip.addEventListener("mousedown", (ev) => ev.preventDefault());
+      chip.addEventListener("click", () => { this.hidePop(); void this.source.pinSpeaker(ref.path, line, c.pin).then(() => this.refresh()); });
+    }
+    box.createDiv({ cls: "czm-speaker-box-hint", text: "Click a name to pin it · v on the page for the keys" });
+  }
+
+  /** `v` on the page: the speaker chips of the selected paragraph take the keyboard; ← → move, Enter pins, Escape returns. */
+  private focusVoice(current: HTMLElement): void {
+    if (!this.voiced.get(current)) return;
+    if (!this.active) this.select(current, false);
+    this.showPopFor(current);
+    const chips = [...(this.pop?.querySelectorAll<HTMLElement>(".czm-speaker-chip") ?? [])];
+    const first = chips.find((c) => c.classList.contains("is-pinned")) ?? chips[0];
+    if (!first) return;
+    first.tabIndex = 0;
+    first.focus();
+  }
+
+  private onPopKey(ev: KeyboardEvent): void {
+    const chips = [...(this.pop?.querySelectorAll<HTMLElement>(".czm-speaker-chip") ?? [])];
+    const at = chips.indexOf(ev.target as HTMLElement);
+    if (at < 0) return;
+    const go = (n: number) => { const next = chips[(n + chips.length) % chips.length]; if (!next) return; for (const c of chips) c.tabIndex = -1; next.tabIndex = 0; next.focus(); };
+    if (ev.key === "ArrowRight" || ev.key === "ArrowDown") { ev.preventDefault(); go(at + 1); }
+    else if (ev.key === "ArrowLeft" || ev.key === "ArrowUp") { ev.preventDefault(); go(at - 1); }
+    else if (ev.key === "Escape") { ev.preventDefault(); const back = this.activeEl(); this.hidePop(); back?.focus(); }
   }
 
   private castLine(cast: readonly CastMember[], sourcePath: string, label: string): HTMLElement {
@@ -744,6 +838,12 @@ export class ManuscriptView extends ItemView {
         if (ref?.block) { if (!this.active) this.select(current, false); this.source.reveal(ref.path, ref.block.from, 0, true); }
         break;
       }
+      case "v": {
+        if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+        ev.preventDefault();
+        this.focusVoice(current);
+        break;
+      }
       case "c": {
         if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
         ev.preventDefault();
@@ -761,7 +861,7 @@ export class ManuscriptView extends ItemView {
     const el = (ev.target as HTMLElement).closest<HTMLElement>(".czm-ms-block");
     if (this.hoverTimer !== null) { window.clearTimeout(this.hoverTimer); this.hoverTimer = null; }
     const ref = el ? this.refs.get(el) : undefined;
-    if (!el || !ref?.block || (ref.block.annotations.length === 0 && this.conflictsFor(ref.path, ref.block).length === 0)) { this.hidePop(); return; }
+    if (!el || !ref?.block || (ref.block.annotations.length === 0 && this.conflictsFor(ref.path, ref.block).length === 0 && !this.voiced.get(el))) { this.hidePop(); return; }
     if (this.pop?.dataset.for === keyOf(ref) && !this.pop.hidden) return;
     // Intent, not passage: crossing three paragraphs on the way somewhere should not flash three boxes.
     this.hoverTimer = window.setTimeout(() => { this.hoverTimer = null; this.showPopFor(el); }, HOVER_DELAY_MS);
@@ -771,12 +871,15 @@ export class ManuscriptView extends ItemView {
     const ref = el ? this.refs.get(el) : undefined;
     const pop = this.pop, body = this.body, page = this.page;
     const conflicts = el && ref?.block ? this.conflictsFor(ref.path, ref.block) : [];
-    if (!el || !ref?.block || (ref.block.annotations.length === 0 && conflicts.length === 0) || !pop || !body || !page) { this.hidePop(); return; }
+    const voice = el ? this.voiced.get(el) : undefined;
+    if (!el || !ref?.block || (ref.block.annotations.length === 0 && conflicts.length === 0 && !voice) || !pop || !body || !page) { this.hidePop(); return; }
     pop.empty();
     pop.dataset.for = keyOf(ref);
+    pop.classList.toggle("has-voice", !!voice);
     const item = { title: ref.title, path: ref.path };
     this.renderRows(pop, ref.block.annotations.map((a) => ({ item, a })), this.source.settings().tags, false);
     this.renderConflicts(pop, conflicts);
+    if (voice) this.renderVoice(pop, el, ref);
     for (const r of pop.querySelectorAll<HTMLElement>(".czm-ms-cm-row")) r.tabIndex = -1;
     pop.hidden = false;
     // Beside the page in the margin when there is room, else under the paragraph; never past the bottom.

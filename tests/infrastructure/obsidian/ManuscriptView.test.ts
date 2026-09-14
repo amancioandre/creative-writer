@@ -7,12 +7,13 @@ import { IntlSentenceSegmenter } from "../../../src/infrastructure/segmentation/
 import type { ProjectSpec } from "../../../src/domain/progress/Project";
 import { EMPTY_FACTS, type StoryFacts } from "../../../src/domain/manuscript/StoryFacts";
 import { DEFAULT_STORY_COLORS } from "../../../src/domain/settings/Settings";
+import { DEFAULT_CONVENTIONS } from "../../../src/domain/dialogue/DialogueSpans";
 
 const novel: ProjectSpec = { name: "Novel", scope: "Novel/", targetWords: 1, deadline: null, dailyWords: 0, notePath: "Novel/Novel.md", ignoredNames: [] };
 const seg = new IntlSentenceSegmenter();
 
 function open(notes: ManuscriptNote[], overrides: Partial<ManuscriptSource> = {}) {
-  const calls = { revealed: [] as [string, number, number, boolean][], links: [] as string[], renders: 0, exported: [] as string[], comments: [] as [string, number, string][], resolved: [] as [string, number, number][], facts: [] as [string[], boolean][], promoted: [] as [string, string][], ignored: [] as string[], builds: 0 };
+  const calls = { revealed: [] as [string, number, number, boolean][], links: [] as string[], renders: 0, exported: [] as string[], comments: [] as [string, number, string][], resolved: [] as [string, number, number][], facts: [] as [string[], boolean][], promoted: [] as [string, string][], ignored: [] as string[], builds: 0, pins: [] as [string, number, string | null][] };
   let settings: ManuscriptSettings = DEFAULT_MANUSCRIPT;
   const src: ManuscriptSource = {
     projects: () => [novel],
@@ -31,6 +32,8 @@ function open(notes: ManuscriptNote[], overrides: Partial<ManuscriptSource> = {}
     storyColors: () => DEFAULT_STORY_COLORS,
     promote: async (_p, name, kind) => { calls.promoted.push([name, kind]); return `Novel/Characters/${name}.md`; },
     ignore: async (_p, name) => { calls.ignored.push(name); },
+    voices: () => ({ roster: [{ id: "m", name: "Mara", aliases: [], colour: "#111111", accent: [], accentNever: [] }, { id: "t", name: "Tomas", aliases: [], colour: "#222222", accent: [], accentNever: [] }], conventions: DEFAULT_CONVENTIONS }),
+    pinSpeaker: async (p, l, label) => { calls.pins.push([p, l, label]); },
     jumpTo: () => undefined,
     ...overrides,
   };
@@ -71,7 +74,7 @@ describe("ManuscriptView", () => {
     expect([...one.querySelectorAll(".czm-ms-block")].map((b) => b.getAttribute("data-line"))).toEqual(["0", "1", "3", "4"]);
     expect(one.querySelector(".czm-ms-heading p")?.textContent).toBe("Chapter One");
     expect(el.querySelectorAll(".czm-ms-note")[1]!.querySelector(".czm-ms-title")?.textContent).toBe("Chapter Two1 words · under a minute");
-    expect([...el.querySelectorAll(".czm-ms-tool")].map((b) => b.getAttribute("aria-pressed"))).toEqual(["false", "true", "true", "false", "false", null]);
+    expect([...el.querySelectorAll(".czm-ms-tool")].map((b) => b.getAttribute("aria-pressed"))).toEqual(["false", "true", "true", "false", "false", "false", null]);
   });
 
   it("selects on click without taking the editor's focus, and edits on double click at the sentence", async () => {
@@ -422,5 +425,59 @@ describe("resolved comments", () => {
     expect(rows[0]!.querySelector(".czm-ms-cm-resolve")!.getAttribute("aria-label")).toBe("Reopen");
     expect(rows[1]!.classList.contains("is-resolved")).toBe(false);
     expect(v.contentEl.querySelector(".czm-ms-mark.is-resolved")).not.toBeNull();
+  });
+});
+
+describe("ManuscriptView — voices", () => {
+  const talk = "Mara came in.\n\n“You came alone?” Tomas did not look up.\n\n“Yes.”\n\n%% not speech %% “A sign on the door.”\n\nRain.";
+  const voiced = (overrides: Partial<ManuscriptSource> = {}) => open([{ path: "Novel/Part One/01 Chapter One.md", frontmatter: {}, text: talk }], { settings: () => ({ ...DEFAULT_MANUSCRIPT, showVoices: true }), ...overrides });
+
+  it("stripes each spoken paragraph in its speaker's colour, grey when nobody is sure, and leaves narration alone", async () => {
+    const { v } = voiced();
+    await v.onOpen();
+    const blocks = [...v.contentEl.querySelectorAll<HTMLElement>(".czm-ms-block")];
+    expect(blocks.map((b) => b.classList.contains("is-voiced"))).toEqual([false, true, true, true, false]);
+    expect(blocks.map((b) => b.style.getPropertyValue("--czm-speech"))).toEqual(["", "#222222", "#8a8a8a", "#8a8a8a", ""]);
+  });
+
+  it("shows the speaker chips in the hover box and pins from a click", async () => {
+    const { v, calls } = voiced();
+    await v.onOpen();
+    const blocks = v.contentEl.querySelectorAll<HTMLElement>(".czm-ms-block");
+    const pop = v.contentEl.querySelector<HTMLElement>(".czm-ms-pop")!;
+    blocks[2]!.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 250));
+    expect(pop.hidden).toBe(false);
+    expect(pop.classList.contains("has-voice")).toBe(true);
+    expect(pop.querySelector(".czm-speaker-box-head")?.textContent).toBe("Speaker not certain · guess: Mara (turn-taking)");
+    const chips = [...pop.querySelectorAll<HTMLButtonElement>(".czm-speaker-chip")];
+    expect(chips.map((c) => c.textContent)).toEqual(["Mara", "Tomas", "Not speech"]);
+    chips[1]!.click();
+    expect(calls.pins).toEqual([["Novel/Part One/01 Chapter One.md", 4, "Tomas"]]);
+    expect(pop.hidden).toBe(true);
+  });
+
+  it("offers Unpin on a pinned paragraph, and v on the page puts the keyboard on the chips", async () => {
+    const { v, calls } = voiced();
+    await v.onOpen();
+    const blocks = v.contentEl.querySelectorAll<HTMLElement>(".czm-ms-block");
+    click(blocks[3]!);
+    key(blocks[3]!, "v");
+    const pop = v.contentEl.querySelector<HTMLElement>(".czm-ms-pop")!;
+    expect(pop.hidden).toBe(false);
+    expect(pop.querySelector(".czm-speaker-box-head")?.textContent).toBe("Not speech · pinned by you");
+    const chips = [...pop.querySelectorAll<HTMLElement>(".czm-speaker-chip")];
+    expect(chips.map((c) => c.textContent)).toEqual(["Mara", "Tomas", "Not speech", "Unpin"]);
+    expect(document.activeElement).toBe(chips[2]);
+    key(chips[2]!, "ArrowRight");
+    expect(document.activeElement).toBe(chips[3]);
+    (document.activeElement as HTMLButtonElement).click();
+    expect(calls.pins).toEqual([["Novel/Part One/01 Chapter One.md", 6, null]]);
+  });
+
+  it("draws no stripes with voices off", async () => {
+    const { v } = open([{ path: "Novel/Part One/01 Chapter One.md", frontmatter: {}, text: talk }]);
+    await v.onOpen();
+    expect(v.contentEl.querySelectorAll(".is-voiced")).toHaveLength(0);
   });
 });
