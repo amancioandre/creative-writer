@@ -330,6 +330,16 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-shell-jump.is-current { color: var(--text-accent); opacity: 1; cursor: default; }
 .czm-shell-body { flex: 1 1 auto; display: flex; min-height: 0; }
 .czm-shell-main { flex: 1 1 auto; position: relative; min-width: 0; min-height: 0; }
+/* The key in the surface's corner: a dot per kind in its colour; never in the way of the pointer. */
+.czm-shell-key { position: absolute; left: 10px; bottom: 8px; z-index: 2; display: flex; flex-wrap: wrap; gap: 3px 12px; padding: 4px 8px; border-radius: 6px; background: color-mix(in srgb, var(--background-primary) 85%, transparent); font-size: var(--font-ui-smaller); color: var(--text-muted); pointer-events: none; }
+.czm-shell-key-item::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: 0; background: var(--czm-kind, var(--text-muted)); }
+/* A broken link on the threads chart: where the thread last touched a scene; opens the note at the line. */
+.czm-th-broken-mark { cursor: pointer; }
+.czm-th-broken-mark circle { fill: var(--background-primary); stroke: var(--text-warning); stroke-width: 1.5; }
+.czm-th-broken-mark text { fill: var(--text-warning); font-size: 11px; font-weight: 700; user-select: none; pointer-events: none; }
+.czm-th-broken-mark:hover circle, .czm-th-broken-mark:focus-visible circle { fill: color-mix(in srgb, var(--text-warning) 20%, var(--background-primary)); }
+.czm-th-broken-mark:focus-visible { outline: none; }
+.czm-th-broken .czm-th-fix, .czm-map-row.is-broken .czm-th-fix { margin-left: 6px; }
 .czm-shell-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px; text-align: center; pointer-events: none; }
 .czm-shell-empty .czm-map-empty { max-width: 46ch; margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); }
 .czm-shell-empty-fixes { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; pointer-events: auto; }

@@ -116,6 +116,7 @@ export class StoryTimelineView extends ItemView {
       .sort((a, b) => kindOrder(a) - kindOrder(b) || b.mentions - a.mentions);
     shell.setState(`${rows.length} scene${rows.length === 1 ? "" : "s"} · ${columns.length} in the cast${q ? ` · “${this.query.trim()}”` : ""}`, q ? { label: "Clear", cls: "czm-tl-clear", onClick: () => { this.clearSearch(); } } : null);
     if (rows.length === 0) { shell.empty("No scenes yet — headings with prose under them become scenes."); return; }
+    shell.key(columns.length ? (Object.keys(ORDER) as Entity["kind"][]).filter((k) => columns.some((c) => c.kind === k)).map((k) => ({ label: KIND_LABEL[k], color: settings.colors[k], cls: `czm-key-${k}` })) : []);
     if (columns.length === 0) { shell.empty(q ? `Nobody matches “${this.query.trim()}”.` : "Nobody appears in a scene yet — names that recur, or notes typed as characters, become the cast.", q ? [{ label: "Clear search", cls: "czm-tl-clear", onClick: () => { this.clearSearch(); } }] : []); return; }
     const wrap = root.createDiv({ cls: "czm-tl-wrap" });
     const table = wrap.createEl("table", { cls: "czm-tl-table" });

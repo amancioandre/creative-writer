@@ -563,3 +563,14 @@ describe("StoryMapView performance", () => {
     svg.dispatchEvent(new MouseEvent("pointerup", { clientX: 30, clientY: 30, bubbles: true }));
   });
 });
+
+describe("the side column's toggle", () => {
+  it("draws the column it opens", async () => {
+    const { el } = await open({ settings: () => ({ ...DEFAULT_STORY_MAP, panelOpen: false }) });
+    const side = el.querySelector(".czm-shell-side")!;
+    expect(side.querySelectorAll("details").length).toBe(0);
+    (el.querySelector(".czm-shell-side-toggle") as HTMLButtonElement).click();
+    expect(side.classList.contains("is-open")).toBe(true);
+    expect(side.querySelectorAll("details").length).toBeGreaterThan(0);
+  });
+});

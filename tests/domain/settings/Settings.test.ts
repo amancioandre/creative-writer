@@ -91,7 +91,8 @@ describe("normalizeSettings — story map", () => {
     expect(normalizeSettings({}).storyMap).toEqual(DEFAULT_SETTINGS.storyMap);
     expect(normalizeSettings({}).threads).toEqual(DEFAULT_SETTINGS.threads);
     const t = normalizeSettings({ threads: { kinds: { entity: true, bogus: 1 }, strips: { cast: false, "": true, x: "no" }, showDismissed: true, contradictionsOnly: "yes", panelOpen: false } }).threads;
-    expect(t).toEqual({ kinds: { entity: true, fact: true, writer: true, echo: false }, echoSensitivity: "medium", strips: { cast: false }, showDismissed: true, contradictionsOnly: false, panelOpen: false });
+    expect(t).toEqual({ kinds: { entity: true, fact: true, writer: true, echo: false }, echoSensitivity: "medium", strips: { cast: false }, showDismissed: true, contradictionsOnly: false, panelOpen: false, sections: {} });
+    expect(normalizeSettings({ threads: { sections: { filters: false, strips: true, "": true, x: "no" } } }).threads.sections).toEqual({ filters: false, strips: true });
     expect(normalizeSettings({ threads: { echoSensitivity: "high" } }).threads.echoSensitivity).toBe("high");
     expect(normalizeSettings({ threads: { echoSensitivity: "loud" } }).threads.echoSensitivity).toBe("medium");
   });
@@ -130,7 +131,8 @@ describe("manuscript settings", () => {
 
 describe("writer settings", () => {
   it("defaults to no stories folder and normalises one to a bare vault-relative path", () => {
-    expect(normalizeSettings(undefined).writer).toEqual({ storiesFolder: "", panelOpen: true });
+    expect(normalizeSettings(undefined).writer).toEqual({ storiesFolder: "", panelOpen: true, sections: {} });
+    expect(normalizeSettings({ writer: { sections: { layers: true } } }).writer.sections).toEqual({ layers: true });
     expect(normalizeSettings({ writer: { panelOpen: false } }).writer.panelOpen).toBe(false);
     expect(normalizeSettings({ writer: { storiesFolder: " /storytelling\\stories/ " } }).writer.storiesFolder).toBe("storytelling/stories");
     expect(normalizeSettings({ writer: { storiesFolder: 3 } }).writer.storiesFolder).toBe("");

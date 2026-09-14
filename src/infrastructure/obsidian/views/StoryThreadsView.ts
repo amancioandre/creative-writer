@@ -156,7 +156,9 @@ export class StoryThreadsView extends ItemView {
     this.shell = new PanelShell(this.contentEl, {
       current: "threads",
       jump: (to) => this.source.jumpTo(to, this.project),
-      side: { isOpen: () => this.settings.panelOpen, onToggle: () => this.saveSettings({ ...this.settings, panelOpen: !this.settings.panelOpen }) },
+      // The toggle draws the column it opens: a column folded at render time is empty until then.
+      side: { isOpen: () => this.settings.panelOpen, onToggle: () => { this.saveSettings({ ...this.settings, panelOpen: !this.settings.panelOpen }); this.renderPanel(); } },
+      sections: { isOpen: (cls) => this.settings.sections[cls], onToggle: (cls, open) => this.saveSettings({ ...this.settings, sections: { ...this.settings.sections, [cls]: open } }) },
     });
     this.root = this.shell.main;
     this.root.addClass("czm-map"); this.root.addClass("czm-th");
@@ -339,6 +341,35 @@ export class StoryThreadsView extends ItemView {
       this.arcsG.appendChild(path);
       this.arcEls.set(arc, path);
     }
+    // A broken link sits on the chart where its thread last touched a scene, so the warning is where the eye is; it opens the note at the line.
+    for (const thread of threads) {
+      if (thread.kind !== "writer") continue;
+      for (const r of thread.refs) {
+        if (!r.unresolved) continue;
+        const last = [...thread.refs].reverse().find((x) => x.index >= 0);
+        const slot = last ? slots.find((s) => s.index === last.index) : slots[0];
+        const x = slot ? (last ? (slot.x0 + slot.x1) / 2 : slot.x0 + 8) : 8;
+        const g = document.createElementNS(SVG, "g");
+        g.setAttribute("class", "czm-th-broken-mark");
+        g.setAttribute("transform", `translate(${f(x)} ${f(baseY - 16)})`);
+        g.setAttribute("tabindex", "0"); g.setAttribute("role", "button");
+        const label = `${thread.label}: “${r.unresolved}” points at no scene. Open Story threads.md at the line to fix it.`;
+        g.setAttribute("aria-label", label);
+        const dot = document.createElementNS(SVG, "circle");
+        dot.setAttribute("r", "7");
+        g.appendChild(dot);
+        const t = document.createElementNS(SVG, "text");
+        t.setAttribute("text-anchor", "middle"); t.setAttribute("y", "4");
+        t.textContent = "!";
+        g.appendChild(t);
+        const title = document.createElementNS(SVG, "title");
+        title.textContent = label;
+        g.appendChild(title);
+        onActivate(g, (ev) => { ev.stopPropagation(); this.fixLink(r); }, { role: false });
+        this.arcsG.appendChild(g);
+      }
+    }
+
 
     // Strips.
     this.stripsG.replaceChildren();
@@ -560,8 +591,12 @@ export class StoryThreadsView extends ItemView {
       const { stored, stale } = this.model.semantic;
       threads.createDiv({ text: `${stored} sentence pair${stored === 1 ? "" : "s"} from the model${stale ? `, ${stale} stale — read again` : ""}.`, cls: `czm-map-hint czm-th-semantic${stale ? " is-stale" : ""}` });
     }
-    const broken = this.model.threads.filter((t) => t.kind === "writer").flatMap((t) => t.refs.filter((r) => r.unresolved).map((r) => ({ thread: t.label, link: r.unresolved! })));
-    for (const b of broken) threads.createDiv({ text: `${b.thread}: “${b.link}” points at no scene.`, cls: "czm-map-warn czm-th-broken" });
+    const broken = this.model.threads.filter((t) => t.kind === "writer").flatMap((t) => t.refs.filter((r) => r.unresolved).map((r) => ({ thread: t.label, link: r.unresolved!, ref: r })));
+    for (const b of broken) {
+      const row = threads.createDiv({ text: `${b.thread}: “${b.link}” points at no scene. `, cls: "czm-map-warn czm-th-broken" });
+      const fix = row.createEl("button", { text: "Fix", cls: "czm-shell-reset czm-th-fix", attr: { title: "Open Story threads.md at the line" } });
+      fix.addEventListener("click", () => this.fixLink(b.ref));
+    }
     const unanchored = this.model.threads.filter((t) => t.kind === "writer").flatMap((t) => t.refs.filter((r) => r.anchor === null).map((r) => ({ thread: t.label, quote: r.quote ?? "", scene: r.scene.title || basenameOf(r.scene.path) })));
     for (const u of unanchored) threads.createDiv({ text: `${u.thread}: “${u.quote}” is no longer in ${u.scene}.`, cls: "czm-map-warn czm-th-broken czm-th-unanchored" });
     const dangling = this.model.threads.filter((t) => t.kind === "writer").flatMap((t) => t.dangling.map((r) => ({ thread: t.label, scene: r.scene.title || basenameOf(r.scene.path) })));
@@ -753,6 +788,12 @@ export class StoryThreadsView extends ItemView {
     note.addEventListener("keydown", (ev) => { if (ev.key === "Enter") submit(); });
   }
 
+  /** The way to mend a broken link: the threads note, open at the line that holds it. */
+  private fixLink(r: ThreadRef): void {
+    if (!this.project) return;
+    this.source.reveal({ path: this.source.threadsNotePath(this.project), title: "", line: r.line ?? 0 });
+  }
+
   private stopList(refs: readonly ThreadRef[], thread: Thread): void {
     const list = this.card.createDiv({ cls: "czm-map-list" });
     for (const r of refs) {
@@ -762,7 +803,10 @@ export class StoryThreadsView extends ItemView {
       if (r.role && r.role !== "touch") row.createSpan({ text: r.role, cls: `czm-th-role is-${r.role}` });
       row.createSpan({ text: r.unresolved ? "" : thread.kind === "fact" ? r.value ?? "" : r.note || (r.quote ? `“${r.quote}”` : basenameOf(r.scene.path)), cls: "czm-map-row-meta" });
       if (r.anchor === null) row.createSpan({ text: "quote not found", cls: "czm-map-warn czm-th-role-warn" });
-      if (!r.unresolved) {
+      if (r.unresolved) {
+        const fix = row.createEl("button", { text: "Fix", cls: "czm-shell-reset czm-th-fix", attr: { title: "Open Story threads.md at the line" } });
+        fix.addEventListener("click", (ev) => { ev.stopPropagation(); this.fixLink(r); });
+      } else {
         onActivate(row, () => this.source.reveal(r.scene));
       }
     }

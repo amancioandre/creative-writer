@@ -193,7 +193,9 @@ export class WriterView extends ItemView {
     this.shell = new PanelShell(this.contentEl, {
       current: "board",
       jump: (to) => this.source.jumpTo(to),
-      side: { isOpen: () => this.source.settings().panelOpen, onToggle: () => this.source.updateSettings({ ...this.source.settings(), panelOpen: !this.source.settings().panelOpen }) },
+      // The toggle draws the column it opens: a column folded at render time is empty until then.
+      side: { isOpen: () => this.source.settings().panelOpen, onToggle: () => { this.source.updateSettings({ ...this.source.settings(), panelOpen: !this.source.settings().panelOpen }); this.renderPanel(); } },
+      sections: { isOpen: (cls) => this.source.settings().sections[cls], onToggle: (cls, open) => this.source.updateSettings({ ...this.source.settings(), sections: { ...this.source.settings().sections, [cls]: open } }) },
     });
     this.root = this.shell.main;
     this.root.addClass("czm-map"); this.root.addClass("czm-writer");

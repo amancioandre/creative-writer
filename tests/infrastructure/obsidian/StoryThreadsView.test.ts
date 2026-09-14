@@ -83,7 +83,7 @@ describe("StoryThreadsView", () => {
   });
 
   it("draws one bar per scene, arcs for facts and hand-drawn threads by default, and the contradiction on top in red", async () => {
-    const { el } = await open();
+    const { el, calls } = await open();
     const bars = [...el.querySelectorAll(".czm-th-bar")];
     expect(bars).toHaveLength(4);
     expect(bars[1]!.classList.contains("is-bookmarked")).toBe(true);
@@ -99,6 +99,12 @@ describe("StoryThreadsView", () => {
     // The kind toggles carry the arcs' own colours as swatches.
     expect(setting("czm-set-thread-writer").settingEl.classList.contains("czm-th-kind-writer")).toBe(true);
     expect(el.querySelector(".czm-th-broken")!.textContent).toContain("Nine#Nowhere");
+    // The warning also sits on the chart, where the thread last touched a scene, and both carry the fix: the note at the line.
+    const mark = el.querySelector<SVGGElement>(".czm-th-broken-mark")!;
+    expect(mark.getAttribute("aria-label")).toContain("Nine#Nowhere");
+    mark.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    (el.querySelector(".czm-th-broken .czm-th-fix") as HTMLButtonElement).click();
+    expect(calls.revealed.slice(-2)).toEqual(["@0", "@0"]);
     // The axis names its scenes and its chapters.
     expect([...el.querySelectorAll(".czm-th-axis-label")].map((t) => t.textContent)).toEqual(["Camp", "Creek", "Return", "Night"]);
     expect([...el.querySelectorAll(".czm-th-axis-note")].map((t) => t.textContent)).toEqual(["One", "Two"]);

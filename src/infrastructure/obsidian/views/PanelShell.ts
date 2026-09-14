@@ -19,7 +19,12 @@ export interface ShellOptions {
   readonly jump: (to: PanelId) => void;
   /** A docked side column, with the toggle that folds it. Absent for panels without one. */
   readonly side?: { readonly isOpen: () => boolean; readonly onToggle: () => void };
+  /** The side column's sections as the writer last left them; absent, every render uses the section's default. */
+  readonly sections?: { readonly isOpen: (cls: string) => boolean | undefined; readonly onToggle: (cls: string, open: boolean) => void };
 }
+
+/** One entry of the key over the surface: a colour and what it means. */
+export interface KeyItem { readonly label: string; readonly color: string; readonly cls?: string }
 
 /** The row of sibling panels, in the fixed order; the current one is shown, not linked. For panels that do not take the whole shell. */
 export function renderJumps(parent: HTMLElement, current: PanelId, jump: (to: PanelId) => void): void {
@@ -107,8 +112,11 @@ export class PanelShell {
   readonly main: HTMLElement;
   readonly side: HTMLElement;
   private sideToggle: HTMLButtonElement | null = null;
+  private keyEl: HTMLElement | null = null;
+  private readonly opts: ShellOptions;
 
   constructor(host: HTMLElement, opts: ShellOptions) {
+    this.opts = opts;
     this.root = host.createDiv({ cls: "czm-shell" });
     this.head = this.root.createDiv({ cls: "czm-shell-head" });
     this.scope = this.head.createDiv({ cls: "czm-shell-scope" });
@@ -164,11 +172,26 @@ export class PanelShell {
   /** A collapsed group in the side column whose header reads its current value, so it can be read without opening. */
   section(title: string, value: string, cls: string, open: boolean): HTMLDetailsElement {
     const d = this.side.createEl("details", { cls: `czm-map-section czm-map-section-${cls}` });
-    d.open = open;
+    // As the writer last left it, else the section's own default; a fold or unfold is remembered.
+    const want = this.opts.sections?.isOpen(cls) ?? open;
+    d.open = want;
+    d.addEventListener("toggle", () => { if (d.open !== want) this.opts.sections?.onToggle(cls, d.open); });
     const summary = d.createEl("summary");
     summary.createSpan({ text: title, cls: "czm-map-section-title" });
     if (value) summary.createSpan({ text: value, cls: "czm-map-section-value" });
     return d;
+  }
+
+  /** The key in the surface's corner: what each colour on it means. An empty list removes it. */
+  key(items: readonly KeyItem[]): void {
+    this.keyEl?.remove();
+    this.keyEl = null;
+    if (!items.length) return;
+    this.keyEl = this.main.createDiv({ cls: "czm-shell-key", attr: { "aria-label": "Key" } });
+    for (const it of items) {
+      const item = this.keyEl.createSpan({ cls: `czm-shell-key-item${it.cls ? ` ${it.cls}` : ""}`, text: it.label });
+      item.setCssProps({ "--czm-kind": it.color });
+    }
   }
 
   /** An empty state over the main surface that names its cause and carries the fix. Returns the element; remove it to clear. */

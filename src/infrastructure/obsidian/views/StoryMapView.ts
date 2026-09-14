@@ -184,7 +184,9 @@ export class StoryMapView extends ItemView {
     this.shell = new PanelShell(this.contentEl, {
       current: "map",
       jump: (to) => this.source.jumpTo(to, this.project),
-      side: { isOpen: () => this.settings.panelOpen, onToggle: () => this.saveSettings({ ...this.settings, panelOpen: !this.settings.panelOpen }) },
+      // The toggle draws the column it opens: a column folded at render time is empty until then.
+      side: { isOpen: () => this.settings.panelOpen, onToggle: () => { this.saveSettings({ ...this.settings, panelOpen: !this.settings.panelOpen }); this.renderPanel(); } },
+      sections: { isOpen: (cls) => this.settings.sections[cls], onToggle: (cls, open) => this.saveSettings({ ...this.settings, sections: { ...this.settings.sections, [cls]: open } }) },
     });
     this.root = this.shell.main;
     this.root.addClass("czm-map");
@@ -337,8 +339,15 @@ export class StoryMapView extends ItemView {
     this.emptyEl?.remove();
     this.emptyEl = null;
     if (shown.entities.length === 0) this.emptyEl = this.renderEmpty();
+    this.renderKey();
     this.applySelectionClasses();
     this.paint();
+  }
+
+  /** The key in the corner: the kinds on the map now, in their colours. */
+  private renderKey(): void {
+    const colors = this.settings.colors;
+    this.shell.key(STORY_KINDS.filter((k) => this.shown.entities.some((e) => e.kind === k)).map((k) => ({ label: KIND_LABEL[k], color: colors[k], cls: `czm-key-${k}` })));
   }
 
   /** Nothing to draw: say why, and offer the one click that changes it. */
@@ -870,6 +879,7 @@ this.renderCard(); this.paint();
       const e = this.shown.entities.find((x) => x.id === id);
       if (e) g.style.setProperty("--czm-kind", colors[e.kind]);
     }
+    this.renderKey();
     this.renderCard();
   }
 

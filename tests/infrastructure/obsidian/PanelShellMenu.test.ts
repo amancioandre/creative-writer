@@ -34,3 +34,27 @@ describe("the ⋯ menu", () => {
     expect(Menu.last!.items[0]!.title).toBe("Row 2");
   });
 });
+
+describe("the side column's sections", () => {
+  it("open as the writer last left them and remember a fold", () => {
+    const host = document.body.createDiv();
+    const remembered: Record<string, boolean> = { filters: false };
+    const shell = new PanelShell(host, { current: "map", jump: () => undefined, sections: { isOpen: (c) => remembered[c], onToggle: (c, open) => { remembered[c] = open; } } });
+    const filters = shell.section("Filters", "", "filters", true);
+    const kinds = shell.section("Kinds", "", "kinds", true);
+    expect(filters.open).toBe(false);
+    expect(kinds.open).toBe(true);
+    kinds.open = false;
+    kinds.dispatchEvent(new Event("toggle"));
+    expect(remembered).toEqual({ filters: false, kinds: false });
+  });
+
+  it("draws a key in the surface's corner and removes it for an empty list", () => {
+    const host = document.body.createDiv();
+    const shell = new PanelShell(host, { current: "timeline", jump: () => undefined });
+    shell.key([{ label: "Characters", color: "#abcdef" }, { label: "Places", color: "#123456" }]);
+    expect([...host.querySelectorAll(".czm-shell-key-item")].map((i) => i.textContent)).toEqual(["Characters", "Places"]);
+    shell.key([]);
+    expect(host.querySelector(".czm-shell-key")).toBeNull();
+  });
+});

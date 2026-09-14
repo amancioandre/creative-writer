@@ -80,6 +80,8 @@ export interface StoryMapSettings {
   /** Hex colour per node kind. */
   readonly colors: Readonly<Record<StoryEntityKind, string>>;
   readonly panelOpen: boolean;
+  /** Side-column section → open or folded, as the writer last left it. */
+  readonly sections: Readonly<Record<string, boolean>>;
 }
 
 export const STORY_KINDS: readonly StoryEntityKind[] = ["character", "location", "item", "faction", "event", "note", "candidate", "reference"];
@@ -106,6 +108,7 @@ export const DEFAULT_STORY_MAP: StoryMapSettings = {
   forces: DEFAULT_FORCES,
   colors: DEFAULT_STORY_COLORS,
   panelOpen: true,
+  sections: {},
 };
 
 export type ThreadKind = "entity" | "fact" | "writer" | "echo";
@@ -125,6 +128,8 @@ export interface ThreadsSettings {
   readonly showDismissed: boolean;
   readonly contradictionsOnly: boolean;
   readonly panelOpen: boolean;
+  /** Side-column section → open or folded, as the writer last left it. */
+  readonly sections: Readonly<Record<string, boolean>>;
 }
 
 /** Entity threads are the densest and the least surprising, so they start off; a picked entity turns its own on. */
@@ -135,6 +140,7 @@ export const DEFAULT_THREADS: ThreadsSettings = {
   showDismissed: false,
   contradictionsOnly: false,
   panelOpen: true,
+  sections: {},
 };
 
 /**
@@ -244,9 +250,19 @@ export interface WriterSettings {
   readonly storiesFolder: string;
   /** The board's floating panel, open or folded. */
   readonly panelOpen: boolean;
+  /** Side-column section → open or folded, as the writer last left it. */
+  readonly sections: Readonly<Record<string, boolean>>;
 }
 
-export const DEFAULT_WRITER: WriterSettings = { storiesFolder: "", panelOpen: true };
+export const DEFAULT_WRITER: WriterSettings = { storiesFolder: "", panelOpen: true, sections: {} };
+
+/** A map of section names to booleans, anything else dropped. */
+function boolMap(raw: unknown): Record<string, boolean> {
+  const out: Record<string, boolean> = {};
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  for (const [k, v] of Object.entries(r)) if (typeof v === "boolean" && k) out[k] = v;
+  return out;
+}
 
 export interface GoalSettings {
   /** Words added per day; 0 = no daily goal (any writing day counts for streaks). */
@@ -337,7 +353,7 @@ export function normalizeFolderPath(raw: unknown): string {
 
 function normalizeWriter(raw: unknown): WriterSettings {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  return { storiesFolder: normalizeFolderPath(r.storiesFolder), panelOpen: typeof r.panelOpen === "boolean" ? r.panelOpen : DEFAULT_WRITER.panelOpen };
+  return { storiesFolder: normalizeFolderPath(r.storiesFolder), panelOpen: typeof r.panelOpen === "boolean" ? r.panelOpen : DEFAULT_WRITER.panelOpen, sections: boolMap(r.sections) };
 }
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -362,6 +378,7 @@ export function normalizeThreads(raw: unknown): ThreadsSettings {
     showDismissed: typeof r.showDismissed === "boolean" ? r.showDismissed : DEFAULT_THREADS.showDismissed,
     contradictionsOnly: typeof r.contradictionsOnly === "boolean" ? r.contradictionsOnly : DEFAULT_THREADS.contradictionsOnly,
     panelOpen: typeof r.panelOpen === "boolean" ? r.panelOpen : DEFAULT_THREADS.panelOpen,
+    sections: boolMap(r.sections),
   };
 }
 
@@ -390,6 +407,7 @@ export function normalizeStoryMap(raw: unknown): StoryMapSettings {
     forces: { repulsion: force("repulsion"), linkDistance: force("linkDistance"), linkStrength: force("linkStrength"), gravity: force("gravity") },
     colors,
     panelOpen: typeof r.panelOpen === "boolean" ? r.panelOpen : DEFAULT_STORY_MAP.panelOpen,
+    sections: boolMap(r.sections),
   };
 }
 
