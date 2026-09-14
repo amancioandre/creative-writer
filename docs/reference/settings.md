@@ -1,77 +1,94 @@
 # Settings
 
-Settings → Community plugins → Creative Writer. Everything here is stored in the plugin's `data.json`.
+Settings → Community plugins → Creative Writer. Everything here is stored in the plugin's `data.json`. The tab has eight groups in the order a writer meets them; a row that only matters while another is on appears when that one is switched on.
 
-## General
+## Where it runs
 
 | Setting | Default | What |
 |---|---|---|
-| Enabled | on | Master switch for the editor features. |
-| Notes | All notes | Which notes get the writing tools; see [Where it runs](/guide/where-it-runs). |
-| Folders | — | With *Only these folders*: one vault-relative folder per line. |
+| Enabled | on | Master switch for the editor features. The *Toggle everywhere* command flips it. |
+| Notes | Project folders and every other note | One rule for everything: the notes the editor tools run in are the notes the daily goal, the project totals, the story map and the threads count. A declared project (`writing-target` or `story: true` in a note's front matter) is always in; the mode decides what else is. Side material stays out with `creative-writer: false` in its front matter, wherever it lives; `creative-writer: true` lets a note in whatever the mode. The plugin's own notes (writing log, story map, threads) are never counted. See [Where it runs](/guide/where-it-runs). |
+| Folders | — | Shown with *Project folders and these folders*: one vault-relative folder per line. |
 
-## Editor
+## Writing
+
+The editor while you draft. Everything here stays on under any lens.
 
 | Setting | Default | What |
 |---|---|---|
 | Typewriter scrolling | on | Keep the line you are writing vertically centred. |
-| Current line | on | A faint band behind the visual line you are on. |
+| Current line | on | A faint band behind the visual line you are on, so it stands out inside its paragraph. |
 | Focus fade | on | Fade lines progressively the further they are from the cursor. |
-| Paragraph strength | 0.7 | Opacity of the rest of the cursor paragraph. |
-| Far text strength | 0.25 | Opacity of the paragraphs furthest from the cursor. |
-| Paragraph rhythm | on | Colour each sentence of the current paragraph by effective length. |
-| Rhythm tiers | 6 | Colour steps in the gradient (4–6). |
-| Fullscreen in Zen Mode | off | Also request window fullscreen. |
-| Readability in status bar | on | Show the current paragraph's bands; click to open the desk. |
+| Paragraph strength | 0.7 | With Focus fade: how visible the rest of the cursor paragraph is next to the line you are on (1 = no difference). |
+| Far text strength | 0.25 | With Focus fade: how visible the paragraphs furthest from the cursor are. Nearer ones sit between this and the paragraph strength. |
+| Paragraph rhythm | on | Tint each sentence of the current paragraph by its effective length; in Zen Mode the tint leaves the text for a meter in the margin. See [Rhythm](/guide/rhythm). |
+| Rhythm tiers | 6 | With Paragraph rhythm: colour steps in the gradient (4–6). |
+| Zen Mode goes fullscreen | off | Also request window fullscreen when Zen Mode is toggled on. |
+| Readability in the status bar | on | The current paragraph's reading-ease and sentence-rhythm bands. Click it to open the writing desk with the whole note's profile. |
 
-## Writer
+## Lenses
 
-| Setting | Default | What |
-|---|---|---|
-| Stories folder | none | Vault-relative folder where your stories live. A promoted idea is scaffolded there, the writer file is created there, and folders under it with prose but no project declaration are listed as unfiled on the board. Empty = the vault root, and no unfiled row. See the [writer protocol](/reference/writer-file). |
-
-## Goals
+A lens is a reading pass: it colours the page one way at a time.
 
 | Setting | Default | What |
 |---|---|---|
-| Daily word goal | 500 | Words added per day for the streak and the desk's bar. 0 = any day you write counts. |
-| Writing log note | `Creative Writer/Writing log.md` | Vault-relative path of the note that keeps the log, so it syncs. Takes effect at the next save; reload to read from a new path. |
+| Style checks | on | Tint clichés, passive voice, filter verbs, adverbs, repetition, nominalisations, weak verbs and metaphor candidates in the current paragraph. Hover a tint for the note. See [Style checks](/guide/style-checks). |
+| Kinds | all on | With Style checks: one chip per kind; click a chip to switch that kind off or on. |
 
 ## Manuscript
 
+Three groups for the [manuscript](/guide/manuscript) page. *Prose only* and the comments pane are switches at the top of the page itself and are remembered there, not here.
+
+### Manuscript outline
+
 | Setting | Default | What |
 |---|---|---|
-| Folder levels as headings | 2 | How many folder levels below the project folder become headings on the [manuscript](/guide/manuscript) page. 0 = no outline. |
+| Folder levels as headings | 2 | How many folder levels below the project folder become headings. 0 = notes follow one another with no outline. |
 | Note names as headings | on | Each note's name above its text. A note whose first heading already is its name shows that heading once. |
-| Strip from names | Numbers and separators | What to remove from the start of folder and note names: the sort prefix in `01 - Camp`. *Nothing* keeps names as they are; *Custom pattern* uses the regular expression in the next row. |
-| Custom pattern | `^\d+[\s._)-]*` | The regular expression used with *Custom pattern*. |
+| Strip from names | Numbers and separators | What to remove from the start of folder and note names: the sort prefix in `01 - Camp`. *Nothing* keeps names as they are. |
+| Custom pattern | `^\d+[\s._)-]*` | With *Custom pattern*: the regular expression removed from the start of names. |
 | Nest the notes' own headings | on | Push a note's headings down below the outline, so a scene in a chapter in a part is level three. Off: headings keep the level they have in the note. |
-| Prose only | off | Show only paragraphs, headings, quotes and scene breaks. Also toggled at the top of the page. |
-| Comments | on | The pane beside the page: the active paragraph's `%% comments %%` with a box to add one, and every comment in reading order. Dots on marked paragraphs and the hover box show either way. Also toggled at the top of the page. |
-| Tint tags in the editor | on | Colour the tag word that opens a comment (`%% TODO: … %%`) in the editor. |
-| Tags | `TODO`, `FIX`, `CHECK`, `IDEA`, `CUT` | One per line, an uppercase word and a hex colour. See [Comments and tags](/guide/manuscript#comments-and-tags). |
-| Ruler | on | The strip at the top of the page: a segment per section, wide by words, coloured by readability, marked when changed today. |
-| Story on the page | off | Cast lines and scene cast in the map's colours, the model's contradictions and the anchored stops of directed threads in the gutter. Builds the story map on each refresh. |
+
+### Manuscript comments
+
+| Setting | Default | What |
+|---|---|---|
+| Tint tags in the editor | on | Colour the tag word that opens a comment (`%% TODO: … %%`) in the editor. Only inside comments; a TODO in dialogue is left alone. |
+| Tags | `TODO`, `FIX`, `CHECK`, `IDEA`, `CUT` | One per line, an uppercase word and a hex colour. A comment that opens with the word and a colon takes the colour, on the page and in the editor. See [Comments and tags](/guide/manuscript#comments-and-tags). |
+
+### Manuscript page
+
+| Setting | Default | What |
+|---|---|---|
+| Ruler | on | The strip at the top of the page: a segment per section, wide by words, coloured by readability, marked when changed today. Click a segment to go there. |
+| Story on the page | off | Cast lines and scene cast in the map's colours, the model's contradictions and the anchored stops of directed threads in the gutter. Builds the story map on each refresh, so it is off by default. |
 | Echoes on the page | off | The echo finder's repeated phrases as marks in the gutter, each naming another place the words occur. Builds the story threads on each refresh. |
-| Reading speed | 250 | Words per minute behind the reading time at the top of the page and beside each section. 100 to 600. |
+| Echo sensitivity | Medium | How many [echoes](/guide/story-threads#echoes) the page and the story threads view hear: *Low* reports only the plainest repeats (four-word phrases, near-identical sentences), *Medium* three-word phrases and sentences six content words long that are 60% alike, *High* shorter phrases and looser sentences. One choice instead of a knob per threshold. |
+| Reading speed | 250 | Words per minute behind the reading time at the top of the page and beside each section. 100 to 600; adults read prose at about 250. |
 
-## Style checks
+## Stories and goals
 
-A master toggle, then one toggle per kind: Cliché, Passive voice, Filter verb, Adverb, Repetition, Nominalisation, Weak verb, Metaphor candidate. See [Style checks](/guide/style-checks).
+| Setting | Default | What |
+|---|---|---|
+| Stories folder | none | Vault-relative folder where your stories live. A promoted idea is scaffolded there, a new writer card goes there, the writer file is created there, and folders under it with prose but no project declaration are listed as unfiled on the writer board. Empty = the vault root, and no unfiled row. See the [writer protocol](/reference/writer-file). |
+| Daily word goal | 500 | Words added per day, in the notes the scope takes in, for the streak and the desk's bar. 0 = any day you write counts. |
+| Writing log note | `Creative Writer/Writing log.md` | Vault-relative path of the note that keeps the log (words added and cut per day), so streaks sync with the vault. Takes effect at the next save; reload to read from a new path. |
 
 ## Model assistant
 
+Only the chosen provider's rows are shown.
+
 | Setting | Default | What |
 |---|---|---|
-| Model | Off | Off, Local (Ollama) or Claude. |
-| Analyse automatically | off | Run after a pause in typing; otherwise only on command. |
-| Pause before analysing | 1500 ms | Quiet time before the model is called (500–10000). |
-| Ollama URL | `http://localhost:11434` | |
-| Ollama model | `qwen2.5:7b` | Any chat model you have pulled. |
-| Ollama embedding model | `nomic-embed-text` | An embedding model you have pulled, for the [echo finder](/guide/story-threads#echoes)'s sentence pairs. |
-| Claude model | Opus 5 | Opus 5 or Haiku 4.5. |
-| Anthropic API key | — | Stored in plain text in `data.json`. |
-| Daily spending cap (USD) | 1 | Claude calls stop at this; 0 = no cap. Shows today's spend. |
+| Model | Off | Off, Local (Ollama) or Claude. A language model reads the current paragraph and adds findings the rules cannot see: clichés in context, tired metaphors, passives that hide an agent. Local Ollama keeps everything on this machine. See [Model assistant](/guide/model-assistant). |
+| Ollama URL | `http://localhost:11434` | With Ollama. |
+| Ollama model | `qwen2.5:7b` | With Ollama: any chat model you have pulled. qwen2.5:7b and llama3.1:8b follow the JSON format well; reasoning models (deepseek-r1) are slower but better at the myth analysis. |
+| Ollama embedding model | `nomic-embed-text` | With Ollama: an embedding model you have pulled, for the [echo finder](/guide/story-threads#echoes)'s sentence pairs. |
+| Claude model | Opus 5 | With Claude: Opus 5 ($5 / $25 per million tokens) reads prose far more carefully; Haiku 4.5 ($1 / $5) is the budget option. A paragraph costs roughly a cent on Opus with the rulebook cached. |
+| Anthropic API key | — | With Claude. Stored in plain text in `data.json`; if the vault syncs, the key syncs with it. Use a key you can revoke. |
+| Daily spending cap (USD) | 1 | With Claude: calls stop at this; 0 = no cap. Shows today's spend. |
+| Analyse automatically | off | With a model chosen: run after a pause in typing; otherwise only by the *Analyse paragraph with model* command. |
+| Pause before analysing | 1500 ms | With Analyse automatically: quiet time before the model is called (500–10000). |
 
 ## Story map
 
@@ -98,10 +115,4 @@ Likewise in the view's own panel, persisted under `threads`:
 | Strips | One toggle per strip | all on |
 | Panel | Open or closed | open |
 
-Which entity or echo is being followed and the zoom are not persisted — they are for the session.
-
-In the settings tab itself, under **Story threads**:
-
-| Setting | What | Default |
-|---|---|---|
-| Echo sensitivity | How many [echoes](/guide/story-threads#echoes) the view hears: *Low* reports only the plainest repeats (four-word phrases, near-identical sentences), *Medium* three-word phrases and sentences six content words long that are 60% alike, *High* shorter phrases and looser sentences. One choice instead of a knob per threshold. | Medium |
+Which entity or echo is being followed and the zoom are not persisted — they are for the session. The echo sensitivity the view uses is the one under Manuscript page above.

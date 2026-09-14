@@ -21,13 +21,13 @@ Everything that touches the page lives in the editor. Everything *about* the wor
 
 One command hides the ribbon, tabs, sidebars and status bar (optionally fullscreen). Typewriter scrolling keeps the line you're writing centred; focus fade veils the rest of its paragraph slightly and farther paragraphs progressively by distance. A faint band marks the current line.
 
-`Toggle Zen Mode` · Settings → Typewriter scrolling / Focus fade / Current line
+`Toggle Zen Mode` · Settings → Writing → Typewriter scrolling / Focus fade / Current line
 
 ### Paragraph rhythm and offline style checks
 
 Each sentence of the current paragraph sits on a faint tint, cool → warm by its felt length, so you *see* monotony before you hear it; in Zen Mode the tint leaves the text for a meter in the margin. Style checks tint clichés, passive voice, filter verbs, adverbs, repetition, nominalisations, weak verbs and metaphor candidates; hover for the note. Rules, a part-of-speech tagger and concreteness norms — no network, no model required.
 
-Settings → Paragraph rhythm / Style checks (every kind toggles individually)
+Settings → Writing → Paragraph rhythm · Settings → Lenses → Style checks (every kind is a chip)
 
 ### Story map
 

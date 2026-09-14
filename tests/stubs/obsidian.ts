@@ -44,7 +44,8 @@ export class Setting {
   name = "";
   toggle?: ToggleComponent;
   slider?: SliderComponent;
-  constructor(public containerEl: HTMLElement) { this.settingEl = containerEl.createDiv({ cls: "setting-item" }); Setting.created.push(this); }
+  controlEl!: HTMLElement;
+  constructor(public containerEl: HTMLElement) { this.settingEl = containerEl.createDiv({ cls: "setting-item" }); this.controlEl = this.settingEl.createDiv({ cls: "setting-item-control" }); Setting.created.push(this); }
   setName(n: string) { this.name = n; return this; }
   desc = "";
   setDesc(d: string) { this.desc = d; return this; }

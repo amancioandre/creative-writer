@@ -56,7 +56,7 @@ When the view is narrow the pane sits under the page instead of beside it.
 
 ## Settings
 
-Settings → Manuscript: how many folder levels become headings, whether note names do, what to strip from names (numbers and separators, nothing, or a pattern of your own), whether the notes' own headings nest under the outline, prose only, the comments pane, tag tinting in the editor, the tag list, and the reading speed behind the reading time. See [Settings](/reference/settings#manuscript).
+Settings → Manuscript outline: how many folder levels become headings, whether note names do, what to strip from names (numbers and separators, nothing, or a pattern of your own), and whether the notes' own headings nest under the outline. Manuscript comments: tag tinting in the editor and the tag list. Manuscript page: the ruler, the story and echo marks, and the reading speed behind the reading time. Prose only and the comments pane are switches at the top of the page and are remembered there. See [Settings](/reference/settings#manuscript).
 
 ## The rest of the plugin on the page
 

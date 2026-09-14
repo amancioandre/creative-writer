@@ -1,7 +1,7 @@
 import { type App, type Plugin, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
 import { RhythmScale } from "../../domain/rhythm/RhythmScale";
 import { MAX_READING_SPEED, MIN_READING_SPEED } from "../../domain/manuscript/ReadingTime";
-import { DEFAULT_GOALS, DEFAULT_MANUSCRIPT, ECHO_SENSITIVITIES, foldersToText, normalizeFolderPath, normalizeNotePath, tagsToText, textToFolders, textToTags, type ClaudeModelId, type EchoSensitivity, type LlmProvider, type PluginSettings } from "../../domain/settings/Settings";
+import { DEFAULT_GOALS, DEFAULT_MANUSCRIPT, ECHO_SENSITIVITIES, foldersToText, normalizeNotePath, tagsToText, textToFolders, textToTags, type EchoSensitivity, type PluginSettings } from "../../domain/settings/Settings";
 import type { ScopeMode } from "../../domain/scope/NoteScope";
 import type { FindingKind } from "../../domain/style/Finding";
 
@@ -22,17 +22,6 @@ const SCOPE_OPTIONS: Record<ScopeMode, string> = {
   marked: "Project folders and notes marked creative-writer: true",
 };
 
-const SCOPE_DESC = "One rule for everything: the notes the editor tools run in are the notes the daily goal, the project totals, the story map and the threads count. A declared project (writing-target or story: true in a note's front matter) is always in; the mode decides what else is. Side material — memos, research, reviews — stays out with creative-writer: false in its front matter, wherever it lives; creative-writer: true lets a note in whatever the mode. The plugin's own notes (writing log, story map, threads) are never counted.";
-
-
-const WRITER_FOLDER_DESC = "Vault-relative folder where your stories live. A promoted idea is scaffolded there, a new writer card goes there, the writer file is created there, and folders under it with prose but no project declaration are listed as unfiled on the writer board. Empty = the vault root, and no unfiled row.";
-
-const LOG_NOTE_DESC = "Vault-relative path of the note that keeps the log (words added and cut per day), so streaks sync with the vault. Takes effect at the next save; reload to read from a new path.";
-
-const ECHOES_DESC = "The echo finder's repeated phrases as marks in the gutter, each naming another place the words occur. Builds the story threads on each refresh.";
-
-const ECHO_SENSITIVITY_DESC = "How many echoes the threads view hears: repeated phrases and near-identical sentences across the book. Low reports only the plainest repeats; high hears shorter phrases and looser sentences.";
-
 const ECHO_OPTIONS: Record<EchoSensitivity, string> = { low: "Low", medium: "Medium", high: "High" };
 
 const STRIP_PRESETS: Record<string, string> = { numbers: "Numbers and separators (01 -, 3., 2))", none: "Nothing", custom: "Custom pattern" };
@@ -42,7 +31,8 @@ export function stripPresetOf(pattern: string): keyof typeof STRIP_PRESETS {
   return pattern === DEFAULT_MANUSCRIPT.stripPrefix ? "numbers" : pattern.trim() === "" ? "none" : "custom";
 }
 
-const STYLE_CHECKS: ReadonlyArray<[FindingKind, string, string]> = [
+/** The style-check kinds as the chips row shows them: kind, label, and the note behind the label. */
+export const STYLE_CHECKS: ReadonlyArray<[FindingKind, string, string]> = [
   ["cliche", "Clichés", "Phrases worn smooth by overuse."],
   ["passive", "Passive voice", "\"The letter was written\" — by whom?"],
   ["filter", "Filter verbs", "saw, heard, felt, realised — narrating perception instead of rendering it."],
@@ -53,10 +43,36 @@ const STYLE_CHECKS: ReadonlyArray<[FindingKind, string, string]> = [
   ["metaphor", "Metaphor candidates", "A concrete word applied to an abstract one — possibly figurative. Fresh or tired is your call."],
 ];
 
+/*
+ * The tab's own vocabulary for a definition. Structurally it is what Obsidian
+ * 1.13 renders from getSettingDefinitions(); the legacy renderer walks the
+ * same list, so the two paths cannot drift. Local types rather than
+ * Obsidian's because the test build stands the API in with a stub.
+ */
+type Control =
+  | { type: "toggle"; key: string }
+  | { type: "dropdown"; key: string; options: Record<string, string> }
+  | { type: "slider"; key: string; min: number; max: number; step: number }
+  | { type: "text"; key: string; placeholder?: string }
+  | { type: "textarea"; key: string; placeholder?: string; rows?: number };
+interface ControlRow { name: string; desc?: string; control: Control; visible?: () => boolean }
+interface RenderRow { name: string; desc?: string; render: (setting: Setting) => void; visible?: () => boolean }
+type Row = ControlRow | RenderRow;
+interface Group { type: "group"; heading: string; items: Row[] }
+
+/** Keys whose value decides whether other rows are shown; a change to one re-renders the tab. */
+const PARENT_KEYS: ReadonlySet<string> = new Set(["scope.mode", "focusFadeEnabled", "rhythmEnabled", "styleEnabled", "manuscript.stripPreset", "llm.provider", "llm.onIdle"]);
+
 /**
  * Settings are described once as definitions (Obsidian 1.13+: rendered by
  * the app and indexed for settings search) and read/written through dotted
- * keys. Older app versions fall back to the imperative renderer below.
+ * keys. Older app versions fall back to the imperative renderer below, which
+ * walks the same definitions.
+ *
+ * The layout follows the writer's day: where it runs, the editor while
+ * drafting, the lenses, the manuscript page, stories and goals, the model.
+ * A row that only matters while another is on is hidden until then, and
+ * every description is one line; the how and the why live in the docs.
  */
 export class CreativeZenSettingsTab extends PluginSettingTab {
   constructor(app: App, plugin: Plugin, private readonly port: SettingsPort) {
@@ -64,90 +80,74 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
   }
 
   getSettingDefinitions(): SettingDefinitionItem[] {
-    const s = this.port.current();
+    return this.definitions();
+  }
+
+  private definitions(): Group[] {
+    const s = () => this.port.current();
+    const group = (heading: string, items: Row[]): Group => ({ type: "group", heading, items });
+    const toggle = (key: string): Control => ({ type: "toggle", key });
+    const dropdown = (key: string, options: Record<string, string>): Control => ({ type: "dropdown", key, options });
+    const slider = (key: string, min: number, max: number, step: number): Control => ({ type: "slider", key, min, max, step });
+    const text = (key: string, placeholder?: string): Control => ({ type: "text", key, placeholder });
+    const textarea = (key: string, placeholder: string, rows: number): Control => ({ type: "textarea", key, placeholder, rows });
+    const llmOn = () => s().llm.provider !== "off";
+
     return [
-      {
-        type: "group",
-        heading: "Where it runs",
-        items: [
-          { name: "Enabled", desc: "Master switch. The \"Toggle everywhere\" command flips it.", control: { type: "toggle", key: "enabled" } },
-          { name: "Notes", desc: `${SCOPE_DESC} ${this.scopeLine()}`, control: { type: "dropdown", key: "scope.mode", options: SCOPE_OPTIONS } },
-          { name: "Folders", desc: "One vault-relative folder per line, e.g. storytelling/novel.", control: { type: "textarea", key: "scope.foldersText", placeholder: "storytelling", rows: 3 } },
-        ],
-      },
-      { name: "Typewriter scrolling", desc: "Keep the line you are writing vertically centred.", control: { type: "toggle", key: "typewriterEnabled" } },
-      { name: "Current line", desc: "A faint band across the editor behind the line you are writing, so it stands out inside its paragraph.", control: { type: "toggle", key: "currentLineEnabled" } },
-      { name: "Focus fade", desc: "Fade lines progressively the further they are from the cursor.", control: { type: "toggle", key: "focusFadeEnabled" } },
-      { name: "Paragraph strength", desc: "How visible the rest of the cursor paragraph is, next to the line you are on (1 = no difference).", control: { type: "slider", key: "focusParagraphOpacity", min: 0.1, max: 1, step: 0.05 } },
-      { name: "Far text strength", desc: "How visible the paragraphs furthest from the cursor are. Nearer ones sit between this and the paragraph strength.", control: { type: "slider", key: "focusFarOpacity", min: 0.05, max: 1, step: 0.05 } },
-      { name: "Paragraph rhythm", desc: "Colour each sentence of the current paragraph by its length and weight.", control: { type: "toggle", key: "rhythmEnabled" } },
-      { name: "Rhythm tiers", desc: "How many colour steps the rhythm gradient uses.", control: { type: "slider", key: "rhythmTiers", min: RhythmScale.MIN_TIERS, max: RhythmScale.MAX_TIERS, step: 1 } },
-      { name: "Fullscreen in Zen Mode", desc: "Also request window fullscreen when Zen Mode is toggled on.", control: { type: "toggle", key: "zenFullscreen" } },
-      { name: "Readability in status bar", desc: "Show the current paragraph's reading-ease and sentence-rhythm bands. Click it to open the writing desk with the whole note's profile.", control: { type: "toggle", key: "readabilityEnabled" } },
-      {
-        type: "group",
-        heading: "Writer",
-        items: [
-          { name: "Stories folder", desc: WRITER_FOLDER_DESC, control: { type: "text", key: "writer.storiesFolder", placeholder: "storytelling" } },
-        ],
-      },
-      {
-        type: "group",
-        heading: "Goals",
-        items: [
-          { name: "Daily word goal", desc: "Words added per day, in the notes the scope above takes in, for the streak and the progress bar in the writing desk. 0 = any day you write counts.", control: { type: "slider", key: "goals.dailyWords", min: 0, max: 5000, step: 50 } },
-          { name: "Writing log note", desc: LOG_NOTE_DESC, control: { type: "text", key: "goals.logNote", placeholder: DEFAULT_GOALS.logNote } },
-        ],
-      },
-      {
-        type: "group",
-        heading: "Manuscript",
-        items: [
-          { name: "Folder levels as headings", desc: "How many folder levels below the project folder become headings in the manuscript view. 0 = none: notes follow one another with no outline.", control: { type: "slider", key: "manuscript.folderDepth", min: 0, max: 6, step: 1 } },
-          { name: "Note names as headings", desc: "Put each note's name above its text. A note whose first heading already is its name shows that heading once.", control: { type: "toggle", key: "manuscript.noteTitles" } },
-          { name: "Strip from names", desc: "What to remove from the start of folder and note names before they become headings: the sort prefix in \"01 - Camp\".", control: { type: "dropdown", key: "manuscript.stripPreset", options: STRIP_PRESETS } },
-          { name: "Custom pattern", desc: "With Custom above: a regular expression removed from the start of names.", control: { type: "text", key: "manuscript.stripPrefix", placeholder: DEFAULT_MANUSCRIPT.stripPrefix } },
-          { name: "Nest the notes' own headings", desc: "Push the headings inside a note down below the outline, so a scene inside a chapter inside a part reads as level three.", control: { type: "toggle", key: "manuscript.demoteHeadings" } },
-          { name: "Prose only", desc: "Show only paragraphs, headings, quotes and scene breaks: no lists, tables, code or callouts. Also toggled at the top of the view.", control: { type: "toggle", key: "manuscript.proseOnly" } },
-          { name: "Comments pane", desc: "A pane beside the manuscript page: the active paragraph's %% comments %% with a box to add one, and every comment in reading order. Also toggled at the top of the view.", control: { type: "toggle", key: "manuscript.showComments" } },
-          { name: "Tint tags in the editor", desc: "Colour the tag word that opens a comment, %% TODO: … %%, in the editor. Only inside comments; a TODO in dialogue is left alone.", control: { type: "toggle", key: "manuscript.tintTags" } },
-          { name: "Tags", desc: "One per line: an uppercase word and a hex colour, e.g. CHECK #4a8fe2. A comment that opens with the word and a colon takes the colour, on the page and in the editor.", control: { type: "textarea", key: "manuscript.tagsText", placeholder: "TODO #d9a621", rows: 4 } },
-          { name: "Ruler", desc: "A strip at the top of the manuscript page: one segment per section, wide by words, coloured by readability, marked when it changed today. Click a segment to go there.", control: { type: "toggle", key: "manuscript.showRuler" } },
-          { name: "Story on the page", desc: "Who is in each section and scene, in the story map's colours, and the model's contradictions as red marks in the gutter. Builds the story map each refresh, so it is off by default.", control: { type: "toggle", key: "manuscript.showStory" } },
-          { name: "Echoes on the page", desc: ECHOES_DESC, control: { type: "toggle", key: "manuscript.showEchoes" } },
-          { name: "Reading speed", desc: "Words per minute behind the reading time at the top of the manuscript page and beside each section. Adults read prose at about 250; set your own pace.", control: { type: "slider", key: "manuscript.readingSpeed", min: MIN_READING_SPEED, max: MAX_READING_SPEED, step: 10 } },
-        ],
-      },
-      {
-        type: "group",
-        heading: "Story threads",
-        items: [
-          { name: "Echo sensitivity", desc: ECHO_SENSITIVITY_DESC, control: { type: "dropdown", key: "threads.echoSensitivity", options: ECHO_OPTIONS } },
-        ],
-      },
-      {
-        type: "group",
-        heading: "Style checks",
-        items: [
-          { name: "Style checks", desc: "Highlight clichés, passive voice, filter verbs, adverbs, repetition and more in the current paragraph. Hover a highlight for the note.", control: { type: "toggle", key: "styleEnabled" } },
-          ...STYLE_CHECKS.map(([kind, name, desc]) => ({ name, desc, control: { type: "toggle" as const, key: `styleChecks.${kind}` } })),
-        ],
-      },
-      {
-        type: "group",
-        heading: "Model assistant",
-        items: [
-          { name: "Model", desc: "A language model reads the current paragraph and adds findings the rules cannot see: clichés in context, tired metaphors, passives that hide an agent. Local Ollama keeps everything on this machine.", control: { type: "dropdown", key: "llm.provider", options: { off: "Off", ollama: "Local (Ollama)", claude: "Claude (Anthropic API)" } } },
-          { name: "Analyse automatically", desc: "Run the model after a pause in typing. Off: only when you run the \"Analyse paragraph with model\" command.", control: { type: "toggle", key: "llm.onIdle" } },
-          { name: "Pause before analysing", desc: "Milliseconds of quiet before the model is called.", control: { type: "slider", key: "llm.idleMs", min: 500, max: 10000, step: 250 } },
-          { name: "Ollama URL", control: { type: "text", key: "llm.ollamaUrl", placeholder: "http://localhost:11434" } },
-          { name: "Ollama model", desc: "Any chat model you have pulled. qwen2.5:7b and llama3.1:8b follow the JSON format well; reasoning models (deepseek-r1) are slower but better at the myth analysis.", control: { type: "text", key: "llm.ollamaModel", placeholder: "qwen2.5:7b" } },
-          { name: "Ollama embedding model", desc: "An embedding model you have pulled, for the echo finder's sentence pairs. nomic-embed-text is small and good.", control: { type: "text", key: "llm.ollamaEmbedModel", placeholder: "nomic-embed-text" } },
-          { name: "Claude model", desc: "Opus 5 ($5 / $25 per million tokens) reads prose far more carefully; Haiku 4.5 ($1 / $5) is the budget option. A paragraph costs roughly a cent on Opus with the rulebook cached.", control: { type: "dropdown", key: "llm.claudeModel", options: { "claude-opus-5": "Claude Opus 5", "claude-haiku-4-5": "Claude Haiku 4.5" } } },
-          { name: "Anthropic API key", desc: this.keyWarning(), control: { type: "text", key: "llm.claudeApiKey", placeholder: "sk-ant-…" } },
-          { name: "Daily spending cap (USD)", desc: `Claude calls stop when today's spend reaches this. 0 = no cap. Spent today: $${s.llm.spend.usd.toFixed(3)}.`, control: { type: "slider", key: "llm.dailyCapUsd", min: 0, max: 20, step: 0.5 } },
-        ],
-      },
+      group("Where it runs", [
+        { name: "Enabled", desc: "Master switch. The \"Toggle everywhere\" command flips it.", control: toggle("enabled") },
+        { name: "Notes", desc: `Which notes the tools, the counts and the story map take in. ${this.scopeLine()}`, control: dropdown("scope.mode", SCOPE_OPTIONS) },
+        { name: "Folders", desc: "One vault-relative folder per line, e.g. storytelling/novel.", control: textarea("scope.foldersText", "storytelling", 3), visible: () => s().scope.mode === "folders" },
+      ]),
+      group("Writing", [
+        { name: "Typewriter scrolling", desc: "Keep the line you are writing centred.", control: toggle("typewriterEnabled") },
+        { name: "Current line", desc: "A faint band behind the line you are writing.", control: toggle("currentLineEnabled") },
+        { name: "Focus fade", desc: "Fade lines the further they are from the cursor.", control: toggle("focusFadeEnabled") },
+        { name: "Paragraph strength", desc: "How visible the rest of the cursor paragraph is (1 = no difference).", control: slider("focusParagraphOpacity", 0.1, 1, 0.05), visible: () => s().focusFadeEnabled },
+        { name: "Far text strength", desc: "How visible the paragraphs furthest from the cursor are.", control: slider("focusFarOpacity", 0.05, 1, 0.05), visible: () => s().focusFadeEnabled },
+        { name: "Paragraph rhythm", desc: "Tint each sentence of the paragraph by its length and weight; a margin meter in Zen Mode.", control: toggle("rhythmEnabled") },
+        { name: "Rhythm tiers", desc: "Colour steps in the gradient.", control: slider("rhythmTiers", RhythmScale.MIN_TIERS, RhythmScale.MAX_TIERS, 1), visible: () => s().rhythmEnabled },
+        { name: "Zen Mode goes fullscreen", desc: "Also ask the window for fullscreen.", control: toggle("zenFullscreen") },
+        { name: "Readability in the status bar", desc: "The paragraph's reading ease. Click it for the whole note.", control: toggle("readabilityEnabled") },
+      ]),
+      group("Lenses", [
+        { name: "Style checks", desc: "Tint clichés, passive voice, filter verbs and more in the paragraph. Hover a tint for the note.", control: toggle("styleEnabled") },
+        { name: "Kinds", desc: "Which checks the lens shows.", render: (setting) => this.renderKindChips(setting), visible: () => s().styleEnabled },
+      ]),
+      group("Manuscript outline", [
+        { name: "Folder levels as headings", desc: "Folder levels below the project folder that become headings. 0 = no outline.", control: slider("manuscript.folderDepth", 0, 6, 1) },
+        { name: "Note names as headings", desc: "A note whose first heading is already its name shows it once.", control: toggle("manuscript.noteTitles") },
+        { name: "Strip from names", desc: "The sort prefix in \"01 - Camp\".", control: dropdown("manuscript.stripPreset", STRIP_PRESETS) },
+        { name: "Custom pattern", desc: "A regular expression removed from the start of names.", control: text("manuscript.stripPrefix", DEFAULT_MANUSCRIPT.stripPrefix), visible: () => stripPresetOf(s().manuscript.stripPrefix) === "custom" },
+        { name: "Nest the notes' own headings", desc: "A scene in a chapter in a part reads as level three.", control: toggle("manuscript.demoteHeadings") },
+      ]),
+      group("Manuscript comments", [
+        { name: "Tint tags in the editor", desc: "Colour the word that opens a comment, %% TODO: … %%, in the editor.", control: toggle("manuscript.tintTags") },
+        { name: "Tags", desc: "One per line: an uppercase word and a hex colour, e.g. CHECK #4a8fe2.", control: textarea("manuscript.tagsText", "TODO #d9a621", 4) },
+      ]),
+      group("Manuscript page", [
+        { name: "Ruler", desc: "One segment per section, wide by words, coloured by readability.", control: toggle("manuscript.showRuler") },
+        { name: "Story on the page", desc: "Cast per section and the model's contradictions. Builds the story map, so off by default.", control: toggle("manuscript.showStory") },
+        { name: "Echoes on the page", desc: "Repeated phrases as marks in the gutter. Builds the story threads.", control: toggle("manuscript.showEchoes") },
+        { name: "Echo sensitivity", desc: "How close two passages must be to count, here and in the story threads.", control: dropdown("threads.echoSensitivity", ECHO_OPTIONS) },
+        { name: "Reading speed", desc: "Words per minute behind the reading times. Adults read prose at about 250.", control: slider("manuscript.readingSpeed", MIN_READING_SPEED, MAX_READING_SPEED, 10) },
+      ]),
+      group("Stories and goals", [
+        { name: "Stories folder", desc: "Where the writer board keeps its stories. Empty = the vault root.", control: text("writer.storiesFolder", "storytelling") },
+        { name: "Daily word goal", desc: "Words added per day for the streak. 0 = any day you write counts.", control: slider("goals.dailyWords", 0, 5000, 50) },
+        { name: "Writing log note", desc: "Daily counts, kept in the vault so they sync.", control: text("goals.logNote", DEFAULT_GOALS.logNote) },
+      ]),
+      group("Model assistant", [
+        { name: "Model", desc: "A model reads the paragraph and adds what the rules cannot see. Ollama keeps everything on this machine.", control: dropdown("llm.provider", { off: "Off", ollama: "Local (Ollama)", claude: "Claude (Anthropic API)" }) },
+        { name: "Ollama URL", control: text("llm.ollamaUrl", "http://localhost:11434"), visible: () => s().llm.provider === "ollama" },
+        { name: "Ollama model", desc: "Any chat model you have pulled; qwen2.5:7b and llama3.1:8b follow the format well.", control: text("llm.ollamaModel", "qwen2.5:7b"), visible: () => s().llm.provider === "ollama" },
+        { name: "Ollama embedding model", desc: "For the echo finder. nomic-embed-text is small and good.", control: text("llm.ollamaEmbedModel", "nomic-embed-text"), visible: () => s().llm.provider === "ollama" },
+        { name: "Claude model", desc: "Opus 5 reads prose far more carefully; Haiku 4.5 is the budget option.", control: dropdown("llm.claudeModel", { "claude-opus-5": "Claude Opus 5", "claude-haiku-4-5": "Claude Haiku 4.5" }), visible: () => s().llm.provider === "claude" },
+        { name: "Anthropic API key", desc: this.keyWarning(), control: text("llm.claudeApiKey", "sk-ant-…"), visible: () => s().llm.provider === "claude" },
+        { name: "Daily spending cap (USD)", desc: `Claude calls stop at this; 0 = no cap. Spent today: $${s().llm.spend.usd.toFixed(3)}.`, control: slider("llm.dailyCapUsd", 0, 20, 0.5), visible: () => s().llm.provider === "claude" },
+        { name: "Analyse automatically", desc: "After a pause in typing. Off: only by the \"Analyse paragraph with model\" command.", control: toggle("llm.onIdle"), visible: llmOn },
+        { name: "Pause before analysing", desc: "Milliseconds of quiet before the model is called.", control: slider("llm.idleMs", 500, 10000, 250), visible: () => llmOn() && s().llm.onIdle },
+      ]),
     ];
   }
 
@@ -164,6 +164,11 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
   }
 
   async setControlValue(key: string, value: unknown): Promise<void> {
+    await this.write(key, value);
+    if (PARENT_KEYS.has(key)) this.refresh();
+  }
+
+  private async write(key: string, value: unknown): Promise<void> {
     if (key === "manuscript.stripPreset") {
       const c = this.port.current();
       const pattern = value === "numbers" ? DEFAULT_MANUSCRIPT.stripPrefix : value === "none" ? "" : stripPresetOf(c.manuscript.stripPrefix) === "custom" ? c.manuscript.stripPrefix : DEFAULT_MANUSCRIPT.stripPrefix;
@@ -197,6 +202,13 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
     await this.port.update(setPath(this.port.current(), key.split("."), value));
   }
 
+  /** Re-evaluates every row's visibility: the app's update() when it has one, else a full legacy render. */
+  private refresh(): void {
+    const update = (this as { update?: () => void }).update;
+    if (typeof update === "function") update.call(this);
+    else this.renderLegacy();
+  }
+
   display(): void {
     // Obsidian ≥ 1.13 renders getSettingDefinitions(); older versions have no base display().
     const base = (PluginSettingTab.prototype as { display?: (this: PluginSettingTab) => void }).display;
@@ -204,122 +216,62 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
     else this.renderLegacy();
   }
 
-  /** Imperative rendering for Obsidian < 1.13. Same settings, same keys. */
+  /** Imperative rendering for Obsidian < 1.13: the same definitions, walked by hand. */
   renderLegacy(): void {
     const { containerEl } = this;
     containerEl.empty();
-    const s = this.port.current();
-    const set = (patch: Partial<PluginSettings>) => this.port.update({ ...this.port.current(), ...patch });
-    const llm = (patch: Partial<PluginSettings["llm"]>) => set({ llm: { ...this.port.current().llm, ...patch } });
-
-    new Setting(containerEl).setName("Enabled").setDesc("Master switch.")
-      .addToggle((t) => t.setValue(s.enabled).onChange((v) => set({ enabled: v })));
-    new Setting(containerEl).setName("Notes").setDesc(`${SCOPE_DESC} ${this.scopeLine()}`)
-      .addDropdown((d) => d.addOptions(SCOPE_OPTIONS).setValue(s.scope.mode).onChange((v) => set({ scope: { ...this.port.current().scope, mode: v as ScopeMode } })));
-    new Setting(containerEl).setName("Folders").setDesc("One vault-relative folder per line.")
-      .addTextArea((t) => t.setPlaceholder("storytelling").setValue(foldersToText(s.scope.folders)).onChange((v) => set({ scope: { ...this.port.current().scope, folders: textToFolders(v) } })));
-    new Setting(containerEl).setName("Typewriter scrolling").setDesc("Keep the line you are writing vertically centred.")
-      .addToggle((t) => t.setValue(s.typewriterEnabled).onChange((v) => set({ typewriterEnabled: v })));
-    new Setting(containerEl).setName("Current line").setDesc("A faint band across the editor behind the line you are writing, so it stands out inside its paragraph.")
-      .addToggle((t) => t.setValue(s.currentLineEnabled).onChange((v) => set({ currentLineEnabled: v })));
-    new Setting(containerEl).setName("Focus fade").setDesc("Fade lines progressively the further they are from the cursor.")
-      .addToggle((t) => t.setValue(s.focusFadeEnabled).onChange((v) => set({ focusFadeEnabled: v })));
-    new Setting(containerEl).setName("Paragraph strength").setDesc("How visible the rest of the cursor paragraph is next to the current line.")
-      .addSlider((sl) => sl.setLimits(0.1, 1, 0.05).setValue(s.focusParagraphOpacity).onChange((v) => set({ focusParagraphOpacity: v })));
-    new Setting(containerEl).setName("Far text strength").setDesc("How visible the paragraphs furthest from the cursor are.")
-      .addSlider((sl) => sl.setLimits(0.05, 1, 0.05).setValue(s.focusFarOpacity).onChange((v) => set({ focusFarOpacity: v })));
-    new Setting(containerEl).setName("Paragraph rhythm").setDesc("Colour each sentence of the current paragraph by its length and weight.")
-      .addToggle((t) => t.setValue(s.rhythmEnabled).onChange((v) => set({ rhythmEnabled: v })));
-    new Setting(containerEl).setName("Rhythm tiers").setDesc("How many colour steps the rhythm gradient uses.")
-      .addSlider((sl) => sl.setLimits(RhythmScale.MIN_TIERS, RhythmScale.MAX_TIERS, 1).setValue(s.rhythmTiers).onChange((v) => set({ rhythmTiers: v })));
-    new Setting(containerEl).setName("Fullscreen in Zen Mode").setDesc("Also request window fullscreen when Zen Mode is toggled on.")
-      .addToggle((t) => t.setValue(s.zenFullscreen).onChange((v) => set({ zenFullscreen: v })));
-    new Setting(containerEl).setName("Readability in status bar").setDesc("Show the current paragraph's reading-ease and sentence-rhythm bands. Click it to open the writing desk.")
-      .addToggle((t) => t.setValue(s.readabilityEnabled).onChange((v) => set({ readabilityEnabled: v })));
-
-    new Setting(containerEl).setName("Writer").setHeading();
-    new Setting(containerEl).setName("Stories folder").setDesc(WRITER_FOLDER_DESC)
-      .addText((t) => t.setPlaceholder("storytelling").setValue(s.writer.storiesFolder).onChange((v) => set({ writer: { ...this.port.current().writer, storiesFolder: normalizeFolderPath(v) } })));
-
-    new Setting(containerEl).setName("Goals").setHeading();
-    new Setting(containerEl).setName("Daily word goal").setDesc("Words added per day, in the notes the scope takes in, for the streak and the progress bar in the writing desk. 0 = any day you write counts.")
-      .addSlider((sl) => sl.setLimits(0, 5000, 50).setValue(s.goals.dailyWords).onChange((v) => set({ goals: { ...this.port.current().goals, dailyWords: v } })));
-    new Setting(containerEl).setName("Writing log note").setDesc(LOG_NOTE_DESC)
-      .addText((t) => t.setPlaceholder(DEFAULT_GOALS.logNote).setValue(s.goals.logNote).onChange((v) => { const p = normalizeNotePath(v); if (p) void set({ goals: { ...this.port.current().goals, logNote: p } }); }));
-
-    new Setting(containerEl).setName("Manuscript").setHeading();
-    const ms = (patch: Partial<PluginSettings["manuscript"]>) => set({ manuscript: { ...this.port.current().manuscript, ...patch } });
-    new Setting(containerEl).setName("Folder levels as headings").setDesc("How many folder levels below the project folder become headings in the manuscript view. 0 = none.")
-      .addSlider((sl) => sl.setLimits(0, 6, 1).setValue(s.manuscript.folderDepth).onChange((v) => ms({ folderDepth: v })));
-    new Setting(containerEl).setName("Note names as headings").setDesc("Put each note's name above its text. A note whose first heading already is its name shows that heading once.")
-      .addToggle((t) => t.setValue(s.manuscript.noteTitles).onChange((v) => ms({ noteTitles: v })));
-    new Setting(containerEl).setName("Strip from names").setDesc("What to remove from the start of folder and note names before they become headings.")
-      .addDropdown((d) => d.addOptions(STRIP_PRESETS).setValue(stripPresetOf(s.manuscript.stripPrefix)).onChange((v) => ms({ stripPrefix: v === "numbers" ? DEFAULT_MANUSCRIPT.stripPrefix : v === "none" ? "" : this.port.current().manuscript.stripPrefix })));
-    new Setting(containerEl).setName("Custom pattern").setDesc("With Custom above: a regular expression removed from the start of names.")
-      .addText((t) => t.setPlaceholder(DEFAULT_MANUSCRIPT.stripPrefix).setValue(s.manuscript.stripPrefix).onChange((v) => ms({ stripPrefix: v })));
-    new Setting(containerEl).setName("Nest the notes' own headings").setDesc("Push the headings inside a note down below the outline.")
-      .addToggle((t) => t.setValue(s.manuscript.demoteHeadings).onChange((v) => ms({ demoteHeadings: v })));
-    new Setting(containerEl).setName("Prose only").setDesc("Show only paragraphs, headings, quotes and scene breaks. Also toggled at the top of the view.")
-      .addToggle((t) => t.setValue(s.manuscript.proseOnly).onChange((v) => ms({ proseOnly: v })));
-    new Setting(containerEl).setName("Comments pane").setDesc("A pane beside the manuscript page: the active paragraph's comments with a box to add one, and every comment in reading order.")
-      .addToggle((t) => t.setValue(s.manuscript.showComments).onChange((v) => ms({ showComments: v })));
-    new Setting(containerEl).setName("Tint tags in the editor").setDesc("Colour the tag word that opens a comment, %% TODO: … %%, in the editor.")
-      .addToggle((t) => t.setValue(s.manuscript.tintTags).onChange((v) => ms({ tintTags: v })));
-    new Setting(containerEl).setName("Tags").setDesc("One per line: an uppercase word and a hex colour, e.g. CHECK #4a8fe2.")
-      .addTextArea((t) => t.setPlaceholder("TODO #d9a621").setValue(tagsToText(s.manuscript.tags)).onChange((v) => ms({ tags: textToTags(v) })));
-    new Setting(containerEl).setName("Ruler").setDesc("A strip at the top of the manuscript page: one segment per section, wide by words, coloured by readability.")
-      .addToggle((t) => t.setValue(s.manuscript.showRuler).onChange((v) => ms({ showRuler: v })));
-    new Setting(containerEl).setName("Story on the page").setDesc("Who is in each section and scene, and the model's contradictions in the gutter. Builds the story map each refresh.")
-      .addToggle((t) => t.setValue(s.manuscript.showStory).onChange((v) => ms({ showStory: v })));
-    new Setting(containerEl).setName("Echoes on the page").setDesc(ECHOES_DESC)
-      .addToggle((t) => t.setValue(s.manuscript.showEchoes).onChange((v) => ms({ showEchoes: v })));
-    new Setting(containerEl).setName("Reading speed").setDesc("Words per minute behind the reading time on the manuscript page. Adults read prose at about 250.")
-      .addSlider((sl) => sl.setLimits(MIN_READING_SPEED, MAX_READING_SPEED, 10).setValue(s.manuscript.readingSpeed).onChange((v) => ms({ readingSpeed: v })));
-
-    new Setting(containerEl).setName("Story threads").setHeading();
-    new Setting(containerEl).setName("Echo sensitivity").setDesc(ECHO_SENSITIVITY_DESC)
-      .addDropdown((d) => d.addOptions(ECHO_OPTIONS).setValue(s.threads.echoSensitivity).onChange((v) => set({ threads: { ...this.port.current().threads, echoSensitivity: ECHO_SENSITIVITIES.includes(v as EchoSensitivity) ? (v as EchoSensitivity) : "medium" } })));
-
-    new Setting(containerEl).setName("Style checks").setHeading();
-    new Setting(containerEl).setName("Style checks").setDesc("Highlight clichés, passive voice, filter verbs, adverbs, repetition and more in the current paragraph. Hover a highlight for the note.")
-      .addToggle((t) => t.setValue(s.styleEnabled).onChange((v) => set({ styleEnabled: v })));
-    for (const [kind, name, desc] of STYLE_CHECKS) {
-      new Setting(containerEl).setName(name).setDesc(desc)
-        .addToggle((t) => t.setValue(s.styleChecks[kind]).onChange((v) => set({ styleChecks: { ...this.port.current().styleChecks, [kind]: v } })));
+    for (const group of this.definitions()) {
+      const rows = group.items.filter((row) => row.visible?.() ?? true);
+      if (rows.length === 0) continue;
+      new Setting(containerEl).setName(group.heading).setHeading();
+      for (const row of rows) {
+        const setting = new Setting(containerEl).setName(row.name);
+        if (row.desc) setting.setDesc(row.desc);
+        if ("render" in row) { row.render(setting); continue; }
+        this.bind(setting, row.control);
+      }
     }
+  }
 
-    new Setting(containerEl).setName("Model assistant").setHeading();
-    new Setting(containerEl).setName("Model").setDesc("A language model reads the current paragraph and adds findings the rules cannot see. Local Ollama keeps everything on this machine.")
-      .addDropdown((d) => d.addOptions({ off: "Off", ollama: "Local (Ollama)", claude: "Claude (Anthropic API)" }).setValue(s.llm.provider).onChange((v) => llm({ provider: v as LlmProvider })));
-    new Setting(containerEl).setName("Analyse automatically").setDesc("Run the model after a pause in typing. Off: only on command.")
-      .addToggle((t) => t.setValue(s.llm.onIdle).onChange((v) => llm({ onIdle: v })));
-    new Setting(containerEl).setName("Pause before analysing").setDesc("Milliseconds of quiet before the model is called.")
-      .addSlider((sl) => sl.setLimits(500, 10000, 250).setValue(s.llm.idleMs).onChange((v) => llm({ idleMs: v })));
-    new Setting(containerEl).setName("Ollama URL")
-      .addText((t) => t.setPlaceholder("http://localhost:11434").setValue(s.llm.ollamaUrl).onChange((v) => llm({ ollamaUrl: v })));
-    new Setting(containerEl).setName("Ollama model").setDesc("Any chat model you have pulled.")
-      .addText((t) => t.setPlaceholder("qwen2.5:7b").setValue(s.llm.ollamaModel).onChange((v) => llm({ ollamaModel: v })));
-    new Setting(containerEl).setName("Ollama embedding model").setDesc("An embedding model you have pulled, for the echo finder's sentence pairs (Read project for echoes in the story threads view). nomic-embed-text is small and good.")
-      .addText((t) => t.setPlaceholder("nomic-embed-text").setValue(s.llm.ollamaEmbedModel).onChange((v) => llm({ ollamaEmbedModel: v })));
-    new Setting(containerEl).setName("Claude model")
-      .addDropdown((d) => d.addOptions({ "claude-opus-5": "Claude Opus 5", "claude-haiku-4-5": "Claude Haiku 4.5" }).setValue(s.llm.claudeModel).onChange((v) => llm({ claudeModel: v as ClaudeModelId })));
-    new Setting(containerEl).setName("Anthropic API key").setDesc(this.keyWarning())
-      .addText((t) => t.setPlaceholder("sk-ant-…").setValue(s.llm.claudeApiKey).onChange((v) => llm({ claudeApiKey: v })));
-    new Setting(containerEl).setName("Daily spending cap (USD)").setDesc(`Claude calls stop when today's spend reaches this. 0 = no cap. Spent today: $${s.llm.spend.usd.toFixed(3)}.`)
-      .addSlider((sl) => sl.setLimits(0, 20, 0.5).setValue(s.llm.dailyCapUsd).onChange((v) => llm({ dailyCapUsd: v })));
+  private bind(setting: Setting, control: Control): void {
+    const value = this.getControlValue(control.key);
+    const set = (v: unknown) => void this.setControlValue(control.key, v);
+    switch (control.type) {
+      case "toggle": setting.addToggle((t) => t.setValue(value === true).onChange(set)); break;
+      case "dropdown": setting.addDropdown((d) => d.addOptions(control.options).setValue(asText(value)).onChange(set)); break;
+      case "slider": setting.addSlider((sl) => sl.setLimits(control.min, control.max, control.step).setValue(typeof value === "number" ? value : control.min).onChange(set)); break;
+      case "text": setting.addText((t) => t.setPlaceholder(control.placeholder ?? "").setValue(asText(value)).onChange(set)); break;
+      case "textarea": setting.addTextArea((t) => t.setPlaceholder(control.placeholder ?? "").setValue(asText(value)).onChange(set)); break;
+    }
+  }
+
+  /** One row of chips, one per style-check kind; a chip is a button that toggles its kind. */
+  private renderKindChips(setting: Setting): void {
+    const wrap = setting.controlEl.createDiv({ cls: "czm-chips" });
+    for (const [kind, name, desc] of STYLE_CHECKS) {
+      const on = () => this.port.current().styleChecks[kind];
+      const chip = wrap.createEl("button", { cls: "czm-chip", text: name, attr: { type: "button", title: desc, "aria-pressed": String(on()) } });
+      chip.classList.toggle("is-active", on());
+      chip.addEventListener("click", () => {
+        const next = !on();
+        chip.classList.toggle("is-active", next);
+        chip.setAttribute("aria-pressed", String(next));
+        void this.setControlValue(`styleChecks.${kind}`, next);
+      });
+    }
   }
 
   private keyWarning(): string {
-    return `Stored in PLAINTEXT in this vault's ${this.port.configDir()}/plugins/creative-writer/data.json. If the vault syncs, the key syncs with it. Use a key you can revoke.`;
+    return `Stored in PLAINTEXT in ${this.port.configDir()}/plugins/creative-writer/data.json and syncs with the vault. Use a key you can revoke.`;
   }
 }
 
-/** Immutable deep set along a key path. */
 /** The value of a text control, or "" when something else arrived. */
 function asText(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
+/** Immutable deep set along a key path. */
 function setPath<T>(obj: T, path: string[], value: unknown): T {
   if (path.length === 0) return value as T;
   const [head, ...rest] = path;
