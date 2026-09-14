@@ -177,10 +177,17 @@ export class ManuscriptView extends ItemView {
     return typeof el.isShown === "function" ? el.isShown() : true;
   }
 
-  private annotations(): { item: NoteItem; a: Annotation }[] {
-    const out: { item: NoteItem; a: Annotation }[] = [];
-    for (const item of this.manuscript.items) if (item.kind === "note") for (const a of item.annotations) out.push({ item, a });
+  private annotations(): { item: NoteItem; a: Annotation; block: ManuscriptBlock | null }[] {
+    const out: { item: NoteItem; a: Annotation; block: ManuscriptBlock | null }[] = [];
+    for (const item of this.manuscript.items) if (item.kind === "note") for (const a of item.annotations) out.push({ item, a, block: item.blocks.find((b) => b.annotations.includes(a)) ?? null });
     return out;
+  }
+
+  /** One line of the prose a comment hangs on, for the list. */
+  private anchorText(block: ManuscriptBlock | null): string {
+    if (!block) return "";
+    const text = block.kind === "heading" ? block.headingText : block.markdown.split("\n").map((l) => stripInlineMarkup(l)).join(" ").replace(/\s+/g, " ").trim();
+    return text.length > 80 ? `${text.slice(0, 80).trimEnd()}…` : text;
   }
 
   private activeBlock(): { item: NoteItem; block: ManuscriptBlock } | null {
@@ -427,7 +434,7 @@ export class ManuscriptView extends ItemView {
     const row = form.createDiv({ cls: "czm-ms-compose-row" });
     const chip = row.createSpan({ cls: "czm-ms-cm-badge czm-ms-compose-chip" });
     chip.hidden = true;
-    const text = row.createEl("textarea", { cls: "czm-ms-compose-text", attr: { rows: "1", placeholder: hit ? "TODO: a note on this paragraph, then Enter" : "Select a paragraph first", "aria-label": "New comment" } });
+    const text = row.createEl("textarea", { cls: "czm-ms-compose-text", attr: { rows: "1", placeholder: hit ? "A note on this paragraph…" : "Pick a paragraph on the page…", "aria-label": "New comment" } });
     text.disabled = !hit;
     text.value = this.draft;
     const reflectTag = () => {
@@ -456,7 +463,7 @@ export class ManuscriptView extends ItemView {
       if (ev.key === "Escape") { ev.preventDefault(); if (text.value) { text.value = ""; this.draft = ""; reflectTag(); grow(); } else this.activeEl()?.focus(); }
     });
     const where = form.createDiv({ cls: "czm-ms-compose-where" });
-    where.setText(hit ? `Enter appends it to the end of this paragraph in ${hit.item.title}. Shift+Enter for a new line.` : "Click a paragraph, or press an arrow key on the page, to comment on it.");
+    where.setText(hit ? `Enter adds it to the end of this paragraph in ${hit.item.title} · Shift+Enter for a new line · a TAG: prefix, or a chip below, sets the kind` : "Click a paragraph, or press an arrow key on the page, to comment on it.");
     // The tags as a legend; a click drops the prefix in, for anyone who prefers the mouse.
     const legend = form.createDiv({ cls: "czm-ms-legend" });
     for (const t of settings.tags) {
@@ -490,7 +497,24 @@ export class ManuscriptView extends ItemView {
     for (const [value, label] of options) { const o = filter.createEl("option", { text: label }); o.value = value; if (value === this.tagFilter) o.selected = true; }
     filter.addEventListener("change", () => { this.tagFilter = filter.value; this.renderSide(); });
     const shown = all.filter(({ a }) => !this.tagFilter || tagKey(a) === this.tagFilter);
-    this.renderRows(pane.createDiv({ cls: "czm-ms-cm-rows", attr: { role: "list" } }), shown, settings.tags, true);
+    // One list, grouped under the chapter each comment is in; the header stays put while its rows scroll by.
+    const list = pane.createDiv({ cls: "czm-ms-cm-rows czm-ms-cm-groups", attr: { role: "list" } });
+    let last: NoteItem | null = null;
+    let group: HTMLElement | null = null;
+    for (const entry of shown) {
+      if (entry.item !== last) {
+        last = entry.item;
+        group = list.createDiv({ cls: "czm-ms-cm-group" });
+        const n = shown.filter((e) => e.item === entry.item).length;
+        const head = group.createDiv({ cls: "czm-ms-cm-head" });
+        head.createSpan({ text: entry.item.title, cls: "czm-ms-cm-head-title" });
+        head.createSpan({ text: String(n), cls: "czm-ms-cm-head-count" });
+      }
+      this.renderRows(group!, [entry], settings.tags, false);
+    }
+    // One tab stop for the whole list; the arrows do the rest.
+    list.querySelectorAll<HTMLElement>(".czm-ms-cm-row").forEach((r, i) => { r.tabIndex = i === 0 ? 0 : -1; });
+    this.attachListKeys(list);
   }
 
   /** Comment rows: a tag badge in its colour, the text, and where it is. Arrows move, Enter opens the editor, Escape returns to the page. */
@@ -502,10 +526,17 @@ export class ManuscriptView extends ItemView {
       if (color) badge.style.setProperty("--czm-tag", color);
       row.createSpan({ text: a.text.length > 160 ? `${a.text.slice(0, 160)}…` : a.text, cls: "czm-ms-cm-text" });
       if (where) row.createSpan({ text: item.title, cls: "czm-ms-cm-where" });
+      const anchor = "block" in rows[i]! ? this.anchorText((rows[i] as { block: ManuscriptBlock | null }).block) : "";
+      if (anchor) row.createSpan({ text: anchor, cls: "czm-ms-cm-anchor", attr: { title: anchor } });
       // Click: the page goes to the paragraph and the editor follows. Double click or Shift+Enter: into the editor at the comment.
       row.addEventListener("click", () => this.goTo(item.path, a.line, (b) => b.annotations.includes(a)));
       row.addEventListener("dblclick", () => this.source.reveal(item.path, a.line, a.ch, true));
     });
+    if (!parent.classList.contains("czm-ms-cm-group")) this.attachListKeys(parent);
+  }
+
+  /** Arrows move between rows, Enter opens the page there, Shift+Enter the editor, Escape returns to the page. One handler for a whole list, grouped or not. */
+  private attachListKeys(parent: HTMLElement): void {
     parent.addEventListener("keydown", (ev) => {
       const items = [...parent.querySelectorAll<HTMLElement>(".czm-ms-cm-row")];
       const at = items.indexOf(ev.target as HTMLElement);

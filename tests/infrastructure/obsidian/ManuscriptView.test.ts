@@ -229,6 +229,11 @@ describe("ManuscriptView", () => {
     const rows = () => [...all().querySelectorAll<HTMLElement>(".czm-ms-cm-row")];
     expect(rows().map((r) => r.querySelector(".czm-ms-cm-badge")?.textContent)).toEqual(["CHECK", "mark", "note"]);
     expect(rows().map((r) => r.tabIndex)).toEqual([0, -1, -1]);
+    // One list grouped under a sticky chapter header with its count; each row hangs on a line of the prose; no chapter name per row.
+    expect([...all().querySelectorAll(".czm-ms-cm-head")].map((h) => h.textContent)).toEqual(["One3"]);
+    expect(rows().map((r) => r.querySelector(".czm-ms-cm-anchor")?.textContent)).toEqual(["Marta woke. She stayed.", "Marta woke. She stayed.", "End."]);
+    expect(all().querySelector(".czm-ms-cm-where")).toBeNull();
+    expect(v.contentEl.querySelector(".czm-ms-compose-text")!.getAttribute("placeholder")).toBe("Pick a paragraph on the page…");
     rows()[0]!.focus();
     key(rows()[0]!, "ArrowDown");
     expect(document.activeElement).toBe(rows()[1]);

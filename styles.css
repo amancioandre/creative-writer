@@ -573,12 +573,18 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-ms-cm-badge.is-conflict { background: color-mix(in srgb, var(--color-red) 20%, transparent); color: color-mix(in srgb, var(--color-red) 70%, var(--text-normal)); }
 
 /* The comments pane: this paragraph and its composer, then every comment. A drawer under the page when narrow. */
-.czm-ms-side { flex: 0 0 300px; max-width: 40%; border-left: 1px solid var(--background-modifier-border); overflow: auto; font-size: var(--font-ui-smaller); display: flex; flex-direction: column; }
+.czm-ms-side { flex: 0 0 300px; max-width: 40%; border-left: 1px solid var(--background-modifier-border); overflow: hidden; font-size: var(--font-ui-smaller); display: flex; flex-direction: column; }
+/* The paragraph block is pinned; the list under it is the one thing that scrolls. */
+.czm-ms-side-para-wrap { flex: 0 0 auto; max-height: 55%; overflow: auto; }
+.czm-ms-side-all { flex: 1 1 auto; min-height: 0; overflow: auto; }
 .czm-ms-side[hidden] { display: none; }
 .czm-ms.is-narrow .czm-ms-main { flex-direction: column; }
 .czm-ms.is-narrow .czm-ms-side { flex: 0 0 auto; max-width: none; max-height: 42%; border-left: 0; border-top: 1px solid var(--background-modifier-border); }
 .czm-ms-side-para { padding: 8px 10px 10px; border-bottom: 1px solid var(--background-modifier-border); }
 .czm-ms-side-all { padding: 8px 0 10px; }
+.czm-ms-cm-group { margin-bottom: 4px; }
+.czm-ms-cm-head { position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 6px 10px 3px; background: var(--background-primary); border-bottom: 1px solid var(--background-modifier-border); font-weight: 600; }
+.czm-ms-cm-head-count { font-family: var(--font-monospace); font-weight: normal; color: var(--text-muted); }
 .czm-ms-side-title { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 600; padding: 0 10px 4px 0; }
 .czm-ms-side-all .czm-ms-side-title { padding-left: 10px; }
 .czm-ms-side-title .dropdown { max-width: 150px; font-weight: normal; }
@@ -594,12 +600,15 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-ms-legend { display: flex; flex-wrap: wrap; gap: 4px; }
 .czm-ms-legend-chip { cursor: pointer; border: 0; line-height: 1.6; }
 .czm-ms-legend-chip:hover { filter: brightness(1.1); }
-.czm-ms-cm-row { display: flex; gap: 8px; align-items: baseline; padding: 3px 10px 3px 0; cursor: pointer; border-radius: var(--radius-s); }
-.czm-ms-side-all .czm-ms-cm-row { padding-left: 10px; }
+.czm-ms-cm-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 1px 8px; align-items: baseline; padding: 3px 10px 3px 0; cursor: pointer; border-radius: var(--radius-s); }
+/* In the list the tag is a bar down the row's edge, so the comment stays the loudest thing on it. */
+.czm-ms-side-all .czm-ms-cm-row { padding-left: 8px; margin-left: 10px; border-left: 2px solid var(--czm-tag, var(--text-faint)); border-radius: 0; }
+.czm-ms-side-all .czm-ms-cm-badge { background: none; padding: 0; min-width: 0; color: var(--czm-tag, var(--text-muted)); }
+.czm-ms-cm-anchor { grid-column: 2 / 4; font-style: italic; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .czm-ms-cm-row:hover { background: var(--background-modifier-hover); }
 .czm-ms-cm-row:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -2px; }
 /* Badge text is the tag colour pulled toward the theme's text colour, so amber reads on white and navy reads on black. */
-.czm-ms-cm-badge { flex: 0 0 auto; min-width: 3.2em; text-align: center; font-family: var(--font-monospace); font-size: 0.85em; border-radius: 3px; padding: 0 4px; background: color-mix(in srgb, var(--czm-tag, var(--text-muted)) 20%, transparent); color: color-mix(in srgb, var(--czm-tag, var(--text-muted)) 60%, var(--text-normal)); }
+.czm-ms-cm-badge { flex: 0 0 auto; min-width: 3.2em; text-align: center; font-family: var(--font-monospace); font-size: 0.85em; text-transform: lowercase; border-radius: 3px; padding: 0 4px; background: color-mix(in srgb, var(--czm-tag, var(--text-muted)) 20%, transparent); color: color-mix(in srgb, var(--czm-tag, var(--text-muted)) 60%, var(--text-normal)); }
 .czm-ms-cm-badge.is-highlight { background: var(--text-highlight-bg); color: var(--text-normal); }
 .czm-ms-cm-text { flex: 1 1 auto; min-width: 0; white-space: normal; }
 .czm-ms-cm-where { flex: 0 0 auto; color: var(--text-faint); font-weight: normal; }
