@@ -30,6 +30,7 @@ function open(notes: ManuscriptNote[], overrides: Partial<ManuscriptSource> = {}
     storyColors: () => DEFAULT_STORY_COLORS,
     promote: async (_p, name, kind) => { calls.promoted.push([name, kind]); return `Novel/Characters/${name}.md`; },
     ignore: async (_p, name) => { calls.ignored.push(name); },
+    jumpTo: () => undefined,
     ...overrides,
   };
   const v = new ManuscriptView(new WorkspaceLeaf(), src);

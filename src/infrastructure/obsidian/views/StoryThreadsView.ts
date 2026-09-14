@@ -1,7 +1,8 @@
 import { ItemView, Setting, setIcon, type WorkspaceLeaf } from "obsidian";
 import { couldNot, StatusLine } from "./StatusLine";
+import { PanelShell, type Fix, type PanelId } from "./PanelShell";
 import type { ProjectSpec } from "../../../domain/progress/Project";
-import { THREAD_KINDS, type StoryEntityKind, type ThreadKind, type ThreadsSettings } from "../../../domain/settings/Settings";
+import { DEFAULT_THREADS, THREAD_KINDS, type StoryEntityKind, type ThreadKind, type ThreadsSettings } from "../../../domain/settings/Settings";
 import { basenameOf } from "../../../domain/story/EntityIndex";
 import type { SceneRef } from "../../../domain/story/StoryGraph";
 import { DEFAULT_LAYOUT, STRIP_LABEL_HEIGHT, layoutArcs, layoutSlots, layoutStrips, type ArcPath, type LayoutOptions, type SlotBox } from "../../../domain/threads/ArcLayout";
@@ -41,7 +42,8 @@ export interface StoryThreadsSource {
   storyColors(): Readonly<Record<StoryEntityKind, string>>;
   settings(): ThreadsSettings;
   updateSettings(next: ThreadsSettings): void;
-  openMap(project: ProjectSpec): void;
+  /** Opens a sibling panel, for the same project where the panel takes one. */
+  jumpTo(to: PanelId, project: ProjectSpec | null): void;
 }
 
 const SVG = "http://www.w3.org/2000/svg";
@@ -89,6 +91,10 @@ export class StoryThreadsView extends ItemView {
   private card!: HTMLElement;
   private badge!: HTMLElement;
   private status!: StatusLine;
+  private shell!: PanelShell;
+  private scopeSelect!: HTMLSelectElement;
+  private search!: HTMLInputElement;
+  private emptyEl: HTMLElement | null = null;
 
   constructor(leaf: WorkspaceLeaf, private readonly source: StoryThreadsSource) {
     super(leaf);
@@ -131,7 +137,17 @@ export class StoryThreadsView extends ItemView {
   private mount(): void {
     this.contentEl.empty();
     this.contentEl.addClass("czm-map-host");
-    this.root = this.contentEl.createDiv({ cls: "czm-map czm-th" });
+    this.shell = new PanelShell(this.contentEl, {
+      current: "threads",
+      jump: (to) => this.source.jumpTo(to, this.project),
+      side: { isOpen: () => this.settings.panelOpen, onToggle: () => this.saveSettings({ ...this.settings, panelOpen: !this.settings.panelOpen }) },
+    });
+    this.root = this.shell.main;
+    this.root.addClass("czm-map"); this.root.addClass("czm-th");
+    this.scopeSelect = this.shell.scope.createEl("select", { cls: "dropdown", attr: { "aria-label": "Project" } });
+    this.scopeSelect.addEventListener("change", () => void this.show(this.source.projects().find((p) => p.scope === this.scopeSelect.value) ?? null));
+    this.search = this.shell.scope.createEl("input", { cls: "czm-map-search", attr: { type: "search", placeholder: "Find a thread…", "aria-label": "Find a thread" } });
+    this.search.addEventListener("input", () => { this.query = this.search.value; this.renderChart(); this.renderCard(); this.renderHead(); });
     this.scroller = this.root.createDiv({ cls: "czm-th-scroll" });
     this.svg = document.createElementNS(SVG, "svg");
     this.svg.setAttribute("class", "czm-th-svg");
@@ -157,11 +173,7 @@ export class StoryThreadsView extends ItemView {
     }, { passive: false });
     this.scroller.addEventListener("scroll", () => this.placeCard());
 
-    const corner = this.root.createDiv({ cls: "czm-map-corner" });
-    const toggle = corner.createEl("button", { cls: "czm-map-icon clickable-icon", attr: { "aria-label": "Toggle panel" } });
-    setIcon(toggle, "sliders-horizontal");
-    toggle.addEventListener("click", () => { this.saveSettings({ ...this.settings, panelOpen: !this.settings.panelOpen }); this.renderPanel(); });
-    this.panel = this.root.createDiv({ cls: "czm-map-panel" });
+    this.panel = this.shell.side;
     this.badge = this.root.createDiv({ cls: "czm-th-badge" });
     this.card = this.root.createDiv({ cls: "czm-map-card czm-th-card" });
     this.status = new StatusLine(this.root);
@@ -301,22 +313,29 @@ export class StoryThreadsView extends ItemView {
       this.stripsG.appendChild(rect);
     }
 
-    if (this.model.scenes.length === 0 || this.arcs.length === 0) this.renderEmpty(contentWidth, baseY);
+    this.emptyEl?.remove();
+    this.emptyEl = null;
+    if (this.model.scenes.length === 0 || this.arcs.length === 0) this.emptyEl = this.renderEmpty();
     this.applySelectionClasses();
   }
 
-  private renderEmpty(width: number, baseY: number): void {
-    const t = document.createElementNS(SVG, "text");
-    t.setAttribute("class", "czm-map-empty"); t.setAttribute("text-anchor", "middle");
-    t.setAttribute("x", f(width / 2)); t.setAttribute("y", f(baseY / 2));
+  /** Nothing to draw: say why, and offer the click that changes it. */
+  private renderEmpty(): HTMLElement {
     const s = this.settings;
-    t.textContent = !this.project
-      ? "No project yet — put story: true (or writing-target: 50000) in a note's front matter and its folder becomes one."
-      : this.model.scenes.length === 0 ? "No scenes yet — headings with prose under them become scenes."
-      : this.model.threads.length === 0 && this.model.factsRead === 0 ? "Nothing to draw yet — read the project for facts, draw a thread by hand, or switch on names in the panel."
-      : s.contradictionsOnly && this.model.contradictions.length === 0 ? (this.model.factsRead ? "No contradictions in the scenes read so far." : "No facts read yet — read the project for facts to check it for contradictions.")
-      : "Nothing matches the current filters.";
-    this.arcsG.appendChild(t);
+    const redraw = () => { this.renderChart(); this.renderPanel(); this.renderCard(); };
+    if (!this.project) return this.shell.empty("No project yet — put story: true (or writing-target: 50000) in a note's front matter and its folder becomes one.");
+    if (this.model.scenes.length === 0) return this.shell.empty("No scenes yet — headings with prose under them become scenes.");
+    if (this.model.threads.length === 0 && this.model.factsRead === 0) return this.shell.empty("Nothing to draw yet — read the project for facts, draw a thread by hand, or switch on names in the panel.", [{ label: "Show names", cls: "czm-th-fix-names", onClick: () => { this.saveSettings({ ...this.settings, kinds: { ...this.settings.kinds, entity: true } }); redraw(); } }]);
+    if (s.contradictionsOnly && this.model.contradictions.length === 0) return this.shell.empty(this.model.factsRead ? "No contradictions in the scenes read so far." : "No facts read yet — read the project for facts to check it for contradictions.", [{ label: "Show every thread", cls: "czm-th-fix-only", onClick: () => { this.saveSettings({ ...this.settings, contradictionsOnly: false }); redraw(); } }]);
+    const reasons: string[] = [];
+    const fixes: Fix[] = [];
+    // Only kinds the writer turned off are worth blaming; one that is off by default (names) is not a filter they set.
+    const off = THREAD_KINDS.filter((k) => !s.kinds[k] && DEFAULT_THREADS.kinds[k] && this.model.threads.some((t) => t.kind === k));
+    if (off.length) { reasons.push(`${off.map((k) => KIND_TITLE[k].toLowerCase()).join(", ")} ${off.length === 1 ? "is" : "are"} off`); fixes.push({ label: "Show all kinds", cls: "czm-th-fix-kinds", onClick: () => { this.saveSettings({ ...this.settings, kinds: Object.fromEntries(THREAD_KINDS.map((k) => [k, true])) as Record<ThreadKind, boolean> }); redraw(); } }); }
+    if (this.query.trim()) { reasons.push(`“${this.query.trim()}” matches no thread`); fixes.push({ label: "Clear search", cls: "czm-th-fix-query", onClick: () => { this.query = ""; this.search.value = ""; redraw(); } }); }
+    if (this.entityFilter || this.echoFilter) { reasons.push("one name or echo is followed"); fixes.push({ label: "Follow all", cls: "czm-th-fix-follow", onClick: () => { this.entityFilter = null; this.echoFilter = null; redraw(); } }); }
+    if (s.contradictionsOnly) { reasons.push("only contradictions are shown"); fixes.push({ label: "Show every thread", cls: "czm-th-fix-only", onClick: () => { this.saveSettings({ ...this.settings, contradictionsOnly: false }); redraw(); } }); }
+    return this.shell.empty(reasons.length ? `Nothing to show: ${reasons.join("; ")}.` : "Nothing matches the current filters.", fixes);
   }
 
   private hover(arc: ArcPath, on: boolean): void {
@@ -377,49 +396,51 @@ export class StoryThreadsView extends ItemView {
 
   // --- floating panel ----------------------------------------------------------
 
-  private renderPanel(): void {
-    const s = this.settings;
-    this.panel.empty();
-    this.panel.classList.toggle("is-open", s.panelOpen);
-    if (!s.panelOpen) return;
+  /** The head: which project, the search, one line about what is drawn, and the tools. */
+  private renderHead(): void {
     const projects = this.source.projects();
-    const head = this.panel.createDiv({ cls: "czm-map-panel-head" });
-    const select = head.createEl("select", { cls: "dropdown", attr: { "aria-label": "Project" } });
+    this.scopeSelect.empty();
     for (const p of projects) {
-      const opt = select.createEl("option", { text: p.name });
+      const opt = this.scopeSelect.createEl("option", { text: p.name });
       opt.value = p.scope;
       if (this.project?.scope === p.scope) opt.selected = true;
     }
-    if (projects.length === 0) select.createEl("option", { text: "No projects" });
-    select.addEventListener("change", () => void this.show(projects.find((p) => p.scope === select.value) ?? null));
-    const search = head.createEl("input", { cls: "czm-map-search", attr: { type: "search", placeholder: "Find a thread…", "aria-label": "Find a thread" } });
-    search.value = this.query;
-    search.addEventListener("input", () => { this.query = search.value; this.renderChart(); this.renderCard(); });
+    if (projects.length === 0) this.scopeSelect.createEl("option", { text: "No projects" });
+    if (this.search.value !== this.query) this.search.value = this.query;
+    if (!this.project) this.shell.setState("No project");
+    else {
+      const live = this.model.contradictions.filter(isLiveContradiction).length;
+      const n = this.model.scenes.length, a = this.arcs.length;
+      this.shell.setState(`${n} scene${n === 1 ? "" : "s"} · ${a} arc${a === 1 ? "" : "s"} · ${live} contradiction${live === 1 ? "" : "s"}`);
+    }
+    this.shell.tools.empty();
+    const tool = (icon: string, label: string, cls: string, onClick: () => void) => { const b = this.shell.tool(icon, label, onClick); b.addClass(cls); return b; };
+    tool("maximize", "Fit the whole manuscript in the view", "czm-map-fit", () => this.fit());
+    if (this.project) tool("file-text", "Open Story threads.md, where hand-drawn threads live", "czm-th-note-btn", () => this.source.openNote(this.source.threadsNotePath(this.project!)));
+  }
 
-    const actions = this.panel.createDiv({ cls: "czm-map-panel-actions" });
-    const btn = (text: string, cls: string, onClick: () => void, title?: string) => {
-      const b = actions.createEl("button", { text, cls });
-      if (title) b.title = title;
-      b.addEventListener("click", onClick);
-      return b;
-    };
+  private renderPanel(): void {
+    const s = this.settings;
+    this.renderHead();
+    this.panel.empty();
+    this.shell.setSideOpen(s.panelOpen);
+    if (!s.panelOpen) return;
+
     if (this.project) {
-      btn(this.running ? "Stop" : "Read project for facts", "czm-map-analyse czm-th-read", () => void this.toggleRead(null), "Asks the local model (Ollama) for the concrete facts each scene states — eye colours, ages, places, who knows what — so scenes can be checked against each other. Unchanged scenes are skipped.");
+      // The one filled button: the expensive, opt-in reading, with what it costs beneath; the other readings are plain.
+      const read = this.panel.createEl("button", { text: this.running ? "Stop" : "Read project for facts", cls: "czm-map-analyse czm-th-read czm-shell-cta mod-cta" });
+      read.addEventListener("click", () => void this.toggleRead(null));
+      this.panel.createDiv({ text: "Local model (Ollama) reads each scene for the facts it states, so scenes can be checked against each other. Unchanged scenes are skipped.", cls: "czm-shell-cta-hint" });
+      const actions = this.panel.createDiv({ cls: "czm-map-panel-actions" });
+      const btn = (text: string, cls: string, onClick: () => void, title: string) => { const b = actions.createEl("button", { text, cls }); b.title = title; b.addEventListener("click", onClick); return b; };
       btn(this.running ? "Stop" : "Read contradictions for intent", "czm-map-analyse czm-th-read-intent", () => void this.toggleIntent(), "Asks the local model what each open contradiction means — a reversal the story intends, an error, or the same thing said twice. A verdict is a proposal on the card; accepting it is your click.");
       btn(this.running ? "Stop" : "Read project for echoes", "czm-map-analyse czm-th-read-echoes", () => void this.toggleEchoes(), "Embeds every sentence with the local model and keeps the pairs that say the same thing in different words. Only the pairs are stored, in Story map.md.");
-      btn("Story map", "czm-th-map-btn", () => this.source.openMap(this.project!), "Open the story map for this project.");
-      btn("Threads note", "czm-th-note-btn", () => this.source.openNote(this.source.threadsNotePath(this.project!)), "Open Story threads.md, where hand-drawn threads live.");
     }
-    btn("Fit", "czm-map-fit", () => this.fit());
 
-    const section = (title: string, cls: string, open = true) => {
-      const d = this.panel.createEl("details", { cls: `czm-map-section czm-map-section-${cls}` });
-      d.open = open;
-      d.createEl("summary", { text: title });
-      return d;
-    };
+    const section = (title: string, cls: string, open = true, value = "") => this.shell.section(title, value, cls, open);
 
-    const threads = section("Threads", "filters");
+    const kindsOn = THREAD_KINDS.filter((k) => s.kinds[k]).length;
+    const threads = section("Threads", "filters", true, `${kindsOn} of ${THREAD_KINDS.length} kinds`);
     for (const kind of THREAD_KINDS) {
       const n = this.model.threads.filter((t) => t.kind === kind).length;
       new Setting(threads).setName(`${KIND_TITLE[kind]}${n ? ` · ${n}` : ""}`).setClass(`czm-set-thread-${kind}`).addToggle((t) => t.setValue(s.kinds[kind]).onChange((v) => { this.saveSettings({ ...this.settings, kinds: { ...this.settings.kinds, [kind]: v } }); this.renderChart(); this.renderCard(); }));
@@ -453,7 +474,7 @@ export class StoryThreadsView extends ItemView {
     const dangling = this.model.threads.filter((t) => t.kind === "writer").flatMap((t) => t.dangling.map((r) => ({ thread: t.label, scene: r.scene.title || basenameOf(r.scene.path) })));
     for (const d of dangling) threads.createDiv({ text: `${d.thread}: planted in ${d.scene}, no payoff yet.`, cls: "czm-map-hint czm-th-dangling" });
 
-    const clashes = section("Contradictions", "contradictions");
+    const clashes = section("Contradictions", "contradictions", true, this.model.factsRead === 0 ? "" : `${this.model.contradictions.filter(isLiveContradiction).length} open`);
     const live = this.model.contradictions.filter(isLiveContradiction).length, explained = this.model.contradictions.filter((c) => c.explainedBy).length, dismissed = this.model.contradictions.length - live - explained;
     clashes.createDiv({ text: this.model.factsRead === 0 ? "No facts read yet." : `${live} open, ${dismissed} dismissed${explained ? `, ${explained} reversal${explained === 1 ? "" : "s"}` : ""}, in ${this.model.factsRead} scene${this.model.factsRead === 1 ? "" : "s"} read.`, cls: "czm-map-hint czm-th-clash-count" });
     new Setting(clashes).setName("Only contradictions").setClass("czm-set-contradictions-only").addToggle((t) => t.setValue(s.contradictionsOnly).onChange((v) => { this.saveSettings({ ...this.settings, contradictionsOnly: v }); this.renderChart(); this.renderCard(); }));

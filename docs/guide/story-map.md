@@ -43,7 +43,7 @@ Edges from a model reading whose scene has changed since are drawn **dashed** (s
 
 ## The map itself
 
-- **Pan** by dragging the background; **zoom** with the wheel (around the cursor); **Fit** in the panel frames everything.
+- **Pan** by dragging the background; **zoom** with the wheel (around the cursor); **Fit** in the head frames everything.
 - Nodes settle under a live force simulation and stop moving after a few seconds. **Drag** a node and its neighbours react; a dragged node stays **pinned** where you left it, and pinned positions are remembered in `Story map.md`, so the map opens the same way on the laptop. **Unpin** in the node's card lets it float again; **Shake** unpins everything and lets the layout settle, with an **Undo** in the status line that pins every hand-placed node back where it was.
 - Node radius scales with how often the entity is mentioned; edge thickness with how many scenes back it up.
 - A labelled edge — a relationship you drew, one the model read, or a reference — shows its word on the line itself, in small italics; click the word or the line for the card. When two nodes are joined more than once (*man owns horse*, *horse helps man*) the edges bend apart so each can be told from, and clicked, on its own. Label size 0 hides these too.
@@ -52,12 +52,13 @@ Edges from a model reading whose scene has changed since are drawn **dashed** (s
 
 ## The panel
 
-The icon top-right toggles a floating panel; its state is remembered.
+Every panel of the plugin wears the same shell: a head with the project, a search, one line saying what is shown (*14 nodes · 9 shown · 2 filters on*, with a **Reset**), the tools, and jumps to the five sibling panels in a fixed order; and a side column, docked to the right so it never covers the map, folded by the sliders icon in the head. Its state is remembered. When nothing is drawn, the page says which filter is hiding what and offers the click that lifts it.
 
 | Section | What |
 |---|---|
 | *Head* | Project dropdown; a search box — matching names stay, with their direct neighbours for context. |
-| *Actions* | **Read project with model** (see [Reading a project](/guide/model-reading)); **Timeline** opens the [story timeline](/guide/story-timeline); **Threads** opens the [story threads](/guide/story-threads); **Add** a node; **Fit**; **Shake**; **Show all** when a focus is active. |
+| *Head* | **Add** a node; **Fit**; **Shake**; **Show all** when a focus is active; the jumps to the desk, board, [timeline](/guide/story-timeline), [threads](/guide/story-threads) and manuscript. |
+| *Side column* | **Read project with model** (see [Reading a project](/guide/model-reading)), the one filled button, with its cost beneath; then the folded groups below, each header showing its value. Kinds absent from the project fold into one line. |
 | **Filters** | Toggle each layer; *Hide loners* removes nodes with no visible edge. |
 | **Kinds & colours** | A colour swatch and a toggle per kind, with counts; *Reset colours*. |
 | **Display** | Node size, edge thickness, edge opacity, label size (0 hides labels). |

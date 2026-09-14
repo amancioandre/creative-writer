@@ -29,7 +29,7 @@ function model(overrides: Partial<ThreadModel> = {}): ThreadModel {
 }
 
 function source(overrides: Partial<StoryThreadsSource> = {}, m: ThreadModel = model()) {
-  const calls = { opened: [] as string[], revealed: [] as string[], dismissed: [] as string[], undismissed: [] as string[], added: [] as string[], stops: [] as string[], roles: [] as string[], removed: [] as string[], read: [] as (string | null)[], intent: [] as string[], echoes: 0, map: 0 };
+  const calls = { opened: [] as string[], revealed: [] as string[], dismissed: [] as string[], undismissed: [] as string[], added: [] as string[], stops: [] as string[], roles: [] as string[], removed: [] as string[], read: [] as (string | null)[], intent: [] as string[], echoes: 0, jumps: [] as string[] };
   let current = m;
   let settings: ThreadsSettings = DEFAULT_THREADS;
   const src: StoryThreadsSource = {
@@ -52,7 +52,7 @@ function source(overrides: Partial<StoryThreadsSource> = {}, m: ThreadModel = mo
     storyColors: () => DEFAULT_STORY_COLORS,
     settings: () => settings,
     updateSettings: (next) => { settings = next; },
-    openMap: () => { calls.map++; },
+    jumpTo: (to) => { calls.jumps.push(to); },
     ...overrides,
   };
   return { src, calls, settings: () => settings };
@@ -354,6 +354,20 @@ describe("StoryThreadsView", () => {
     const { el: clean } = await open({}, model({ threads: [letter], contradictions: [] }));
     setting("czm-set-contradictions-only").toggle!.onChangeCb(true);
     expect(clean.querySelector(".czm-map-empty")!.textContent).toContain("No contradictions in the scenes read");
+    // The empty state carries its fix: one click shows every thread again.
+    (clean.querySelector(".czm-th-fix-only") as HTMLElement).click();
+    expect(clean.querySelector(".czm-map-empty")).toBeNull();
+    expect(arcs(clean).length).toBeGreaterThan(0);
+    const { el: filtered } = await open();
+    const search = filtered.querySelector(".czm-map-search") as HTMLInputElement;
+    search.value = "zzz";
+    search.dispatchEvent(new Event("input"));
+    expect(filtered.querySelector(".czm-map-empty")!.textContent).toBe("Nothing to show: “zzz” matches no thread.");
+    expect(filtered.querySelector(".czm-shell-state-text")!.textContent).toBe("4 scenes · 0 arcs · 1 contradiction");
+    (filtered.querySelector(".czm-th-fix-query") as HTMLElement).click();
+    expect(filtered.querySelector(".czm-map-empty")).toBeNull();
+    (filtered.querySelector('.czm-shell-jump[data-panel="map"]') as HTMLElement).click();
+    expect(filtered.querySelector(".czm-shell-jump.is-current")!.getAttribute("data-panel")).toBe("threads");
   });
 
   it("keeps a selection across a refresh when it still exists, and drops it otherwise", async () => {

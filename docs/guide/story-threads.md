@@ -121,12 +121,13 @@ Strips share the slots exactly, so a spike lines up with the scene above it at e
 | Section | What |
 |---|---|
 | *Head* | Project dropdown; a search box over thread labels. |
-| *Actions* | **Read project for facts** / **Stop**; **Story map**; **Threads note**; **Fit**. |
+| *Head* | The project, a search, one line (*12 scenes · 5 arcs · 1 contradiction*), **Fit**, **Threads note**, and the jumps to the sibling panels (the story map among them). |
+| *Side column* | **Read project for facts** / **Stop**, the one filled button; **Read contradictions for intent** and **Read project for echoes** beneath it. |
 | **Threads** | A toggle per kind with counts; *Follow one name…*; any broken links in your threads. |
 | **Contradictions** | Open and dismissed counts; *Only contradictions*; *Show dismissed*. |
 | **Strips** | A toggle per strip. |
 
-**Ctrl/⌘ + wheel** zooms the axis horizontally around the pointer (the strips zoom with it); the view scrolls sideways like any wide page; **Fit** returns to one screen. The panel's state persists in the plugin settings.
+**Ctrl/⌘ + wheel** zooms the axis horizontally around the pointer (the strips zoom with it); the view scrolls sideways like any wide page; **Fit** returns to one screen. The side column is docked, never floating over the chart; its state persists in the plugin settings. When nothing is drawn, the page says which filter is hiding what and offers the click that lifts it.
 
 ## Sync
 

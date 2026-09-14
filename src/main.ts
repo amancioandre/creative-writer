@@ -71,6 +71,7 @@ import { AnalyzeSceneFacts } from "./application/use-cases/AnalyzeSceneFacts";
 import { BuildManuscript } from "./application/use-cases/BuildManuscript";
 import { ExportManuscript } from "./application/use-cases/ExportManuscript";
 import { MANUSCRIPT_VIEW_TYPE, ManuscriptView } from "./infrastructure/obsidian/views/ManuscriptView";
+import type { PanelId } from "./infrastructure/obsidian/views/PanelShell";
 import { castFromGraph, conflictMarks, echoMarks, threadMarks, type SectionFacts } from "./domain/manuscript/StoryFacts";
 import { OllamaFactAnalyser } from "./infrastructure/llm/OllamaFactAnalyser";
 import { OllamaIntentAnalyser } from "./infrastructure/llm/OllamaIntentAnalyser";
@@ -242,6 +243,7 @@ export default class CreativeZenModePlugin extends Plugin {
         return found;
       },
       revealScene: (ref) => void this.revealScene(ref.path, ref.line),
+      jumpTo: (to) => this.jumpTo(to, null),
     }));
     this.addCommand({ id: "open-writing-desk", name: "Open writing desk", callback: () => void this.openDesk() });
 
@@ -251,6 +253,7 @@ export default class CreativeZenModePlugin extends Plugin {
     const storyRepo = new StoryMapNoteRepository(notes);
     const buildStoryMap = new BuildStoryMap(projectNotes, storyRepo, { candidateMinMentions: 3, tagger: new CompromiseTagger() });
     const storySource = {
+      jumpTo: (to: PanelId, project: ProjectSpec | null) => this.jumpTo(to, project),
       projects: () => buildStoryMap.projects(),
       activeProject: () => {
         const path = this.app.workspace.getActiveViewOfType(MarkdownView)?.file?.path;
@@ -290,8 +293,6 @@ export default class CreativeZenModePlugin extends Plugin {
       loadLayout: (project) => storyRepo.load(project).then((f) => f.layout),
       saveLayout: (project, layout) => storyRepo.update(project, (f) => setLayout(f, layout)).then(() => undefined),
       updateSettings: (next) => void this.updateSettings({ ...this.current, storyMap: next }),
-      openTimeline: (project) => void this.openStoryTimeline(project),
-      openThreads: (project) => void this.openStoryThreads(project),
       // Checked at click time, not load time, so switching the model on in settings takes effect without a reload.
       analyse: (project, notePath, graph, signal, onProgress) => {
         const cfg = this.current.llm;
@@ -345,6 +346,7 @@ export default class CreativeZenModePlugin extends Plugin {
         return path;
       },
       declare: async (folder) => { const path = await promoteIdea.declare(folder); await indexed(path, (c) => c?.frontmatter?.["story"] !== undefined); },
+      jumpTo: (to) => this.jumpTo(to, null),
       openStory: (view, spec) => {
         if (view === "map") void this.openStoryMap().then(() => (this.app.workspace.getLeavesOfType(STORY_MAP_VIEW_TYPE)[0]?.view as StoryMapView | undefined)?.show(spec));
         else if (view === "timeline") void this.openStoryTimeline(spec);
@@ -473,7 +475,7 @@ export default class CreativeZenModePlugin extends Plugin {
       storyColors: () => this.current.storyMap.colors,
       settings: () => this.current.threads,
       updateSettings: (next) => void this.updateSettings({ ...this.current, threads: next }),
-      openMap: () => void this.openStoryMap(),
+      jumpTo: (to, project) => this.jumpTo(to, project),
     }));
     this.addCommand({ id: "open-story-threads", name: "Open story threads", callback: () => void this.openStoryThreads(null) });
     this.addRibbonIcon("spline", "Open story threads", () => void this.openStoryThreads(null));
@@ -502,6 +504,7 @@ export default class CreativeZenModePlugin extends Plugin {
       return path;
     };
     this.registerView(MANUSCRIPT_VIEW_TYPE, (leaf: WorkspaceLeaf) => new ManuscriptView(leaf, {
+      jumpTo: storySource.jumpTo,
       projects: storySource.projects,
       activeProject: storySource.activeProject,
       build: (project) => buildManuscript.execute(project),
@@ -748,12 +751,25 @@ export default class CreativeZenModePlugin extends Plugin {
     }, 400);
   }
 
-  private async openStoryMap(): Promise<void> {
+  private async openStoryMap(project: ProjectSpec | null = null): Promise<void> {
     const existing = this.app.workspace.getLeavesOfType(STORY_MAP_VIEW_TYPE)[0];
     const leaf = existing ?? this.app.workspace.getLeaf("tab");
     if (!existing) await leaf.setViewState({ type: STORY_MAP_VIEW_TYPE, active: true });
     await this.app.workspace.revealLeaf(leaf);
-    await (leaf.view as StoryMapView).onOpen();
+    const view = leaf.view as StoryMapView;
+    if (project) await view.show(project); else await view.onOpen();
+  }
+
+  /** The jumps in every panel's head: the same six, in the same order, carrying the project where the target takes one. */
+  private jumpTo(to: PanelId, project: ProjectSpec | null): void {
+    switch (to) {
+      case "desk": void this.openDesk(); break;
+      case "board": void this.openWriter(); break;
+      case "map": void this.openStoryMap(project); break;
+      case "timeline": void this.openStoryTimeline(project); break;
+      case "threads": void this.openStoryThreads(project); break;
+      case "manuscript": void this.openManuscript(project); break;
+    }
   }
 
   private async openStoryTimeline(project: ProjectSpec | null): Promise<void> {

@@ -61,3 +61,23 @@ export function applyFilter(graph: StoryGraph, filter: GraphFilter): StoryGraph 
 export function neighbours(graph: StoryGraph, id: string): Edge[] {
   return graph.edges.filter((e) => e.from === id || e.to === id).sort((a, b) => b.weight - a.weight);
 }
+
+export type EmptyCause = "query" | "focus" | "kinds" | "layers" | "isolated";
+
+/**
+ * Why a filter shows nothing: for each constraint that is on, how many
+ * entities would appear if that one alone were lifted. Empty when the graph
+ * itself is empty, when something is shown, or when no single constraint
+ * explains it.
+ */
+export function explainEmpty(graph: StoryGraph, filter: GraphFilter): { cause: EmptyCause; count: number }[] {
+  if (graph.entities.length === 0 || applyFilter(graph, filter).entities.length > 0) return [];
+  const on: [EmptyCause, boolean, GraphFilter][] = [
+    ["query", filter.query.trim() !== "", { ...filter, query: "" }],
+    ["focus", !!filter.focusId, { ...filter, focusId: null }],
+    ["kinds", filter.kinds.size < ALL_KINDS.length, { ...filter, kinds: new Set(ALL_KINDS) }],
+    ["layers", filter.layers.size < ALL_LAYERS.length, { ...filter, layers: new Set(ALL_LAYERS) }],
+    ["isolated", filter.hideIsolated, { ...filter, hideIsolated: false }],
+  ];
+  return on.filter(([, active]) => active).map(([cause, , f]) => ({ cause, count: applyFilter(graph, f).entities.length })).filter((r) => r.count > 0);
+}

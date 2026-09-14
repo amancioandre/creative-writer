@@ -1,4 +1,5 @@
 import { ItemView, Menu, Notice, setIcon, type WorkspaceLeaf } from "obsidian";
+import { renderJumps, type PanelId } from "./PanelShell";
 import type { ProjectSpec } from "../../../domain/progress/Project";
 import { EMPTY_MANUSCRIPT, type Manuscript, type ManuscriptBlock, type NoteItem } from "../../../domain/manuscript/Manuscript";
 import { locateInBlock } from "../../../domain/manuscript/Locate";
@@ -13,6 +14,8 @@ import type { EntityKind } from "../../../domain/story/StoryGraph";
 export const MANUSCRIPT_VIEW_TYPE = "creative-writer-manuscript";
 
 export interface ManuscriptSource {
+  /** Opens a sibling panel, for the same project where the panel takes one. */
+  jumpTo(to: PanelId, project: ProjectSpec | null): void;
   projects(): ProjectSpec[];
   activeProject(): ProjectSpec | null;
   build(project: ProjectSpec): Promise<Manuscript>;
@@ -203,6 +206,7 @@ export class ManuscriptView extends ItemView {
       if (this.project?.scope === p.scope) opt.selected = true;
     }
     select.addEventListener("change", () => void this.show(projects.find((p) => p.scope === select.value) ?? null));
+    renderJumps(head.createDiv(), "manuscript", (to) => this.source.jumpTo(to, this.project));
     if (!this.project) { head.createSpan({ text: "No project yet — put story: true (or writing-target: 50000) in a note's front matter and its folder becomes one.", cls: "czm-map-hint" }); return; }
     const m = this.manuscript;
     const count = this.annotations().length;

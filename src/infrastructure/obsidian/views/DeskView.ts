@@ -1,4 +1,5 @@
 import { ItemView, type WorkspaceLeaf } from "obsidian";
+import { renderJumps, type PanelId } from "./PanelShell";
 import type { ProseProfile } from "../../../application/use-cases/ProfileProse";
 import type { WritingLog } from "../../../domain/progress/WritingLog";
 import { addDays, type Day, weekday } from "../../../domain/progress/Dates";
@@ -21,6 +22,8 @@ export const DESK_VIEW_TYPE = "creative-writer-desk";
 const HEATMAP_WEEKS = 12;
 
 export interface DeskSource {
+  /** Opens a sibling panel. */
+  jumpTo(to: PanelId): void;
   /** Profile of the active note, or null when no markdown note is active. */
   activeProfile(): { name: string; profile: ProseProfile } | null;
   log(): WritingLog;
@@ -68,6 +71,7 @@ export class DeskView extends ItemView {
   refresh(): void {
     this.contentEl.empty();
     const root = this.contentEl.createDiv({ cls: "czm-desk" });
+    renderJumps(root.createDiv({ cls: "czm-desk-jumps" }), "desk", (to) => this.source.jumpTo(to));
 
     root.createEl("h4", { text: "Today" });
     renderProgress(root, this.source.log(), this.source.today(), this.source.dailyGoal());

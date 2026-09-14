@@ -26,7 +26,7 @@ const file = putReading(EMPTY_STORY_MAP_FILE, {
 });
 
 function source(overrides: Partial<StoryMapSource> = {}) {
-  const calls = { opened: [] as string[], revealed: [] as string[], promoted: [] as string[], ignored: [] as string[], aliased: [] as string[], relations: [] as string[], renamed: [] as string[], removed: [] as string[], restored: [] as string[], layouts: [] as Layout[], timeline: 0, threads: 0 };
+  const calls = { opened: [] as string[], revealed: [] as string[], promoted: [] as string[], ignored: [] as string[], aliased: [] as string[], relations: [] as string[], renamed: [] as string[], removed: [] as string[], restored: [] as string[], layouts: [] as Layout[], jumps: [] as string[] };
   let settings: StoryMapSettings = DEFAULT_STORY_MAP;
   // Relations written through the source show up in the next build, as they would from the vault.
   const authored: ProjectRelation[] = [];
@@ -56,8 +56,7 @@ function source(overrides: Partial<StoryMapSource> = {}) {
     analyse: async () => { throw new Error("no model"); },
     settings: () => settings,
     updateSettings: (next) => { settings = next; },
-    openTimeline: () => { calls.timeline++; },
-    openThreads: () => { calls.threads++; },
+    jumpTo: (to) => { calls.jumps.push(to); },
     ...overrides,
   };
   return { src, calls, settings: () => settings };
@@ -235,6 +234,27 @@ describe("StoryMapView", () => {
   it("explains when there is no project", async () => {
     const { el } = await open({ projects: () => [], activeProject: () => null });
     expect(el.querySelector(".czm-map-empty")?.textContent).toContain("No project yet");
+    expect(el.querySelector(".czm-shell-state")?.textContent).toBe("No project");
+  });
+
+  it("names the filter that empties the map and offers the click that lifts it; the state line counts filters and resets them", async () => {
+    const { el } = await open();
+    const search = el.querySelector(".czm-map-search") as HTMLInputElement;
+    search.value = "nobody";
+    search.dispatchEvent(new Event("input"));
+    expect(el.querySelector(".czm-map-empty")!.textContent).toBe("Nothing to show: “nobody” matches nothing.");
+    expect(el.querySelector(".czm-shell-state-text")!.textContent).toMatch(/^\d+ nodes · 0 shown · 1 filter on$/);
+    (el.querySelector(".czm-map-fix-query") as HTMLElement).click();
+    expect(el.querySelector(".czm-map-empty")).toBeNull();
+    expect(search.value).toBe("");
+    expect(el.querySelectorAll(".czm-node").length).toBeGreaterThan(0);
+    // Hiding every kind that is present, then resetting from the state line.
+    for (const kind of ["character", "location", "candidate", "reference"]) setting(`czm-set-kind-${kind}`).toggle!.onChangeCb(false);
+    expect(el.querySelector(".czm-map-empty")!.textContent).toContain("hidden kinds hold");
+    expect(el.querySelector(".czm-map-absent")!.textContent).toContain("Not in this project");
+    (el.querySelector(".czm-shell-state .czm-map-reset-filters") as HTMLElement).click();
+    expect(el.querySelector(".czm-map-empty")).toBeNull();
+    expect(el.querySelector(".czm-shell-state-text")!.textContent).not.toContain("filter");
   });
 
   it("reads a single note from its card, the project from the panel, and opens the timeline", async () => {
@@ -248,10 +268,10 @@ describe("StoryMapView", () => {
     await tick(); await tick();
     expect(paths).toEqual(["Novel/One.md", null]);
     expect(el.querySelector(".czm-map-status")!.textContent).toContain("Read 1 scene");
-    (el.querySelector(".czm-map-timeline-btn") as HTMLElement).click();
-    expect(calls.timeline).toBe(1);
-    (el.querySelector(".czm-map-threads-btn") as HTMLElement).click();
-    expect(calls.threads).toBe(1);
+    (el.querySelector('.czm-shell-jump[data-panel="timeline"]') as HTMLElement).click();
+    (el.querySelector('.czm-shell-jump[data-panel="threads"]') as HTMLElement).click();
+    expect(calls.jumps).toEqual(["timeline", "threads"]);
+    expect((el.querySelector('.czm-shell-jump[data-panel="map"]') as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("shows the model's own message when no model is configured", async () => {

@@ -1,5 +1,6 @@
 import { ItemView, Setting, setIcon, type WorkspaceLeaf } from "obsidian";
 import { couldNot, StatusLine } from "./StatusLine";
+import { PanelShell, type PanelId } from "./PanelShell";
 import type { ProjectSpec } from "../../../domain/progress/Project";
 import type { WriterSettings } from "../../../domain/settings/Settings";
 import { EMPTY_BOARD, type Board, type Card } from "../../../domain/writer/Board";
@@ -44,6 +45,8 @@ export interface WriterSource {
   /** Creates a note tagged into a group and returns its path. */
   createNote(title: string, group: string): Promise<string>;
   copySchema(): Promise<void>;
+  /** Opens a sibling panel. */
+  jumpTo(to: PanelId): void;
   settings(): WriterSettings;
   updateSettings(next: WriterSettings): void;
 }
@@ -114,6 +117,7 @@ export class WriterView extends ItemView {
   private card!: HTMLElement;
   private panel!: HTMLElement;
   private status!: StatusLine;
+  private shell!: PanelShell;
   private help!: HTMLElement;
 
   constructor(leaf: WorkspaceLeaf, private readonly source: WriterSource) {
@@ -178,7 +182,13 @@ export class WriterView extends ItemView {
   private mount(): void {
     this.contentEl.empty();
     this.contentEl.addClass("czm-map-host");
-    this.root = this.contentEl.createDiv({ cls: "czm-map czm-writer" });
+    this.shell = new PanelShell(this.contentEl, {
+      current: "board",
+      jump: (to) => this.source.jumpTo(to),
+      side: { isOpen: () => this.source.settings().panelOpen, onToggle: () => this.source.updateSettings({ ...this.source.settings(), panelOpen: !this.source.settings().panelOpen }) },
+    });
+    this.root = this.shell.main;
+    this.root.addClass("czm-map"); this.root.addClass("czm-writer");
     this.canvas = new GraphCanvas(this.root, {
       cls: "czm-map-svg czm-writer-svg",
       minZoom: MIN_ZOOM,
@@ -187,11 +197,8 @@ export class WriterView extends ItemView {
       onTap: () => this.select(null),
       onView: () => { this.paint(); this.queueView(); },
     });
-    const corner = this.root.createDiv({ cls: "czm-map-corner" });
-    const toggle = corner.createEl("button", { cls: "czm-map-icon clickable-icon", attr: { "aria-label": "Toggle panel" } });
-    setIcon(toggle, "sliders-horizontal");
-    toggle.addEventListener("click", () => { this.source.updateSettings({ ...this.source.settings(), panelOpen: !this.source.settings().panelOpen }); this.renderPanel(); });
-    this.panel = this.root.createDiv({ cls: "czm-map-panel czm-writer-panel" });
+    this.panel = this.shell.side;
+    this.panel.addClass("czm-writer-panel");
     this.card = this.root.createDiv({ cls: "czm-map-card czm-writer-side" });
     this.status = new StatusLine(this.root);
     this.help = this.root.createDiv({ cls: "czm-writer-help", attr: { role: "dialog", "aria-label": "Keyboard shortcuts" } });
@@ -799,7 +806,7 @@ export class WriterView extends ItemView {
 
   private focusSearch(): void {
     if (!this.source.settings().panelOpen) { this.source.updateSettings({ ...this.source.settings(), panelOpen: true }); this.renderPanel(); }
-    this.panel.querySelector<HTMLInputElement>(".czm-map-search")?.focus();
+    this.shell.scope.querySelector<HTMLInputElement>(".czm-map-search")?.focus();
   }
 
   private togglePanel(): void {
@@ -924,12 +931,12 @@ export class WriterView extends ItemView {
 
   // --- panel ---------------------------------------------------------------------
 
-  private renderPanel(): void {
-    const s = this.source.settings();
-    this.panel.empty();
-    this.panel.classList.toggle("is-open", s.panelOpen);
-    if (!s.panelOpen) return;
-    const head = this.panel.createDiv({ cls: "czm-map-panel-head" });
+  /** The head: the framework (this board's scope), the search, one line about what is on the board, and the tools. */
+  private renderHead(): void {
+    const head = this.shell.scope;
+    const active = document.activeElement;
+    if (active && head.contains(active) && active.classList.contains("czm-map-search")) return; // typing: leave the field alone
+    head.empty();
     const fw = head.createEl("select", { cls: "dropdown czm-writer-framework", attr: { "aria-label": "Framework" } });
     for (const x of FRAMEWORKS) { const o = fw.createEl("option", { text: x.name }); o.value = x.id; }
     if (typeof this.file.framework !== "string") { const o = fw.createEl("option", { text: `${this.board.framework.name} (yours)` }); o.value = "custom"; }
@@ -939,6 +946,19 @@ export class WriterView extends ItemView {
     search.value = this.query;
     search.addEventListener("input", () => { this.query = search.value; this.applySelectionClasses(); });
     search.addEventListener("keydown", (ev) => { if (ev.key === "Escape") { ev.stopPropagation(); this.root.focus({ preventScroll: true }); } });
+    const stories = this.stories.stories.length, cards = this.board.cards.length, unfiled = this.stories.unfiled.length;
+    this.shell.setState(`${stories} stor${stories === 1 ? "y" : "ies"} · ${cards} card${cards === 1 ? "" : "s"}${unfiled ? ` · ${unfiled} unfiled` : ""}`);
+    this.shell.tools.empty();
+    const fit = this.shell.tool("maximize", "Fit the board in the view", () => this.fit()); fit.addClass("czm-map-fit");
+    const help = this.shell.tool("keyboard", "Keyboard shortcuts (?)", () => this.run("help")); help.addClass("czm-writer-help-btn");
+  }
+
+  private renderPanel(): void {
+    const s = this.source.settings();
+    this.renderHead();
+    this.panel.empty();
+    this.shell.setSideOpen(s.panelOpen);
+    if (!s.panelOpen) return;
 
     const actions = this.panel.createDiv({ cls: "czm-map-panel-actions" });
     const btn = (text: string, cls: string, onClick: () => void, title?: string) => { const b = actions.createEl("button", { text, cls }); if (title) b.title = title; b.addEventListener("click", onClick); return b; };
@@ -952,15 +972,15 @@ export class WriterView extends ItemView {
     btn("Add note…", "czm-writer-add", () => void this.addNote(into.value), "Put an existing note on the board, in the group chosen here.");
     btn("New note…", "czm-writer-new", () => this.newNoteForm(into.value), "Write a new note straight into the group chosen here.");
     btn("New story…", "czm-writer-new-story", () => this.select({ kind: "new-story" }), "Scaffold a story folder in the stories folder.");
-    btn("Fit", "czm-map-fit", () => this.fit());
     btn("Copy schema", "czm-writer-schema", () => void this.source.copySchema(), "Put the writer protocol on the clipboard, for a person or a tool preparing this vault.");
 
-    const section = (title: string, open = true) => { const d = this.panel.createEl("details", { cls: `czm-map-section czm-map-section-${title.split(" ")[0]!.toLowerCase()}` }); d.open = open; d.createEl("summary", { text: title }); return d; };
-    const layers = section("Layers", false);
+    const section = (title: string, open = true, value = "") => this.shell.section(title, value, title.split(" ")[0]!.toLowerCase(), open);
+    const hidden = this.hiddenLayers.size;
+    const layers = section("Layers", false, hidden ? `${hidden} hidden` : "");
     for (const l of this.layout.layers) {
       new Setting(layers).setName(l.name).setClass("czm-set-layer").addToggle((t) => t.setValue(!this.hiddenLayers.has(l.name)).onChange((v) => { if (v) this.hiddenLayers.delete(l.name); else this.hiddenLayers.add(l.name); this.renderGraph(); }));
     }
-    const colours = section("Groups & colours", false);
+    const colours = section("Groups & colours", false, `${this.layout.groups.length}`);
     for (const pg of this.layout.groups) {
       const n = this.board.cards.filter((c) => c.groups.includes(pg.group.def.id)).length;
       new Setting(colours).setName(`${pg.group.def.name}${n ? ` · ${n}` : ""}`).setClass(`czm-set-group-${pg.group.def.id}`)
@@ -971,7 +991,7 @@ export class WriterView extends ItemView {
       this.queue((file) => ({ ...file, colours: {} }));
       void this.flushFile().then(() => this.show()).then(() => this.status.undoable("Colours reset", async () => { this.queue((file) => ({ ...file, colours: before })); await this.flushFile(); await this.show(); }));
     }));
-    const prefixSec = section("Tag prefix", false);
+    const prefixSec = section("Tag prefix", false, `#${this.file.prefix}`);
     new Setting(prefixSec).setName("Prefix").setDesc(`Cards are notes tagged #${this.file.prefix}/<group>.`).setClass("czm-set-prefix")
       .addText((t) => t.setPlaceholder("writer").setValue(this.file.prefix).onChange((v) => { const p = normalizePrefix(v); if (p !== this.file.prefix) { this.queue((file) => ({ ...file, prefix: p })); void this.flushFile().then(() => this.show()); } }));
     if (this.source.filePath()) prefixSec.createDiv({ text: `Layout in ${this.source.filePath()}`, cls: "czm-map-hint" });

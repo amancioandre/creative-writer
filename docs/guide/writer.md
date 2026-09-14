@@ -55,7 +55,7 @@ The [myth and archetype](/guide/myth) report gains **Add to writer** on every ar
 
 ## Moving around
 
-Drag the background to pan, wheel to zoom, **Fit** in the panel to see everything. Drag a card to place it; positions are kept relative to the group, so a card travels with its group. Groups **flow**: inside a layer they sit left to right and never overlap. Drag a group by its name or its empty area to change its place in the row, and drag the small square in its corner to resize it; the neighbours move along. Order and sizes are remembered in the writer file.
+Drag the background to pan, wheel to zoom, **Fit** in the head to see everything. Drag a card to place it; positions are kept relative to the group, so a card travels with its group. Groups **flow**: inside a layer they sit left to right and never overlap. Drag a group by its name or its empty area to change its place in the row, and drag the small square in its corner to resize it; the neighbours move along. Order and sizes are remembered in the writer file.
 
 **Drop a card into another group and its tag follows.** The old tag is replaced by the new one, in the front matter if it lives there, in the text if it was inline. Drop it on the background and it just stays where you put it; the tag is untouched.
 
@@ -92,7 +92,7 @@ The lane and group moves, the new note, the fit and the list are also commands (
 
 ## The panel
 
-The sliders icon top-right folds the panel. It holds the framework dropdown (Truby, Generic, or yours if the file carries one), a search that dims everything but the matching cards, the group dropdown for new cards, **Add note…**, **New note…**, **Fit** and **Copy schema**, then three folded sections: which layers are shown, a colour per group, and the tag prefix.
+The head holds the framework dropdown (Truby, Generic, or yours if the file carries one), a search that dims everything but the matching cards, one line saying what is on the board (*3 stories · 12 cards · 1 unfiled*), **Fit**, the keyboard help, and the jumps to the other panels. The sliders icon folds the side column, docked to the right: the group dropdown for new cards, **Add note…**, **New note…**, **New story…** and **Copy schema**, then three folded sections whose headers show their value: which layers are shown, a colour per group, and the tag prefix.
 
 **Copy schema** puts the [writer protocol](/reference/writer-file) on the clipboard: everything a person or a tool needs to prepare or migrate a board into your vault. The plugin ships no importer on purpose.
 

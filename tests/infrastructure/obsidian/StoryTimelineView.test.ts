@@ -20,7 +20,7 @@ function open(overrides: Partial<StoryTimelineSource> = {}) {
   const src: StoryTimelineSource = {
     projects: () => [novel], activeProject: () => novel,
     build: async () => buildStoryGraph("Novel", notes, file),
-    openNote: (p) => { calls.opened.push(p); }, reveal: (r) => { calls.revealed.push(r.title); },
+    openNote: (p) => { calls.opened.push(p); }, reveal: (r) => { calls.revealed.push(r.title); }, jumpTo: () => undefined,
     settings: () => DEFAULT_STORY_MAP,
     ...overrides,
   };

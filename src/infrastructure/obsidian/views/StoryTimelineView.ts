@@ -4,6 +4,7 @@ import type { StoryMapSettings } from "../../../domain/settings/Settings";
 import { EMPTY_GRAPH, type Entity, type SceneRef, type StoryGraph } from "../../../domain/story/StoryGraph";
 import { basenameOf } from "../../../domain/story/EntityIndex";
 import { KIND_LABEL } from "./StoryMapView";
+import { PanelShell, type PanelId } from "./PanelShell";
 
 export const STORY_TIMELINE_VIEW_TYPE = "creative-writer-story-timeline";
 
@@ -14,6 +15,8 @@ export interface StoryTimelineSource {
   openNote(path: string): void;
   reveal(ref: SceneRef): void;
   settings(): StoryMapSettings;
+  /** Opens a sibling panel, for the same project where the panel takes one. */
+  jumpTo(to: PanelId, project: ProjectSpec | null): void;
 }
 
 /**
@@ -56,8 +59,9 @@ export class StoryTimelineView extends ItemView {
 
   render(): void {
     this.contentEl.empty();
-    const root = this.contentEl.createDiv({ cls: "czm-tl" });
-    const head = root.createDiv({ cls: "czm-tl-head" });
+    const shell = new PanelShell(this.contentEl, { current: "timeline", jump: (to) => this.source.jumpTo(to, this.project) });
+    const root = shell.main.createDiv({ cls: "czm-tl" });
+    const head = shell.scope;
     const projects = this.source.projects();
     const select = head.createEl("select", { cls: "dropdown", attr: { "aria-label": "Project" } });
     for (const p of projects) {
@@ -68,9 +72,9 @@ export class StoryTimelineView extends ItemView {
     select.addEventListener("change", () => void this.show(projects.find((p) => p.scope === select.value) ?? null));
     const search = head.createEl("input", { cls: "czm-map-search", attr: { type: "search", placeholder: "Filter the cast…", "aria-label": "Filter the cast" } });
     search.value = this.query;
-    search.addEventListener("input", () => { this.query = search.value; this.render(); this.contentEl.querySelector<HTMLInputElement>(".czm-map-search")?.focus(); });
+    search.addEventListener("input", () => { this.query = search.value; this.render(); const again = this.contentEl.querySelector<HTMLInputElement>(".czm-map-search"); if (again) { again.focus(); again.setSelectionRange(again.value.length, again.value.length); } });
 
-    if (!this.project) { root.createEl("p", { text: "No project yet — put story: true (or writing-target: 50000) in a note's front matter and its folder becomes one.", cls: "czm-map-hint" }); return; }
+    if (!this.project) { shell.setState("No project"); shell.empty("No project yet — put story: true (or writing-target: 50000) in a note's front matter and its folder becomes one."); return; }
     const rows = this.graph.timeline;
     const q = this.query.trim().toLowerCase();
     const settings = this.source.settings();
@@ -78,9 +82,9 @@ export class StoryTimelineView extends ItemView {
       .filter((e) => e.appearances.length > 0 && e.kind !== "note" && e.kind !== "reference" && settings.kinds[e.kind])
       .filter((e) => !q || e.name.toLowerCase().includes(q) || e.aliases.some((a) => a.toLowerCase().includes(q)))
       .sort((a, b) => kindOrder(a) - kindOrder(b) || b.mentions - a.mentions);
-    if (rows.length === 0 || columns.length === 0) { root.createEl("p", { text: rows.length === 0 ? "No scenes yet — headings with prose under them become scenes." : "Nobody matches.", cls: "czm-map-hint" }); return; }
-
-    head.createSpan({ text: `${rows.length} scene${rows.length === 1 ? "" : "s"} · ${columns.length} in the cast`, cls: "czm-map-hint" });
+    shell.setState(`${rows.length} scene${rows.length === 1 ? "" : "s"} · ${columns.length} in the cast${q ? ` · “${this.query.trim()}”` : ""}`, q ? { label: "Clear", cls: "czm-tl-clear", onClick: () => { this.query = ""; this.render(); } } : null);
+    if (rows.length === 0) { shell.empty("No scenes yet — headings with prose under them become scenes."); return; }
+    if (columns.length === 0) { shell.empty(q ? `Nobody matches “${this.query.trim()}”.` : "Nobody appears in a scene yet — names that recur, or notes typed as characters, become the cast.", q ? [{ label: "Clear search", cls: "czm-tl-clear", onClick: () => { this.query = ""; this.render(); } }] : []); return; }
     const wrap = root.createDiv({ cls: "czm-tl-wrap" });
     const table = wrap.createEl("table", { cls: "czm-tl-table" });
     const thead = table.createEl("thead").createEl("tr");

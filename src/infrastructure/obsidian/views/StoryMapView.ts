@@ -1,8 +1,9 @@
 import { ItemView, Setting, setIcon, type WorkspaceLeaf } from "obsidian";
 import { couldNot, StatusLine } from "./StatusLine";
+import { PanelShell, type Fix, type PanelId } from "./PanelShell";
 import type { ProjectSpec } from "../../../domain/progress/Project";
-import { DEFAULT_DISPLAY, DEFAULT_FORCES, DEFAULT_STORY_COLORS, DISPLAY_RANGES, FORCE_RANGES, STORY_KINDS, STORY_LAYERS, type DisplaySettings, type ForceSettings, type StoryEntityKind, type StoryLayer, type StoryMapSettings } from "../../../domain/settings/Settings";
-import { applyFilter, neighbours, type GraphFilter } from "../../../domain/story/Filter";
+import { DEFAULT_DISPLAY, DEFAULT_FORCES, DEFAULT_STORY_COLORS, DEFAULT_STORY_MAP, DISPLAY_RANGES, FORCE_RANGES, STORY_KINDS, STORY_LAYERS, type DisplaySettings, type ForceSettings, type StoryEntityKind, type StoryLayer, type StoryMapSettings } from "../../../domain/settings/Settings";
+import { applyFilter, explainEmpty, neighbours, type GraphFilter } from "../../../domain/story/Filter";
 import { Simulation, type Point } from "../../../domain/story/Simulation";
 import { EMPTY_GRAPH, type Edge, type Entity, type EntityKind, type SceneRef, type StoryGraph } from "../../../domain/story/StoryGraph";
 import { basenameOf } from "../../../domain/story/EntityIndex";
@@ -41,10 +42,8 @@ export interface StoryMapSource {
   analyse(project: ProjectSpec, notePath: string | null, graph: StoryGraph, signal: AbortSignal, onProgress: (p: AnalyzeProgress) => void): Promise<number>;
   settings(): StoryMapSettings;
   updateSettings(next: StoryMapSettings): void;
-  /** Opens the timeline view for the same project. */
-  openTimeline(project: ProjectSpec): void;
-  /** Opens the story threads view for the same project. */
-  openThreads(project: ProjectSpec): void;
+  /** Opens a sibling panel, for the same project where the panel takes one. */
+  jumpTo(to: PanelId, project: ProjectSpec | null): void;
 }
 
 const SVG = "http://www.w3.org/2000/svg";
@@ -99,6 +98,11 @@ export class StoryMapView extends ItemView {
   private composer!: HTMLElement;
   private panel!: HTMLElement;
   private status!: StatusLine;
+  private shell!: PanelShell;
+  private scopeSelect!: HTMLSelectElement;
+  private search!: HTMLInputElement;
+  private emptyEl: HTMLElement | null = null;
+  private filter: GraphFilter = { layers: new Set(), kinds: new Set(), query: "", hideIsolated: false };
 
   constructor(leaf: WorkspaceLeaf, private readonly source: StoryMapSource) {
     super(leaf);
@@ -161,7 +165,17 @@ export class StoryMapView extends ItemView {
   private mount(): void {
     this.contentEl.empty();
     this.contentEl.addClass("czm-map-host");
-    this.root = this.contentEl.createDiv({ cls: "czm-map" });
+    this.shell = new PanelShell(this.contentEl, {
+      current: "map",
+      jump: (to) => this.source.jumpTo(to, this.project),
+      side: { isOpen: () => this.settings.panelOpen, onToggle: () => this.saveSettings({ ...this.settings, panelOpen: !this.settings.panelOpen }) },
+    });
+    this.root = this.shell.main;
+    this.root.addClass("czm-map");
+    this.scopeSelect = this.shell.scope.createEl("select", { cls: "dropdown", attr: { "aria-label": "Project" } });
+    this.scopeSelect.addEventListener("change", () => void this.show(this.source.projects().find((p) => p.scope === this.scopeSelect.value) ?? null));
+    this.search = this.shell.scope.createEl("input", { cls: "czm-map-search", attr: { type: "search", placeholder: "Find a name…", "aria-label": "Find a name" } });
+    this.search.addEventListener("input", () => { this.query = this.search.value; this.rebuild(); });
     this.svg = document.createElementNS(SVG, "svg");
     this.svg.setAttribute("class", "czm-map-svg");
     this.svg.setAttribute("role", "img");
@@ -173,11 +187,7 @@ export class StoryMapView extends ItemView {
     this.svg.appendChild(this.rubber);
     this.attachPanZoom();
 
-    const corner = this.root.createDiv({ cls: "czm-map-corner" });
-    const toggle = corner.createEl("button", { cls: "czm-map-icon clickable-icon", attr: { "aria-label": "Toggle panel" } });
-    setIcon(toggle, "sliders-horizontal");
-    toggle.addEventListener("click", () => { this.saveSettings({ ...this.settings, panelOpen: !this.settings.panelOpen }); this.renderPanel(); });
-    this.panel = this.root.createDiv({ cls: "czm-map-panel" });
+    this.panel = this.shell.side;
     this.card = this.root.createDiv({ cls: "czm-map-card" });
     this.composer = this.root.createDiv({ cls: "czm-map-new" });
     this.status = new StatusLine(this.root);
@@ -200,6 +210,7 @@ export class StoryMapView extends ItemView {
       hideIsolated: s.hideIsolated,
       focusId: this.focusId,
     };
+    this.filter = filter;
     this.shown = applyFilter(this.graph, filter);
     this.sim.setForces(s.forces);
     this.sim.setGraph(this.shown.entities, this.shown.edges);
@@ -291,16 +302,51 @@ export class StoryMapView extends ItemView {
       this.nodeEls.set(e.id, g);
     }
     this.viewport.appendChild(nodesG);
-    if (shown.entities.length === 0) {
-      const t = document.createElementNS(SVG, "text");
-      t.setAttribute("class", "czm-map-empty"); t.setAttribute("text-anchor", "middle");
-      t.textContent = !this.project
-        ? "No project yet — put story: true (or writing-target: 50000) in a note's front matter and its folder becomes one."
-        : this.graph.entities.length === 0 ? "Nothing to map yet — double-click here to add a character or place, or write until names recur." : "Nothing matches the current filters.";
-      this.viewport.appendChild(t);
-    }
+    this.emptyEl?.remove();
+    this.emptyEl = null;
+    if (shown.entities.length === 0) this.emptyEl = this.renderEmpty();
     this.applySelectionClasses();
     this.paint();
+  }
+
+  /** Nothing to draw: say why, and offer the one click that changes it. */
+  private renderEmpty(): HTMLElement {
+    if (!this.project) return this.shell.empty("No project yet — put story: true (or writing-target: 50000) in a note's front matter and its folder becomes one.");
+    if (this.graph.entities.length === 0) return this.shell.empty("Nothing to map yet — double-click here to add a character or place, or write until names recur.", [{ label: "Add a node", cls: "czm-map-add-empty", onClick: () => this.openComposerAtCentre() }]);
+    const why = explainEmpty(this.graph, this.filter);
+    if (why.length === 0) return this.shell.empty("Nothing matches the current filters.", [{ label: "Reset filters", cls: "czm-map-reset-filters", onClick: () => this.resetFilters() }]);
+    const n = (c: number) => `${c} node${c === 1 ? "" : "s"}`;
+    const reasons = why.map((w) => w.cause === "query" ? `“${this.query.trim()}” matches nothing`
+      : w.cause === "isolated" ? `Hide loners is hiding ${n(w.count)}`
+      : w.cause === "kinds" ? `hidden kinds hold ${n(w.count)}`
+      : w.cause === "layers" ? `hidden layers would connect ${n(w.count)}`
+      : `the focus leaves out ${n(w.count)}`);
+    const fixes: Fix[] = why.map((w) => w.cause === "query" ? { label: "Clear search", cls: "czm-map-fix-query", onClick: () => { this.query = ""; this.search.value = ""; this.rebuild(); } }
+      : w.cause === "isolated" ? { label: "Show loners", cls: "czm-map-fix-isolated", onClick: () => { this.saveSettings({ ...this.settings, hideIsolated: false }); this.rebuild(); } }
+      : w.cause === "kinds" ? { label: "Show all kinds", cls: "czm-map-fix-kinds", onClick: () => { this.saveSettings({ ...this.settings, kinds: Object.fromEntries(STORY_KINDS.map((k) => [k, true])) as Record<StoryEntityKind, boolean> }); this.rebuild(); } }
+      : w.cause === "layers" ? { label: "Show all layers", cls: "czm-map-fix-layers", onClick: () => { this.saveSettings({ ...this.settings, layers: Object.fromEntries(STORY_LAYERS.map((l) => [l, true])) as Record<StoryLayer, boolean> }); this.rebuild(); } }
+      : { label: "Show all", cls: "czm-map-fix-focus", onClick: () => { this.focusId = null; this.rebuild(); } });
+    return this.shell.empty(`Nothing to show: ${reasons.join("; ")}.`, fixes);
+  }
+
+  /** Back to the defaults: every layer and kind as shipped, loners shown, no search, no focus. */
+  private resetFilters(): void {
+    this.saveSettings({ ...this.settings, layers: DEFAULT_STORY_MAP.layers, kinds: DEFAULT_STORY_MAP.kinds, hideIsolated: DEFAULT_STORY_MAP.hideIsolated });
+    this.query = ""; this.search.value = ""; this.focusId = null;
+    this.rebuild();
+  }
+
+  /** How many of the filters differ from the defaults, counting the search and the focus. */
+  private filtersOn(): number {
+    const s = this.settings;
+    return STORY_LAYERS.filter((l) => s.layers[l] !== DEFAULT_STORY_MAP.layers[l]).length
+      + STORY_KINDS.filter((k) => s.kinds[k] !== DEFAULT_STORY_MAP.kinds[k]).length
+      + (s.hideIsolated !== DEFAULT_STORY_MAP.hideIsolated ? 1 : 0) + (this.query.trim() ? 1 : 0) + (this.focusId ? 1 : 0);
+  }
+
+  private openComposerAtCentre(): void {
+    const r = this.svg.getBoundingClientRect();
+    this.openComposer(this.toWorld(r.left + (r.width || 800) / 2, r.top + (r.height || 600) / 2));
   }
 
   private paintRubber(): void {
@@ -632,40 +678,27 @@ this.renderCard(); this.paint();
 
   // --- floating panel ------------------------------------------------------------
 
-  private renderPanel(): void {
-    const s = this.settings;
-    this.panel.empty();
-    this.panel.classList.toggle("is-open", s.panelOpen);
-    if (!s.panelOpen) return;
+  /** The head: which project, the search, one line about what is shown, and the tools. */
+  private renderHead(): void {
     const projects = this.source.projects();
-    const head = this.panel.createDiv({ cls: "czm-map-panel-head" });
-    const select = head.createEl("select", { cls: "dropdown", attr: { "aria-label": "Project" } });
+    this.scopeSelect.empty();
     for (const p of projects) {
-      const opt = select.createEl("option", { text: p.name });
+      const opt = this.scopeSelect.createEl("option", { text: p.name });
       opt.value = p.scope;
       if (this.project?.scope === p.scope) opt.selected = true;
     }
-    if (projects.length === 0) select.createEl("option", { text: "No projects" });
-    select.addEventListener("change", () => void this.show(projects.find((p) => p.scope === select.value) ?? null));
-    const search = head.createEl("input", { cls: "czm-map-search", attr: { type: "search", placeholder: "Find a name…", "aria-label": "Find a name" } });
-    search.value = this.query;
-    search.addEventListener("input", () => { this.query = search.value; this.rebuild(); this.panel.querySelector<HTMLInputElement>(".czm-map-search")?.focus(); });
-
-    const actions = this.panel.createDiv({ cls: "czm-map-panel-actions" });
-    const btn = (text: string, cls: string, onClick: () => void, title?: string) => {
-      const b = actions.createEl("button", { text, cls });
-      if (title) b.title = title;
-      b.addEventListener("click", onClick);
-      return b;
-    };
-    if (this.project) {
-      btn(this.running ? "Stop" : "Read project with model", "czm-map-analyse", () => void this.toggleAnalyse(null), "Asks the local model (Ollama) for relationships, outside references and events in every scene. Unchanged scenes are skipped.");
-      btn("Timeline", "czm-map-timeline-btn", () => this.source.openTimeline(this.project!), "Open the Who-is-where timeline for this project.");
-      btn("Threads", "czm-map-threads-btn", () => this.source.openThreads(this.project!), "Open the story threads view: the manuscript as one line, with facts, contradictions and hand-drawn threads arcing over it.");
-    }
-    if (this.project) btn("Add", "czm-map-add", () => { const r = this.svg.getBoundingClientRect(); this.openComposer(this.toWorld(r.left + (r.width || 800) / 2, r.top + (r.height || 600) / 2)); }, "Add a character, place, item, faction or event as a new note. Or double-click the background.");
-    btn("Fit", "czm-map-fit", () => this.fit());
-    btn("Shake", "czm-map-shake", () => {
+    if (projects.length === 0) this.scopeSelect.createEl("option", { text: "No projects" });
+    if (this.search.value !== this.query) this.search.value = this.query;
+    const on = this.filtersOn();
+    if (!this.project) this.shell.setState("No project");
+    else this.shell.setState(`${this.graph.entities.length} node${this.graph.entities.length === 1 ? "" : "s"} · ${this.shown.entities.length} shown${on ? ` · ${on} filter${on === 1 ? "" : "s"} on` : ""}`, on ? { label: "Reset", cls: "czm-map-reset-filters", onClick: () => this.resetFilters() } : null);
+    const tools = this.shell.tools;
+    tools.empty();
+    const tool = (icon: string, label: string, cls: string, onClick: () => void) => { const b = this.shell.tool(icon, label, onClick); b.addClass(cls); return b; };
+    if (this.project) tool("plus", "Add a character, place, item, faction or event as a new note (or double-click the background)", "czm-map-add", () => this.openComposerAtCentre());
+    tool("maximize", "Fit the map in the view", "czm-map-fit", () => this.fit());
+    if (this.focusId) tool("eye", "Show all: leave the focus on one node", "czm-map-unfocus", () => { this.focusId = null; this.rebuild(); });
+    tool("shuffle", "Shake: unpin everything and let the layout settle again", "czm-map-shake", () => {
       // Remember every hand-placed node so the shake can be taken back.
       const held = new Map<string, Point>();
       for (const id of this.nodeEls.keys()) if (this.sim.isPinned(id)) { const p = this.sim.position(id); if (p) held.set(id, p); }
@@ -677,39 +710,54 @@ this.renderCard(); this.paint();
           this.applySelectionClasses(); this.startLoop(); this.queueLayoutSave();
         });
       }
-    }, "Unpin everything (forgetting hand-placed positions) and let the layout settle again.");
-    if (this.focusId) btn("Show all", "czm-map-unfocus", () => { this.focusId = null; this.rebuild(); });
+    });
+  }
 
-    const section = (title: string, open = true) => {
-      const d = this.panel.createEl("details", { cls: `czm-map-section czm-map-section-${title.split(" ")[0]!.toLowerCase()}` });
-      d.open = open;
-      d.createEl("summary", { text: title });
-      return d;
-    };
+  private renderPanel(): void {
+    const s = this.settings;
+    this.renderHead();
+    this.panel.empty();
+    this.shell.setSideOpen(s.panelOpen);
+    if (!s.panelOpen) return;
 
-    const filters = section("Filters");
+    if (this.project) {
+      // The one filled button: the expensive, opt-in action, with its cost on the line beneath.
+      const read = this.panel.createEl("button", { text: this.running ? "Stop" : "Read project with model", cls: "czm-map-analyse czm-shell-cta mod-cta" });
+      read.addEventListener("click", () => void this.toggleAnalyse(null));
+      this.panel.createDiv({ text: "Local model (Ollama) reads every scene for relationships, references and events. Unchanged scenes are skipped.", cls: "czm-shell-cta-hint" });
+    }
+
+    const section = (title: string, value: string, cls: string, open = true) => this.shell.section(title, value, cls, open);
+    const filtersOn = STORY_LAYERS.filter((l) => !s.layers[l]).length + (s.hideIsolated ? 1 : 0);
+    const filters = section("Filters", filtersOn ? `${filtersOn} on` : "", "filters");
     for (const layer of STORY_LAYERS) {
       new Setting(filters).setName(LAYER_LABEL[layer]).setClass(`czm-set-layer-${layer}`).addToggle((t) => t.setValue(s.layers[layer]).onChange((v) => { this.saveSettings({ ...this.settings, layers: { ...this.settings.layers, [layer]: v } }); this.rebuild(); }));
     }
     new Setting(filters).setName("Hide loners").setDesc("Nodes with no visible edge.").setClass("czm-set-isolated").addToggle((t) => t.setValue(s.hideIsolated).onChange((v) => { this.saveSettings({ ...this.settings, hideIsolated: v }); this.rebuild(); }));
 
-    const kinds = section("Kinds & colours");
-    for (const kind of STORY_KINDS) {
-      const n = this.graph.entities.filter((e) => e.kind === kind).length;
-      const row = new Setting(kinds).setName(`${KIND_LABEL[kind]}${n ? ` · ${n}` : ""}`).setClass(`czm-set-kind-${kind}`);
+    const counts = new Map(STORY_KINDS.map((k) => [k, this.graph.entities.filter((e) => e.kind === k).length]));
+    const present = STORY_KINDS.filter((k) => (counts.get(k) ?? 0) > 0);
+    const shownKinds = present.filter((k) => s.kinds[k]).length;
+    const kinds = section("Kinds & colours", present.length ? `${shownKinds} of ${present.length}` : "", "kinds");
+    // Only kinds the project has get a row; the rest fold into one line, so the panel is as long as the story.
+    for (const kind of present) {
+      const n = counts.get(kind) ?? 0;
+      const row = new Setting(kinds).setName(`${KIND_LABEL[kind]} · ${n}`).setClass(`czm-set-kind-${kind}`);
       row.addColorPicker((c) => c.setValue(s.colors[kind]).onChange((v) => { this.saveSettings({ ...this.settings, colors: { ...this.settings.colors, [kind]: v } }); this.recolor(); }));
       row.addToggle((t) => t.setValue(s.kinds[kind]).onChange((v) => { this.saveSettings({ ...this.settings, kinds: { ...this.settings.kinds, [kind]: v } }); this.rebuild(); }));
     }
+    const absent = STORY_KINDS.filter((k) => !present.includes(k));
+    if (absent.length) kinds.createDiv({ text: `Not in this project: ${absent.map((k) => KIND_LABEL[k]).join(", ")}.`, cls: "czm-map-hint czm-map-absent" });
     new Setting(kinds).setName("Reset colours").setClass("czm-set-reset-colors").addButton((b) => b.setButtonText("Reset").onClick(() => { this.saveSettings({ ...this.settings, colors: DEFAULT_STORY_COLORS }); this.renderPanel(); this.recolor(); }));
 
     if (this.project?.ignoredNames.length) {
-      const ignored = section("Ignored names", false);
+      const ignored = section("Ignored names", String(this.project.ignoredNames.length), "ignored", false);
       for (const name of this.project.ignoredNames) {
         new Setting(ignored).setName(name).setClass("czm-set-ignored").addButton((b) => b.setButtonText("Restore").onClick(() => void this.source.unignore(this.project!, name).then(() => this.reloadProject())));
       }
     }
 
-    const displaySec = section("Display", false);
+    const displaySec = section("Display", JSON.stringify(s.display) === JSON.stringify(DEFAULT_DISPLAY) ? "" : "custom", "display", false);
     for (const key of Object.keys(DISPLAY_LABEL) as (keyof DisplaySettings)[]) {
       const [min, max, step] = DISPLAY_RANGES[key];
       new Setting(displaySec).setName(DISPLAY_LABEL[key]).setClass(`czm-set-display-${key}`).addSlider((sl) => sl.setLimits(min, max, step).setValue(s.display[key]).onChange((v) => {
@@ -719,7 +767,7 @@ this.renderCard(); this.paint();
     }
     new Setting(displaySec).setName("Reset display").setClass("czm-set-reset-display").addButton((b) => b.setButtonText("Reset").onClick(() => { this.saveSettings({ ...this.settings, display: DEFAULT_DISPLAY }); this.renderPanel(); this.renderGraph(); }));
 
-    const forces = section("Forces", false);
+    const forces = section("Forces", JSON.stringify(s.forces) === JSON.stringify(DEFAULT_FORCES) ? "" : "custom", "forces", false);
     for (const key of Object.keys(FORCE_LABEL) as (keyof ForceSettings)[]) {
       const [min, max, step] = FORCE_RANGES[key];
       new Setting(forces).setName(FORCE_LABEL[key]).setClass(`czm-set-force-${key}`).addSlider((sl) => sl.setLimits(min, max, step).setValue(s.forces[key]).onChange((v) => {

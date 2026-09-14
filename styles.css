@@ -275,10 +275,37 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 /* floating chrome */
 .czm-map-corner { position: absolute; top: 8px; right: 8px; z-index: 3; }
 .czm-map-icon { width: 28px; height: 28px; border-radius: 6px; background: var(--background-secondary); border: 1px solid var(--background-modifier-border); display: flex; align-items: center; justify-content: center; }
-.czm-map-panel { position: absolute; top: 44px; right: 8px; width: 280px; max-height: calc(100% - 60px); overflow: auto; z-index: 2; display: none;
-  background: var(--background-secondary); border: 1px solid var(--background-modifier-border); border-radius: 10px; box-shadow: var(--shadow-s); padding: 10px 12px; font-size: var(--font-ui-small); line-height: 1.35; }
+/* --- The shell every panel shares -----------------------------------------
+   head: scope · state line · tools · jumps; body: the panel's surface and a
+   docked side column (never floating over what it filters). */
+.czm-shell { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.czm-shell-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 10px; border-bottom: 1px solid var(--background-modifier-border); font-size: var(--font-ui-smaller); }
+.czm-shell-scope { display: flex; align-items: center; gap: 6px; }
+.czm-shell-scope .dropdown { max-width: 200px; margin: 0; }
+.czm-shell-scope .czm-map-search { width: 170px; margin: 0; }
+.czm-shell-state { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; font-family: var(--font-monospace); font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }
+.czm-shell-state-text { overflow: hidden; text-overflow: ellipsis; }
+.czm-shell-reset, .czm-shell-fix { font-size: var(--font-ui-smaller); padding: 1px 8px; height: auto; }
+.czm-shell-tools { display: inline-flex; align-items: center; gap: 2px; }
+.czm-shell-tool.is-active { color: var(--text-accent); background: var(--background-modifier-hover); }
+.czm-shell-jumps { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; padding-left: 8px; border-left: 1px solid var(--background-modifier-border); }
+.czm-shell-jump.is-current { color: var(--text-accent); opacity: 1; cursor: default; }
+.czm-shell-body { flex: 1 1 auto; display: flex; min-height: 0; }
+.czm-shell-main { flex: 1 1 auto; position: relative; min-width: 0; min-height: 0; }
+.czm-shell-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px; text-align: center; pointer-events: none; }
+.czm-shell-empty .czm-map-empty { max-width: 46ch; margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); }
+.czm-shell-empty-fixes { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; pointer-events: auto; }
+.czm-shell-cta { width: 100%; margin: 0 0 4px; }
+.czm-shell-cta-hint { font-size: var(--font-ui-smaller); color: var(--text-muted); margin: 0 0 10px; }
+.czm-desk-jumps { margin: 0 0 8px; padding: 0 0 6px; border-left: 0; border-bottom: 1px solid var(--background-modifier-border); }
+.czm-ms-head .czm-shell-jumps { order: 9; margin-left: 0; }
+
+/* The side column: docked right of the surface, folded by the toggle in the head. */
+.czm-map-panel { flex: 0 0 300px; width: 300px; overflow: auto; display: none; background: var(--background-secondary); border-left: 1px solid var(--background-modifier-border); padding: 10px 12px; font-size: var(--font-ui-small); line-height: 1.35; }
 .czm-map-panel.is-open { display: block; }
-.czm-map-panel-head { display: flex; flex-direction: column; gap: 8px; margin: 0 8px 10px; }
+.czm-map-section-value { margin-left: auto; margin-right: 6px; font-weight: 400; text-transform: none; letter-spacing: 0; font-family: var(--font-monospace); color: var(--text-faint); }
+.czm-map-section-value.is-on { color: var(--text-accent); }
+.czm-map-absent { padding: 2px 8px 6px; }
 .czm-map-panel-actions { margin-left: 8px; margin-right: 8px; }
 .czm-map-panel-head .dropdown, .czm-map-search { width: 100%; box-sizing: border-box; margin: 0; }
 .czm-map-panel-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }

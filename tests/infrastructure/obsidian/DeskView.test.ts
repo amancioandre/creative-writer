@@ -6,7 +6,7 @@ import { IntlSentenceSegmenter } from "../../../src/infrastructure/segmentation/
 import { EMPTY_LOG } from "../../../src/domain/progress/WritingLog";
 
 const profile = new ProfileProse(new IntlSentenceSegmenter("en"));
-const progress = { log: () => EMPTY_LOG, today: () => "2026-08-24", dailyGoal: () => 500, projects: async () => [], scenes: () => [], revealLine: () => undefined, echoes: async () => null, revealScene: () => undefined };
+const progress = { log: () => EMPTY_LOG, today: () => "2026-08-24", dailyGoal: () => 500, projects: async () => [], scenes: () => [], revealLine: () => undefined, echoes: async () => null, revealScene: () => undefined, jumpTo: () => undefined };
 
 describe("DeskView", () => {
   it("has a stable view type and title", () => {

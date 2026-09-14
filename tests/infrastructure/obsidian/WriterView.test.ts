@@ -23,7 +23,7 @@ function source(overrides: Partial<WriterSource> = {}, notes: WriterNote[] = bas
   let settings: WriterSettings = DEFAULT_WRITER;
   let tagged = notes;
   let row = stories;
-  const calls = { opened: [] as string[], retags: [] as string[], created: [] as string[], schema: 0, picks: [] as (string | null)[], stages: [] as string[], promoted: [] as string[], declared: [] as string[], views: [] as string[], voices: [] as string[], reading: [] as string[] };
+  const calls = { opened: [] as string[], retags: [] as string[], created: [] as string[], schema: 0, picks: [] as (string | null)[], stages: [] as string[], promoted: [] as string[], declared: [] as string[], views: [] as string[], voices: [] as string[], reading: [] as string[], jumps: [] as string[] };
   const src: WriterSource = {
     build: async () => ({ board: buildBoard(tagged, file), file, stories: row }),
     setStage: async (spec, stage) => { calls.stages.push(`${spec.name}: ${stage ?? "inferred"}`); row = { ...row, stories: row.stories.map((s) => s.spec === spec ? { ...s, stage: stage ?? "development", declared: !!stage } : s) }; },
@@ -50,6 +50,7 @@ function source(overrides: Partial<WriterSource> = {}, notes: WriterNote[] = bas
     pickNote: async () => { const p = calls.picks.shift() ?? null; return p; },
     createNote: async (title, group) => { const p = `new/${title}.md`; calls.created.push(`${group}:${title}`); tagged = [...tagged, note(p, [`#writer/${group}`])]; return p; },
     copySchema: async () => { calls.schema++; },
+    jumpTo: (to) => { calls.jumps.push(to); },
     settings: () => settings,
     updateSettings: (next) => { settings = next; },
     ...overrides,
@@ -249,11 +250,17 @@ describe("WriterView", () => {
     const { v } = await open({}, baseNotes, saved);
     expect((v as unknown as { canvas: { view: unknown } }).canvas.view).toEqual({ x: 12, y: 34, k: 0.5 });
   });
-  it("folds the panel through the corner button", async () => {
+  it("folds the docked panel through the toggle in the head, and says what is on the board", async () => {
     const { el, settings } = await open();
-    (el.querySelector(".czm-map-icon") as HTMLElement).click();
+    const toggle = el.querySelector(".czm-shell-side-toggle") as HTMLButtonElement;
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    toggle.click();
     expect(settings().panelOpen).toBe(false);
     expect(el.querySelector(".czm-writer-panel")!.classList.contains("is-open")).toBe(false);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(el.querySelector(".czm-shell-state")!.textContent).toBe("0 stories · 3 cards");
+    expect([...el.querySelectorAll(".czm-shell-jump")].map((b) => b.getAttribute("data-panel"))).toEqual(["desk", "board", "map", "timeline", "threads", "manuscript"]);
+    expect((el.querySelector('.czm-shell-jump[data-panel="board"]') as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("draws the stories band: a card per project with stage, premise and meta, idea and unfiled pills, and a hint when empty", async () => {
