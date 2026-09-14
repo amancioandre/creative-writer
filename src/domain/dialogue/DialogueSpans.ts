@@ -3,10 +3,11 @@ import { quoteSpans } from "../style/Quotes";
 /**
  * How a writer marks speech and thought on the page. Speech is quoted
  * (double or single) or opened by a dash on its own line (the travessão of
- * Portuguese and French prose); a thought is a whole paragraph in italics,
- * any italic run, a single-quoted run, or whatever pattern the writer
- * gives. Italics inside a sentence are emphasis and never a thought under
- * the default.
+ * Portuguese and French prose); a thought is italics that make a whole
+ * paragraph or a whole sentence, `_He is guessing,_ she thought.`, or any
+ * italic run, a single-quoted run, or whatever pattern the writer gives.
+ * A word or two in italics inside a sentence is emphasis and never a
+ * thought under the default.
  */
 export type DialogueMarks = "double" | "single" | "dash" | "none";
 export const DIALOGUE_MARKS: readonly DialogueMarks[] = ["double", "single", "dash", "none"];
@@ -122,15 +123,30 @@ export function dashSpans(text: string): Span[] {
 
 const ITALIC_PARAGRAPH = /^(\s*)([*_])(?!\2)((?:(?!\2)[\s\S])+)\2([.!?…,;:]*)\s*$/;
 const ITALIC_ANY = /(?<![*_\p{L}\p{N}])([*_])(?!\1)(?:(?!\1)[^\n])+?\1(?![*_\p{L}\p{N}])/gu;
+/** "…, she thought.", "— he wondered": a thought tag right after the italics. */
+const THOUGHT_TAG = /^[,.;:—–-]?\s*(?:[\p{L}']+\s+){0,2}(?:thought|thinks|thinking|wondered|wonders|mused|reflected|realised|realized|decided|hoped|prayed|remembered|considered|told (?:him|her|them)self)\b/iu;
+/** Where a sentence may begin: the start, a full stop, a closing quote, a dash or a colon before the italics. */
+const SENTENCE_BEFORE = /(?:^|[.!?…"”’)]|[—–:])\s*$/;
+const MIN_THOUGHT_WORDS = 3;
+
+/** Italic runs that are thoughts: the whole paragraph, or a whole sentence (three words or more, where a sentence begins, or followed by a thought tag). */
+function italicThoughts(text: string): Span[] {
+  const whole = ITALIC_PARAGRAPH.exec(text);
+  if (whole) { const from = whole[1]!.length; return [[from, from + 1 + whole[3]!.length + 1 + whole[4]!.length]]; }
+  const out: Span[] = [];
+  for (const m of text.matchAll(ITALIC_ANY)) {
+    const inner = m[0].slice(1, -1).trim();
+    if (inner.split(/\s+/).length < MIN_THOUGHT_WORDS) continue;
+    const before = text.slice(0, m.index);
+    const after = text.slice(m.index + m[0].length);
+    if (SENTENCE_BEFORE.test(before) || THOUGHT_TAG.test(after)) out.push([m.index, m.index + m[0].length]);
+  }
+  return out;
+}
 
 function thoughtSpans(text: string, c: DialogueConventions): Span[] {
   switch (c.thoughts) {
-    case "italic-paragraph": {
-      const m = ITALIC_PARAGRAPH.exec(text);
-      if (!m) return [];
-      const from = m[1]!.length;
-      return [[from, from + 1 + m[3]!.length + 1 + m[4]!.length]];
-    }
+    case "italic-paragraph": return italicThoughts(text);
     case "italic-any": return Array.from(text.matchAll(ITALIC_ANY), (m) => [m.index, m.index + m[0].length] as const);
     case "single-quotes": return c.marks === "single" ? [] : singleQuoteSpans(text);
     case "custom": return customSpans(text, c.thoughtPattern);

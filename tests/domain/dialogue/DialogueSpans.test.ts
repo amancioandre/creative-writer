@@ -25,13 +25,21 @@ describe("findDialogue — speech", () => {
 });
 
 describe("findDialogue — thought", () => {
-  it("a whole paragraph in italics is a thought; italics inside a sentence are emphasis", () => {
+  it("a whole paragraph in italics is a thought; a word or two in italics inside a sentence is emphasis", () => {
     expect(slices("_He is guessing. He has to be guessing._", DEFAULT_CONVENTIONS)).toEqual([["thought", "_He is guessing. He has to be guessing._"]]);
     expect(slices("*He is guessing.*", DEFAULT_CONVENTIONS)).toEqual([["thought", "*He is guessing.*"]]);
     expect(slices("  _Trailing punctuation._!  ", DEFAULT_CONVENTIONS)).toEqual([["thought", "_Trailing punctuation._!"]]);
     expect(slices("_Alone_ was generous. Alone was what he was meant to think.", DEFAULT_CONVENTIONS)).toEqual([]);
     expect(slices("_One thought_ and _another_", DEFAULT_CONVENTIONS)).toEqual([]);
+    expect(slices("He was _not going_ to say it.", DEFAULT_CONVENTIONS)).toEqual([]);
     expect(slices("**Bold is not a thought**", DEFAULT_CONVENTIONS)).toEqual([]);
+  });
+  it("a whole sentence in italics is a thought too: tagged, or standing where a sentence begins", () => {
+    expect(slices("_He is guessing,_ she thought. She turned the lantern down.", DEFAULT_CONVENTIONS)).toEqual([["thought", "_He is guessing,_"]]);
+    expect(slices("She turned the lantern down — _he has to be guessing_ — and waited.", DEFAULT_CONVENTIONS)).toEqual([["thought", "_he has to be guessing_"]]);
+    expect(slices("“Yes.” _Alone was generous. Alone was what he was meant to think._ She turned the lantern down.", DEFAULT_CONVENTIONS)).toEqual([["speech", "“Yes.”"], ["thought", "_Alone was generous. Alone was what he was meant to think._"]]);
+    expect(slices("Mara wondered, _is he guessing_, and said nothing.", DEFAULT_CONVENTIONS)).toEqual([]);
+    expect(slices("So much _for the three of us_ then.", DEFAULT_CONVENTIONS)).toEqual([]);
   });
   it("any italics, when the writer says so", () => {
     expect(slices("_Alone_ was generous, *he thought*, and snake_case is not.", conv({ thoughts: "italic-any" }))).toEqual([["thought", "_Alone_"], ["thought", "*he thought*"]]);

@@ -67,7 +67,7 @@ interface Group { type: "group"; heading: string; items: Row[] }
 const PARENT_KEYS: ReadonlySet<string> = new Set(["scope.mode", "focusFadeEnabled", "rhythmEnabled", "lens", "dialogue.thoughts", "manuscript.stripPreset", "llm.provider", "llm.onIdle"]);
 
 const DIALOGUE_OPTIONS: Record<string, string> = { double: "Double quotes “ ”", single: "Single quotes ‘ ’", dash: "Dash lines — travessão", none: "None" };
-const THOUGHT_OPTIONS: Record<string, string> = { "italic-paragraph": "Whole paragraph in italics", "italic-any": "Any italics", "single-quotes": "Single quotes ‘ ’", custom: "Custom pattern", none: "None" };
+const THOUGHT_OPTIONS: Record<string, string> = { "italic-paragraph": "A sentence or paragraph in italics", "italic-any": "Any italics", "single-quotes": "Single quotes ‘ ’", custom: "Custom pattern", none: "None" };
 
 /**
  * Settings are described once as definitions (Obsidian 1.13+: rendered by
@@ -122,7 +122,7 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
         { name: "Kinds", desc: "Which style checks the lens shows. Hover a tint for the note.", render: (setting) => this.renderKindChips(setting), visible: () => s().lens === "style" },
         { name: "Bad words note", desc: "Your own overused words, one heading per category. A project note can name its own with bad-words.", control: text("words.note", DEFAULT_WORDS.note) },
         { name: "Dialogue marks", desc: "How speech is written. A project note can override with dialogue:.", control: dropdown("dialogue.marks", DIALOGUE_OPTIONS) },
-        { name: "Thought marks", desc: "How thought is written. Italics inside a sentence are emphasis and never count. Override with thoughts:.", control: dropdown("dialogue.thoughts", THOUGHT_OPTIONS) },
+        { name: "Thought marks", desc: "How thought is written. A word or two in italics inside a sentence is emphasis and never counts. Override with thoughts:.", control: dropdown("dialogue.thoughts", THOUGHT_OPTIONS) },
         { name: "Thought pattern", desc: "A regular expression; every match in a paragraph is a thought, group 1 when there is one.", control: text("dialogue.thoughtPattern", "^[_*](.+)[_*][.!?]?$"), visible: () => s().dialogue.thoughts === "custom" },
         { name: "Dim narration", desc: "Under the dialogue lens, fade everything that is not speech or thought.", control: toggle("dialogue.dimNarration") },
         { name: "Speaker colours", desc: "Tint speech by who is speaking: colour: in the character note, or the palette in cast order. Grey when nobody is sure.", control: toggle("dialogue.speakerColours") },

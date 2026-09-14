@@ -26,9 +26,9 @@ How speech and thought are written is a convention, so it is a setting, and a pr
 | | Settings → Lenses | Project note |
 |---|---|---|
 | Speech | **Dialogue marks**: double quotes “ ”, single quotes ‘ ’, dash lines (the travessão: a paragraph that opens with — is speech, and each further — toggles narration and speech), or none. | `dialogue: double` · `single` · `dash` · `none` |
-| Thought | **Thought marks**: a whole paragraph in italics (the default), any italics, single quotes, a custom pattern, or none. | `thoughts: italic-paragraph` · `italic-any` · `single-quotes` · `none`, or a regular expression of your own |
+| Thought | **Thought marks**: a sentence or paragraph in italics (the default), any italics, single quotes, a custom pattern, or none. | `thoughts: italic-paragraph` · `italic-any` · `single-quotes` · `none`, or a regular expression of your own |
 
-Under the default, italics inside a sentence are emphasis and never a thought: `_Alone_ was generous` stays narration; `_He is guessing. He has to be guessing._` on a line of its own is a thought. A custom pattern is tested against each paragraph; every match is a thought, or its first group when the pattern has one. **Dim narration** fades everything that is not speech or thought; switch it off to keep the page at full strength with the tints on top.
+Under the default, a thought is italics that make a whole paragraph, `_He is guessing. He has to be guessing._` on a line of its own, or a whole sentence: three words or more, standing where a sentence begins or followed by a thought tag, `_He is guessing,_ she thought.` A word or two in italics inside a sentence is emphasis and never a thought: `_Alone_ was generous` stays narration. A custom pattern is tested against each paragraph; every match is a thought, or its first group when the pattern has one. **Dim narration** fades everything that is not speech or thought; switch it off to keep the page at full strength with the tints on top.
 
 ### Who is speaking
 
