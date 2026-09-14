@@ -211,7 +211,8 @@ export default class CreativeZenModePlugin extends Plugin {
     let deskEchoes: { scope: string; at: number; found: { project: string; groups: readonly EchoGroup[] } } | null = null;
     this.registerView(DESK_VIEW_TYPE, (leaf: WorkspaceLeaf) => new DeskView(leaf, {
       activeProfile: () => {
-        const md = this.app.workspace.getActiveViewOfType(MarkdownView);
+        // The desk keeps the note the writer was in, even while the desk itself has the focus.
+        const md = this.app.workspace.getActiveViewOfType(MarkdownView) ?? this.lastMarkdownView();
         return md?.file ? { name: md.file.basename, profile: profile.document(md.editor.getValue()) } : null;
       },
       log: countedLog,
@@ -960,6 +961,17 @@ export default class CreativeZenModePlugin extends Plugin {
 
   private deskRefreshTimer: number | null = null;
   /** Re-profiling a whole note on every keystroke is wasteful; once a second is plenty for a side panel. */
+  /** The markdown view of the last active file, when it is still open somewhere. */
+  private lastMarkdownView(): MarkdownView | null {
+    const file = this.app.workspace.getActiveFile();
+    if (!file) return null;
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+      const view = leaf.view;
+      if (view instanceof MarkdownView && view.file?.path === file.path) return view;
+    }
+    return null;
+  }
+
   private refreshDesk(): void {
     const leaf = this.app.workspace.getLeavesOfType(DESK_VIEW_TYPE)[0];
     if (!leaf) return;

@@ -3,7 +3,7 @@ import { renderJumps, type PanelId } from "./PanelShell";
 import type { ProseProfile } from "../../../application/use-cases/ProfileProse";
 import type { WritingLog } from "../../../domain/progress/WritingLog";
 import { addDays, type Day, weekday } from "../../../domain/progress/Dates";
-import { heatmap, sessionKind, streak, summarizeDay, totals } from "../../../domain/progress/ProgressSummary";
+import { heatmap, sessionKind, streak, summarizeDay, totals, type HeatmapCell } from "../../../domain/progress/ProgressSummary";
 import type { Scene } from "../../../domain/text/Scenes";
 import type { ProjectStatus } from "../../../domain/progress/Project";
 import { echoVerdict, type EchoGroup } from "../../../domain/echoes/Echoes";
@@ -78,7 +78,7 @@ export class DeskView extends ItemView {
     root.createEl("h4", { text: "Today" });
     renderProgress(root, this.source.log(), this.source.today(), this.source.dailyGoal());
 
-    const projects = root.createDiv();
+    const projects = root.createDiv({ attr: { "aria-live": "polite" } });
     const generation = ++this.generation;
     void this.source.projects().then((list) => {
       if (generation !== this.generation) return;
@@ -94,7 +94,8 @@ export class DeskView extends ItemView {
     root.createEl("h4", { text: "Readability" });
     const active = this.source.activeProfile();
     if (!active) {
-      root.createEl("p", { text: "Open a note to see how it reads.", cls: "czm-desk-hint" });
+      // The row stays; only its body waits.
+      root.createEl("p", { text: "Open a note and this fills in.", cls: "czm-desk-hint" });
       return;
     }
     root.createEl("p", { text: active.name, cls: "czm-desk-title" });
@@ -161,31 +162,41 @@ export function renderEchoes(root: HTMLElement, found: DeskEchoes, reveal: (ref:
 
 export function renderProgress(root: HTMLElement, log: WritingLog, today: Day, goal: number): void {
   const day = summarizeDay(log, today, goal);
+  const kind = sessionKind(day.added, day.removed);
+  // The headline is the decision, not the measurement: how far to go, or that the goal is met.
   const head = root.createDiv({ cls: "czm-desk-today" });
-  head.createSpan({ text: `${day.added.toLocaleString()} words`, cls: "czm-desk-today-words" });
-  head.createSpan({ text: goal > 0 ? `of ${goal.toLocaleString()}` : "no daily goal", cls: "czm-desk-today-goal" });
+  const toGo = Math.max(0, goal - day.added);
+  const headline = goal > 0 ? (day.goalMet ? "Goal met" : `${toGo.toLocaleString()} to go`) : `${day.added.toLocaleString()} words`;
+  head.createSpan({ text: headline, cls: "czm-desk-verdict" });
+  const pace = goal > 0
+    ? (day.goalMet ? "Done today" : kind === "revising" ? "Revision day" : day.added >= goal / 2 ? "Halfway" : day.added > 0 ? "Under way" : "Not started")
+    : (kind === "revising" ? "Revision day" : day.added > 0 ? "Writing" : "Not started");
+  head.createSpan({ text: pace, cls: `czm-desk-pace-word is-${pace.toLowerCase().replace(/\s+/g, "-")}` });
+  const sub = goal > 0 ? `${day.added.toLocaleString()} of ${goal.toLocaleString()}` : `${day.added.toLocaleString()} added · no daily goal`;
+  root.createDiv({ text: day.removed > 0 ? `${sub} · ${day.removed.toLocaleString()} cut` : sub, cls: "czm-desk-today-sub czm-desk-mono" });
   if (goal > 0) {
     const bar = root.createDiv({ cls: "czm-desk-bar" });
     const fill = bar.createDiv({ cls: `czm-desk-bar-fill${day.goalMet ? " is-met" : ""}` });
     fill.style.width = `${Math.round(day.progress * 100)}%`;
   }
-  const kind = sessionKind(day.added, day.removed);
   if (kind === "revising") root.createDiv({ text: `Revision day: ${day.removed.toLocaleString()} cut. Cutting is work; the streak counts it when the goal is 0.`, cls: "czm-desk-legend" });
-  else if (day.removed > 0) root.createDiv({ text: `${day.removed.toLocaleString()} cut along the way.`, cls: "czm-desk-legend" });
 
+  // The streak facts on one line, in figures that line up.
   const s = streak(log, today, goal);
   const weekStart = addDays(today, -weekday(today));
   const week = totals(log, weekStart, today, goal);
-  const row = root.createDiv({ cls: "czm-desk-streak" });
-  row.createSpan({ text: `Streak ${s.current} day${s.current === 1 ? "" : "s"}` });
-  row.createSpan({ text: `Best ${s.longest}` });
-  row.createSpan({ text: `This week ${week.added.toLocaleString()}` });
+  root.createDiv({ text: `Streak ${s.current} · best ${s.longest} · week ${week.added.toLocaleString()}`, cls: "czm-desk-streak czm-desk-mono" });
 
   renderHeatmap(root, log, today, goal);
 }
 
 export function renderHeatmap(root: HTMLElement, log: WritingLog, today: Day, goal: number): void {
   const map = heatmap(log, today, HEATMAP_WEEKS, goal);
+  const cells = map.columns.flat().filter((c): c is HeatmapCell => !!c);
+  const written = cells.filter((c) => c.added + c.removed > 0).length;
+  const head = root.createDiv({ cls: "czm-desk-band-head czm-desk-heat-head" });
+  head.createSpan({ text: `Last ${HEATMAP_WEEKS} weeks`, cls: "czm-desk-band-name" });
+  head.createSpan({ text: `${written} of ${cells.length} days written`, cls: "czm-desk-band-name czm-desk-mono" });
   const grid = root.createDiv({ cls: "czm-desk-heatmap" });
   grid.setAttribute("aria-label", `Words added per day, last ${HEATMAP_WEEKS} weeks`);
   for (const column of map.columns) {
@@ -228,7 +239,17 @@ export function renderProjects(root: HTMLElement, projects: readonly ProjectStat
     head.createSpan({ text: `${p.totalWords.toLocaleString()} / ${p.spec.targetWords.toLocaleString()} · ${Math.round(p.fraction * 100)}%`, cls: "czm-desk-band-name" });
     const bar = item.createDiv({ cls: "czm-desk-bar" });
     bar.createDiv({ cls: `czm-desk-bar-fill${p.verdict === "done" ? " is-met" : ""}` }).style.width = `${Math.round(p.fraction * 100)}%`;
-    item.createDiv({ text: paceLine(p), cls: "czm-desk-band-hint" });
+    // One verdict with a dot, then the dates on labelled lines, so a projection is never mistaken for a deadline.
+    const pace = item.createDiv({ cls: `czm-desk-pace is-${p.verdict}`, attr: { title: paceLine(p) } });
+    pace.createSpan({ cls: "czm-desk-pace-dot" });
+    pace.createSpan({ text: paceWord(p), cls: "czm-desk-pace-word" });
+    const clause = paceClause(p);
+    if (clause) pace.createSpan({ text: ` · ${clause}`, cls: "czm-desk-pace-clause" });
+    for (const [label, day] of paceDates(p)) {
+      const line = item.createDiv({ cls: "czm-desk-date czm-desk-mono" });
+      line.createSpan({ text: label, cls: "czm-desk-date-label" });
+      line.createSpan({ text: prettyDay(day) });
+    }
     if (p.today) {
       const daily = item.createDiv({ cls: "czm-desk-project-daily" });
       const row = daily.createDiv({ cls: "czm-desk-band-head" });
@@ -245,6 +266,39 @@ export function prettyDay(day: Day, locale?: string, thisYear = new Date().getFu
   const [y, m, d] = day.split("-").map(Number);
   if (!y || !m || !d) return day;
   return new Date(y, m - 1, d).toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short", ...(y === thisYear ? {} : { year: "numeric" }) });
+}
+
+/** The verdict in a word or two. */
+export function paceWord(p: ProjectStatus): string {
+  const passed = p.daysLeft !== null && p.daysLeft <= 0;
+  switch (p.verdict) {
+    case "done": return "Done";
+    case "on-track": return "On track";
+    case "behind": return passed ? "Deadline passed" : "Behind";
+    case "stalled": return passed ? "Deadline passed" : "Stalled";
+    case "no-deadline": return "No deadline";
+  }
+}
+
+/** The one clause after the verdict: what the pace is and what it would take. */
+export function paceClause(p: ProjectStatus): string {
+  const n = (v: number) => Math.round(v).toLocaleString();
+  const passed = p.daysLeft !== null && p.daysLeft <= 0;
+  switch (p.verdict) {
+    case "done": return "";
+    case "on-track": return `${n(p.neededPerDay!)} a day needed, writing ${n(p.recentPerDay)}`;
+    case "behind": return passed ? `${n(p.remaining)} words to go, writing ${n(p.recentPerDay)} a day` : `${n(p.neededPerDay!)} a day needed, writing ${n(p.recentPerDay)}`;
+    case "stalled": return passed ? `${n(p.remaining)} words to go, nothing added this week` : p.neededPerDay !== null ? `nothing added this week; ${n(p.neededPerDay)} a day would still make it` : "nothing added this week";
+    case "no-deadline": return `writing ${n(p.recentPerDay)} a day`;
+  }
+}
+
+/** The dates a project has, each with its label. */
+export function paceDates(p: ProjectStatus): [string, Day][] {
+  const out: [string, Day][] = [];
+  if (p.projectedDay && p.verdict !== "done") out.push(["Projected", p.projectedDay]);
+  if (p.spec.deadline) out.push(["Deadline", p.spec.deadline]);
+  return out;
 }
 
 export function paceLine(p: ProjectStatus, locale?: string): string {

@@ -62,10 +62,12 @@ describe("DeskView progress", () => {
     const v = new DeskView(new WorkspaceLeaf(), { activeProfile: () => null, ...progress, log: () => log });
     v.refresh();
     const t = v.contentEl.textContent!;
-    expect(t).toContain("650 words");
-    expect(t).toContain("of 500");
-    expect(t).toContain("50 cut");
-    expect(t).toContain("Streak 1 day");
+    // The headline is the verdict; the count is the subline; the streak facts are one line.
+    expect(v.contentEl.querySelector(".czm-desk-verdict")!.textContent).toBe("Goal met");
+    expect(v.contentEl.querySelector(".czm-desk-pace-word")!.textContent).toBe("Done today");
+    expect(v.contentEl.querySelector(".czm-desk-today-sub")!.textContent).toBe("650 of 500 · 50 cut");
+    expect(v.contentEl.querySelector(".czm-desk-streak")!.textContent).toMatch(/^Streak 1 · best \d+ · week [\d,]+$/);
+    expect(v.contentEl.querySelector(".czm-desk-heat-head")!.textContent).toContain("2 of 78 days written");
     expect(v.contentEl.querySelector(".czm-desk-bar-fill.is-met")).not.toBeNull();
     expect(v.contentEl.querySelectorAll(".czm-desk-cell")).toHaveLength(12 * 7);
     expect(v.contentEl.querySelectorAll(".czm-desk-cell.is-future")).toHaveLength(6);
@@ -100,7 +102,13 @@ describe("DeskView projects", () => {
     expect(t).toContain("Projects");
     expect(t).toContain("7,000 / 10,000 · 70%");
     expect(t).toContain("On track");
-    expect(t).toMatch(/after the \S+ 3 Sep deadline|after the \S+ Sep 3 deadline/);
+    const paces = [...v.contentEl.querySelectorAll(".czm-desk-pace")];
+    expect(paces[0]!.classList.contains("is-on-track")).toBe(true);
+    expect(paces[0]!.querySelector(".czm-desk-pace-word")!.textContent).toBe("On track");
+    expect(paces[0]!.querySelector(".czm-desk-pace-clause")!.textContent).toContain("a day needed, writing 500");
+    expect(paces[1]!.querySelector(".czm-desk-pace-word")!.textContent).toBe("Behind");
+    expect([...v.contentEl.querySelectorAll(".czm-desk-date-label")].map((l) => l.textContent)).toEqual(["Projected", "Deadline", "Projected", "Deadline"]);
+    expect(t).toMatch(/Deadline\S+ (3 Sep|Sep 3)/);
     expect(t).not.toContain("2026-09-03");
     expect(v.contentEl.querySelectorAll(".czm-desk-project.is-behind")).toHaveLength(1);
     expect(v.contentEl.querySelectorAll(".czm-desk-project-daily")).toHaveLength(1);

@@ -191,12 +191,26 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 
 /* --- Writing desk: progress ------------------------------------------------ */
 .czm-desk-today { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.czm-desk-today-words { font-size: 1.6em; font-weight: 600; }
-.czm-desk-today-goal { opacity: 0.7; font-size: var(--font-ui-small); }
+.czm-desk-verdict { font-size: 1.6em; font-weight: 600; }
+.czm-desk-mono { font-family: var(--font-monospace); font-size: var(--font-ui-smaller); font-variant-numeric: tabular-nums; }
+.czm-desk-today-sub { color: var(--text-muted); }
+.czm-desk-pace-word { font-size: var(--font-ui-small); font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+.czm-desk-pace-word.is-done-today { color: var(--text-success); }
+.czm-desk-pace-word.is-halfway, .czm-desk-pace-word.is-under-way, .czm-desk-pace-word.is-writing { color: var(--text-normal); }
+.czm-desk-pace { display: flex; align-items: baseline; gap: 6px; font-size: var(--font-ui-small); margin-top: 2px; }
+.czm-desk-pace-dot { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); align-self: center; }
+.czm-desk-pace.is-on-track .czm-desk-pace-dot, .czm-desk-pace.is-done .czm-desk-pace-dot { background: var(--text-success); }
+.czm-desk-pace.is-behind .czm-desk-pace-dot { background: var(--text-warning); }
+.czm-desk-pace.is-on-track .czm-desk-pace-word, .czm-desk-pace.is-done .czm-desk-pace-word { color: var(--text-success); }
+.czm-desk-pace.is-behind .czm-desk-pace-word { color: var(--text-warning); }
+.czm-desk-pace-clause { color: var(--text-muted); }
+.czm-desk-date { display: flex; gap: 8px; color: var(--text-muted); }
+.czm-desk-date-label { display: inline-block; min-width: 6.5em; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.9em; }
+.czm-desk-heat-head { margin-top: 10px; }
 .czm-desk-bar { height: 6px; border-radius: 3px; background: var(--background-modifier-border); margin: 6px 0 4px; overflow: hidden; }
 .czm-desk-bar-fill { height: 100%; background: var(--interactive-accent); border-radius: 3px; }
 .czm-desk-bar-fill.is-met { background: var(--text-success); }
-.czm-desk-streak { display: flex; gap: 12px; font-size: var(--font-ui-small); opacity: 0.8; margin-bottom: 10px; }
+.czm-desk-streak { color: var(--text-muted); margin-bottom: 4px; }
 .czm-desk-heatmap { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 1fr); gap: 3px; margin: 6px 0 4px; }
 .czm-desk-cell { width: 11px; height: 11px; border-radius: 2px; background: var(--background-modifier-border); opacity: 0.6; }
 .czm-desk-cell.is-future { visibility: hidden; }

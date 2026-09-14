@@ -4,9 +4,9 @@
 
 ## Today
 
-Words **added** today against your **Daily word goal** (Settings → Goals; default 500), as a bar; words **cut** today shown separately. Deletions are tracked on their own so a revision day still counts as work: when cutting outweighs adding, the desk says *Revision day* and the streak counts it when the goal is 0.
+The headline is the decision, not the count: *120 to go* against your **Daily word goal** (Settings → Goals; default 500), or *Goal met*; a two-word verdict beside it (*Not started*, *Under way*, *Halfway*, *Done today*, *Revision day*); the count itself on the line beneath, *380 of 500 · 60 cut*, and the bar. Deletions are tracked on their own so a revision day still counts as work: when cutting outweighs adding, the desk says *Revision day* and the streak counts it when the goal is 0.
 
-Below: current streak, best streak, this week's total.
+Below, on one line: the current streak, the best, this week's total.
 
 ## Heatmap
 
@@ -37,7 +37,7 @@ The note's headings, each with its word count (bar-scaled to the longest scene),
 
 ## Projects
 
-Each project declared in front matter with its total, target, percentage, pace line and — if it has a daily goal — today's words and its own streak. See [Projects](/guide/projects).
+Each project declared in front matter reads as a column: its name, the total against the target in figures that line up, the bar, one verdict with a dot (*On track* in green, *Behind* in amber, *Stalled* or *No deadline* in grey, *Deadline passed*) followed by one clause on the pace, then the dates on their own labelled lines, *Projected* and *Deadline*, so a projection is never mistaken for a deadline the plugin knows about. A project with a daily goal adds today's words and its own streak. See [Projects](/guide/projects).
 
 ## Where the log lives
 
