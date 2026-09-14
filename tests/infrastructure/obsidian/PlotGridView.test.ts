@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Menu, WorkspaceLeaf } from "obsidian";
-import { PLOT_GRID_VIEW_TYPE, PlotGridView, actOf, type PlotGridSource } from "../../../src/infrastructure/obsidian/views/PlotGridView";
+import { PLOT_GRID_VIEW_TYPE, PlotGridView, ROW_CHUNK, actOf, type PlotGridSource } from "../../../src/infrastructure/obsidian/views/PlotGridView";
 import { buildStoryGraph, type ProjectNote } from "../../../src/domain/story/BuildGraph";
 import { buildPlotGrid } from "../../../src/domain/plot/PlotGrid";
 import { buildThreads } from "../../../src/domain/threads/BuildThreads";
@@ -70,6 +70,7 @@ function open(overrides: Partial<PlotGridSource> = {}, threads = threadsNote) {
     updateGridSettings: (next) => { prefs = next; },
     sentences: async (_p, scene) => { calls.writes.push(`sentences ${scene.title}`); return scene.title === "Camp" ? ["Marta woke before Ilse at the gate of Lisbon."] : scene.title === "Return" ? ["Marta came back to Lisbon.", "The gate of Lisbon was shut."] : []; },
     snapshot: async () => { calls.writes.push("snapshot"); return "Novel/Plot grid · 2026-09-13.md"; },
+    exportGrid: async () => { calls.writes.push("export"); return "Novel/Plot grid.md"; },
     openNote: (p) => { calls.opened.push(p); }, reveal: (r) => { calls.revealed.push(`${r.title}@${r.line}`); }, jumpTo: (to) => { calls.jumps.push(to); },
     settings: () => DEFAULT_STORY_MAP,
     threadsNotePath: () => "Novel/Story threads.md",
@@ -495,6 +496,32 @@ describe("PlotGridView", () => {
     expect(calls.writes.filter((w) => w === "propose")).toHaveLength(2);
     expect(calls.writes).toContain("readProject");
     expect(el.querySelectorAll(".czm-pg-proposal")).toHaveLength(3);
+  });
+
+  it("draws a long manuscript a chunk at a time, and draws up to a cell the keyboard asks for", async () => {
+    const chapters = Array.from({ length: 30 }, (_, c) => note(`Novel/Ch ${String(c + 1).padStart(2, "0")}.md`, Array.from({ length: 5 }, (_, i) => `# Scene ${c + 1}.${i + 1}\nMarta and Ilse walked on through the salt wind of Lisbon.\n`).join("\n")));
+    const big = [notes[0]!, notes[1]!, notes[2]!, ...chapters];
+    const { v } = open({ build: async () => buildPlotGrid(buildStoryGraph("Novel", big, file), buildThreads(buildStoryGraph("Novel", big, file), file, parseStoryThreads("## Subplot: Salt\n- [[Ch 30#Scene 30.5]] — the end\n"), new Set()), {}) });
+    await v.onOpen();
+    const el = v.contentEl;
+    expect(el.querySelector(".czm-shell-state-text")?.textContent).toContain("150 scenes");
+    expect(el.querySelectorAll(".czm-pg-scene")).toHaveLength(ROW_CHUNK);
+    el.querySelector<HTMLElement>('.czm-pg-cell[data-col="0"][data-row="0"]')!.click();
+    el.querySelector<HTMLElement>('.czm-pg-cell[data-col="0"][data-row="0"]')!.dispatchEvent(new KeyboardEvent("keydown", { key: "End", bubbles: true }));
+    v.run("next-issue");
+    // Nothing is broken, so the selection stays; PageDown ten at a time reaches past the first chunk and draws it.
+    for (let i = 0; i < 7; i++) el.querySelector<HTMLElement>(".czm-pg-cell.is-selected")!.dispatchEvent(new KeyboardEvent("keydown", { key: "PageDown", bubbles: true }));
+    expect(el.querySelector(".czm-pg-cell.is-selected")?.getAttribute("data-row")).toBe("70");
+    expect(el.querySelectorAll(".czm-pg-scene").length).toBeGreaterThanOrEqual(71);
+  });
+
+  it("exports the grid as an undated note", async () => {
+    const { v, calls } = open();
+    await v.onOpen();
+    v.run("export");
+    await new Promise((r) => setTimeout(r, 20));
+    expect(calls.writes).toContain("export");
+    expect(v.contentEl.querySelector(".czm-map-status")?.textContent).toBe("Wrote Plot grid.mdOpen");
   });
 
   it("lists its keys behind ? and closes the list again", async () => {

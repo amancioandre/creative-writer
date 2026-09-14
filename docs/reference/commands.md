@@ -36,6 +36,7 @@ All commands appear in the palette under **Creative Writer:**. None has a defaul
 | **Plot grid: next broken anchor** / **previous broken anchor** | Live while the grid is the active tab. |
 | **Plot grid: pick a sentence as the anchor** | Live while the grid is the active tab, with a cell selected. |
 | **Plot grid: snapshot the grid** | Live while the grid is the active tab. Writes `Plot grid · <date>.md` beside the project. |
+| **Plot grid: export the grid to a note** | Live while the grid is the active tab. Writes `Plot grid.md` beside the project, refreshed on every export. |
 | **Plot grid: read every column with the model** / **read this column with the model** / **check this column against the draft** | Live while the grid is the active tab. The model leaves readings; you answer them. |
 | **Plot grid: dismiss the reading** | Live while the grid is the active tab, with a cell that has a reading selected. |
 | **Plot grid: propose columns with the model** | Live while the grid is the active tab. One call over the events the map holds; the proposals wait in the side column for a tick. |

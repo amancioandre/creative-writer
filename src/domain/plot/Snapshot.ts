@@ -5,10 +5,10 @@ import type { GridCell, PlotGrid } from "./PlotGrid";
 /** Front matter flag on a snapshot, so the plugin never reads its own table back as a chapter. */
 export const GRID_SNAPSHOT_FLAG = "creative-writer-grid-snapshot";
 
-/** `Plot grid · 2026-09-13.md` beside the project's notes. */
-export function snapshotPath(project: ProjectSpec, day: string): string {
+/** `Plot grid · 2026-09-13.md` beside the project's notes; `Plot grid.md` for the undated export that is refreshed in place. */
+export function snapshotPath(project: ProjectSpec, day: string | null): string {
   const folder = project.scope.endsWith("/") || project.scope === "" ? project.scope : project.scope.slice(0, project.scope.lastIndexOf("/") + 1);
-  return `${folder}Plot grid · ${day}.md`;
+  return `${folder}Plot grid${day ? ` · ${day}` : ""}.md`;
 }
 
 /**
@@ -17,7 +17,7 @@ export function snapshotPath(project: ProjectSpec, day: string): string {
  * role and a ✓ where the anchor was found. Two snapshots side by side are
  * the outline against the draft.
  */
-export function snapshotNote(grid: PlotGrid, project: ProjectSpec, day: string): string {
+export function snapshotNote(grid: PlotGrid, project: ProjectSpec, day: string | null): string {
   const columns = grid.columns;
   const head = ["Scene", "Words", ...columns.map((c) => c.heading.name)];
   const lines = [
@@ -25,7 +25,7 @@ export function snapshotNote(grid: PlotGrid, project: ProjectSpec, day: string):
     "creative-writer: false",
     `${GRID_SNAPSHOT_FLAG}: 1`,
     "---",
-    `%% ${project.name}: the plot grid on ${day}, written by Creative Writer from Story threads.md. A snapshot: ${grid.rows.length} scenes, ${columns.length} columns, ${grid.filled} cells filled, ${grid.verified} verified, ${grid.broken} broken. Never read back; delete it freely. %%`,
+    `%% ${project.name}: the plot grid${day ? ` on ${day}` : ""}, written by Creative Writer from Story threads.md. ${day ? "A snapshot" : "An export, refreshed on every export"}: ${grid.rows.length} scenes, ${columns.length} columns, ${grid.filled} cells filled, ${grid.verified} verified, ${grid.broken} broken. Never read back; delete it freely. %%`,
     "",
     `| ${head.map(cellText).join(" | ")} |`,
     `| ${head.map((_, i) => (i === 1 ? "---:" : "---")).join(" | ")} |`,

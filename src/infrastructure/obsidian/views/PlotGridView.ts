@@ -48,6 +48,8 @@ export interface PlotGridSource {
   sentences(project: ProjectSpec, scene: SceneRef): Promise<string[]>;
   /** Writes the grid as a dated table beside the project; resolves to the path written. */
   snapshot(project: ProjectSpec): Promise<string>;
+  /** The same table as `Plot grid.md`, refreshed in place: for a print or a spreadsheet. */
+  exportGrid(project: ProjectSpec): Promise<string>;
   /** The model reads one column, scene by scene, writing readings the writer will answer. Resolves to how many scenes were read. */
   readColumn(project: ProjectSpec, column: GridColumn, signal: AbortSignal, onProgress: (p: AnalyzeProgress) => void): Promise<number>;
   /** The model checks a column's plans against the draft. */
@@ -78,7 +80,10 @@ export function sceneLink(ref: SceneRef): string {
 
 interface Selection { readonly col: number; readonly row: number }
 
-export type PlotGridAction = "clear-search" | "toggle-cast" | "open-note" | "toggle-panel" | "new-column" | "fold-arcs" | "fold-themes" | "fold-subplots" | "fold-threads" | "hide-column" | "show-hidden" | "focus-search" | "help" | "toggle-unmoved" | "audit" | "snapshot" | "next-issue" | "previous-issue" | "anchor" | "read-column" | "check-column" | "read-all" | "dismiss-reading" | "stop-reading" | "propose-columns";
+export type PlotGridAction = "clear-search" | "toggle-cast" | "open-note" | "toggle-panel" | "new-column" | "fold-arcs" | "fold-themes" | "fold-subplots" | "fold-threads" | "hide-column" | "show-hidden" | "focus-search" | "help" | "toggle-unmoved" | "audit" | "snapshot" | "next-issue" | "previous-issue" | "anchor" | "read-column" | "check-column" | "read-all" | "dismiss-reading" | "stop-reading" | "propose-columns" | "export";
+
+/** Rows are drawn this many at a time; past the first chunk, the next is drawn as the last row comes into view. */
+export const ROW_CHUNK = 60;
 
 /** The keys of the grid, as `?` lists them: the loop a writer runs all day. Folds, hiding and the search are commands, bindable in Settings → Hotkeys. */
 export const KEY_HELP: readonly (readonly [string, string])[] = [
@@ -126,6 +131,10 @@ export class PlotGridView extends ItemView {
   private running: { controller: AbortController; column: GridColumn | null; what: string } | null = null;
   /** The model's proposals, with the writer's ticks, until they are added or put away. */
   private proposals: { list: ColumnProposal[]; picked: Set<string> } | null = null;
+  /** How many rows are in the table so far, and what draws the next chunk. */
+  private drawn = 0;
+  private drawMore: ((upTo?: number) => void) | null = null;
+  private sentinel: IntersectionObserver | null = null;
   private editing = false;
   private generation = 0;
   private shell: PanelShell | null = null;
@@ -241,6 +250,7 @@ export class PlotGridView extends ItemView {
       { label: "Audit view", icon: "scan-search", command: "plot-grid-audit", checked: this.audit, onClick: () => this.run("audit") },
       { label: "Next broken anchor", command: "plot-grid-next-issue", disabled: this.grid.broken === 0, onClick: () => this.run("next-issue") },
       { label: "Snapshot the grid", icon: "camera", command: "plot-grid-snapshot", disabled: !this.project, onClick: () => this.run("snapshot") },
+      { label: "Export the grid to a note", icon: "file-output", command: "plot-grid-export", disabled: !this.project, onClick: () => this.run("export") },
       "-",
       { label: this.running ? `Stop ${this.running.what}` : "Read every column with the model…", icon: "sparkles", command: "plot-grid-read-all", disabled: !this.project, onClick: () => this.run(this.running ? "stop-reading" : "read-all") },
       { label: "Propose columns…", icon: "list-plus", command: "plot-grid-propose-columns", disabled: !this.project || !!this.running, onClick: () => this.run("propose-columns") },
@@ -277,6 +287,7 @@ export class PlotGridView extends ItemView {
       case "toggle-unmoved": this.save({ unmoved: !this.settings.unmoved }); this.renderTable(); break;
       case "audit": this.audit = !this.audit; this.renderTable(); if (this.selection) this.select(this.selection, false); break;
       case "snapshot": void this.snapshot(); break;
+      case "export": void this.snapshot(false); break;
       case "next-issue": this.walk(1); break;
       case "previous-issue": this.walk(-1); break;
       case "anchor": void this.openPicker(); break;
@@ -391,11 +402,11 @@ export class PlotGridView extends ItemView {
     this.status?.say("No readings awaiting you, and no broken anchors.");
   }
 
-  private async snapshot(): Promise<void> {
+  private async snapshot(dated = true): Promise<void> {
     const project = this.project;
     if (!project) return;
     let path: string;
-    try { path = await this.source.snapshot(project); } catch (e) { this.status?.fail(couldNot("write the snapshot", e)); return; }
+    try { path = dated ? await this.source.snapshot(project) : await this.source.exportGrid(project); } catch (e) { this.status?.fail(couldNot(dated ? "write the snapshot" : "export the grid", e)); return; }
     this.status?.action(`Wrote ${basenameOf(path)}.md`, "Open", () => this.source.openNote(path));
   }
 
@@ -511,27 +522,48 @@ export class PlotGridView extends ItemView {
     if (this.castExpanded) this.renderCastNames(table, columns.length, cast, settings);
     const tbody = table.createEl("tbody");
     const span = 3 + columns.length + (this.castExpanded ? Math.max(1, cast.length) : 1) + 1;
+    const scope = this.project.scope;
     let lastPath = "", lastAct = "";
-    for (const row of rows) {
-      const act = actOf(row.scene.path, this.project.scope);
-      if (act !== lastAct) {
-        lastAct = act;
-        if (act) tbody.createEl("tr", { cls: "czm-pg-act" }).createEl("th", { text: act, attr: { colspan: String(span), scope: "rowgroup" } });
+    this.drawn = 0;
+    this.sentinel?.disconnect(); this.sentinel = null;
+    // A long manuscript is drawn a chunk at a time: the first sixty rows now, the next sixty as the last one scrolls into view.
+    const draw = (upTo: number) => {
+      for (let i = this.drawn; i < Math.min(upTo, rows.length); i++) {
+        const row = rows[i]!;
+        const act = actOf(row.scene.path, scope);
+        if (act !== lastAct) {
+          lastAct = act;
+          if (act) tbody.createEl("tr", { cls: "czm-pg-act" }).createEl("th", { text: act, attr: { colspan: String(span), scope: "rowgroup" } });
+        }
+        if (row.scene.path !== lastPath) {
+          lastPath = row.scene.path;
+          const tr = tbody.createEl("tr", { cls: "czm-pg-note" });
+          const th = tr.createEl("th", { attr: { colspan: String(span), scope: "rowgroup" } });
+          const link = th.createSpan({ text: basenameOf(row.scene.path), cls: "is-link" });
+          onActivate(link, () => this.source.openNote(row.scene.path));
+          // The one structural question the row can answer: how much of the book, and how much of the cast, this chapter holds.
+          const chapter = rows.filter((r) => r.scene.path === row.scene.path);
+          const words = chapter.reduce((n, r) => n + r.words, 0);
+          const names = new Set(chapter.flatMap((r) => r.present).filter((id) => cast.some((c) => c.id === id))).size;
+          th.createSpan({ text: `${plural(chapter.length, "scene")} · ${words.toLocaleString()} words · ${names} of the cast`, cls: "czm-pg-note-total" });
+        }
+        this.renderRow(tbody, row, columns, cast, settings);
+        this.drawn = i + 1;
       }
-      if (row.scene.path !== lastPath) {
-        lastPath = row.scene.path;
-        const tr = tbody.createEl("tr", { cls: "czm-pg-note" });
-        const th = tr.createEl("th", { attr: { colspan: String(span), scope: "rowgroup" } });
-        const link = th.createSpan({ text: basenameOf(row.scene.path), cls: "is-link" });
-        onActivate(link, () => this.source.openNote(row.scene.path));
-        // The one structural question the row can answer: how much of the book, and how much of the cast, this chapter holds.
-        const chapter = rows.filter((r) => r.scene.path === row.scene.path);
-        const words = chapter.reduce((n, r) => n + r.words, 0);
-        const names = new Set(chapter.flatMap((r) => r.present).filter((id) => cast.some((c) => c.id === id))).size;
-        th.createSpan({ text: `${plural(chapter.length, "scene")} · ${words.toLocaleString()} words · ${names} of the cast`, cls: "czm-pg-note-total" });
+      this.sentinel?.disconnect(); this.sentinel = null;
+      const last = tbody.lastElementChild;
+      if (this.drawn < rows.length && last && typeof IntersectionObserver !== "undefined") {
+        this.sentinel = new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting)) draw(this.drawn + ROW_CHUNK); }, { root: wrap });
+        this.sentinel.observe(last);
       }
-      this.renderRow(tbody, row, columns, cast, settings);
-    }
+    };
+    this.drawMore = (upTo?: number) => draw(upTo ?? this.drawn + ROW_CHUNK);
+    draw(rows.length > ROW_CHUNK + 20 ? ROW_CHUNK : rows.length);
+  }
+
+  /** Draws the rows up to and including one that is not on the table yet, so a selection or a walk can land on it. */
+  private ensureRow(row: number): void {
+    if (row >= this.drawn && this.drawMore) this.drawMore(row + 1);
   }
 
   private renderRow(tbody: HTMLElement, row: GridRow, columns: readonly GridColumn[], cast: readonly Entity[], settings: StoryMapSettings): void {
@@ -734,6 +766,7 @@ export class PlotGridView extends ItemView {
   select(at: Selection, focus = true): void {
     if (this.editing) return;
     if (at.col < 0 || at.row < 0 || at.col >= this.shown.length || at.row >= this.rows.length) return;
+    this.ensureRow(at.row);
     const prev = this.selection ? this.cellEl(this.selection) : null;
     prev?.classList.remove("is-selected"); prev?.setAttribute("aria-selected", "false"); prev?.setAttribute("tabindex", "-1");
     this.selection = at;

@@ -469,6 +469,7 @@ export default class CreativeZenModePlugin extends Plugin {
         return prose.split(/\n\s*\n/).flatMap((para) => segmenter.segment(para).map((s) => s.text.trim())).filter(Boolean);
       },
       snapshot: (project) => snapshotPlotGrid.execute(project),
+      exportGrid: (project) => snapshotPlotGrid.execute(project, false),
       readColumn: async (project, column, signal, onProgress) => {
         const { graph } = await buildPlotGrid.executeWithGraph(project);
         return new ReadColumn(projectNotes, storyRepo, this.columnAnalyser()).execute(project, column, graph, signal, onProgress);
@@ -498,7 +499,7 @@ export default class CreativeZenModePlugin extends Plugin {
       ["plot-grid-fold-arcs", "fold-arcs"], ["plot-grid-fold-themes", "fold-themes"], ["plot-grid-fold-subplots", "fold-subplots"], ["plot-grid-fold-threads", "fold-threads"],
       ["plot-grid-hide-column", "hide-column"], ["plot-grid-show-hidden", "show-hidden"], ["plot-grid-toggle-unmoved", "toggle-unmoved"], ["plot-grid-focus-search", "focus-search"], ["plot-grid-help", "help"],
       ["plot-grid-audit", "audit"], ["plot-grid-snapshot", "snapshot"], ["plot-grid-next-issue", "next-issue"], ["plot-grid-previous-issue", "previous-issue"], ["plot-grid-anchor", "anchor"],
-      ["plot-grid-read-all", "read-all"], ["plot-grid-read-column", "read-column"], ["plot-grid-check-column", "check-column"], ["plot-grid-dismiss-reading", "dismiss-reading"], ["plot-grid-propose-columns", "propose-columns"],
+      ["plot-grid-read-all", "read-all"], ["plot-grid-read-column", "read-column"], ["plot-grid-check-column", "check-column"], ["plot-grid-dismiss-reading", "dismiss-reading"], ["plot-grid-propose-columns", "propose-columns"], ["plot-grid-export", "export"],
     ]);
     this.registerView(STORY_THREADS_VIEW_TYPE, (leaf: WorkspaceLeaf) => new StoryThreadsView(leaf, {
       projects: storySource.projects,

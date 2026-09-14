@@ -19,6 +19,8 @@ describe("snapshot", () => {
   it("is a dated table beside the project, flagged so it is never read back, pipes escaped", () => {
     expect(snapshotPath(novel, "2026-09-13")).toBe("Novel/Plot grid · 2026-09-13.md");
     expect(snapshotPath({ ...novel, scope: "Novel/Novel.md" }, "2026-09-13")).toBe("Novel/Plot grid · 2026-09-13.md");
+    expect(snapshotPath(novel, null)).toBe("Novel/Plot grid.md");
+    expect(snapshotNote(grid, novel, null)).toContain("An export, refreshed on every export");
     const md = snapshotNote(grid, novel, "2026-09-13");
     expect(md.startsWith(`---\ncreative-writer: false\n${GRID_SNAPSHOT_FLAG}: 1\n---\n`)).toBe(true);
     expect(md).toContain("2 scenes, 2 columns, 2 cells filled, 1 verified, 1 broken");

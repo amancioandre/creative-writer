@@ -14,5 +14,6 @@ describe("SnapshotPlotGrid", () => {
     expect(await use.execute(novel)).toBe("Novel/Plot grid · 2026-09-13.md");
     expect(written[0]![0]).toBe("Novel/Plot grid · 2026-09-13.md");
     expect(written[0]![1]).toContain("creative-writer-grid-snapshot: 1");
+    expect(await use.execute(novel, false)).toBe("Novel/Plot grid.md");
   });
 });
