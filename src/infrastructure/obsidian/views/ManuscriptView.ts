@@ -900,8 +900,19 @@ export class ManuscriptView extends ItemView {
     if (voice) this.renderVoice(pop, el, ref, index);
     for (const r of pop.querySelectorAll<HTMLElement>(".czm-ms-cm-row")) r.tabIndex = -1;
     pop.hidden = false;
-    // Beside the page in the margin when there is room, else under the paragraph; never past the bottom.
-    const r = el.getBoundingClientRect(), b = body.getBoundingClientRect(), p = page.getBoundingClientRect();
+    const b = body.getBoundingClientRect(), p = page.getBoundingClientRect();
+    // A speaker box sits right under the sentence it is about (its first line), on the text, and flips above when the bottom is near.
+    const sentence = voice ? el.querySelector<HTMLElement>(`[data-czm-span="${index}"]`) : null;
+    const line = sentence?.getClientRects()[0];
+    if (line) {
+      const left = Math.max(0, Math.min(line.left - b.left, body.clientWidth - pop.offsetWidth - 8));
+      let top = line.bottom - b.top + body.scrollTop + 4;
+      if (top + pop.offsetHeight > body.scrollTop + body.clientHeight && body.clientHeight > 0) top = Math.max(0, line.top - b.top + body.scrollTop - pop.offsetHeight - 4);
+      pop.setCssStyles({ left: `${left}px`, top: `${top}px`, maxWidth: "360px" });
+      return;
+    }
+    // A comment box: beside the page in the margin when there is room, else under the paragraph; never past the bottom.
+    const r = el.getBoundingClientRect();
     const room = b.right - p.right;
     const top = r.top - b.top + body.scrollTop;
     if (room >= 240) pop.setCssStyles({ left: `${p.right - b.left + 8}px`, top: `${top}px`, maxWidth: `${Math.min(360, room - 16)}px` });
