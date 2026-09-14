@@ -10,6 +10,7 @@ import { KIND_LABEL } from "./StoryMapView";
 import { PanelShell, showOverflow, type MenuEntry, type PanelId } from "./PanelShell";
 import { COLUMN_KINDS } from "../../../domain/threads/StoryThreadsNote";
 import { rankSentences } from "../../../domain/plot/Snapshot";
+import type { AnalyzeProgress } from "../../../application/use-cases/AnalyzeSceneRelations";
 import { StatusLine, couldNot } from "./StatusLine";
 import { inField, onActivate } from "./keys";
 
@@ -45,6 +46,15 @@ export interface PlotGridSource {
   sentences(project: ProjectSpec, scene: SceneRef): Promise<string[]>;
   /** Writes the grid as a dated table beside the project; resolves to the path written. */
   snapshot(project: ProjectSpec): Promise<string>;
+  /** The model reads one column, scene by scene, writing readings the writer will answer. Resolves to how many scenes were read. */
+  readColumn(project: ProjectSpec, column: GridColumn, signal: AbortSignal, onProgress: (p: AnalyzeProgress) => void): Promise<number>;
+  /** The model checks a column's plans against the draft. */
+  checkColumn(project: ProjectSpec, column: GridColumn, signal: AbortSignal, onProgress: (p: AnalyzeProgress) => void): Promise<number>;
+  /** The writer's no to a reading: remembered, skipped until the scene changes. */
+  dismissReading(project: ProjectSpec, scene: SceneRef, column: string): Promise<void>;
+  dismissColumnReadings(project: ProjectSpec, column: string): Promise<void>;
+  /** What the model is, for the head: "Ollama · qwen2.5:7b", "Claude · claude-haiku-4-5", or "" when off. */
+  modelLabel(): string;
   /** Opens a sibling panel, for the same project where the panel takes one. */
   jumpTo(to: PanelId, project: ProjectSpec | null): void;
 }
@@ -62,7 +72,7 @@ export function sceneLink(ref: SceneRef): string {
 
 interface Selection { readonly col: number; readonly row: number }
 
-export type PlotGridAction = "clear-search" | "toggle-cast" | "open-note" | "toggle-panel" | "new-column" | "fold-arcs" | "fold-themes" | "fold-subplots" | "fold-threads" | "hide-column" | "show-hidden" | "focus-search" | "help" | "toggle-unmoved" | "audit" | "snapshot" | "next-issue" | "previous-issue" | "anchor";
+export type PlotGridAction = "clear-search" | "toggle-cast" | "open-note" | "toggle-panel" | "new-column" | "fold-arcs" | "fold-themes" | "fold-subplots" | "fold-threads" | "hide-column" | "show-hidden" | "focus-search" | "help" | "toggle-unmoved" | "audit" | "snapshot" | "next-issue" | "previous-issue" | "anchor" | "read-column" | "check-column" | "read-all" | "dismiss-reading" | "stop-reading";
 
 /** The keys of the grid, as `?` lists them: the loop a writer runs all day. Folds, hiding and the search are commands, bindable in Settings → Hotkeys. */
 export const KEY_HELP: readonly (readonly [string, string])[] = [
@@ -73,7 +83,8 @@ export const KEY_HELP: readonly (readonly [string, string])[] = [
   ["Shift + Enter", "Editing: a new line"],
   ["Delete", "Take the stop out, with Undo"],
   ["\"", "Anchor: pick a sentence of the scene; on a broken stop, the near matches first"],
-  ["n · p", "Next and previous broken anchor"],
+  ["n · p", "Next and previous reading awaiting you, or broken anchor"],
+  ["x", "Dismiss the reading in the cell"],
   ["o", "Open the scene, at the anchor when there is one"],
   ["v", "Audit view: every cell by its state, every header by its count"],
   ["?", "This list"],
@@ -105,6 +116,8 @@ export class PlotGridView extends ItemView {
   private audit = false;
   /** The anchor picker's sentences, once asked for; keyed by scene. */
   private picker: { key: string; sentences: string[] } | null = null;
+  /** A model pass in flight, with the column it reads and what to call it. */
+  private running: { controller: AbortController; column: GridColumn | null; what: string } | null = null;
   private editing = false;
   private generation = 0;
   private shell: PanelShell | null = null;
@@ -186,7 +199,22 @@ export class PlotGridView extends ItemView {
     this.search = search;
     // The field stays put and keeps its caret; only the table under it is redrawn, once the typing pauses.
     search.addEventListener("input", () => { this.query = search.value; if (this.searchTimer !== null) window.clearTimeout(this.searchTimer); this.searchTimer = window.setTimeout(() => { this.searchTimer = null; this.renderTable(); }, SEARCH_DEBOUNCE_MS); });
+    this.renderTools();
     this.renderTable();
+  }
+
+  /** The head's one model tool: Read… for every column, or Stop while a pass runs. */
+  private renderTools(): void {
+    const shell = this.shell;
+    if (!shell) return;
+    shell.tools.empty();
+    if (this.running) {
+      const stop = shell.tools.createEl("button", { text: "Stop", cls: "czm-shell-reset czm-pg-stop", attr: { "aria-label": `Stop ${this.running.what}` } });
+      stop.addEventListener("click", () => this.run("stop-reading"));
+      return;
+    }
+    const model = this.source.modelLabel();
+    shell.tool("sparkles", model ? `Read every column with the model (${model})` : "Read… needs a model: set one in Creative Writer settings", () => this.run("read-all"), false).addClass("czm-pg-read-all");
   }
 
   private menu(): readonly (MenuEntry | "-")[] {
@@ -205,6 +233,11 @@ export class PlotGridView extends ItemView {
       { label: "Audit view", icon: "scan-search", command: "plot-grid-audit", checked: this.audit, onClick: () => this.run("audit") },
       { label: "Next broken anchor", command: "plot-grid-next-issue", disabled: this.grid.broken === 0, onClick: () => this.run("next-issue") },
       { label: "Snapshot the grid", icon: "camera", command: "plot-grid-snapshot", disabled: !this.project, onClick: () => this.run("snapshot") },
+      "-",
+      { label: this.running ? `Stop ${this.running.what}` : "Read every column with the model…", icon: "sparkles", command: "plot-grid-read-all", disabled: !this.project, onClick: () => this.run(this.running ? "stop-reading" : "read-all") },
+      { label: "Read this column with the model…", command: "plot-grid-read-column", disabled: !this.current() || !!this.running, onClick: () => this.run("read-column") },
+      { label: "Check this column against the draft…", command: "plot-grid-check-column", disabled: !this.current() || !!this.running, onClick: () => this.run("check-column") },
+      { label: "Dismiss the reading", command: "plot-grid-dismiss-reading", disabled: !this.selected?.cell.reading, onClick: () => this.run("dismiss-reading") },
       "-",
       { label: "Toggle panel", icon: "sliders-horizontal", command: "plot-grid-toggle-panel", checked: this.panelOpen, onClick: () => this.run("toggle-panel") },
       { label: "Find a column", icon: "search", command: "plot-grid-focus-search", onClick: () => this.run("focus-search") },
@@ -238,7 +271,46 @@ export class PlotGridView extends ItemView {
       case "next-issue": this.walk(1); break;
       case "previous-issue": this.walk(-1); break;
       case "anchor": void this.openPicker(); break;
+      case "read-column": { const c = this.current(); if (c) void this.readColumns([c], "reading"); break; }
+      case "check-column": { const c = this.current(); if (c) void this.readColumns([c], "checking"); break; }
+      case "read-all": void this.readColumns(this.grid.columns.filter((c) => c.special !== "pov" && c.special !== "time"), "reading"); break;
+      case "dismiss-reading": void this.dismissReading(); break;
+      case "stop-reading": this.running?.controller.abort(); break;
     }
+  }
+
+  /** One pass over the given columns: the state line counts scenes, Stop aborts, and nothing is lost on stop. */
+  private async readColumns(columns: readonly GridColumn[], what: "reading" | "checking"): Promise<void> {
+    const project = this.project;
+    if (!project || this.running || !columns.length) return;
+    if (!this.source.modelLabel()) { this.status?.fail("Reading needs a model: set Model to Local (Ollama) or Claude in Creative Writer settings."); return; }
+    const controller = new AbortController();
+    this.running = { controller, column: columns.length === 1 ? columns[0]! : null, what: what === "reading" ? "reading" : "checking" };
+    this.renderTools();
+    let read = 0;
+    try {
+      for (const column of columns) {
+        if (controller.signal.aborted) break;
+        const onProgress = (p: AnalyzeProgress) => { this.status?.hold(`${what === "reading" ? "Reading" : "Checking"} scene ${p.done} of ${p.total} for ${column.heading.name}…`); };
+        read += what === "reading" ? await this.source.readColumn(project, column, controller.signal, onProgress) : await this.source.checkColumn(project, column, controller.signal, onProgress);
+      }
+      this.running = null;
+      await this.show(project, true);
+      const open = this.grid.readings;
+      this.status?.say(controller.signal.aborted ? `Stopped after ${plural(read, "scene")}; what landed is kept.` : `${what === "reading" ? "Read" : "Checked"} ${plural(read, "scene")} · ${open ? `${plural(open, "reading")} awaiting you` : "nothing new for these columns"}.`);
+    } catch (e) {
+      this.running = null;
+      this.renderTools();
+      this.status?.fail(couldNot(what === "reading" ? "read the column" : "check the column", e));
+    }
+  }
+
+  private async dismissReading(): Promise<void> {
+    const sel = this.selected, project = this.project;
+    if (!sel || !project || !sel.cell.reading) return;
+    try { await this.source.dismissReading(project, sel.row.scene, sel.column.heading.heading); } catch (e) { this.status?.fail(couldNot("dismiss the reading", e)); return; }
+    await this.show(project, true);
+    this.status?.say(`Reading dismissed: ${sel.column.heading.name} at ${sel.row.scene.title || basenameOf(sel.row.scene.path)}. It stays dismissed until the scene changes.`);
   }
 
   /** The next or previous cell in reading order whose anchor is broken; wraps around, says so when there is none. */
@@ -251,9 +323,9 @@ export class PlotGridView extends ItemView {
       const at = ((start + step * i) % total + total) % total;
       const col = at % cols, row = Math.floor(at / cols);
       const cell = this.shown[col]!.cells[this.rows[row]!.index]!;
-      if (cell.state === "broken") { this.select({ col, row }); return; }
+      if (cell.state === "broken" || (cell.reading && !cell.reading.stale)) { this.select({ col, row }); return; }
     }
-    this.status?.say("No broken anchors.");
+    this.status?.say("No readings awaiting you, and no broken anchors.");
   }
 
   private async snapshot(): Promise<void> {
@@ -328,9 +400,10 @@ export class PlotGridView extends ItemView {
       .filter((e) => !q || e.name.toLowerCase().includes(q) || e.aliases.some((a) => a.toLowerCase().includes(q)));
     const unknown = grid.unknownPrefixes.length ? ` · ${grid.unknownPrefixes.length} heading${grid.unknownPrefixes.length === 1 ? "" : "s"} not read as a kind (${grid.unknownPrefixes.map((p) => `${p}:`).join(", ")})` : "";
     const hid = this.hidden.length ? ` · ${this.hidden.length} hidden` : "";
+    const awaiting = grid.readings ? ` · ${plural(grid.readings, "reading")} awaiting you` : "";
     root.classList.toggle("is-audit", this.audit);
     const auditLine = this.audit ? `${plural(grid.cells, "cell")} · ${grid.filled} filled · ${grid.verified} verified · ${grid.broken} broken` : `${rows.length} scene${rows.length === 1 ? "" : "s"} · ${plural(columns.length, "column")} · ${cast.length} in the cast`;
-    shell.setState(`${auditLine}${hid}${q ? ` · “${this.query.trim()}”` : ""}${unknown}`, q ? { label: "Clear", cls: "czm-pg-clear", onClick: () => { this.clearSearch(); } } : this.hidden.length ? { label: "Show hidden", cls: "czm-pg-show-hidden", onClick: () => this.run("show-hidden") } : null);
+    shell.setState(`${auditLine}${awaiting}${hid}${q ? ` · “${this.query.trim()}”` : ""}${unknown}`, q ? { label: "Clear", cls: "czm-pg-clear", onClick: () => { this.clearSearch(); } } : this.hidden.length ? { label: "Show hidden", cls: "czm-pg-show-hidden", onClick: () => this.run("show-hidden") } : null);
     this.renderSide();
     if (rows.length === 0) { shell.empty("No scenes yet — headings become scenes, with prose under them or not."); return; }
     this.renderKey(cast);
@@ -436,8 +509,9 @@ export class PlotGridView extends ItemView {
     const selected = this.selection?.col === at.col && this.selection?.row === at.row;
     const stop = cell.stop;
     const unmoved = !stop && cell.presentUnmoved && column.armed && this.settings.unmoved;
+    const reading = cell.reading;
     const el = td.createDiv({
-      cls: `czm-pg-cell is-${stop ? cell.state : "empty"}${unmoved ? " is-unmoved" : ""}${selected ? " is-selected" : ""}`,
+      cls: `czm-pg-cell is-${stop ? cell.state : "empty"}${unmoved ? " is-unmoved" : ""}${reading ? ` has-reading${reading.stale ? " is-stale" : ""}` : ""}${selected ? " is-selected" : ""}`,
       attr: { role: "button", tabindex: selected || (!this.selection && at.col === 0 && at.row === 0) ? "0" : "-1", "data-col": String(at.col), "data-row": String(at.row), "aria-selected": String(selected), "aria-label": stop ? `${where}: ${stop.role && stop.role !== "touch" ? `${stop.role}, ` : ""}${stop.note || stop.quote || ""}` : unmoved ? `${where}: ${column.entity?.name ?? "the character"} is on the page, unmoved` : `${where}: empty` },
     });
     if (stop && column.special === "pov") {
@@ -454,6 +528,12 @@ export class PlotGridView extends ItemView {
       else if (cell.state === "verified") el.title = `“${stop.quote}”`;
     } else if (unmoved) {
       el.createSpan({ text: "present, unmoved", cls: "czm-pg-unmoved" });
+    }
+    // A reading is a note in the cell's corner, never its text: the writer writes the cell, and the reading is the placeholder when they do.
+    if (reading) {
+      const glyph = el.createSpan({ cls: "czm-pg-reading-glyph", attr: { title: reading.stale ? `The model read this scene before it changed: “${reading.text}”` : `${reading.kind === "check" ? "Checked" : "The model read"}: ${reading.text}` } });
+      setIcon(glyph, reading.kind === "check" ? (reading.evidence ? "check" : "circle-help") : "sparkles");
+      el.setAttribute("aria-label", `${el.getAttribute("aria-label") ?? where}. ${reading.stale ? "A stale reading" : "A reading awaits you"}: ${reading.text}`);
     }
     // A click selects; a second click on the selected cell, or Enter, edits.
     el.addEventListener("click", () => { if (this.selection?.col === at.col && this.selection?.row === at.row) this.edit(); else this.select(at); });
@@ -503,6 +583,10 @@ export class PlotGridView extends ItemView {
       ...kindRows,
       "-",
       ...jobRows,
+      "-",
+      { label: "Read this column with the model…", icon: "sparkles", command: "plot-grid-read-column", disabled: !!this.running || c.special === "pov" || c.special === "time", onClick: () => void this.readColumns([c], "reading") },
+      { label: "Check this column against the draft…", command: "plot-grid-check-column", disabled: !!this.running || c.filled === 0, onClick: () => void this.readColumns([c], "checking") },
+      { label: `Dismiss all readings${c.readings ? ` (${c.readings})` : ""}`, disabled: c.readings === 0, onClick: () => { if (this.project) void this.source.dismissColumnReadings(this.project, c.heading.heading).then(() => this.show(this.project, true)); } },
       "-",
       { label: "Hide column", icon: "eye-off", command: "plot-grid-hide-column", onClick: () => this.hideColumn(c) },
       { label: "Delete column…", icon: "x", onClick: () => { this.save({ panelOpen: true }); this.shell?.setSideOpen(true); this.renderSide(); const del = this.shell?.side.querySelector<HTMLButtonElement>(`.czm-pg-col-delete[data-heading="${CSS.escape(c.heading.heading)}"]`); del?.click(); del?.focus(); } },
@@ -568,6 +652,7 @@ export class PlotGridView extends ItemView {
     ] : [];
     shell.key([
       ...audit,
+      ...(this.grid.readings ? [{ label: "reading awaiting you", color: "", cls: "czm-pg-key-role is-reading" }] : []),
       { label: "plant", color: "", cls: "czm-pg-key-role is-plant" },
       { label: "payoff", color: "", cls: "czm-pg-key-role is-payoff" },
       { label: "reversal · turn", color: "", cls: "czm-pg-key-role is-reversal" },
@@ -613,7 +698,8 @@ export class PlotGridView extends ItemView {
     this.editing = true;
     el.empty();
     el.addClass("is-editing");
-    const field = el.createEl("textarea", { cls: "czm-pg-editor", attr: { rows: "1", "aria-label": `${sel.column.heading.name} at ${sel.row.scene.title || basenameOf(sel.row.scene.path)}`, placeholder: "What the thread does here" } });
+    const hint = sel.cell.reading && !sel.cell.stop ? sel.cell.reading.text : "What the thread does here";
+    const field = el.createEl("textarea", { cls: "czm-pg-editor", attr: { rows: "1", "aria-label": `${sel.column.heading.name} at ${sel.row.scene.title || basenameOf(sel.row.scene.path)}`, placeholder: hint } });
     field.value = sel.cell.stop?.note ?? "";
     const grow = () => { field.setCssStyles({ height: "auto" }); field.setCssStyles({ height: `${field.scrollHeight}px` }); };
     field.addEventListener("input", grow);
@@ -657,6 +743,7 @@ export class PlotGridView extends ItemView {
       case "o": if (this.selected) { ev.preventDefault(); const s = this.selected; this.source.reveal(s.cell.stop?.anchor ? { ...s.row.scene, line: s.cell.stop.anchor.line } : s.row.scene); } break;
       case "?": ev.preventDefault(); this.run("help"); break;
       case "v": ev.preventDefault(); this.run("audit"); break;
+      case "x": if (this.selected?.cell.reading) { ev.preventDefault(); void this.dismissReading(); } break;
       case "n": ev.preventDefault(); this.walk(1); break;
       case "p": ev.preventDefault(); this.walk(-1); break;
       case '"': ev.preventDefault(); void this.openPicker(); break;
@@ -717,6 +804,8 @@ export class PlotGridView extends ItemView {
     else this.renderColumnSection(colOne, picked);
     const columns = this.grid.columns;
     const colSection = shell.section("Columns", `${columns.length}${this.hidden.length ? ` · ${this.hidden.length} hidden` : ""}${this.grid.unknownPrefixes.length ? ` · ${this.grid.unknownPrefixes.length} unread` : ""}`, "pg-columns", true);
+    const modelSection = shell.section("Model", this.source.modelLabel() || "off", "pg-model", false);
+    modelSection.createDiv({ text: this.source.modelLabel() ? `${this.source.modelLabel()}. Read… asks what each thread does in each scene and leaves a reading in the empty cells; you write the cell in your own words, or dismiss it. The model never writes a cell, and never a chapter.` : "No model. Set Model to Local (Ollama) or Claude in Creative Writer settings to read columns.", cls: "czm-map-absent" });
     const rowsSection = shell.section("Rows", [this.settings.unmoved ? "unmoved on" : "", this.audit ? "audit" : ""].filter(Boolean).join(" · "), "pg-rows", false);
     const auditRow = rowsSection.createDiv({ cls: "setting-item mod-toggle" });
     const auditInfo = auditRow.createDiv({ cls: "setting-item-info" });
@@ -738,7 +827,7 @@ export class PlotGridView extends ItemView {
       const row = list.createDiv({ cls: `czm-map-row czm-pg-side-col${c.heading.unknownPrefix ? " is-unknown" : ""}`, attr: { tabindex: "0", title: c.heading.heading } });
       const name = row.createSpan({ text: c.heading.name, cls: "czm-map-row-name" });
       if (c.heading.unknownPrefix) name.title = `“${c.heading.unknownPrefix}:” is not a kind — Arc:, Theme: or Subplot: are`;
-      row.createSpan({ text: `${c.filled} of ${this.rows.length}`, cls: "czm-map-row-meta" });
+      row.createSpan({ text: `${c.filled} of ${this.rows.length}${c.readings ? ` · ${c.readings} to answer` : ""}`, cls: "czm-map-row-meta" });
       if (c.special) row.createSpan({ text: SPECIAL_LABEL[c.special].toLowerCase(), cls: "czm-pg-side-job" });
       if (this.hidden.includes(c.heading.heading)) { row.addClass("is-hidden"); const show = row.createEl("button", { cls: "clickable-icon czm-pg-col-show", attr: { "aria-label": `Show column ${c.heading.name}` } }); setIcon(show, "eye-off"); show.addEventListener("click", (ev) => { ev.stopPropagation(); this.setHidden(this.hidden.filter((h) => h !== c.heading.heading)); this.renderTable(); }); }
       const del = row.createEl("button", { cls: "clickable-icon czm-pg-col-delete", attr: { "aria-label": `Delete column ${c.heading.name}`, title: "Delete the column and every stop under it", "data-heading": c.heading.heading } });
@@ -795,6 +884,27 @@ export class PlotGridView extends ItemView {
     const state = section.createDiv({ cls: "czm-pg-field" });
     state.createDiv({ text: "State", cls: "czm-pg-field-label" });
     state.createDiv({ text: !stop ? "empty" : cell.state === "plan" ? "plan — no anchor yet" : cell.state === "verified" ? "verified — the quote is in the scene" : "broken — the quote is no longer in the scene", cls: `czm-pg-field-box czm-pg-state is-${stop ? cell.state : "empty"}` });
+    if (cell.reading) {
+      const r = cell.reading;
+      const box = section.createDiv({ cls: `czm-pg-reading${r.stale ? " is-stale" : ""}` });
+      const head = box.createDiv({ cls: "czm-pg-reading-head" });
+      head.createSpan({ text: r.kind === "check" ? (r.evidence ? "Checked: on the page" : "Checked: not on the page") : "A reading", cls: "czm-pg-reading-label" });
+      head.createSpan({ text: "Story map.md", cls: "czm-map-row-meta" });
+      if (r.kind !== "check" || !r.evidence) box.createDiv({ text: r.text, cls: "czm-pg-reading-text" });
+      if (r.evidence) box.createDiv({ text: `“${r.evidence}”`, cls: "czm-pg-reading-quote" });
+      box.createDiv({ text: `${r.model}${r.role ? ` · ${r.role}` : ""}${r.stale ? " · the scene changed since" : ""}`, cls: "czm-map-row-meta" });
+      const acts = box.createDiv({ cls: "czm-map-panel-actions czm-pg-reading-actions" });
+      const at = acts.createEl("button", { text: "Open scene at the quote", cls: "czm-pg-reading-open" });
+      if (!r.evidence) at.disabled = true;
+      at.addEventListener("click", () => this.source.reveal(row.scene));
+      const no = acts.createEl("button", { text: "Dismiss", cls: "czm-pg-reading-dismiss" });
+      no.addEventListener("click", () => void this.dismissReading());
+      if (r.kind === "check" && r.evidence && stop) {
+        const anchor = acts.createEl("button", { text: "Anchor to it", cls: "czm-pg-reading-anchor mod-cta" });
+        anchor.addEventListener("click", () => void this.writeCell(column, row, stop, stop.note, { role: stop.role, quote: r.evidence }));
+      }
+      box.createDiv({ text: stop ? "" : "Write the cell in your own words; the reading is the placeholder while you type.", cls: "czm-map-absent" });
+    }
     const roles = column.heading.kind === "arc" ? [...THREAD_ROLES, ...ARC_ROLES] : THREAD_ROLES;
     const role = section.createDiv({ cls: "czm-pg-field" });
     role.createDiv({ text: "Role", cls: "czm-pg-field-label" });
@@ -828,7 +938,7 @@ export class PlotGridView extends ItemView {
     }
     const note = section.createDiv({ cls: "czm-pg-field" });
     note.createDiv({ text: "Note", cls: "czm-pg-field-label" });
-    const noteInput = note.createEl("textarea", { cls: "czm-pg-note-field", attr: { rows: "2", placeholder: "What the thread does here", "aria-label": "Note" } });
+    const noteInput = note.createEl("textarea", { cls: "czm-pg-note-field", attr: { rows: "2", placeholder: cell.reading && !stop ? cell.reading.text : "What the thread does here", "aria-label": "Note" } });
     noteInput.value = stop?.note ?? "";
     const actions = section.createDiv({ cls: "czm-map-panel-actions czm-pg-cell-actions" });
     const save = actions.createEl("button", { text: stop ? "Save stop" : "Write stop", cls: "czm-pg-save mod-cta" });

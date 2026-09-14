@@ -1,3 +1,4 @@
+import { STOP_ROLES, type StopRole } from "../threads/Thread";
 import type { SemanticEcho } from "../echoes/Semantic";
 import type { IntentReading } from "../threads/Intent";
 import type { SceneRef } from "./StoryGraph";
@@ -18,7 +19,7 @@ import type { SceneRef } from "./StoryGraph";
  * (by the contradiction's key) and the echo finder's semantic pairs —
  * the pairs only, never the vectors, each with the hash of its scenes.
  */
-export const STORY_MAP_VERSION = 3;
+export const STORY_MAP_VERSION = 4;
 export const STORY_MAP_NOTE = "Story map.md";
 export const STORY_MAP_FLAG = "creative-writer-storymap";
 
@@ -98,9 +99,35 @@ export interface StoryMapFile {
   readonly intents: readonly IntentReading[];
   /** Sentence pairs the embedding model found alike, with the hash of each scene's prose when read. */
   readonly echoes: readonly SemanticEcho[];
+  /** The plot grid's readings: what the model read one thread doing in one scene, awaiting the writer. */
+  readonly grid: readonly GridReading[];
 }
 
-export const EMPTY_STORY_MAP_FILE: StoryMapFile = { version: STORY_MAP_VERSION, readings: [], facts: [], dismissed: [], layout: {}, intents: [], echoes: [] };
+/**
+ * One cell's reading. `reading`: the model's note on what the column's
+ * thread does in the scene, with the quote that made it think so.
+ * `check`: the verdict on a plan the writer typed — the plan's own words
+ * with a quote when it is on the page, "not on the page" otherwise. Never
+ * a stop: the writer answers it by writing the cell, or dismisses it.
+ * `state`: `open` awaiting the writer, `dismissed` by them, `none` when
+ * the model read the scene and found nothing for the thread (kept so the
+ * scene is not read again until it changes).
+ */
+export interface GridReading {
+  readonly scene: SceneRef;
+  readonly hash: string;
+  /** The column's heading as written in the threads note. */
+  readonly column: string;
+  readonly model: string;
+  readonly rulebook: string;
+  readonly kind: "reading" | "check";
+  readonly text: string;
+  readonly role: StopRole | null;
+  readonly evidence: string;
+  readonly state: "open" | "dismissed" | "none";
+}
+
+export const EMPTY_STORY_MAP_FILE: StoryMapFile = { version: STORY_MAP_VERSION, readings: [], facts: [], dismissed: [], layout: {}, intents: [], echoes: [], grid: [] };
 
 export function normalizeStoryMapFile(raw: unknown): StoryMapFile {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
@@ -152,7 +179,20 @@ export function normalizeStoryMapFile(raw: unknown): StoryMapFile {
     if (!a || !b || !str(o.quoteA) || !str(o.quoteB)) continue;
     echoes.push({ a, b, hashA: str(o.hashA), hashB: str(o.hashB), quoteA: str(o.quoteA), quoteB: str(o.quoteB), score, model: str(o.model) });
   }
-  return { version: STORY_MAP_VERSION, readings, facts, dismissed, layout, intents, echoes };
+  const grid: GridReading[] = [];
+  const seenCell = new Set<string>();
+  for (const o of list(r.grid)) {
+    const scene = sceneOf(o);
+    const column = str(o.column);
+    if (!scene || typeof o.hash !== "string" || !column) continue;
+    const cellKey = `${key(scene)}|${column.toLowerCase()}`;
+    if (seenCell.has(cellKey)) continue;
+    seenCell.add(cellKey);
+    const role = typeof o.role === "string" && (STOP_ROLES as readonly string[]).includes(o.role) ? (o.role as StopRole) : null;
+    const state = o.state === "dismissed" || o.state === "none" ? o.state : "open";
+    grid.push({ scene, hash: o.hash, column, model: str(o.model), rulebook: str(o.rulebook), kind: o.kind === "check" ? "check" : "reading", text: str(o.text), role, evidence: str(o.evidence), state });
+  }
+  return { version: STORY_MAP_VERSION, readings, facts, dismissed, layout, intents, echoes, grid };
 }
 
 const key = (s: SceneRef) => `${s.path}#${s.title}`;
@@ -164,6 +204,22 @@ export function putReading(file: StoryMapFile, reading: SceneReading): StoryMapF
 }
 
 /** Same discipline for facts; relation readings are untouched. */
+/** One reading per cell: the newest replaces what the cell had. */
+export function putGridReading(file: StoryMapFile, reading: GridReading): StoryMapFile {
+  const rest = file.grid.filter((r) => !(key(r.scene) === key(reading.scene) && r.column.toLowerCase() === reading.column.toLowerCase()));
+  return { ...file, version: STORY_MAP_VERSION, grid: [...rest, reading] };
+}
+
+/** The writer's answer to a reading that is not a cell: dismissed, and skipped by the next pass until the scene changes. */
+export function setGridReadingState(file: StoryMapFile, scene: SceneRef, column: string, state: GridReading["state"]): StoryMapFile {
+  return { ...file, version: STORY_MAP_VERSION, grid: file.grid.map((r) => (key(r.scene) === key(scene) && r.column.toLowerCase() === column.toLowerCase() ? { ...r, state } : r)) };
+}
+
+/** Every open reading in a column dismissed at once. */
+export function dismissColumnReadings(file: StoryMapFile, column: string): StoryMapFile {
+  return { ...file, version: STORY_MAP_VERSION, grid: file.grid.map((r) => (r.column.toLowerCase() === column.toLowerCase() && r.state === "open" ? { ...r, state: "dismissed" as const } : r)) };
+}
+
 export function putFactReading(file: StoryMapFile, reading: FactReading): StoryMapFile {
   const rest = file.facts.filter((r) => key(r.scene) !== key(reading.scene));
   return { ...file, version: STORY_MAP_VERSION, facts: [...rest, reading] };
@@ -214,7 +270,7 @@ export function serializeStoryMapNote(file: StoryMapFile, project: string): stri
     "creative-writer: false",
     `${STORY_MAP_FLAG}: ${STORY_MAP_VERSION}`,
     "---",
-    `Story map data for **${project}**. Creative Writer rebuilds the map from your notes; this file only keeps what the model inferred (relationships, references, events and facts per scene, what each contradiction means, sentence pairs that echo) and where you pinned nodes by hand, plus the contradictions you dismissed in the story threads view, so all of it follows the project across devices. Relationships and threads you draw yourself live in your own notes, not here. Safe to sync, safe to delete — you would just re-run the readings and re-place pinned nodes.`,
+    `Story map data for **${project}**. Creative Writer rebuilds the map from your notes; this file only keeps what the model inferred (relationships, references, events and facts per scene, what each contradiction means, sentence pairs that echo, what a thread does in a scene for the plot grid) and where you pinned nodes by hand, plus the contradictions you dismissed in the story threads view, so all of it follows the project across devices. Relationships and threads you draw yourself live in your own notes, not here. Safe to sync, safe to delete — you would just re-run the readings and re-place pinned nodes.`,
     "",
     "```json",
     JSON.stringify(file, null, 2),

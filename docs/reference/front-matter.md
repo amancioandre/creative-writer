@@ -61,6 +61,8 @@ creative-writer-storymap: 3
 
 followed by a short explanation and one ```` ```json ```` block: relation readings and fact readings per scene, the model's verdict per contradiction, sentence pairs the embedding model found alike, contradictions you dismissed, and pinned node positions. The flag keeps the plugin from reading its own note as a chapter; a version-1 or version-2 note (before facts, or before intents and echoes, existed) loads as is. Safe to delete — you would re-run the readings.
 
+The story map data note (`Story map.md`) also carries the plot grid's readings under a `grid` key, one per cell the model read, with its state: open, dismissed, or none. Version 4 of the note.
+
 ## Plot grid snapshot
 
 | Key | Value | Effect |

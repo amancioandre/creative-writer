@@ -46,6 +46,16 @@ The grid is used twice, and the two uses are one cell in two states. Before a sc
 - **Anchoring** (`"`, or **Pick…** beside the anchor field) lists the scene's sentences in the side column; on a broken stop, the sentences nearest the lost quote come first, marked with how much they share. Enter, or a click, writes the sentence as the stop's anchor. `n` and `p` walk the broken anchors, so repair is three keys: `n`, `"`, Enter.
 - **Snapshot the grid** (⋯ menu, or the command) writes the grid as a dated markdown table beside the project, `Plot grid · 2026-09-13.md`, one row per scene, one column per thread, each cell its stop with the role and a ✓ where verified. The status line names the file with **Open**. It is never read back (its front matter says so), so keep it, diff it, or delete it: two snapshots side by side are the outline against the draft.
 
+## Reading with the model
+
+The model reads; you write. A pass over a column shows the model each scene that has prose and no stop in that column, with the column's kind, its name, and the notes you have already written there as examples of your voice, and asks one question: what is this thread doing in this scene? What comes back is a **reading**: a note of at most twenty words and the verbatim quote that made the model think so. A reading whose quote is not on the page is dropped before it is saved. A reading is never a stop, and never a line in a chapter: it lives in `Story map.md`, and it is answered by you.
+
+- **Read this column with the model…** is in a column's menu; **Read…** in the head (the sparkle) reads every thread column. The state line counts scenes as they go, **Stop** ends the pass with everything that landed kept; a scene unchanged since it was last read for that column is skipped, and so is one whose reading you dismissed.
+- **A reading waits in the empty cell** as a sparkle on a dashed edge, never as text. Select the cell and the side column shows it whole: the note, the quote, the model. When you edit that cell, the reading is the field's placeholder, faint and uncopyable; you type over it in your own words. Writing the cell answers the reading. **Dismiss** (or `x`) is the other answer, remembered until the scene changes. `n` and `p` walk the readings awaiting you along with the broken anchors; the state line says how many there are.
+- **Check this column against the draft…** is the pass for after the draft: each plan in the column (a stop with no anchor) is shown to the model with the scene as written, and the answer is a quote when the plan is on the page or *not on the page* when it is not. A found plan's side column offers **Anchor to it**, which writes the quote as the stop's anchor; a missing one stands as a debt until you either write the scene or take the plan out.
+- The model is whichever **Model** the settings name: Local (Ollama) reads for nothing; Claude counts against the same daily cap as the style assistant and shows its spend there. With the model off, the head says so.
+- The prompt asks in the column's kind: an arc is asked what the scene does to the character's want, a theme how the scene argues it, a subplot what happens to it. A small local model reads subplots well and arcs less well; read an arc with a larger one, or write it yourself.
+
 ## Keys
 
 Click anywhere on the grid and the keys work; press `?` for the list on the grid itself. Tab is never taken: it moves the focus as it does everywhere in Obsidian, and Ctrl and Cmd stay with Obsidian's own hotkeys. Nothing is bound by default.
@@ -57,7 +67,8 @@ Click anywhere on the grid and the keys work; press `?` for the list on the grid
 | `Escape` | On a cell: back to the row's name. |
 | `Delete` | Take the stop out, with Undo. |
 | `"` | Anchor: pick a sentence of the scene; on a broken stop, the near matches first. |
-| `n` `p` | Next and previous broken anchor. |
+| `n` `p` | Next and previous reading awaiting you, or broken anchor. |
+| `x` | Dismiss the reading in the cell. |
 | `o` | Open the scene, at the anchor when there is one. |
 | `v` | Audit view. |
 | `?` | The list. |

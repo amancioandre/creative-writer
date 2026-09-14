@@ -621,6 +621,24 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-pg-picker-row.is-near .czm-pg-picker-text { color: var(--text-accent); }
 .czm-pg-picker-text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .czm-pg-pick { flex: 0 0 auto; }
+/* A reading: the model's note waits in the cell's corner as a sparkle, dashed edge; the writer writes the cell. */
+.czm-pg-cell.has-reading { border: 1px dashed color-mix(in srgb, var(--text-accent) 50%, transparent); padding-right: 20px; position: relative; }
+.czm-pg-cell.has-reading.is-empty { color: transparent; }
+.czm-pg-cell.has-reading.is-stale { border-color: var(--background-modifier-border); }
+.czm-pg-reading-glyph { position: absolute; right: 4px; top: 4px; display: inline-flex; color: var(--text-accent); }
+.czm-pg-reading-glyph svg { width: 12px; height: 12px; }
+.czm-pg-cell.is-stale .czm-pg-reading-glyph { color: var(--text-faint); }
+.czm-pg-editor::placeholder { color: var(--text-faint); font-style: italic; }
+.czm-pg-reading { margin: 4px 8px 8px; padding: 8px 10px; border: 1px dashed color-mix(in srgb, var(--text-accent) 50%, transparent); border-radius: var(--radius-m); background: color-mix(in srgb, var(--text-accent) 5%, transparent); font-size: var(--font-ui-small); }
+.czm-pg-reading.is-stale { border-color: var(--background-modifier-border); background: none; opacity: 0.8; }
+.czm-pg-reading-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.czm-pg-reading-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-accent); }
+.czm-pg-reading-text { margin-bottom: 4px; }
+.czm-pg-reading-quote { font-style: italic; color: var(--text-muted); margin-bottom: 4px; }
+.czm-pg-reading-actions { grid-template-columns: 1fr 1fr; margin: 6px 0 4px; }
+.czm-pg-reading-anchor { grid-column: 1 / -1; }
+.czm-pg-key-role.is-reading::before { content: "✦"; }
+.czm-pg-stop { color: var(--text-error); }
 /* The key names the roles by their glyph, not a dot. */
 .czm-pg-key-role::before { width: auto; height: auto; border-radius: 0; background: none; color: var(--text-accent); font-size: 10px; }
 .czm-pg-key-role.is-plant::before { content: "▶"; }

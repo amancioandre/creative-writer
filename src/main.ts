@@ -66,6 +66,12 @@ import { writerTag } from "./domain/writer/Tags";
 import { PLOT_GRID_VIEW_TYPE, PlotGridView } from "./infrastructure/obsidian/views/PlotGridView";
 import { BuildPlotGrid } from "./application/use-cases/BuildPlotGrid";
 import { SnapshotPlotGrid } from "./application/use-cases/SnapshotPlotGrid";
+import { ReadColumn } from "./application/use-cases/ReadColumn";
+import { OllamaColumnAnalyser } from "./infrastructure/llm/OllamaColumnAnalyser";
+import { ClaudeColumnAnalyser } from "./infrastructure/llm/ClaudeColumnAnalyser";
+import { dismissColumnReadings, setGridReadingState } from "./domain/story/StoryMapFile";
+import { CostLedger, costOf, PRICES } from "./domain/style/llm/CostLedger";
+import type { ColumnAnalyser } from "./application/ports/ColumnAnalyser";
 import { STORY_THREADS_VIEW_TYPE, StoryThreadsView } from "./infrastructure/obsidian/views/StoryThreadsView";
 import { StoryThreadsNoteRepository } from "./infrastructure/obsidian/StoryThreadsNoteRepository";
 import { BuildStoryThreads } from "./application/use-cases/BuildStoryThreads";
@@ -462,6 +468,17 @@ export default class CreativeZenModePlugin extends Plugin {
         return prose.split(/\n\s*\n/).flatMap((para) => segmenter.segment(para).map((s) => s.text.trim())).filter(Boolean);
       },
       snapshot: (project) => snapshotPlotGrid.execute(project),
+      readColumn: async (project, column, signal, onProgress) => {
+        const { graph } = await buildPlotGrid.executeWithGraph(project);
+        return new ReadColumn(projectNotes, storyRepo, this.columnAnalyser()).execute(project, column, graph, signal, onProgress);
+      },
+      checkColumn: async (project, column, signal, onProgress) => {
+        const { graph } = await buildPlotGrid.executeWithGraph(project);
+        return new ReadColumn(projectNotes, storyRepo, this.columnAnalyser()).check(project, column, graph, signal, onProgress);
+      },
+      dismissReading: async (project, scene, column) => { await storyRepo.update(project, (f) => setGridReadingState(f, scene, column, "dismissed")); },
+      dismissColumnReadings: async (project, column) => { await storyRepo.update(project, (f) => dismissColumnReadings(f, column)); },
+      modelLabel: () => { const cfg = this.current.llm; return cfg.provider === "ollama" ? `Ollama · ${cfg.ollamaModel}` : cfg.provider === "claude" ? `Claude · ${cfg.claudeModel}` : ""; },
     }));
     this.addCommand({ id: "open-story-timeline", name: COMMANDS["open-story-timeline"], callback: () => void this.openPlotGrid(null) });
     this.viewCommands(PlotGridView, [
@@ -469,6 +486,7 @@ export default class CreativeZenModePlugin extends Plugin {
       ["plot-grid-fold-arcs", "fold-arcs"], ["plot-grid-fold-themes", "fold-themes"], ["plot-grid-fold-subplots", "fold-subplots"], ["plot-grid-fold-threads", "fold-threads"],
       ["plot-grid-hide-column", "hide-column"], ["plot-grid-show-hidden", "show-hidden"], ["plot-grid-toggle-unmoved", "toggle-unmoved"], ["plot-grid-focus-search", "focus-search"], ["plot-grid-help", "help"],
       ["plot-grid-audit", "audit"], ["plot-grid-snapshot", "snapshot"], ["plot-grid-next-issue", "next-issue"], ["plot-grid-previous-issue", "previous-issue"], ["plot-grid-anchor", "anchor"],
+      ["plot-grid-read-all", "read-all"], ["plot-grid-read-column", "read-column"], ["plot-grid-check-column", "check-column"], ["plot-grid-dismiss-reading", "dismiss-reading"],
     ]);
     this.registerView(STORY_THREADS_VIEW_TYPE, (leaf: WorkspaceLeaf) => new StoryThreadsView(leaf, {
       projects: storySource.projects,
@@ -973,6 +991,34 @@ export default class CreativeZenModePlugin extends Plugin {
     md.editor.setCursor({ line, ch });
     md.editor.scrollIntoView({ from: { line, ch }, to: { line, ch } }, true);
     md.editor.focus();
+  }
+
+  /**
+   * The plot grid's column reader for the configured model: Ollama, or
+   * Claude with the same daily cap the style assistant honours, counted in
+   * the same ledger. Resolved at call time, so a change in settings takes
+   * effect on the next pass.
+   */
+  private columnAnalyser(): ColumnAnalyser {
+    const cfg = this.current.llm;
+    const http = new RequestUrlHttpClient();
+    if (cfg.provider === "ollama") return new OllamaColumnAnalyser(http, { baseUrl: cfg.ollamaUrl, model: cfg.ollamaModel });
+    if (cfg.provider !== "claude") throw new Error("Reading needs a model: set Model to Local (Ollama) or Claude in Creative Writer settings.");
+    const claude = new ClaudeColumnAnalyser(http, { apiKey: cfg.claudeApiKey, model: cfg.claudeModel });
+    const ledger = CostLedger.fromPersisted(cfg.spend);
+    const priced = async (call: () => Promise<unknown>) => {
+      if (ledger.capReached(cfg.dailyCapUsd)) throw new Error(`Claude: daily cap of $${cfg.dailyCapUsd.toFixed(2)} reached. Raise it in settings or wait until tomorrow.`);
+      const out = await call();
+      const price = PRICES[cfg.claudeModel];
+      if (claude.lastUsage && price) { ledger.add(costOf(claude.lastUsage, price)); void this.updateSettings({ ...this.current, llm: { ...this.current.llm, spend: ledger.persisted() } }); }
+      return out;
+    };
+    return {
+      name: claude.name,
+      rulebook: claude.rulebook,
+      read: (text, present, column, signal) => priced(() => claude.read(text, present, column, signal)),
+      check: (text, plan, column, signal) => priced(() => claude.check(text, plan, column, signal)),
+    };
   }
 
   /** Writes or clears one text property in a note's front matter — the project note's `plot-pov`, `plot-time`, `plot-theme`. */

@@ -6,7 +6,7 @@ import { buildPlotGrid } from "../../../src/domain/plot/PlotGrid";
 import { buildThreads } from "../../../src/domain/threads/BuildThreads";
 import { addThread, appendThreadItems, parseStoryThreads, removeThread, removeThreadItem, renameThread } from "../../../src/domain/threads/StoryThreadsNote";
 import { splitScenes } from "../../../src/domain/text/Scenes";
-import { EMPTY_STORY_MAP_FILE, putReading } from "../../../src/domain/story/StoryMapFile";
+import { EMPTY_STORY_MAP_FILE, putGridReading, putReading, type GridReading, type StoryMapFile } from "../../../src/domain/story/StoryMapFile";
 import { textHash } from "../../../src/domain/story/StoryGraph";
 import type { ProjectSpec } from "../../../src/domain/progress/Project";
 import { DEFAULT_PLOT_GRID, DEFAULT_STORY_MAP, type PlotGridSettings } from "../../../src/domain/settings/Settings";
@@ -39,9 +39,29 @@ function open(overrides: Partial<PlotGridSource> = {}, threads = threadsNote) {
   let md = threads;
   let prefs: PlotGridSettings = DEFAULT_PLOT_GRID;
   let spec: ProjectSpec = novel;
+  let map: StoryMapFile = file;
+  const hashes = new Map(notes.flatMap((n) => n.scenes.map((s) => [`${n.path}#${s.title}`, textHash(s.prose)] as const)));
   const src: PlotGridSource = {
     projects: () => [spec], activeProject: () => spec,
-    build: async () => buildPlotGrid(buildStoryGraph("Novel", notes, file), buildThreads(buildStoryGraph("Novel", notes, file), file, parseStoryThreads(md), new Set(), undefined, (p) => notes.find((n) => n.path === p)?.text), { pov: spec.plotPov, time: spec.plotTime, theme: spec.plotTheme }),
+    build: async () => buildPlotGrid(buildStoryGraph("Novel", notes, map), buildThreads(buildStoryGraph("Novel", notes, map), map, parseStoryThreads(md), new Set(), undefined, (p) => notes.find((n) => n.path === p)?.text), { pov: spec.plotPov, time: spec.plotTime, theme: spec.plotTheme }, { readings: map.grid, hashes }),
+    readColumn: async (_p, column, signal, onProgress) => {
+      calls.writes.push(`read ${column.heading.name}`);
+      const targets = column.cells.map((c, i) => [c, i] as const).filter(([c]) => !c.stop);
+      let n = 0;
+      for (const [, i] of targets) {
+        if (signal.aborted) break;
+        const scene = column.cells.length ? grid(md).rows[i]!.scene : { path: "", title: "", line: 0 };
+        onProgress({ done: ++n, total: targets.length, scene, skipped: false });
+        const reading: GridReading = { scene, hash: hashes.get(`${scene.path}#${scene.title}`) ?? "", column: column.heading.heading, model: "test", rulebook: "t", kind: "reading", text: `the model read ${scene.title}`, role: null, evidence: "Lisbon", state: "open" };
+        map = putGridReading(map, reading);
+        await new Promise((r) => setTimeout(r, 5));
+      }
+      return n;
+    },
+    checkColumn: async (_p, column) => { calls.writes.push(`check ${column.heading.name}`); return 0; },
+    dismissReading: async (_p, scene, column) => { calls.writes.push(`dismiss ${column} at ${scene.title}`); map = { ...map, grid: map.grid.map((r) => (r.scene.title === scene.title && r.column === column ? { ...r, state: "dismissed" } : r)) }; },
+    dismissColumnReadings: async () => undefined,
+    modelLabel: () => "Ollama · test",
     renameThread: async (_p, from, to) => { calls.writes.push(`rename ${from} → ${to}`); md = renameThread(md, from, to); },
     setProjectKey: async (_p, key, value) => { calls.writes.push(`${key}=${value ?? ""}`); const k = key === "plot-pov" ? "plotPov" : key === "plot-time" ? "plotTime" : "plotTheme"; spec = { ...spec, [k]: value ?? undefined }; },
     gridSettings: () => prefs,
@@ -287,7 +307,7 @@ describe("PlotGridView", () => {
     // The header's ⋯ opens the column menu; a job row writes the key and the rebuild reads it back.
     const eyes = [...el.querySelectorAll(".czm-pg-col-thread")].find((th) => th.querySelector(".czm-pg-col-title")?.textContent === "Eyes")!;
     (eyes.querySelector(".czm-pg-col-more") as HTMLElement).click();
-    expect(Menu.last!.items.map((i) => i.title.replace(/Plot grid:.*$/, ""))).toEqual(["Rename…", "Kind: arc", "Kind: theme", "Kind: subplot", "Kind: free thread", "Use as POV", "Use as Time", "Use as Main theme", "Hide column", "Delete column…"]);
+    expect(Menu.last!.items.map((i) => i.title.replace(/Plot grid:.*$/, ""))).toEqual(["Rename…", "Kind: arc", "Kind: theme", "Kind: subplot", "Kind: free thread", "Use as POV", "Use as Time", "Use as Main theme", "Read this column with the model…", "Check this column against the draft…", "Dismiss all readings", "Hide column", "Delete column…"]);
     Menu.last!.items.find((i) => i.title === "Use as POV")!.cb();
     await new Promise((r) => setTimeout(r, 400));
     expect(calls.writes).toContain("plot-pov=Eyes");
@@ -377,6 +397,64 @@ describe("PlotGridView", () => {
     expect(calls.opened).toEqual(["Novel/Plot grid · 2026-09-13.md"]);
   });
 
+  it("a reading is a note in the empty cell, the placeholder while typing, and never the text the writer saves", async () => {
+    const { v, calls, note } = open();
+    await v.onOpen();
+    const el = v.contentEl;
+    // Read the gate column: the model leaves readings in its empty cell; the state line counts them.
+    el.querySelector<HTMLElement>('.czm-pg-cell[data-col="1"][data-row="0"]')!.click();
+    v.run("read-column");
+    await new Promise((r) => setTimeout(r, 60));
+    expect(calls.writes).toContain("read The gate");
+    expect(el.querySelector(".czm-shell-state-text")?.textContent).toContain("1 reading awaiting you");
+    const cell = el.querySelector<HTMLElement>('.czm-pg-cell[data-col="1"][data-row="1"]')!;
+    expect(cell.classList.contains("has-reading")).toBe(true);
+    expect(cell.querySelector(".czm-pg-reading-glyph")).not.toBeNull();
+    expect(cell.querySelector(".czm-pg-cell-text")).toBeNull();
+    // Selecting it shows the reading in the side column, with the quote and the model.
+    cell.click();
+    expect(el.querySelector(".czm-pg-reading-text")?.textContent).toBe("the model read Creek");
+    expect(el.querySelector(".czm-pg-reading-quote")?.textContent).toBe("“Lisbon”");
+    // Editing: the reading is the placeholder, not the value.
+    cell.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    const field = el.querySelector(".czm-pg-editor") as HTMLTextAreaElement;
+    expect(field.value).toBe("");
+    expect(field.placeholder).toBe("the model read Creek");
+    field.value = "Ilse washes her eyes in it";
+    field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(note()).toContain("- [[One#Creek]] — Ilse washes her eyes in it");
+    expect(note()).not.toContain("the model read");
+    // Writing the cell answered the reading; the walk finds nothing left.
+    expect(el.querySelector(".czm-shell-state-text")?.textContent).not.toContain("awaiting");
+    expect(el.querySelector('.czm-pg-cell[data-col="1"][data-row="1"]')?.classList.contains("has-reading")).toBe(false);
+  });
+
+  it("n walks to a reading, x dismisses it, and Stop ends a pass with what landed kept", async () => {
+    const { v, calls } = open();
+    await v.onOpen();
+    const el = v.contentEl;
+    el.querySelector<HTMLElement>('.czm-pg-cell[data-col="0"][data-row="0"]')!.click();
+    v.run("read-column");
+    await new Promise((r) => setTimeout(r, 60));
+    expect(calls.writes).toContain("read Ilse");
+    el.querySelector<HTMLElement>('.czm-pg-cell[data-col="0"][data-row="0"]')!.dispatchEvent(new KeyboardEvent("keydown", { key: "n", bubbles: true }));
+    const found = el.querySelector(".czm-pg-cell.is-selected")!;
+    expect(found.classList.contains("has-reading")).toBe(true);
+    found.dispatchEvent(new KeyboardEvent("keydown", { key: "x", bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(calls.writes.some((w) => w.startsWith("dismiss Arc: [[Ilse]] at"))).toBe(true);
+    expect(el.querySelector(".czm-map-status")?.textContent).toContain("Reading dismissed");
+    // A pass in flight shows Stop in the head; Stop aborts it.
+    const p = v.run("read-all");
+    expect(el.querySelector(".czm-pg-stop")).not.toBeNull();
+    (el.querySelector(".czm-pg-stop") as HTMLElement).click();
+    await new Promise((r) => setTimeout(r, 80));
+    void p;
+    expect(el.querySelector(".czm-pg-stop")).toBeNull();
+    expect(el.querySelector(".czm-map-status")?.textContent).toContain("Stopped after");
+  });
+
   it("lists its keys behind ? and closes the list again", async () => {
     const { v } = open();
     await v.onOpen();
@@ -384,7 +462,7 @@ describe("PlotGridView", () => {
     el.querySelector<HTMLElement>('.czm-pg-cell[data-col="0"][data-row="0"]')!.click();
     el.querySelector<HTMLElement>('.czm-pg-cell[data-col="0"][data-row="0"]')!.dispatchEvent(new KeyboardEvent("keydown", { key: "?", bubbles: true }));
     expect(el.querySelector(".czm-pg-help")?.classList.contains("is-open")).toBe(true);
-    expect(el.querySelectorAll(".czm-pg-help tr")).toHaveLength(11);
+    expect(el.querySelectorAll(".czm-pg-help tr")).toHaveLength(12);
     (el.querySelector(".czm-writer-help-close") as HTMLElement).click();
     expect(el.querySelector(".czm-pg-help")?.classList.contains("is-open")).toBe(false);
   });

@@ -3,7 +3,7 @@ import { semanticEchoPairs } from "../../domain/echoes/Semantic";
 import type { ProjectSpec } from "../../domain/progress/Project";
 import type { EchoSensitivity } from "../../domain/settings/Settings";
 import { sceneKey, textHash, type StoryGraph } from "../../domain/story/StoryGraph";
-import { dismissContradiction, undismissContradiction } from "../../domain/story/StoryMapFile";
+import { dismissContradiction, undismissContradiction, type StoryMapFile } from "../../domain/story/StoryMapFile";
 import { buildThreads, DEFAULT_THREADS_OPTIONS, type BuildThreadsOptions } from "../../domain/threads/BuildThreads";
 import { parseStoryThreads } from "../../domain/threads/StoryThreadsNote";
 import type { ThreadModel } from "../../domain/threads/Thread";
@@ -45,7 +45,7 @@ export class BuildStoryThreads {
   }
 
   /** The model and the graph it was built on, for a view that needs both — the plot grid draws rows from one and columns from the other. */
-  async executeWithGraph(project: ProjectSpec): Promise<{ graph: StoryGraph; model: ThreadModel }> {
+  async executeWithGraph(project: ProjectSpec): Promise<{ graph: StoryGraph; model: ThreadModel; file: StoryMapFile; hashes: ReadonlyMap<string, string> }> {
     const [notes, file, markdown] = await Promise.all([this.notes.notes(project), this.storyRepo.load(project), this.threadsRepo.load(project)]);
     const graph = this.map.graphFrom(project, notes, file);
     const found = this.echoes(project, graph, notes);
@@ -64,7 +64,7 @@ export class BuildStoryThreads {
     const semantic = semanticEchoPairs(file.echoes, sceneIndex, hashes, echoOptions(this.echoSources?.sensitivity() ?? "medium"));
     const said = new Set(found.pairs.map((p) => `${p.a.sentence}|${p.b.sentence}`));
     const echoes: Echoes = { groups: found.groups, pairs: [...found.pairs, ...semantic.pairs.filter((p) => !said.has(`${p.a.sentence}|${p.b.sentence}`))] };
-    return { graph, model: buildThreads(graph, file, parseStoryThreads(markdown), stale, this.options, textOf, echoes, { stored: file.echoes.length, stale: semantic.stale }) };
+    return { graph, model: buildThreads(graph, file, parseStoryThreads(markdown), stale, this.options, textOf, echoes, { stored: file.echoes.length, stale: semantic.stale }), file, hashes };
   }
 
   /** The echo finder over the project's scenes in manuscript order, names excluded, cached by the prose. */

@@ -1,0 +1,25 @@
+import type { ColumnKind } from "../../domain/threads/StoryThreadsNote";
+
+/** What the model is told about the column it reads for: its name, its kind, and the stops already written, as examples of the writer's voice. */
+export interface ColumnBrief {
+  readonly name: string;
+  readonly kind: ColumnKind;
+  readonly examples: readonly string[];
+  /** For an arc: the character the column follows. */
+  readonly character?: string;
+}
+
+/**
+ * Model-backed reading of one scene for one column of the plot grid.
+ * `read` asks what the thread is doing in the scene; `check` asks
+ * whether a plan the writer typed is on the page, and where. Both return
+ * the raw report; the domain validates it and the writer answers it.
+ * The model never writes a cell.
+ */
+export interface ColumnAnalyser {
+  readonly name: string;
+  /** Version of the prompt in use; a reading made under an older one is worth redoing. */
+  readonly rulebook: string;
+  read(text: string, present: readonly string[], column: ColumnBrief, signal: AbortSignal): Promise<unknown>;
+  check(text: string, plan: { readonly note: string; readonly role: string | null }, column: ColumnBrief, signal: AbortSignal): Promise<unknown>;
+}

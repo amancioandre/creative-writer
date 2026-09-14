@@ -2,6 +2,7 @@ import { basenameOf, normalise } from "../story/EntityIndex";
 import { sceneKey, type Entity, type SceneRef, type StoryGraph } from "../story/StoryGraph";
 import { parseColumnHeading, resolveThreadRef, type ColumnHeading, type ColumnKind } from "../threads/StoryThreadsNote";
 import type { Thread, ThreadModel, ThreadRef } from "../threads/Thread";
+import type { GridReading } from "../story/StoryMapFile";
 
 export { parseColumnHeading, type ColumnHeading, type ColumnKind } from "../threads/StoryThreadsNote";
 
@@ -18,8 +19,20 @@ export { parseColumnHeading, type ColumnHeading, type ColumnKind } from "../thre
  */
 export type CellState = "empty" | "plan" | "verified" | "broken";
 
+/** A reading drawn in an empty cell: the model's note, awaiting the writer. Stale when the scene changed since. */
+export interface CellReading {
+  readonly text: string;
+  readonly role: ThreadRef["role"] | null;
+  readonly evidence: string;
+  readonly model: string;
+  readonly kind: GridReading["kind"];
+  readonly stale: boolean;
+}
+
 export interface GridCell {
   readonly state: CellState;
+  /** An open reading for this cell, when it has no stop of its own; a check's verdict when it has a plan. */
+  readonly reading: CellReading | null;
   /** The stop drawn in the cell: the first at this scene in note order. */
   readonly stop: ThreadRef | null;
   /** Further stops of the same thread at the same scene; the cell shows the first and "+n". */
@@ -56,6 +69,10 @@ export interface GridColumn {
   readonly armed: boolean;
   /** Stops whose link resolved to no scene, kept visible as the threads chart keeps them. */
   readonly unresolved: readonly ThreadRef[];
+  /** Open readings awaiting the writer in this column, stale ones not counted. */
+  readonly readings: number;
+  /** Scene key → row index, so a pass over the column can find its cell for a scene. */
+  readonly rowIndex: ReadonlyMap<string, number>;
 }
 
 export interface GridRow {
@@ -87,9 +104,18 @@ export interface PlotGrid {
   readonly filled: number;
   readonly verified: number;
   readonly broken: number;
+  /** Open readings awaiting the writer, over every column. */
+  readonly readings: number;
 }
 
-export const EMPTY_PLOT_GRID: PlotGrid = { project: "", rows: [], columns: [], unknownPrefixes: [], cast: [], cells: 0, filled: 0, verified: 0, broken: 0 };
+export const EMPTY_PLOT_GRID: PlotGrid = { project: "", rows: [], columns: [], unknownPrefixes: [], cast: [], cells: 0, filled: 0, verified: 0, broken: 0, readings: 0 };
+
+/** The model's readings and the scenes' current hashes, so a reading of a scene that changed since is drawn stale. */
+export interface GridReadings {
+  readonly readings: readonly GridReading[];
+  readonly hashes: ReadonlyMap<string, string>;
+}
+const NO_READINGS: GridReadings = { readings: [], hashes: new Map() };
 
 const CAST_ORDER: Record<Entity["kind"], number> = { character: 0, candidate: 1, faction: 2, location: 3, item: 4, event: 5, note: 6, reference: 7 };
 
@@ -100,7 +126,7 @@ const KIND_ORDER: Record<ColumnKind, number> = { arc: 0, theme: 1, subplot: 2, f
  * plus outline headings), columns the writer's threads from the threads
  * model, whose refs already carry each stop's anchor.
  */
-export function buildPlotGrid(graph: StoryGraph, model: ThreadModel, special: SpecialColumns = {}): PlotGrid {
+export function buildPlotGrid(graph: StoryGraph, model: ThreadModel, special: SpecialColumns = {}, read: GridReadings = NO_READINGS): PlotGrid {
   const bare = gridRows(graph);
   const rowIndex = new Map(bare.map((r) => [sceneKey(r.scene), r.index]));
   const writer = model.threads.filter((t) => t.kind === "writer");
@@ -111,7 +137,7 @@ export function buildPlotGrid(graph: StoryGraph, model: ThreadModel, special: Sp
   const columns = writer
     .map((thread, order) => ({ thread, order, heading: parseColumnHeading(thread.label), special: specialOf(thread.label) }))
     .sort((a, b) => rank(a) - rank(b) || a.order - b.order)
-    .map(({ thread, heading, special: job }) => column(thread, heading, job, bare, rowIndex, graph.entities));
+    .map(({ thread, heading, special: job }) => column(thread, heading, job, bare, rowIndex, graph.entities, read));
   const pov = columns.find((c) => c.special === "pov");
   const rows = bare.map((row) => {
     const name = pov?.cells[row.index]?.stop?.note.trim() ?? "";
@@ -121,10 +147,11 @@ export function buildPlotGrid(graph: StoryGraph, model: ThreadModel, special: Sp
   const filled = columns.reduce((n, c) => n + c.filled, 0);
   const verified = columns.reduce((n, c) => n + c.verified, 0);
   const broken = columns.reduce((n, c) => n + c.broken, 0);
+  const readings = columns.reduce((n, c) => n + c.readings, 0);
   const cast = graph.entities
     .filter((e) => e.appearances.length > 0 && e.kind !== "note" && e.kind !== "reference")
     .sort((a, b) => CAST_ORDER[a.kind] - CAST_ORDER[b.kind] || b.mentions - a.mentions);
-  return { project: graph.project, rows, columns, unknownPrefixes, cast, cells: rows.length * columns.length, filled, verified, broken };
+  return { project: graph.project, rows, columns, unknownPrefixes, cast, cells: rows.length * columns.length, filled, verified, broken, readings };
 }
 
 /** The timeline's rows, and between them the headings the timeline left out for having no prose. */
@@ -142,8 +169,9 @@ export function gridRows(graph: StoryGraph): GridRow[] {
   return rows;
 }
 
-function column(thread: Thread, heading: ColumnHeading, special: SpecialColumn | null, rows: readonly GridRow[], rowIndex: ReadonlyMap<string, number>, entities: readonly Entity[]): GridColumn {
+function column(thread: Thread, heading: ColumnHeading, special: SpecialColumn | null, rows: readonly GridRow[], rowIndex: ReadonlyMap<string, number>, entities: readonly Entity[], read: GridReadings): GridColumn {
   const entity = heading.kind === "arc" ? bind(heading, entities) : null;
+  const byScene = new Map(read.readings.filter((r) => r.column.toLowerCase() === heading.heading.toLowerCase()).map((r) => [sceneKey(r.scene), r]));
   const at = new Map<number, ThreadRef[]>();
   const unresolved: ThreadRef[] = [];
   for (const raw of thread.refs) {
@@ -154,7 +182,7 @@ function column(thread: Thread, heading: ColumnHeading, special: SpecialColumn |
     const list = at.get(i);
     if (list) list.push(ref); else at.set(i, [ref]);
   }
-  let filled = 0, verified = 0, broken = 0;
+  let filled = 0, verified = 0, broken = 0, readings = 0;
   const cells = rows.map((row) => {
     const stops = at.get(row.index) ?? [];
     const stop = stops[0] ?? null;
@@ -163,9 +191,14 @@ function column(thread: Thread, heading: ColumnHeading, special: SpecialColumn |
     if (state === "verified") verified++;
     if (state === "broken") broken++;
     const presentUnmoved = !stop && !!entity && row.present.includes(entity.id);
-    return { state, stop, more: stops.slice(1), presentUnmoved };
+    // A reading belongs to an empty cell; a check's verdict to a plan. A cell that gained a stop has answered its reading.
+    const r = byScene.get(sceneKey(row.scene));
+    const applies = r && r.state === "open" && r.text && (r.kind === "reading" ? !stop : !!stop && state === "plan");
+    const reading: CellReading | null = applies ? { text: r.text, role: r.role, evidence: r.evidence, model: r.model, kind: r.kind, stale: read.hashes.get(sceneKey(row.scene)) !== undefined && read.hashes.get(sceneKey(row.scene)) !== r.hash } : null;
+    if (reading && !reading.stale) readings++;
+    return { state, stop, more: stops.slice(1), presentUnmoved, reading };
   });
-  return { id: thread.id, special, heading, thread, entity, cells, filled, verified, broken, armed: verified > 0, unresolved };
+  return { id: thread.id, special, heading, thread, entity, cells, filled, verified, broken, armed: verified > 0, unresolved, readings, rowIndex };
 }
 
 /** What a stop's anchor says: no quote is a plan, a found quote is verified, a lost one is broken. */

@@ -1,5 +1,6 @@
 import { buildPlotGrid, type PlotGrid } from "../../domain/plot/PlotGrid";
 import type { ProjectSpec } from "../../domain/progress/Project";
+import type { StoryGraph } from "../../domain/story/StoryGraph";
 import type { BuildStoryThreads } from "./BuildStoryThreads";
 
 /**
@@ -11,7 +12,13 @@ export class BuildPlotGrid {
   constructor(private readonly threads: BuildStoryThreads) {}
 
   async execute(project: ProjectSpec): Promise<PlotGrid> {
-    const { graph, model } = await this.threads.executeWithGraph(project);
-    return buildPlotGrid(graph, model, { pov: project.plotPov, time: project.plotTime, theme: project.plotTheme });
+    const { graph, model, file, hashes } = await this.threads.executeWithGraph(project);
+    return buildPlotGrid(graph, model, { pov: project.plotPov, time: project.plotTime, theme: project.plotTheme }, { readings: file.grid, hashes });
+  }
+
+  /** The grid with the graph it was built on, for a pass that needs both. */
+  async executeWithGraph(project: ProjectSpec): Promise<{ grid: PlotGrid; graph: StoryGraph }> {
+    const { graph, model, file, hashes } = await this.threads.executeWithGraph(project);
+    return { grid: buildPlotGrid(graph, model, { pov: project.plotPov, time: project.plotTime, theme: project.plotTheme }, { readings: file.grid, hashes }), graph };
   }
 }

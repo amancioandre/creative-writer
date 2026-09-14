@@ -14,7 +14,7 @@ describe("StoryMapFile", () => {
   it("round-trips through the markdown note", () => {
     const file = putReading(EMPTY_STORY_MAP_FILE, reading);
     const md = serializeStoryMapNote(file, "Novel");
-    expect(md.startsWith("---\ncreative-writer: false\ncreative-writer-storymap: 3\n---")).toBe(true);
+    expect(md.startsWith("---\ncreative-writer: false\ncreative-writer-storymap: 4\n---")).toBe(true);
     expect(md).toContain("Story map data for **Novel**");
     expect(parseStoryMapNote(md)).toEqual(file);
   });
@@ -57,10 +57,11 @@ describe("StoryMapFile", () => {
     expect(parseStoryMapNote(serializeStoryMapNote(c, "Novel"))).toEqual(c);
   });
 
-  it("loads a version 1 note as version 3 with nothing dismissed, no facts, no intents and no echoes", () => {
+  it("loads a version 1 note as version 4 with nothing dismissed, no facts, no intents, no echoes and no grid readings", () => {
     const v1 = { version: 1, readings: [reading], layout: {} };
     const f = normalizeStoryMapFile(v1);
-    expect(f.version).toBe(3);
+    expect(f.version).toBe(4);
+    expect(f.grid).toEqual([]);
     expect(f.readings).toEqual([reading]);
     expect(f.facts).toEqual([]);
     expect(f.dismissed).toEqual([]);
