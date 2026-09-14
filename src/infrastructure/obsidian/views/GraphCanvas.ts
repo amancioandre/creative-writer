@@ -33,6 +33,8 @@ export class GraphCanvas {
   readonly svg: SVGSVGElement;
   readonly viewport: SVGGElement;
   view: ViewTransform = { x: 0, y: 0, k: 1 };
+  /** The surface's box, measured once per gesture and on resize; never read inside a frame. */
+  private rect: DOMRect | null = null;
 
   constructor(host: HTMLElement, private readonly opts: GraphCanvasOptions) {
     this.svg = document.createElementNS(SVG, "svg");
@@ -44,13 +46,24 @@ export class GraphCanvas {
     this.attachPanZoom();
   }
 
-  private size(): { w: number; h: number } {
-    const rect = this.svg.getBoundingClientRect();
+  /** Reads the surface's box. Call at the start of a gesture, on resize, before a fit: not per frame. */
+  measure(): DOMRect {
+    this.rect = this.svg.getBoundingClientRect();
+    return this.rect;
+  }
+
+  private box(): DOMRect {
+    return this.rect ?? this.measure();
+  }
+
+  /** The surface's size from the last measurement, with a fallback for a surface that has no layout yet. */
+  size(): { w: number; h: number } {
+    const rect = this.box();
     return { w: rect.width || this.svg.clientWidth || 800, h: rect.height || this.svg.clientHeight || 600 };
   }
 
   toWorld(clientX: number, clientY: number): Point {
-    const rect = this.svg.getBoundingClientRect();
+    const rect = this.box();
     return { x: (clientX - rect.left - this.view.x) / this.view.k, y: (clientY - rect.top - this.view.y) / this.view.k };
   }
 
@@ -68,7 +81,7 @@ export class GraphCanvas {
   }
 
   zoomAt(clientX: number, clientY: number, factor: number): void {
-    const rect = this.svg.getBoundingClientRect();
+    const rect = this.measure();
     const px = clientX - rect.left, py = clientY - rect.top;
     const k = clamp(this.view.k * factor, this.opts.minZoom, this.opts.maxZoom);
     const ratio = k / this.view.k;
@@ -79,6 +92,7 @@ export class GraphCanvas {
 
   /** Zoom and pan so a rectangle of graph space fills the surface, never past 1:1 unless asked. */
   fit(bounds: Rect, pad = 40, maxK = 1): void {
+    this.measure();
     const { w, h } = this.size();
     const bw = Math.max(1, bounds.w + 2 * pad), bh = Math.max(1, bounds.h + 2 * pad);
     const k = clamp(Math.min(w / bw, h / bh, maxK), this.opts.minZoom, this.opts.maxZoom);
@@ -92,6 +106,7 @@ export class GraphCanvas {
     let moved = false;
     this.svg.addEventListener("pointerdown", (ev) => {
       if ((ev.target as Element | null)?.closest?.(this.opts.interactive)) return;
+      this.measure();
       pan = { x: ev.clientX, y: ev.clientY, vx: this.view.x, vy: this.view.y };
       moved = false;
       this.svg.setPointerCapture?.(ev.pointerId);
@@ -113,6 +128,7 @@ export class GraphCanvas {
     this.svg.addEventListener("pointercancel", end);
     this.svg.addEventListener("dblclick", (ev) => {
       if ((ev.target as Element | null)?.closest?.(this.opts.interactive)) return;
+      this.measure();
       this.opts.onDoubleClick?.(this.toWorld(ev.clientX, ev.clientY));
     });
     this.svg.addEventListener("wheel", (ev) => {
@@ -128,6 +144,7 @@ export class GraphCanvas {
     el.addEventListener("pointerdown", (e) => {
       const ev = e as PointerEvent;
       ev.stopPropagation();
+      this.measure();
       start = { x: ev.clientX, y: ev.clientY, world: this.toWorld(ev.clientX, ev.clientY) };
       moved = false;
       (el as Element & { setPointerCapture?: (id: number) => void }).setPointerCapture?.(ev.pointerId);

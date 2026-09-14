@@ -77,6 +77,10 @@ const clickNode = (el: HTMLElement, id: string) => {
 };
 const setting = (cls: string) => Setting.created.find((s) => s.settingEl.classList.contains(cls))!;
 
+/** The search fields redraw once typing pauses. */
+const settle = () => new Promise((r) => setTimeout(r, 150));
+const frame = () => new Promise((r) => requestAnimationFrame(() => r(undefined)));
+
 describe("StoryMapView", () => {
   it("has a stable type and names the project", async () => {
     const { v } = await open();
@@ -166,11 +170,11 @@ describe("StoryMapView", () => {
     const r = () => Number(el.querySelector<SVGCircleElement>('.czm-node[data-id="Novel/Characters/Ilse.md"] circle')!.getAttribute("r"));
     const w = () => Number(el.querySelector<SVGLineElement>(".czm-edge")!.getAttribute("stroke-width"));
     const r0 = r(), w0 = w();
-    setting("czm-set-display-nodeSize").slider!.onChangeCb(2);
+    setting("czm-set-display-nodeSize").slider!.onChangeCb(2); await frame();
     expect(r()).toBeCloseTo(r0 * 2, 0);
-    setting("czm-set-display-edgeWidth").slider!.onChangeCb(3);
+    setting("czm-set-display-edgeWidth").slider!.onChangeCb(3); await frame();
     expect(w()).toBeCloseTo(w0 * 3, 0);
-    setting("czm-set-display-labelSize").slider!.onChangeCb(0);
+    setting("czm-set-display-labelSize").slider!.onChangeCb(0); await frame();
     expect(el.querySelector("svg > g")!.classList.contains("czm-no-labels")).toBe(true);
     await new Promise((r) => setTimeout(r, 450));
     expect(settings().display).toEqual({ nodeSize: 2, edgeWidth: 3, edgeOpacity: 0.55, labelSize: 0 });
@@ -180,7 +184,7 @@ describe("StoryMapView", () => {
     const { el, v } = await open();
     const search = el.querySelector(".czm-map-search") as HTMLInputElement;
     search.value = "lisbon";
-    search.dispatchEvent(new Event("input"));
+    search.dispatchEvent(new Event("input")); await settle();
     const ids = [...el.querySelectorAll(".czm-node")].map((n) => n.getAttribute("data-id"));
     expect(ids).toContain("Novel/Places/Lisbon.md");
     expect(ids).not.toContain("ref:orpheus");
@@ -241,7 +245,7 @@ describe("StoryMapView", () => {
     const { el } = await open();
     const search = el.querySelector(".czm-map-search") as HTMLInputElement;
     search.value = "nobody";
-    search.dispatchEvent(new Event("input"));
+    search.dispatchEvent(new Event("input")); await settle();
     expect(el.querySelector(".czm-map-empty")!.textContent).toBe("Nothing to show: “nobody” matches nothing.");
     expect(el.querySelector(".czm-shell-state-text")!.textContent).toMatch(/^\d+ nodes · 0 shown · 1 filter on$/);
     (el.querySelector(".czm-map-fix-query") as HTMLElement).click();
@@ -536,5 +540,26 @@ describe("StoryMapView keyboard", () => {
     const t = g.getAttribute("transform");
     key(search, "ArrowLeft");
     expect(g.getAttribute("transform")).toBe(t);
+  });
+});
+
+describe("StoryMapView performance", () => {
+  it("reads layout at the start of a gesture and on render, never inside the frame loop", async () => {
+    const { el, v } = await open();
+    const svg = el.querySelector<SVGSVGElement>("svg")!;
+    const reads = { n: 0 };
+    const original = svg.getBoundingClientRect.bind(svg);
+    svg.getBoundingClientRect = () => { reads.n += 1; return original(); };
+    clickNode(el, "Novel/Characters/Marta Kovács.md");
+    reads.n = 0;
+    const paint = (v as unknown as { paint: () => void }).paint.bind(v);
+    for (let i = 0; i < 30; i++) paint();
+    expect(reads.n).toBe(0);
+    // A pan or a drag measures once when it starts.
+    svg.dispatchEvent(new MouseEvent("pointerdown", { clientX: 10, clientY: 10, bubbles: true }));
+    expect(reads.n).toBe(1);
+    for (let i = 0; i < 10; i++) svg.dispatchEvent(new MouseEvent("pointermove", { clientX: 20 + i, clientY: 20 + i, bubbles: true }));
+    expect(reads.n).toBe(1);
+    svg.dispatchEvent(new MouseEvent("pointerup", { clientX: 30, clientY: 30, bubbles: true }));
   });
 });

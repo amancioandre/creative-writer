@@ -225,14 +225,15 @@ export class ManuscriptView extends ItemView {
     if (time) line.createSpan({ text: ` · ${time} to read`, cls: "czm-ms-time", attr: { title: speed, "aria-label": `${time} to read. ${speed}` } });
     if (count) line.createSpan({ text: ` · ${count} comment${count === 1 ? "" : "s"}` });
     const tools = head.createDiv({ cls: "czm-ms-tools" });
-    const toggle = (icon: string, label: string, on: boolean, apply: (v: boolean) => ManuscriptSettings) => {
+    const toggle = (icon: string, label: string, on: boolean, apply: (v: boolean) => ManuscriptSettings, light = false) => {
       const btn = tools.createEl("button", { cls: `clickable-icon czm-ms-tool${on ? " is-active" : ""}`, attr: { "aria-label": label, "aria-pressed": String(on), title: label } });
       setIcon(btn, icon);
-      btn.addEventListener("click", () => { this.source.updateSettings(apply(!on)); void this.refresh(); });
+      // A switch that only shows or hides a pane redraws the pane, not the book.
+      btn.addEventListener("click", () => { this.source.updateSettings(apply(!on)); if (light) { this.renderHead(); this.renderSide(); } else void this.refresh(); });
       return btn;
     };
     toggle("text", "Prose only: paragraphs, headings, quotes and scene breaks — no lists, tables, code or callouts", settings.proseOnly, (v) => ({ ...this.source.settings(), proseOnly: v }));
-    toggle("message-square", "Comments pane: this paragraph's comments and a field to add one; every comment below", settings.showComments, (v) => ({ ...this.source.settings(), showComments: v }));
+    toggle("message-square", "Comments pane: this paragraph's comments and a field to add one; every comment below", settings.showComments, (v) => ({ ...this.source.settings(), showComments: v }), true);
     toggle("ruler", "Ruler: one segment per section, wide by words, coloured by readability, marked when it changed today", settings.showRuler, (v) => ({ ...this.source.settings(), showRuler: v }));
     toggle("users", "Story: who is in each section and scene, and the model's contradictions in the gutter", settings.showStory, (v) => ({ ...this.source.settings(), showStory: v }));
     toggle("repeat", "Echoes: repeated phrases marked in the gutter, each naming another place the words occur", settings.showEchoes, (v) => ({ ...this.source.settings(), showEchoes: v }));

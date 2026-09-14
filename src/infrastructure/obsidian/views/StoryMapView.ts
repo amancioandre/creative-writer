@@ -55,6 +55,8 @@ const DISPLAY_LABEL: Record<keyof DisplaySettings, string> = { nodeSize: "Node s
 const MIN_ZOOM = 0.15, MAX_ZOOM = 5;
 /** How far an arrow key pans, in screen pixels. */
 const PAN_STEP = 60;
+/** A search rebuilds the graph once the typing pauses. */
+const SEARCH_DEBOUNCE_MS = 120;
 
 type Selection = { kind: "node"; id: string } | { kind: "edge"; edge: Edge } | { kind: "new-edge"; from: string; to: string } | null;
 const ENTITY_EXITS: readonly [string, EntityKind, string][] = [["Character", "character", "czm-act-character"], ["Place", "location", "czm-act-place"], ["Item", "item", "czm-act-item"], ["Faction", "faction", "czm-act-faction"], ["Event", "event", "czm-act-event"]];
@@ -106,6 +108,15 @@ export class StoryMapView extends ItemView {
   private search!: HTMLInputElement;
   private emptyEl: HTMLElement | null = null;
   private filter: GraphFilter = { layers: new Set(), kinds: new Set(), query: "", hideIsolated: false };
+  /** The surface's box, measured on mount, on resize and at the start of a gesture; the frame loop only reads this. */
+  private surface = { left: 0, top: 0, w: 800, h: 600 };
+  /** The card's and the composer's size, measured once after they are rendered, not per frame. */
+  private cardSize = { w: 260, h: 200 };
+  private cardDirty = true;
+  private composerSize = { w: 240, h: 120 };
+  private composerDirty = true;
+  private rebuildTimer: number | null = null;
+  private graphFrame: number | null = null;
 
   constructor(leaf: WorkspaceLeaf, private readonly source: StoryMapSource) {
     super(leaf);
@@ -178,7 +189,7 @@ export class StoryMapView extends ItemView {
     this.scopeSelect = this.shell.scope.createEl("select", { cls: "dropdown", attr: { "aria-label": "Project" } });
     this.scopeSelect.addEventListener("change", () => void this.show(this.source.projects().find((p) => p.scope === this.scopeSelect.value) ?? null));
     this.search = this.shell.scope.createEl("input", { cls: "czm-map-search", attr: { type: "search", placeholder: "Find a name…", "aria-label": "Find a name" } });
-    this.search.addEventListener("input", () => { this.query = this.search.value; this.rebuild(); });
+    this.search.addEventListener("input", () => { this.query = this.search.value; this.scheduleRebuild(); });
     this.svg = document.createElementNS(SVG, "svg");
     this.svg.setAttribute("class", "czm-map-svg");
     this.svg.setAttribute("role", "group");
@@ -189,6 +200,12 @@ export class StoryMapView extends ItemView {
     this.rubber.setAttribute("class", "czm-map-rubber");
     this.svg.appendChild(this.rubber);
     this.attachPanZoom();
+    this.measureSurface();
+    if (typeof ResizeObserver === "function") {
+      const ro = new ResizeObserver(() => { this.measureSurface(); this.paint(); });
+      ro.observe(this.root);
+      this.register(() => ro.disconnect());
+    }
 
     this.panel = this.shell.side;
     this.card = this.root.createDiv({ cls: "czm-map-card" });
@@ -434,8 +451,26 @@ export class StoryMapView extends ItemView {
 
   // --- navigation ----------------------------------------------------------------
 
+  /** One layout read, outside the frame loop. */
+  private measureSurface(): void {
+    const r = this.svg.getBoundingClientRect();
+    this.surface = { left: r.left, top: r.top, w: r.width || this.svg.clientWidth || 800, h: r.height || this.svg.clientHeight || 600 };
+  }
+
+  /** Rebuild after a pause in typing, so a search is one rebuild, not one per letter. */
+  private scheduleRebuild(): void {
+    if (this.rebuildTimer !== null) window.clearTimeout(this.rebuildTimer);
+    this.rebuildTimer = window.setTimeout(() => { this.rebuildTimer = null; this.rebuild(); }, SEARCH_DEBOUNCE_MS);
+  }
+
+  /** Redraw once per frame however many slider ticks arrive. */
+  private scheduleGraph(): void {
+    if (this.graphFrame !== null) return;
+    this.graphFrame = window.requestAnimationFrame(() => { this.graphFrame = null; this.renderGraph(); });
+  }
+
   private toWorld(clientX: number, clientY: number): Point {
-    const rect = this.svg.getBoundingClientRect();
+    const rect = this.surface;
     return { x: (clientX - rect.left - this.view.x) / this.view.k, y: (clientY - rect.top - this.view.y) / this.view.k };
   }
 
@@ -448,14 +483,14 @@ export class StoryMapView extends ItemView {
     let moved = false;
     this.svg.addEventListener("pointerdown", (ev) => {
       if ((ev.target as Element | null)?.closest?.(".czm-node, .czm-edge")) return;
+      this.measureSurface();
       pan = { x: ev.clientX, y: ev.clientY, vx: this.view.x, vy: this.view.y };
       moved = false;
       this.svg.setPointerCapture?.(ev.pointerId);
     });
     this.svg.addEventListener("pointermove", (ev) => {
       if (this.linking) {
-        const rect = this.svg.getBoundingClientRect();
-        this.rubber.setAttribute("x2", f(ev.clientX - rect.left)); this.rubber.setAttribute("y2", f(ev.clientY - rect.top));
+        this.rubber.setAttribute("x2", f(ev.clientX - this.surface.left)); this.rubber.setAttribute("y2", f(ev.clientY - this.surface.top));
       }
       if (!pan) return;
       const dx = ev.clientX - pan.x, dy = ev.clientY - pan.y;
@@ -472,10 +507,12 @@ export class StoryMapView extends ItemView {
     this.svg.addEventListener("pointercancel", end);
     this.svg.addEventListener("dblclick", (ev) => {
       if ((ev.target as Element | null)?.closest?.(".czm-node, .czm-edge")) return;
+      this.measureSurface();
       this.openComposer(this.toWorld(ev.clientX, ev.clientY));
     });
     this.svg.addEventListener("wheel", (ev) => {
       ev.preventDefault();
+      this.measureSurface();
       this.zoomAt(ev.clientX, ev.clientY, Math.exp(-ev.deltaY * 0.0015));
     }, { passive: false });
   }
@@ -486,7 +523,7 @@ export class StoryMapView extends ItemView {
   }
 
   zoomAt(clientX: number, clientY: number, factor: number): void {
-    const rect = this.svg.getBoundingClientRect();
+    const rect = this.surface;
     const px = clientX - rect.left, py = clientY - rect.top;
     const k = clamp(this.view.k * factor, MIN_ZOOM, MAX_ZOOM);
     const ratio = k / this.view.k;
@@ -599,6 +636,7 @@ this.renderCard(); this.paint();
 
   /** The floating "new node" form, at a point in graph space. */
   openComposer(at: Point): void {
+    this.composerDirty = true;
     if (!this.project) return;
     this.cancelLink();
     this.composerAt = at;
@@ -629,9 +667,9 @@ this.renderCard(); this.paint();
   private placeComposer(): void {
     if (!this.composerAt) return;
     const s = this.toScreen(this.composerAt);
-    const rect = this.svg.getBoundingClientRect();
-    const w = rect.width || 800, h = rect.height || 600;
-    const cw = this.composer.offsetWidth || 240, ch = this.composer.offsetHeight || 120;
+    const { w, h } = this.surface;
+    if (this.composerDirty) { this.composerSize = { w: this.composer.offsetWidth || 240, h: this.composer.offsetHeight || 120 }; this.composerDirty = false; }
+    const cw = this.composerSize.w, ch = this.composerSize.h;
     this.composer.style.left = `${Math.round(clamp(s.x - cw / 2, 8, Math.max(8, w - cw - 8)))}px`;
     this.composer.style.top = `${Math.round(clamp(s.y + 16, 8, Math.max(8, h - ch - 8)))}px`;
   }
@@ -780,7 +818,7 @@ this.renderCard(); this.paint();
       const [min, max, step] = DISPLAY_RANGES[key];
       new Setting(displaySec).setName(DISPLAY_LABEL[key]).setClass(`czm-set-display-${key}`).addSlider((sl) => sl.setLimits(min, max, step).setValue(s.display[key]).onChange((v) => {
         this.saveSettings({ ...this.settings, display: { ...this.settings.display, [key]: v } });
-        this.renderGraph();
+        this.scheduleGraph();
       }));
     }
     new Setting(displaySec).setName("Reset display").setClass("czm-set-reset-display").addButton((b) => b.setButtonText("Reset").onClick(() => { this.saveSettings({ ...this.settings, display: DEFAULT_DISPLAY }); this.renderPanel(); this.renderGraph(); }));
@@ -821,6 +859,7 @@ this.renderCard(); this.paint();
   // --- floating card -------------------------------------------------------------
 
   private renderCard(): void {
+    this.cardDirty = true;
     const sel = this.selection;
     this.card.empty();
     this.card.classList.toggle("is-open", sel !== null);
@@ -1020,8 +1059,7 @@ this.renderCard(); this.paint();
   private placeCard(): void {
     const sel = this.selection;
     if (!sel || !this.card.classList.contains("is-open")) return;
-    const rect = this.svg.getBoundingClientRect();
-    const w = rect.width || 800, h = rect.height || 600;
+    const { w, h } = this.surface;
     let anchor: Point | undefined;
     if (sel.kind === "node") anchor = this.sim.position(sel.id);
     else {
@@ -1031,7 +1069,8 @@ this.renderCard(); this.paint();
     }
     if (!anchor) return;
     const s = this.toScreen(anchor);
-    const cw = this.card.offsetWidth || 260, ch = this.card.offsetHeight || 200;
+    if (this.cardDirty) { this.cardSize = { w: this.card.offsetWidth || 260, h: this.card.offsetHeight || 200 }; this.cardDirty = false; }
+    const cw = this.cardSize.w, ch = this.cardSize.h;
     let x = s.x + 24, y = s.y - 20;
     if (x + cw > w - 8) x = s.x - cw - 24;
     if (x < 8) x = 8;

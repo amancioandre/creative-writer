@@ -57,6 +57,8 @@ const AXIS_LABEL_HEIGHT = 38;
 /** A slot narrower than this carries no title of its own; the chapter name still says where it is. */
 const MIN_LABELLED_SLOT = 40;
 const CHAR_W = 6.2;
+/** A search redraws the chart once the typing pauses. */
+const SEARCH_DEBOUNCE_MS = 120;
 const BOTTOM_PAD = 8;
 
 type Selection = { kind: "arc"; arc: ArcPath } | { kind: "scene"; index: number } | null;
@@ -101,6 +103,12 @@ export class StoryThreadsView extends ItemView {
   private scopeSelect!: HTMLSelectElement;
   private search!: HTMLInputElement;
   private emptyEl: HTMLElement | null = null;
+  /** The view's box and the card's size, measured outside the scroll and frame paths. */
+  private surface = { w: 800, h: 600 };
+  private cardSize = { w: 260, h: 200 };
+  private cardDirty = true;
+  private placeFrame: number | null = null;
+  private searchTimer: number | null = null;
 
   constructor(leaf: WorkspaceLeaf, private readonly source: StoryThreadsSource) {
     super(leaf);
@@ -153,7 +161,7 @@ export class StoryThreadsView extends ItemView {
     this.scopeSelect = this.shell.scope.createEl("select", { cls: "dropdown", attr: { "aria-label": "Project" } });
     this.scopeSelect.addEventListener("change", () => void this.show(this.source.projects().find((p) => p.scope === this.scopeSelect.value) ?? null));
     this.search = this.shell.scope.createEl("input", { cls: "czm-map-search", attr: { type: "search", placeholder: "Find a thread…", "aria-label": "Find a thread" } });
-    this.search.addEventListener("input", () => { this.query = this.search.value; this.renderChart(); this.renderCard(); this.renderHead(); });
+    this.search.addEventListener("input", () => { this.query = this.search.value; if (this.searchTimer !== null) window.clearTimeout(this.searchTimer); this.searchTimer = window.setTimeout(() => { this.searchTimer = null; this.renderChart(); this.renderCard(); this.renderHead(); }, SEARCH_DEBOUNCE_MS); });
     this.scroller = this.root.createDiv({ cls: "czm-th-scroll" });
     this.svg = document.createElementNS(SVG, "svg");
     this.svg.setAttribute("class", "czm-th-svg");
@@ -177,9 +185,16 @@ export class StoryThreadsView extends ItemView {
       ev.preventDefault();
       this.zoomAt(ev.clientX, Math.exp(-ev.deltaY * 0.0015));
     }, { passive: false });
-    this.scroller.addEventListener("scroll", () => this.placeCard());
+    // One placement per frame however fast the scroll events come.
+    this.scroller.addEventListener("scroll", () => { if (this.placeFrame === null) this.placeFrame = window.requestAnimationFrame(() => { this.placeFrame = null; this.placeCard(); }); });
 
     this.panel = this.shell.side;
+    this.measureSurface();
+    if (typeof ResizeObserver === "function") {
+      const ro = new ResizeObserver(() => { this.measureSurface(); this.placeCard(); });
+      ro.observe(this.root);
+      this.register(() => ro.disconnect());
+    }
     this.badge = this.root.createDiv({ cls: "czm-th-badge" });
     this.card = this.root.createDiv({ cls: "czm-map-card czm-th-card" });
     this.status = new StatusLine(this.root);
@@ -558,6 +573,7 @@ export class StoryThreadsView extends ItemView {
   // --- floating card -----------------------------------------------------------
 
   private renderCard(): void {
+    this.cardDirty = true;
     const sel = this.selection;
     this.card.empty();
     this.card.classList.toggle("is-open", sel !== null);
@@ -726,13 +742,13 @@ export class StoryThreadsView extends ItemView {
   private placeCard(): void {
     const sel = this.selection;
     if (!sel || !this.card.classList.contains("is-open")) return;
-    const rect = this.root.getBoundingClientRect();
-    const w = rect.width || 800, h = rect.height || 600;
+    const { w, h } = this.surface;
     let ax: number, ay: number;
     if (sel.kind === "arc") { ax = sel.arc.apex.x; ay = sel.arc.apex.y; }
     else { const slot = this.slots[sel.index]; if (!slot) return; ax = slot.cx; ay = this.baseY + slot.barH; }
     const sx = ax - this.scroller.scrollLeft, sy = ay - this.scroller.scrollTop;
-    const cw = this.card.offsetWidth || 260, ch = this.card.offsetHeight || 200;
+    if (this.cardDirty) { this.cardSize = { w: this.card.offsetWidth || 260, h: this.card.offsetHeight || 200 }; this.cardDirty = false; }
+    const cw = this.cardSize.w, ch = this.cardSize.h;
     let x = sx + 16, y = sel.kind === "arc" ? sy - 12 : sy + 12;
     if (x + cw > w - 8) x = sx - cw - 16;
     if (x < 8) x = 8;
@@ -740,6 +756,11 @@ export class StoryThreadsView extends ItemView {
     if (y < 8) y = 8;
     this.card.style.left = `${Math.round(x)}px`;
     this.card.style.top = `${Math.round(y)}px`;
+  }
+
+  private measureSurface(): void {
+    const rect = this.root.getBoundingClientRect();
+    this.surface = { w: rect.width || 800, h: rect.height || 600 };
   }
 
   private flash(message: string): void {

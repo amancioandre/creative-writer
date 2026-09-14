@@ -123,6 +123,9 @@ export class WriterView extends ItemView {
   private panel!: HTMLElement;
   private status!: StatusLine;
   private shell!: PanelShell;
+  /** The side card's size, measured once after it is rendered, not on every drag frame. */
+  private cardSize = { w: 260, h: 200 };
+  private cardDirty = true;
   private help!: HTMLElement;
 
   constructor(leaf: WorkspaceLeaf, private readonly source: WriterSource) {
@@ -1089,6 +1092,7 @@ export class WriterView extends ItemView {
   // --- side card -------------------------------------------------------------------
 
   private renderCard(): void {
+    this.cardDirty = true;
     const sel = this.selection;
     this.card.empty();
     this.card.setCssStyles({ left: "", top: "" });
@@ -1370,8 +1374,7 @@ export class WriterView extends ItemView {
   private placeCard(): void {
     const sel = this.selection;
     if (!sel || !this.card.classList.contains("is-open")) return;
-    const rect = this.canvas.svg.getBoundingClientRect();
-    const w = rect.width || 800, h = rect.height || 600;
+    const { w, h } = this.canvas.size();
     let anchor: Point | null = null;
     let subjectW = 0;
     if (sel.kind === "card") { const p = this.cardAt(sel.path); if (p) { anchor = { x: p.x + CARD_W, y: p.y }; subjectW = CARD_W; } }
@@ -1382,7 +1385,8 @@ export class WriterView extends ItemView {
     else anchor = { x: this.band.rect.x + this.band.rect.w, y: this.band.rect.y };
     if (!anchor) return;
     const s = this.canvas.toScreen(anchor);
-    const cw = this.card.offsetWidth || 260, ch = this.card.offsetHeight || 200;
+    if (this.cardDirty) { this.cardSize = { w: this.card.offsetWidth || 260, h: this.card.offsetHeight || 200 }; this.cardDirty = false; }
+    const cw = this.cardSize.w, ch = this.cardSize.h;
     let x = s.x + 12, y = s.y;
     if (x + cw > w - 8) x = s.x - subjectW * this.canvas.view.k - cw - 24;
     if (x < 8) x = 8;

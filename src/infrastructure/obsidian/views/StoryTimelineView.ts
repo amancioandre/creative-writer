@@ -8,6 +8,8 @@ import { PanelShell, type PanelId } from "./PanelShell";
 import { onActivate } from "./keys";
 
 export const STORY_TIMELINE_VIEW_TYPE = "creative-writer-story-timeline";
+/** A filter redraws the table once the typing pauses. */
+const SEARCH_DEBOUNCE_MS = 120;
 
 export interface StoryTimelineSource {
   projects(): ProjectSpec[];
@@ -31,6 +33,10 @@ export class StoryTimelineView extends ItemView {
   private graph: StoryGraph = EMPTY_GRAPH;
   private query = "";
   private generation = 0;
+  private shell: PanelShell | null = null;
+  private body: HTMLElement | null = null;
+  private search: HTMLInputElement | null = null;
+  private searchTimer: number | null = null;
 
   constructor(leaf: WorkspaceLeaf, private readonly source: StoryTimelineSource) {
     super(leaf);
@@ -61,7 +67,8 @@ export class StoryTimelineView extends ItemView {
   render(): void {
     this.contentEl.empty();
     const shell = new PanelShell(this.contentEl, { current: "timeline", jump: (to) => this.source.jumpTo(to, this.project) });
-    const root = shell.main.createDiv({ cls: "czm-tl" });
+    this.shell = shell;
+    this.body = shell.main.createDiv({ cls: "czm-tl" });
     const head = shell.scope;
     const projects = this.source.projects();
     const select = head.createEl("select", { cls: "dropdown", attr: { "aria-label": "Project" } });
@@ -73,8 +80,24 @@ export class StoryTimelineView extends ItemView {
     select.addEventListener("change", () => void this.show(projects.find((p) => p.scope === select.value) ?? null));
     const search = head.createEl("input", { cls: "czm-map-search", attr: { type: "search", placeholder: "Filter the cast…", "aria-label": "Filter the cast" } });
     search.value = this.query;
-    search.addEventListener("input", () => { this.query = search.value; this.render(); const again = this.contentEl.querySelector<HTMLInputElement>(".czm-map-search"); if (again) { again.focus(); again.setSelectionRange(again.value.length, again.value.length); } });
+    this.search = search;
+    // The field stays put and keeps its caret; only the table under it is redrawn, once the typing pauses.
+    search.addEventListener("input", () => { this.query = search.value; if (this.searchTimer !== null) window.clearTimeout(this.searchTimer); this.searchTimer = window.setTimeout(() => { this.searchTimer = null; this.renderTable(); }, SEARCH_DEBOUNCE_MS); });
+    this.renderTable();
+  }
 
+  private clearSearch(): void {
+    this.query = "";
+    if (this.search) this.search.value = "";
+    this.renderTable();
+  }
+
+  /** The matrix and the state line for the current project and filter; the shell around them stays. */
+  private renderTable(): void {
+    const shell = this.shell, root = this.body;
+    if (!shell || !root) return;
+    root.empty();
+    shell.main.querySelector(".czm-shell-empty")?.remove();
     if (!this.project) { shell.setState("No project"); shell.empty("No project yet — put story: true (or writing-target: 50000) in a note's front matter and its folder becomes one."); return; }
     // The project note is the container, not a scene of the story.
     const notePath = this.project.notePath;
@@ -85,9 +108,9 @@ export class StoryTimelineView extends ItemView {
       .filter((e) => e.appearances.length > 0 && e.kind !== "note" && e.kind !== "reference" && settings.kinds[e.kind])
       .filter((e) => !q || e.name.toLowerCase().includes(q) || e.aliases.some((a) => a.toLowerCase().includes(q)))
       .sort((a, b) => kindOrder(a) - kindOrder(b) || b.mentions - a.mentions);
-    shell.setState(`${rows.length} scene${rows.length === 1 ? "" : "s"} · ${columns.length} in the cast${q ? ` · “${this.query.trim()}”` : ""}`, q ? { label: "Clear", cls: "czm-tl-clear", onClick: () => { this.query = ""; this.render(); } } : null);
+    shell.setState(`${rows.length} scene${rows.length === 1 ? "" : "s"} · ${columns.length} in the cast${q ? ` · “${this.query.trim()}”` : ""}`, q ? { label: "Clear", cls: "czm-tl-clear", onClick: () => { this.clearSearch(); } } : null);
     if (rows.length === 0) { shell.empty("No scenes yet — headings with prose under them become scenes."); return; }
-    if (columns.length === 0) { shell.empty(q ? `Nobody matches “${this.query.trim()}”.` : "Nobody appears in a scene yet — names that recur, or notes typed as characters, become the cast.", q ? [{ label: "Clear search", cls: "czm-tl-clear", onClick: () => { this.query = ""; this.render(); } }] : []); return; }
+    if (columns.length === 0) { shell.empty(q ? `Nobody matches “${this.query.trim()}”.` : "Nobody appears in a scene yet — names that recur, or notes typed as characters, become the cast.", q ? [{ label: "Clear search", cls: "czm-tl-clear", onClick: () => { this.clearSearch(); } }] : []); return; }
     const wrap = root.createDiv({ cls: "czm-tl-wrap" });
     const table = wrap.createEl("table", { cls: "czm-tl-table" });
     const thead = table.createEl("thead").createEl("tr");
@@ -133,7 +156,7 @@ export class StoryTimelineView extends ItemView {
       }
       tr.createEl("td", { cls: "czm-tl-filler" });
     }
-  }
+    }
 }
 
 const ORDER: Record<Entity["kind"], number> = { character: 0, candidate: 1, faction: 2, location: 3, item: 4, event: 5, note: 6, reference: 7 };

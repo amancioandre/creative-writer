@@ -27,6 +27,10 @@ function open(overrides: Partial<StoryTimelineSource> = {}) {
   return { v: new StoryTimelineView(new WorkspaceLeaf(), src), calls };
 }
 
+/** The search fields redraw once typing pauses. */
+const settle = () => new Promise((r) => setTimeout(r, 150));
+const frame = () => new Promise((r) => requestAnimationFrame(() => r(undefined)));
+
 describe("StoryTimelineView", () => {
   it("has a stable type and title", async () => {
     const { v } = open();
@@ -67,7 +71,7 @@ describe("StoryTimelineView", () => {
     await v.onOpen();
     const search = v.contentEl.querySelector(".czm-map-search") as HTMLInputElement;
     search.value = "lis";
-    search.dispatchEvent(new Event("input"));
+    search.dispatchEvent(new Event("input")); await settle();
     expect([...v.contentEl.querySelectorAll(".czm-tl-col span")].map((s) => s.textContent)).toEqual(["Lisbon"]);
   });
 

@@ -70,6 +70,10 @@ const setting = (cls: string) => Setting.created.find((s) => s.settingEl.classLi
 const arcs = (el: HTMLElement) => [...el.querySelectorAll<SVGPathElement>(".czm-arc")];
 const click = (node: Element) => node.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
+/** The search fields redraw once typing pauses. */
+const settle = () => new Promise((r) => setTimeout(r, 150));
+const frame = () => new Promise((r) => requestAnimationFrame(() => r(undefined)));
+
 describe("StoryThreadsView", () => {
   it("has a stable type, an icon, and names the project", async () => {
     const { v } = await open();
@@ -330,10 +334,10 @@ describe("StoryThreadsView", () => {
     setting("czm-set-contradictions-only").toggle!.onChangeCb(false);
     const search = el.querySelector(".czm-map-search") as HTMLInputElement;
     search.value = "letter";
-    search.dispatchEvent(new Event("input"));
+    search.dispatchEvent(new Event("input")); await settle();
     expect(arcs(el).map((a) => a.getAttribute("data-thread"))).toEqual(["writer:the letter"]);
     search.value = "";
-    search.dispatchEvent(new Event("input"));
+    search.dispatchEvent(new Event("input")); await settle();
     const before = el.querySelectorAll(".czm-th-strip-label").length;
     setting("czm-set-strip-cast").toggle!.onChangeCb(false);
     expect(el.querySelectorAll(".czm-th-strip-label")).toHaveLength(before - 1);
@@ -374,7 +378,7 @@ describe("StoryThreadsView", () => {
     const { el: filtered } = await open();
     const search = filtered.querySelector(".czm-map-search") as HTMLInputElement;
     search.value = "zzz";
-    search.dispatchEvent(new Event("input"));
+    search.dispatchEvent(new Event("input")); await settle();
     expect(filtered.querySelector(".czm-map-empty")!.textContent).toBe("Nothing to show: “zzz” matches no thread.");
     expect(filtered.querySelector(".czm-shell-state-text")!.textContent).toBe("4 scenes · 0 arcs · 1 contradiction");
     (filtered.querySelector(".czm-th-fix-query") as HTMLElement).click();
