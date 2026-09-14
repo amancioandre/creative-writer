@@ -106,4 +106,10 @@ describe("projectStreak", () => {
     expect(projectStreak(log, spec, "2026-08-25")).toBe(0);
     expect(projectStreak(log, { ...spec, dailyWords: 0 }, "2026-08-24")).toBe(0);
   });
+
+  it("reads the plot grid's column jobs from the project note", async () => {
+    const { parseProjectFrontmatter } = await import("../../../src/domain/progress/Project");
+    expect(parseProjectFrontmatter({ story: true, "plot-pov": " POV ", "plot-time": "Time", "plot-theme": "Theme: Debt" }, "Novel/Novel.md")).toMatchObject({ plotPov: "POV", plotTime: "Time", plotTheme: "Theme: Debt" });
+    expect(parseProjectFrontmatter({ story: true, "plot-pov": "" }, "Novel/Novel.md")).not.toHaveProperty("plotPov");
+  });
 });

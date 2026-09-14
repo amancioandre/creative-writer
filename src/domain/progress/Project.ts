@@ -33,6 +33,10 @@ export interface ProjectSpec {
   readonly dailyWords: number;
   /** Names the writer said are not names, as written. */
   readonly ignoredNames: readonly string[];
+  /** The threads note headings the plot grid reads as its POV, Time and main theme columns (`plot-pov`, `plot-time`, `plot-theme`); absent, none. */
+  readonly plotPov?: string;
+  readonly plotTime?: string;
+  readonly plotTheme?: string;
 }
 
 export function parseProjectFrontmatter(frontmatter: unknown, notePath: string): ProjectSpec | null {
@@ -51,7 +55,8 @@ export function parseProjectFrontmatter(frontmatter: unknown, notePath: string):
   const daily = Number(fm["writing-daily"] ?? fm["writing-goal"]);
   const rawIgnore = fm["story-ignore"];
   const ignoredNames = (Array.isArray(rawIgnore) ? rawIgnore : typeof rawIgnore === "string" ? rawIgnore.split(",") : []).filter((x): x is string => typeof x === "string").map((x) => x.trim()).filter(Boolean);
-  return { name, notePath, scope: noteScope ? notePath : folder, targetWords: hasTarget ? Math.floor(target) : 0, deadline, dailyWords: Number.isFinite(daily) && daily > 0 ? Math.floor(daily) : 0, ignoredNames };
+  const text = (key: "plot-pov" | "plot-time" | "plot-theme") => { const v = fm[key]; return typeof v === "string" && v.trim() ? { [key === "plot-pov" ? "plotPov" : key === "plot-time" ? "plotTime" : "plotTheme"]: v.trim() } : {}; };
+  return { name, notePath, scope: noteScope ? notePath : folder, targetWords: hasTarget ? Math.floor(target) : 0, deadline, dailyWords: Number.isFinite(daily) && daily > 0 ? Math.floor(daily) : 0, ignoredNames, ...text("plot-pov"), ...text("plot-time"), ...text("plot-theme") };
 }
 
 function toIso(d: Date): Day {

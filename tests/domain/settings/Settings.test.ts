@@ -137,4 +137,11 @@ describe("writer settings", () => {
     expect(normalizeSettings({ writer: { storiesFolder: " /storytelling\\stories/ " } }).writer.storiesFolder).toBe("storytelling/stories");
     expect(normalizeSettings({ writer: { storiesFolder: 3 } }).writer.storiesFolder).toBe("");
   });
+
+  it("normalises the plot grid's layout", async () => {
+    const { normalizePlotGrid, DEFAULT_PLOT_GRID } = await import("../../../src/domain/settings/Settings");
+    expect(normalizePlotGrid(undefined)).toEqual(DEFAULT_PLOT_GRID);
+    expect(normalizePlotGrid({ panelOpen: false, castExpanded: true, folded: { arc: true, bogus: true }, hidden: { "Novel/": ["Time", 3, " "], "Other/": [] }, unmoved: false, sections: { "pg-cell": false, x: "no" } }))
+      .toEqual({ panelOpen: false, castExpanded: true, folded: { arc: true, theme: false, subplot: false, free: false }, hidden: { "Novel/": ["Time"] }, unmoved: false, sections: { "pg-cell": false } });
+  });
 });

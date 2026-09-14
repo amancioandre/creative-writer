@@ -28,9 +28,21 @@ export interface GridCell {
   readonly presentUnmoved: boolean;
 }
 
+/** A column the project note names for a job: `plot-pov`, `plot-time`, `plot-theme`. */
+export type SpecialColumn = "pov" | "time" | "main-theme";
+
+/** What the project note names as the grid's POV, Time and main theme columns, by heading. */
+export interface SpecialColumns {
+  readonly pov?: string;
+  readonly time?: string;
+  readonly theme?: string;
+}
+
 export interface GridColumn {
   /** The thread's id in the threads model. */
   readonly id: string;
+  /** The job the project note gave this column, if any: POV and Time are drawn in the derived block, the main theme first among the themes. */
+  readonly special: SpecialColumn | null;
   readonly heading: ColumnHeading;
   readonly thread: Thread;
   /** The character an arc column is bound to, when the map knows one. */
@@ -58,6 +70,8 @@ export interface GridRow {
   readonly events: readonly string[];
   /** A heading with no prose yet: a scene planned, not written. */
   readonly outline: boolean;
+  /** Whose eyes the scene is seen through, from the POV column: the name written, and the character it names when the map knows one. */
+  readonly pov: { readonly name: string; readonly entity: Entity | null } | null;
 }
 
 export interface PlotGrid {
@@ -86,14 +100,23 @@ const KIND_ORDER: Record<ColumnKind, number> = { arc: 0, theme: 1, subplot: 2, f
  * plus outline headings), columns the writer's threads from the threads
  * model, whose refs already carry each stop's anchor.
  */
-export function buildPlotGrid(graph: StoryGraph, model: ThreadModel): PlotGrid {
-  const rows = gridRows(graph);
-  const rowIndex = new Map(rows.map((r) => [sceneKey(r.scene), r.index]));
+export function buildPlotGrid(graph: StoryGraph, model: ThreadModel, special: SpecialColumns = {}): PlotGrid {
+  const bare = gridRows(graph);
+  const rowIndex = new Map(bare.map((r) => [sceneKey(r.scene), r.index]));
   const writer = model.threads.filter((t) => t.kind === "writer");
+  const same = (a: string, b: string | undefined) => !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+  const specialOf = (heading: string): SpecialColumn | null => same(heading, special.time) ? "time" : same(heading, special.pov) ? "pov" : same(heading, special.theme) ? "main-theme" : null;
+  // Time and POV first, then the kinds in order, the main theme first among the themes, note order within each.
+  const rank = (c: { heading: ColumnHeading; special: SpecialColumn | null }) => c.special === "time" ? -2 : c.special === "pov" ? -1 : KIND_ORDER[c.heading.kind] * 2 + (c.special === "main-theme" ? 0 : 1);
   const columns = writer
-    .map((thread, order) => ({ thread, order, heading: parseColumnHeading(thread.label) }))
-    .sort((a, b) => KIND_ORDER[a.heading.kind] - KIND_ORDER[b.heading.kind] || a.order - b.order)
-    .map(({ thread, heading }) => column(thread, heading, rows, rowIndex, graph.entities));
+    .map((thread, order) => ({ thread, order, heading: parseColumnHeading(thread.label), special: specialOf(thread.label) }))
+    .sort((a, b) => rank(a) - rank(b) || a.order - b.order)
+    .map(({ thread, heading, special: job }) => column(thread, heading, job, bare, rowIndex, graph.entities));
+  const pov = columns.find((c) => c.special === "pov");
+  const rows = bare.map((row) => {
+    const name = pov?.cells[row.index]?.stop?.note.trim() ?? "";
+    return name ? { ...row, pov: { name, entity: byName(name, graph.entities) } } : row;
+  });
   const unknownPrefixes = columns.map((c) => c.heading.unknownPrefix).filter((p): p is string => !!p);
   const filled = columns.reduce((n, c) => n + c.filled, 0);
   const verified = columns.reduce((n, c) => n + c.verified, 0);
@@ -111,15 +134,15 @@ export function gridRows(graph: StoryGraph): GridRow[] {
   const rows: GridRow[] = [];
   for (const scene of headings) {
     const row = byKey.get(sceneKey(scene));
-    if (row) { rows.push({ scene: row.scene, index: rows.length, words: row.words, bookmarked: row.bookmarked, present: row.present, events: row.events, outline: false }); continue; }
+    if (row) { rows.push({ scene: row.scene, index: rows.length, words: row.words, bookmarked: row.bookmarked, present: row.present, events: row.events, outline: false, pov: null }); continue; }
     // Prose before the first heading that has no prose is not a scene of anything.
     if (!scene.title) continue;
-    rows.push({ scene, index: rows.length, words: 0, bookmarked: false, present: [], events: [], outline: true });
+    rows.push({ scene, index: rows.length, words: 0, bookmarked: false, present: [], events: [], outline: true, pov: null });
   }
   return rows;
 }
 
-function column(thread: Thread, heading: ColumnHeading, rows: readonly GridRow[], rowIndex: ReadonlyMap<string, number>, entities: readonly Entity[]): GridColumn {
+function column(thread: Thread, heading: ColumnHeading, special: SpecialColumn | null, rows: readonly GridRow[], rowIndex: ReadonlyMap<string, number>, entities: readonly Entity[]): GridColumn {
   const entity = heading.kind === "arc" ? bind(heading, entities) : null;
   const at = new Map<number, ThreadRef[]>();
   const unresolved: ThreadRef[] = [];
@@ -142,7 +165,7 @@ function column(thread: Thread, heading: ColumnHeading, rows: readonly GridRow[]
     const presentUnmoved = !stop && !!entity && row.present.includes(entity.id);
     return { state, stop, more: stops.slice(1), presentUnmoved };
   });
-  return { id: thread.id, heading, thread, entity, cells, filled, verified, broken, armed: verified > 0, unresolved };
+  return { id: thread.id, special, heading, thread, entity, cells, filled, verified, broken, armed: verified > 0, unresolved };
 }
 
 /** What a stop's anchor says: no quote is a plan, a found quote is verified, a lost one is broken. */
@@ -154,8 +177,13 @@ export function stateOf(stop: ThreadRef): CellState {
 /** `## Arc: [[Anna]]` binds to the note at that path; `## Arc: Anna` to the entity called Anna, or known by that alias. */
 function bind(heading: ColumnHeading, entities: readonly Entity[]): Entity | null {
   const target = heading.link?.trim();
-  if (!target) return null;
-  const want = normalise(basenameOf(target.replace(/#.*$/, "")));
+  return target ? byName(target, entities) : null;
+}
+
+/** A name, a path, or an alias, as written in a heading or a POV cell (`[[Anna]]` and `Anna` alike). */
+function byName(written: string, entities: readonly Entity[]): Entity | null {
+  const want = normalise(basenameOf(written.replace(/^\[\[|\]\]$/g, "").replace(/\|.*$/, "").replace(/#.*$/, "")));
+  if (!want) return null;
   return entities.find((e) => e.path && normalise(basenameOf(e.path)) === want)
     ?? entities.find((e) => normalise(e.name) === want)
     ?? entities.find((e) => e.aliases.some((a) => normalise(a) === want))

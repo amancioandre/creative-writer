@@ -117,6 +117,7 @@ export const THREAD_KINDS: readonly ThreadKind[] = ["entity", "fact", "writer", 
 /** How many echoes the writer wants to hear about; the presets live with the echo finder. */
 export { ECHO_SENSITIVITIES, type EchoSensitivity } from "../echoes/Echoes";
 import { ECHO_SENSITIVITIES, type EchoSensitivity } from "../echoes/Echoes";
+import { COLUMN_KINDS, type ColumnKind } from "../threads/StoryThreadsNote";
 
 /** The story threads view's own preferences — filters and strips, edited from its panel. */
 export interface ThreadsSettings {
@@ -238,6 +239,38 @@ export interface PluginSettings {
   readonly threads: ThreadsSettings;
   readonly manuscript: ManuscriptSettings;
   readonly writer: WriterSettings;
+  readonly plotGrid: PlotGridSettings;
+}
+
+/** The plot grid's layout as the writer last left it: what is folded, what is hidden, whether the cast is spread out. */
+export interface PlotGridSettings {
+  readonly panelOpen: boolean;
+  readonly castExpanded: boolean;
+  /** Column kind → folded. */
+  readonly folded: Readonly<Record<ColumnKind, boolean>>;
+  /** Project scope → headings hidden in that project. */
+  readonly hidden: Readonly<Record<string, readonly string[]>>;
+  /** "Present, unmoved" on arc columns that have earned it. */
+  readonly unmoved: boolean;
+  /** Side-column section → open or folded, as the writer last left it. */
+  readonly sections: Readonly<Record<string, boolean>>;
+}
+
+export const DEFAULT_PLOT_GRID: PlotGridSettings = { panelOpen: true, castExpanded: false, folded: { arc: false, theme: false, subplot: false, free: false }, hidden: {}, unmoved: true, sections: {} };
+
+export function normalizePlotGrid(raw: unknown): PlotGridSettings {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const hidden: Record<string, string[]> = {};
+  const h = (r.hidden && typeof r.hidden === "object" ? r.hidden : {}) as Record<string, unknown>;
+  for (const [scope, list] of Object.entries(h)) if (Array.isArray(list)) { const names = list.filter((x): x is string => typeof x === "string" && !!x.trim()); if (names.length) hidden[scope] = names; }
+  return {
+    panelOpen: typeof r.panelOpen === "boolean" ? r.panelOpen : DEFAULT_PLOT_GRID.panelOpen,
+    castExpanded: typeof r.castExpanded === "boolean" ? r.castExpanded : DEFAULT_PLOT_GRID.castExpanded,
+    folded: flags(r.folded, COLUMN_KINDS, DEFAULT_PLOT_GRID.folded),
+    hidden,
+    unmoved: typeof r.unmoved === "boolean" ? r.unmoved : DEFAULT_PLOT_GRID.unmoved,
+    sections: boolMap(r.sections),
+  };
 }
 
 export interface WriterSettings {
@@ -300,6 +333,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   threads: DEFAULT_THREADS,
   manuscript: DEFAULT_MANUSCRIPT,
   writer: DEFAULT_WRITER,
+  plotGrid: DEFAULT_PLOT_GRID,
 };
 
 const clampInt = (v: number, min: number, max: number) => Math.min(max, Math.max(min, Math.floor(v)));
@@ -340,6 +374,7 @@ export function normalizeSettings(raw: unknown): PluginSettings {
     llm: normalizeLlm(r.llm),
     storyMap: normalizeStoryMap(r.storyMap),
     threads: normalizeThreads(r.threads),
+    plotGrid: normalizePlotGrid(r.plotGrid),
     manuscript: normalizeManuscript(r.manuscript),
     writer: normalizeWriter(r.writer),
   };

@@ -567,6 +567,43 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-pg-new { display: flex; gap: 4px; margin: 6px 8px 4px; }
 .czm-pg-new-name { flex: 1; min-width: 0; font-size: var(--font-ui-smaller); }
 .czm-pg-new-add { font-size: var(--font-ui-smaller); padding: 3px 8px; height: auto; white-space: nowrap; }
+/* Over the table: the main theme, and a pill per group that folds it. */
+.czm-pg-eyebrow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 2px 4px 4px; font-size: var(--font-ui-smaller); }
+.czm-pg-theme { display: flex; align-items: baseline; gap: 8px; min-width: 0; flex: 1 1 auto; }
+.czm-pg-theme-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); white-space: nowrap; }
+.czm-pg-theme-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.czm-pg-pills { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.czm-pg-pill { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border: 1px solid var(--background-modifier-border); border-radius: 11px; background: var(--background-primary); font-size: var(--font-ui-smaller); box-shadow: none; }
+.czm-pg-pill:hover { background: var(--background-modifier-hover); }
+.czm-pg-pill.is-folded { color: var(--text-muted); border-style: dashed; }
+.czm-pg-pill-count { font-family: var(--font-monospace); font-size: 11px; color: var(--text-faint); }
+.czm-pg-pill:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+/* A column header: the name, the count, and a ⋯ that appears when the header is hovered or holds the focus. */
+.czm-pg-col-sub { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+.czm-pg-col-more { width: 18px; height: 18px; opacity: 0; color: var(--text-faint); }
+.czm-pg-col-thread:hover .czm-pg-col-more, .czm-pg-col-thread:focus-within .czm-pg-col-more, .czm-pg-col-thread.is-current .czm-pg-col-more { opacity: 1; }
+.czm-pg-col-thread.is-current .czm-pg-col-title { color: var(--text-accent); }
+/* POV and Time sit in the derived block: a faint stripe, Time in monospace, POV a dot and a name. */
+.czm-pg-special-pov .czm-pg-col-name::before, .czm-pg-special-time .czm-pg-col-name::before { background: var(--text-faint); }
+.czm-pg-special-time { min-width: 88px; max-width: 120px; }
+.czm-pg-special-time .czm-pg-cell { font-family: var(--font-monospace); color: var(--text-muted); white-space: nowrap; }
+.czm-pg-special-pov { min-width: 96px; max-width: 140px; }
+.czm-pg-pov-dot { display: inline-block; margin-right: 5px; vertical-align: -1px; }
+.czm-pg-scene-head.has-pov { box-shadow: inset 3px 0 0 var(--czm-pov, var(--text-faint)); }
+/* The side column's Column section and Rows toggle. */
+.czm-pg-rename { flex: 1; min-width: 0; font-size: var(--font-ui-smaller); }
+.czm-pg-kind-select { width: 100%; box-sizing: border-box; margin: 0; font-size: var(--font-ui-small); }
+.czm-pg-jobs { grid-template-columns: 1fr 1fr 1fr; margin: 0; }
+.czm-pg-job.is-on { color: var(--text-accent); border-color: var(--interactive-accent); }
+.czm-pg-side-job { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); }
+.czm-pg-side-col.is-hidden .czm-map-row-name { color: var(--text-faint); text-decoration: line-through; }
+.czm-pg-col-show { width: 20px; height: 20px; flex: 0 0 auto; color: var(--text-faint); }
+.czm-pg-toggle { width: 34px; height: 20px; padding: 0; border: 0; border-radius: 10px; background: var(--background-modifier-border); position: relative; box-shadow: none; cursor: pointer; }
+.czm-pg-toggle::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--background-primary); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2); transition: left 120ms; }
+.czm-pg-toggle.is-on { background: var(--interactive-accent); }
+.czm-pg-toggle.is-on::after { left: 16px; }
+.czm-pg-toggle:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.czm-pg-help { width: 380px; }
 /* The key names the roles by their glyph, not a dot. */
 .czm-pg-key-role::before { width: auto; height: auto; border-radius: 0; background: none; color: var(--text-accent); font-size: 10px; }
 .czm-pg-key-role.is-plant::before { content: "▶"; }

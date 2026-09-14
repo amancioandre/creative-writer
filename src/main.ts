@@ -449,9 +449,17 @@ export default class CreativeZenModePlugin extends Plugin {
       removeFromThread: (project, thread, link) => editThread.removeRef(project, thread, link),
       addThread: (project, name) => editThread.addThread(project, name),
       removeThread: (project, name) => editThread.removeThread(project, name),
+      renameThread: (project, from, to) => editThread.rename(project, from, to),
+      setProjectKey: (project, key, value) => this.setTextKey(project.notePath, key, value),
+      gridSettings: () => this.current.plotGrid,
+      updateGridSettings: (next) => void this.updateSettings({ ...this.current, plotGrid: next }),
     }));
     this.addCommand({ id: "open-story-timeline", name: COMMANDS["open-story-timeline"], callback: () => void this.openPlotGrid(null) });
-    this.viewCommands(PlotGridView, [["story-timeline-clear-search", "clear-search"], ["plot-grid-toggle-cast", "toggle-cast"], ["plot-grid-open-note", "open-note"], ["plot-grid-toggle-panel", "toggle-panel"], ["plot-grid-new-column", "new-column"]]);
+    this.viewCommands(PlotGridView, [
+      ["story-timeline-clear-search", "clear-search"], ["plot-grid-toggle-cast", "toggle-cast"], ["plot-grid-open-note", "open-note"], ["plot-grid-toggle-panel", "toggle-panel"], ["plot-grid-new-column", "new-column"],
+      ["plot-grid-fold-arcs", "fold-arcs"], ["plot-grid-fold-themes", "fold-themes"], ["plot-grid-fold-subplots", "fold-subplots"], ["plot-grid-fold-threads", "fold-threads"],
+      ["plot-grid-hide-column", "hide-column"], ["plot-grid-show-hidden", "show-hidden"], ["plot-grid-toggle-unmoved", "toggle-unmoved"], ["plot-grid-focus-search", "focus-search"], ["plot-grid-help", "help"],
+    ]);
     this.registerView(STORY_THREADS_VIEW_TYPE, (leaf: WorkspaceLeaf) => new StoryThreadsView(leaf, {
       projects: storySource.projects,
       activeProject: storySource.activeProject,
@@ -955,6 +963,15 @@ export default class CreativeZenModePlugin extends Plugin {
     md.editor.setCursor({ line, ch });
     md.editor.scrollIntoView({ from: { line, ch }, to: { line, ch } }, true);
     md.editor.focus();
+  }
+
+  /** Writes or clears one text property in a note's front matter — the project note's `plot-pov`, `plot-time`, `plot-theme`. */
+  private async setTextKey(path: string, key: string, value: string | null): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) throw new Error(`${path} is not a note`);
+    await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
+      if (value && value.trim()) fm[key] = value.trim(); else delete fm[key];
+    });
   }
 
   /** Adds to or trims a list property in a note's front matter — `story-ignore` on the project note, `aliases` on an entity note. */

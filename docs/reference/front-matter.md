@@ -23,6 +23,7 @@ The note whose front matter declares a [project](/guide/projects). Any note in t
 | `writing-name` | text | Display name instead of the folder name. |
 | `writing-scope` | `note` | Count only this note, not the folder. |
 | `story-ignore` | list or comma string | Capitalised words the story map must not turn into candidates. Written by the map's *Not a name*; edit freely. |
+| `plot-pov`, `plot-time`, `plot-theme` | a heading from `Story threads.md`, e.g. `Theme: What we owe the dead` | Which thread the [plot grid](/guide/plot-grid) draws as its POV, Time and main theme columns. Written by a column's *Use as…*; edit freely. |
 
 ## Entity notes
 

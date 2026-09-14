@@ -104,6 +104,14 @@ describe("buildPlotGrid", () => {
     expect(nobody.columns[0]!.entity).toBeNull();
   });
 
+  it("puts the columns the project note names first, and reads each row's POV through the map", () => {
+    const md = threadsNote + "\n## Time\n- [[One#Dinner]] — day 2\n\n## POV\n- [[One#The station]] — Anna\n- [[One#Dinner]] — [[Marta]]\n- [[Two#The reading]] — The porter\n\n## Theme: Salt\n- [[One#Dinner]] — x\n";
+    const g = buildPlotGrid(graph, buildThreads(graph, EMPTY_STORY_MAP_FILE, parseStoryThreads(md), new Set(), undefined, (p) => text.get(p)), { pov: "pov", time: "Time", theme: "theme: salt" });
+    expect(g.columns.map((c) => [c.heading.name, c.special])).toEqual([["Time", "time"], ["POV", "pov"], ["Anna", null], ["Salt", "main-theme"], ["What we owe the dead", null], ["The letter", null], ["Salt on the wind", null]]);
+    expect(g.rows.map((r) => r.pov ? [r.pov.name, r.pov.entity?.name ?? null] : null)).toEqual([["Anna", "Anna"], ["[[Marta]]", "Marta"], null, ["The porter", null]]);
+    expect(buildPlotGrid(graph, model).columns.every((c) => c.special === null)).toBe(true);
+  });
+
   it("counts the grid, and is empty for an empty project", () => {
     expect([grid.cells, grid.filled, grid.verified, grid.broken]).toEqual([16, 7, 3, 1]);
     expect(buildPlotGrid(EMPTY_GRAPH, EMPTY_THREAD_MODEL).columns).toEqual([]);

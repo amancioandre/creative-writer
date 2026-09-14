@@ -1,15 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { WorkspaceLeaf } from "obsidian";
+import { Menu, WorkspaceLeaf } from "obsidian";
 import { PLOT_GRID_VIEW_TYPE, PlotGridView, actOf, type PlotGridSource } from "../../../src/infrastructure/obsidian/views/PlotGridView";
 import { buildStoryGraph, type ProjectNote } from "../../../src/domain/story/BuildGraph";
 import { buildPlotGrid } from "../../../src/domain/plot/PlotGrid";
 import { buildThreads } from "../../../src/domain/threads/BuildThreads";
-import { addThread, appendThreadItems, parseStoryThreads, removeThread, removeThreadItem } from "../../../src/domain/threads/StoryThreadsNote";
+import { addThread, appendThreadItems, parseStoryThreads, removeThread, removeThreadItem, renameThread } from "../../../src/domain/threads/StoryThreadsNote";
 import { splitScenes } from "../../../src/domain/text/Scenes";
 import { EMPTY_STORY_MAP_FILE, putReading } from "../../../src/domain/story/StoryMapFile";
 import { textHash } from "../../../src/domain/story/StoryGraph";
 import type { ProjectSpec } from "../../../src/domain/progress/Project";
-import { DEFAULT_STORY_MAP } from "../../../src/domain/settings/Settings";
+import { DEFAULT_PLOT_GRID, DEFAULT_STORY_MAP, type PlotGridSettings } from "../../../src/domain/settings/Settings";
 
 const novel: ProjectSpec = { name: "Novel", scope: "Novel/", targetWords: 1, deadline: null, dailyWords: 0, notePath: "Novel/Project.md", ignoredNames: [] };
 const one = `# Camp\nMarta woke before Ilse at the gate of Lisbon.\n\n# Creek\nIlse found the creek alone.\n\n# Later\n`;
@@ -37,9 +37,15 @@ function open(overrides: Partial<PlotGridSource> = {}, threads = threadsNote) {
   const calls = { opened: [] as string[], revealed: [] as string[], jumps: [] as string[], writes: [] as string[] };
   // The threads note as a string the writes edit, so the grid reads back what it wrote.
   let md = threads;
+  let prefs: PlotGridSettings = DEFAULT_PLOT_GRID;
+  let spec: ProjectSpec = novel;
   const src: PlotGridSource = {
-    projects: () => [novel], activeProject: () => novel,
-    build: async () => grid(md),
+    projects: () => [spec], activeProject: () => spec,
+    build: async () => buildPlotGrid(buildStoryGraph("Novel", notes, file), buildThreads(buildStoryGraph("Novel", notes, file), file, parseStoryThreads(md), new Set(), undefined, (p) => notes.find((n) => n.path === p)?.text), { pov: spec.plotPov, time: spec.plotTime, theme: spec.plotTheme }),
+    renameThread: async (_p, from, to) => { calls.writes.push(`rename ${from} → ${to}`); md = renameThread(md, from, to); },
+    setProjectKey: async (_p, key, value) => { calls.writes.push(`${key}=${value ?? ""}`); const k = key === "plot-pov" ? "plotPov" : key === "plot-time" ? "plotTime" : "plotTheme"; spec = { ...spec, [k]: value ?? undefined }; },
+    gridSettings: () => prefs,
+    updateGridSettings: (next) => { prefs = next; },
     openNote: (p) => { calls.opened.push(p); }, reveal: (r) => { calls.revealed.push(`${r.title}@${r.line}`); }, jumpTo: (to) => { calls.jumps.push(to); },
     settings: () => DEFAULT_STORY_MAP,
     threadsNotePath: () => "Novel/Story threads.md",
@@ -49,7 +55,7 @@ function open(overrides: Partial<PlotGridSource> = {}, threads = threadsNote) {
     removeThread: async (_p, name) => { calls.writes.push(`delete ${name}`); md = removeThread(md, name); },
     ...overrides,
   };
-  return { v: new PlotGridView(new WorkspaceLeaf(), src), calls, note: () => md };
+  return { v: new PlotGridView(new WorkspaceLeaf(), src), calls, note: () => md, prefs: () => prefs };
 }
 
 /** The search field redraws once typing pauses. */
@@ -245,6 +251,86 @@ describe("PlotGridView", () => {
     (el.querySelector(".czm-map-status button") as HTMLElement).click();
     await new Promise((r) => setTimeout(r, 20));
     expect(note()).toContain("## Arc: [[Ilse]]\n- [[One#Camp]] — want: \"woke before Ilse\" to be first");
+  });
+
+  it("folds a group from its pill, hides and shows a column, and remembers both in the settings", async () => {
+    const { v, prefs } = open();
+    await v.onOpen();
+    const el = v.contentEl;
+    expect([...el.querySelectorAll(".czm-pg-pill")].map((p) => p.textContent)).toEqual(["Arcs1", "Subplots1", "Cast3 folded"]);
+    (el.querySelector(".czm-pg-pill") as HTMLElement).click();
+    expect(prefs().folded.arc).toBe(true);
+    expect([...el.querySelectorAll(".czm-pg-col-thread .czm-pg-col-title")].map((s) => s.textContent)).toEqual(["The gate"]);
+    expect(el.querySelector(".czm-pg-pill")?.textContent).toBe("Arcs1 folded");
+    v.run("fold-arcs");
+    expect(prefs().folded.arc).toBe(false);
+    el.querySelector<HTMLElement>('.czm-pg-cell[data-col="1"][data-row="0"]')!.click();
+    v.run("hide-column");
+    expect(prefs().hidden["Novel/"]).toEqual(["Subplot: The gate"]);
+    expect([...el.querySelectorAll(".czm-pg-col-thread .czm-pg-col-title")].map((s) => s.textContent)).toEqual(["Ilse"]);
+    expect(el.querySelector(".czm-shell-state-text")?.textContent).toContain("1 hidden");
+    (el.querySelector(".czm-shell-reset") as HTMLElement).click();
+    expect(prefs().hidden["Novel/"]).toEqual([]);
+    expect(el.querySelectorAll(".czm-pg-col-thread")).toHaveLength(2);
+    v.run("toggle-unmoved");
+    expect(prefs().unmoved).toBe(false);
+    expect(el.querySelector(".czm-pg-cell.is-unmoved")).toBeNull();
+  });
+
+  it("gives a column a job in the project note, draws POV and Time in the derived block, and renames a heading", async () => {
+    const { v, calls, note } = open({}, threadsNote + "\n## When\n- [[One#Camp]] — day 1\n\n## Eyes\n- [[One#Camp]] — Marta Kovács\n- [[One#Creek]] — Ilse\n");
+    await v.onOpen();
+    const el = v.contentEl;
+    expect(el.querySelector(".czm-pg-theme-label")?.textContent).toContain("No main theme yet");
+    // The header's ⋯ opens the column menu; a job row writes the key and the rebuild reads it back.
+    const eyes = [...el.querySelectorAll(".czm-pg-col-thread")].find((th) => th.querySelector(".czm-pg-col-title")?.textContent === "Eyes")!;
+    (eyes.querySelector(".czm-pg-col-more") as HTMLElement).click();
+    expect(Menu.last!.items.map((i) => i.title.replace(/Plot grid:.*$/, ""))).toEqual(["Rename…", "Kind: arc", "Kind: theme", "Kind: subplot", "Kind: free thread", "Use as POV", "Use as Time", "Use as Main theme", "Hide column", "Delete column…"]);
+    Menu.last!.items.find((i) => i.title === "Use as POV")!.cb();
+    await new Promise((r) => setTimeout(r, 400));
+    expect(calls.writes).toContain("plot-pov=Eyes");
+    expect([...el.querySelectorAll(".czm-pg-col-thread .czm-pg-col-title")].map((s) => s.textContent)).toEqual(["Eyes", "Ilse", "The gate", "When"]);
+    expect(el.querySelector(".czm-pg-special-pov .czm-pg-col-count")?.textContent).toBe("pov · 2 of 4");
+    expect(el.querySelector('.czm-pg-scene[data-row="0"] .czm-pg-scene-head')?.classList.contains("has-pov")).toBe(true);
+    expect(el.querySelector('.czm-pg-cell[data-col="0"][data-row="0"] .czm-pg-pov-dot')).not.toBeNull();
+    // Time and the main theme by the side column's job buttons; the eyebrow names the theme.
+    const when = [...el.querySelectorAll(".czm-pg-col-thread")].find((th) => th.querySelector(".czm-pg-col-title")?.textContent === "When")!;
+    (when.querySelector(".czm-pg-col-name") as HTMLElement).click();
+    (el.querySelector(".czm-pg-job[aria-pressed]") as HTMLElement).parentElement!.querySelectorAll<HTMLElement>(".czm-pg-job")[1]!.click();
+    await new Promise((r) => setTimeout(r, 400));
+    expect(calls.writes).toContain("plot-time=When");
+    expect([...el.querySelectorAll(".czm-pg-col-thread .czm-pg-col-title")].map((s) => s.textContent)).toEqual(["When", "Eyes", "Ilse", "The gate"]);
+    const input = el.querySelector(".czm-pg-new-name") as HTMLInputElement;
+    input.value = "Theme: Debt";
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    (el.querySelector(".czm-pg-job[aria-pressed]") as HTMLElement).parentElement!.querySelectorAll<HTMLElement>(".czm-pg-job")[2]!.click();
+    await new Promise((r) => setTimeout(r, 400));
+    expect(calls.writes).toContain("plot-theme=Theme: Debt");
+    expect(el.querySelector(".czm-pg-theme-name")?.textContent).toBe("Debt");
+    // Rename from the side column keeps the job; the kind select rewrites the prefix.
+    const rename = el.querySelector(".czm-pg-rename") as HTMLInputElement;
+    rename.value = "Theme: What we owe";
+    rename.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(note()).toContain("## Theme: What we owe");
+    expect(calls.writes).toContain("plot-theme=Theme: What we owe");
+    const kind = el.querySelector(".czm-pg-kind-select") as HTMLSelectElement;
+    kind.value = "subplot"; kind.dispatchEvent(new Event("change"));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(note()).toContain("## Subplot: What we owe");
+  });
+
+  it("lists its keys behind ? and closes the list again", async () => {
+    const { v } = open();
+    await v.onOpen();
+    const el = v.contentEl;
+    el.querySelector<HTMLElement>('.czm-pg-cell[data-col="0"][data-row="0"]')!.click();
+    el.querySelector<HTMLElement>('.czm-pg-cell[data-col="0"][data-row="0"]')!.dispatchEvent(new KeyboardEvent("keydown", { key: "?", bubbles: true }));
+    expect(el.querySelector(".czm-pg-help")?.classList.contains("is-open")).toBe(true);
+    expect(el.querySelectorAll(".czm-pg-help tr")).toHaveLength(8);
+    (el.querySelector(".czm-writer-help-close") as HTMLElement).click();
+    expect(el.querySelector(".czm-pg-help")?.classList.contains("is-open")).toBe(false);
   });
 
   it("reads a note's folder below the project as its act", () => {

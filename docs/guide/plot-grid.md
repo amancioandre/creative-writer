@@ -21,7 +21,11 @@
 - **Present, unmoved.** Once an arc column holds a verified stop, a scene where its character is on the page and the arc has no stop says so, faintly. It is the grid's one finding of its own: the scene where someone is in the room and nothing happens to them. It stays quiet until a column has earned it, because on a first draft it would fire everywhere.
 - **Cast.** One column with a dot per member of the cast in their kind's colour, absence a faint dot, so a long absence still reads down the column. Click the header (or **Plot grid: fold or expand the cast**) and it spreads into one column per name, as the timeline drew it; click a name to open its note. The *Kinds* toggles in the story map panel apply here too.
 
-The first column and the header row stay put while you scroll. The search filters columns and cast. A key in the corner names the glyphs, and the kinds when the cast is spread out. The head's **⋯** menu holds the cast toggle, **Open Story threads.md** and **Clear the search**, each as the command it also is.
+- **Groups.** Over the table, one pill per kind with its count: click a pill and the group folds out of the way; the pill says *3 folded* until it is clicked again. The **Cast** pill folds and expands the cast. Folds are remembered.
+- **Three columns with a job.** The project note can name a thread as the grid's **POV**, **Time** or **main theme**, with `plot-pov`, `plot-time` and `plot-theme` in its front matter, each holding a heading as written in the threads note. A column's menu (the ⋯ on its header, or a right click) has **Use as POV / Time / Main theme**, which writes the key for you. POV and Time move to the derived block after Words: Time in monospace, POV as a dot in the character's colour and their name, with a 3 px chip in that colour on the scene's name so the eye's owner survives a sideways scroll; the main theme is pinned first among the themes and read in the eyebrow over the grid. Nothing is inferred from a heading's name; a thread called *Time* that has not been given the job is an ordinary thread.
+- **A column's menu** also sets its **kind** (the prefix rewritten in the note), **renames** it (the side column's Column section holds the field, and a column that had a job keeps it), **hides** it (the state line counts hidden columns and offers *Show hidden*) and **deletes** it.
+
+The first column and the header row stay put while you scroll. The search filters columns and cast. A key in the corner names the glyphs, and the kinds when the cast is spread out. The head's **⋯** menu holds the folds, the cast toggle, hide and show, *Present, unmoved*, the panel, the search, the key list, **Open Story threads.md** and **Clear the search**, each as the command it also is.
 
 ## Writing in it
 
@@ -33,6 +37,21 @@ Everything typed into the grid is a line in `Story threads.md`; the grid writes 
 - **Open scene** (or `o`) goes to the scene at the anchor when there is one. Escape from a selected cell puts the focus on the row's name.
 - **Columns**: the side column lists every column by kind with its count; **New column** takes a heading, `Arc: [[Anna]]`, `Theme: …`, `Subplot: …` or a plain name, and writes it to the note as an empty section, ready to fill. The ✕ on a column arms, and a second click deletes the heading and every stop under it.
 - Every write reports in the status line with **Undo** for eight seconds: a changed cell goes back to its previous line, a written one is removed, a removed one is written back, a deleted column comes back with its stops.
+
+## Keys
+
+Click anywhere on the grid and the keys work; press `?` for the list on the grid itself. Tab is never taken: it moves the focus as it does everywhere in Obsidian, and Ctrl and Cmd stay with Obsidian's own hotkeys. Nothing is bound by default.
+
+| Key | Does |
+|---|---|
+| `← → ↑ ↓` | Move between cells. `Home` `End` first and last column; `PgUp` `PgDn` ten rows. |
+| `Enter` | Edit the cell in place. Editing: `Enter` saves, `Shift+Enter` a new line, `Escape` puts the line back. |
+| `Escape` | On a cell: back to the row's name. |
+| `Delete` | Take the stop out, with Undo. |
+| `o` | Open the scene, at the anchor when there is one. |
+| `?` | The list. |
+
+Folding a group, hiding a column, showing the hidden ones, the search, the panel and *Present, unmoved* are commands, each named in the ⋯ menu, so a key of your own can be bound in Settings → Hotkeys.
 
 The line the grid writes is the line you would write:
 

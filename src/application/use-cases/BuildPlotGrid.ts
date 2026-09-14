@@ -12,6 +12,6 @@ export class BuildPlotGrid {
 
   async execute(project: ProjectSpec): Promise<PlotGrid> {
     const { graph, model } = await this.threads.executeWithGraph(project);
-    return buildPlotGrid(graph, model);
+    return buildPlotGrid(graph, model, { pov: project.plotPov, time: project.plotTime, theme: project.plotTheme });
   }
 }
