@@ -42,10 +42,10 @@ export function readabilityStatusExtension(profile: ProfileProse, report: (p: Pr
   );
 }
 
-/** Compact status-bar rendering: "Plain · Varied · 62%" style, only what fits in a glance. */
+/** Compact status-bar rendering that names its measures: "Ease plain · rhythm varied". Only what fits in a glance. */
 export function statusLabel(p: ProseProfile | null): string {
   if (!p || !p.readingEase) return "";
-  const parts = [p.readingEase.band.label];
-  if (p.variety) parts.push(p.variety.band.label);
+  const parts = [`Ease ${p.readingEase.band.label.toLowerCase()}`];
+  if (p.variety) parts.push(`rhythm ${p.variety.band.label.toLowerCase()}`);
   return parts.join(" · ");
 }

@@ -40,6 +40,27 @@ body.czm-zen.czm-zen .inline-title:hover {
   opacity: 1;
 }
 
+/* The one indicator Zen Mode admits: today's words and the way out, on mouse move, gone two seconds later. */
+.czm-zen-hud {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  z-index: 60;
+  padding: 4px 12px;
+  border-radius: 6px;
+  background: var(--background-secondary);
+  color: var(--text-faint);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+  opacity: 0;
+  transition: opacity 200ms ease-out;
+  pointer-events: none;
+}
+.czm-zen-hud.is-shown {
+  opacity: 1;
+}
+
 /* --- Typewriter: room for the first/last lines to reach the centre ------ */
 .czm-typewriter.cm-editor .cm-scroller .cm-content {
   padding-top: 45vh;
@@ -521,7 +542,7 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-ms-block.is-active { background: color-mix(in srgb, var(--interactive-accent) 9%, transparent); }
 .czm-ms-block:focus-visible, .czm-ms-title:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .czm-ms-block:focus { outline: none; }
-.czm-ms-block:focus-visible { outline: 2px solid var(--interactive-accent); }
+.czm-ms-block:focus-visible { outline: 1px solid color-mix(in srgb, var(--interactive-accent) 70%, transparent); outline-offset: 2px; }
 .czm-ms-block > :first-child { margin-top: 0; }
 .czm-ms-block > :last-child { margin-bottom: 0; }
 .czm-ms-block { margin-bottom: var(--p-spacing); }

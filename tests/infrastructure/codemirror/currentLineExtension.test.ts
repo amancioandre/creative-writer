@@ -3,13 +3,13 @@ import { bandFor, currentLineExtension, CURRENT_LINE_LAYER_CLASS } from "../../.
 import { mount, type Harness } from "./helpers";
 
 describe("bandFor", () => {
-  it("stretches the cursor's visual line across the scroller", () => {
-    expect(bandFor({ top: 120, height: 24 }, 800)).toEqual({ top: 120, height: 24, width: 800 });
+  it("stretches the cursor's visual line across the text column, not the window", () => {
+    expect(bandFor({ top: 120, height: 24 }, { left: 320, width: 700 })).toEqual({ top: 120, height: 24, left: 320, width: 700 });
   });
   it("is null without layout", () => {
-    expect(bandFor(null, 800)).toBeNull();
-    expect(bandFor({ top: 0, height: 0 }, 800)).toBeNull();
-    expect(bandFor({ top: 0, height: 24 }, 0)).toBeNull();
+    expect(bandFor(null, { left: 0, width: 800 })).toBeNull();
+    expect(bandFor({ top: 0, height: 0 }, { left: 0, width: 800 })).toBeNull();
+    expect(bandFor({ top: 0, height: 24 }, { left: 0, width: 0 })).toBeNull();
   });
 });
 
@@ -37,19 +37,19 @@ describe("currentLineExtension", () => {
 import { veilsFor, VEIL_LAYER_CLASS } from "../../../src/infrastructure/codemirror/currentLineExtension";
 
 describe("veilsFor", () => {
-  const row = { top: 40, height: 20, width: 800 };
-  it("covers the paragraph above and below the cursor row", () => {
+  const row = { top: 40, height: 20, left: 320, width: 700 };
+  it("covers the paragraph above and below the cursor row, within the text column", () => {
     expect(veilsFor({ top: 0, bottom: 100 }, row)).toEqual([
-      { top: 0, height: 40, width: 800 },
-      { top: 60, height: 40, width: 800 },
+      { top: 0, height: 40, left: 320, width: 700 },
+      { top: 60, height: 40, left: 320, width: 700 },
     ]);
   });
   it("emits nothing for a one-row paragraph", () => {
     expect(veilsFor({ top: 40, bottom: 60 }, row)).toEqual([]);
   });
   it("emits one band when the cursor is on the first or last row", () => {
-    expect(veilsFor({ top: 40, bottom: 100 }, row)).toEqual([{ top: 60, height: 40, width: 800 }]);
-    expect(veilsFor({ top: 0, bottom: 60 }, row)).toEqual([{ top: 0, height: 40, width: 800 }]);
+    expect(veilsFor({ top: 40, bottom: 100 }, row)).toEqual([{ top: 60, height: 40, left: 320, width: 700 }]);
+    expect(veilsFor({ top: 0, bottom: 60 }, row)).toEqual([{ top: 0, height: 40, left: 320, width: 700 }]);
   });
   it("mounts an above-text veil layer", () => {
     const h = mount("one\ntwo", currentLineExtension());

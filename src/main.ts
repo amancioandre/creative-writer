@@ -43,6 +43,7 @@ import { NoteProgressRepository } from "./infrastructure/obsidian/NoteProgressRe
 import { vaultNoteIO } from "./infrastructure/obsidian/VaultNoteIO";
 import { countWords } from "./domain/text/Dialogue";
 import { toDay } from "./domain/progress/Dates";
+import { summarizeDay } from "./domain/progress/ProgressSummary";
 import { splitScenes } from "./domain/text/Scenes";
 import { inScope, parseProjectFrontmatter, projectStatus, projectStreak, recentAdded, type ProjectSpec, type ProjectStatus } from "./domain/progress/Project";
 import { enabledStyleKinds } from "./domain/settings/Settings";
@@ -141,7 +142,10 @@ export default class CreativeZenModePlugin extends Plugin {
     this.settingsRepo = new PluginDataSettingsRepository(this);
     this.current = await this.settingsRepo.load();
 
-    this.zen = new ToggleZenMode(new DomWorkspaceChrome(document), () => this.current.zenFullscreen);
+    this.zen = new ToggleZenMode(new DomWorkspaceChrome(document, {
+      wordsToday: () => summarizeDay(filterLog(this.tracker.current, (path) => this.scope.counts(path)), toDay(new Date()), this.current.goals.dailyWords).added,
+      leave: () => void this.zen.deactivate(),
+    }), () => this.current.zenFullscreen);
 
     this.addCommand({
       id: "toggle-zen-mode",

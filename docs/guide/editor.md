@@ -8,6 +8,8 @@ Four features that change how the page looks while you write. All are toggles in
 
 **Fullscreen in Zen Mode** (off by default) also asks the window to go fullscreen when Zen Mode turns on.
 
+Zen Mode admits one indicator: move the mouse and a small line inside the page says today's words and the way out (*Esc leaves Zen Mode*), then fades two seconds later; it never appears while you type. Escape, pressed on the page while no menu, prompt or suggestion is open, leaves Zen Mode.
+
 Because the writing desk, story map and timeline live in leaves, Zen Mode hides them too — they are *about* the work, not the work.
 
 ## Typewriter scrolling

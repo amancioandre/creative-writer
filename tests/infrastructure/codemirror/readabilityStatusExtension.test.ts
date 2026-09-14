@@ -53,6 +53,6 @@ describe("statusLabel", () => {
   });
   it("joins the ease and variety bands", () => {
     const p = new ProfileProse(new IntlSentenceSegmenter("en")).paragraph("Go. Then a longer sentence follows. And a third one too.");
-    expect(statusLabel(p)).toMatch(/^[A-Z][a-z ]+ · [A-Z][a-z]+$/);
+    expect(statusLabel(p)).toMatch(/^Ease [a-z ]+ · rhythm [a-z]+$/);
   });
 });

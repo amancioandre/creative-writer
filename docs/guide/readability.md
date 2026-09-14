@@ -2,7 +2,7 @@
 
 ## In the status bar
 
-With **Readability in status bar** on, the status bar shows two words for the paragraph you are in: its reading-ease band and its sentence-rhythm band. Hover for the hint; click to open the [writing desk](/guide/writing-desk) with the whole note's profile.
+With **Readability in status bar** on, the status bar names two things for the paragraph you are in, *Ease plain · rhythm dynamic*: its reading-ease band and its sentence-rhythm band. Hover for the hint; click to open the [writing desk](/guide/writing-desk) with the whole note's profile.
 
 ## The bands
 

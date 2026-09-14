@@ -10,17 +10,24 @@ export const VEIL_CLASS = "czm-paragraph-veil";
 export interface Band {
   readonly top: number;
   readonly height: number;
+  readonly left: number;
+  readonly width: number;
+}
+
+/** The text column in layer coordinates: where the content box sits inside the scroller. */
+export interface Column {
+  readonly left: number;
   readonly width: number;
 }
 
 /**
  * Pure geometry: the cursor's visual line (one wrapped row, not the whole
- * paragraph) stretched to the full width of the scroller. `null` when the
+ * paragraph) across the text column, not the whole window. `null` when the
  * cursor has no layout yet.
  */
-export function bandFor(cursor: { readonly top: number; readonly height: number } | null, scrollerWidth: number): Band | null {
-  if (!cursor || cursor.height <= 0 || scrollerWidth <= 0) return null;
-  return { top: cursor.top, height: cursor.height, width: scrollerWidth };
+export function bandFor(cursor: { readonly top: number; readonly height: number } | null, column: Column): Band | null {
+  if (!cursor || cursor.height <= 0 || column.width <= 0) return null;
+  return { top: cursor.top, height: cursor.height, left: column.left, width: column.width };
 }
 
 /**
@@ -29,15 +36,22 @@ export function bandFor(cursor: { readonly top: number; readonly height: number 
  */
 export function veilsFor(paragraph: { readonly top: number; readonly bottom: number }, row: Band): Band[] {
   const out: Band[] = [];
-  if (row.top - paragraph.top > 0.5) out.push({ top: paragraph.top, height: row.top - paragraph.top, width: row.width });
+  if (row.top - paragraph.top > 0.5) out.push({ top: paragraph.top, height: row.top - paragraph.top, left: row.left, width: row.width });
   const rowBottom = row.top + row.height;
-  if (paragraph.bottom - rowBottom > 0.5) out.push({ top: rowBottom, height: paragraph.bottom - rowBottom, width: row.width });
+  if (paragraph.bottom - rowBottom > 0.5) out.push({ top: rowBottom, height: paragraph.bottom - rowBottom, left: row.left, width: row.width });
   return out;
+}
+
+/** The content box inside the scroller: the band and the veil stop at the text column's edges. */
+function columnOf(view: EditorView): Column {
+  const content = view.contentDOM.getBoundingClientRect(), scroller = view.scrollDOM.getBoundingClientRect();
+  const width = content.width || view.scrollDOM.clientWidth;
+  return { left: content.left - scroller.left + view.scrollDOM.scrollLeft, width };
 }
 
 function cursorRow(view: EditorView): Band | null {
   const [cursor] = RectangleMarker.forRange(view, CURRENT_LINE_CLASS, view.state.selection.main);
-  return bandFor(cursor ? { top: cursor.top, height: cursor.height } : null, view.scrollDOM.clientWidth);
+  return bandFor(cursor ? { top: cursor.top, height: cursor.height } : null, columnOf(view));
 }
 
 const shouldUpdate = (u: ViewUpdate) => u.docChanged || u.selectionSet || u.geometryChanged || u.viewportChanged || settingsChanged(u);
@@ -52,7 +66,7 @@ const shouldUpdate = (u: ViewUpdate) => u.docChanged || u.selectionSet || u.geom
  *     by focus fade's opacity — dimmest. Text opacity can only be set per
  *     paragraph in CodeMirror; the veil is how a single row wins.
  *
- * Marker `left: 0` is the scroller's left edge in layer coordinates.
+ * Layer coordinates start at the scroller's left edge; both markers begin at the text column's.
  */
 export function currentLineExtension() {
   const band = layer({
@@ -62,7 +76,7 @@ export function currentLineExtension() {
     markers(view: EditorView) {
       if (!effectiveSettings(view.state).currentLineEnabled) return [];
       const row = cursorRow(view);
-      return row ? [new RectangleMarker(CURRENT_LINE_CLASS, 0, row.top, row.width, row.height)] : [];
+      return row ? [new RectangleMarker(CURRENT_LINE_CLASS, row.left, row.top, row.width, row.height)] : [];
     },
   });
   const veil = layer({
@@ -79,7 +93,7 @@ export function currentLineExtension() {
       const clientToLayer = row.top - client.top;
       const block = view.lineBlockAt(head);
       const paragraph = { top: view.documentTop + block.top + clientToLayer, bottom: view.documentTop + block.bottom + clientToLayer };
-      return veilsFor(paragraph, row).map((b) => new RectangleMarker(VEIL_CLASS, 0, b.top, b.width, b.height));
+      return veilsFor(paragraph, row).map((b) => new RectangleMarker(VEIL_CLASS, b.left, b.top, b.width, b.height));
     },
   });
   return [band, veil];
