@@ -50,7 +50,7 @@ describe("CreativeZenSettingsTab", () => {
       const all = names(defs());
       expect(all).toEqual(expect.arrayContaining([
         "Enabled", "Notes", "Folders", "Typewriter scrolling", "Current line", "Focus fade", "Paragraph strength", "Far text strength", "Paragraph rhythm", "Rhythm tiers", "Zen Mode goes fullscreen",
-        "Readability in the status bar", "Lens", "Rhythm tint underneath", "Kinds", "Bad words note",
+        "Readability in the status bar", "Lens", "Rhythm tint underneath", "Kinds", "Bad words note", "Dialogue marks", "Thought marks", "Thought pattern", "Dim narration",
         "Model", "Analyse automatically", "Ollama URL", "Ollama model", "Claude model", "Anthropic API key", "Daily spending cap (USD)",
         "Writing log note", "Echoes on the page", "Echo sensitivity", "Stories folder", "Daily word goal",
       ]));
@@ -88,6 +88,9 @@ describe("CreativeZenSettingsTab", () => {
       expect(shown("Kinds")).toBe(false);
       expect(shown("Rhythm tint underneath")).toBe(true);
       expect(shown("Bad words note")).toBe(true);
+      expect(shown("Thought pattern")).toBe(false);
+      await tab.setControlValue("dialogue.thoughts", "custom");
+      expect(shown("Thought pattern")).toBe(true);
 
       await tab.setControlValue("scope.mode", "folders");
       expect(shown("Folders")).toBe(true);

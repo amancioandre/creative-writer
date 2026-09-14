@@ -170,3 +170,15 @@ describe("lens settings", () => {
     expect(enabledStyleKinds(normalizeSettings({ lens: "style" })).size).toBe(8);
   });
 });
+
+describe("dialogue settings", () => {
+  it("defaults to double quotes, whole-paragraph italics and dimmed narration", () => {
+    expect(normalizeSettings(undefined).dialogue).toEqual({ marks: "double", thoughts: "italic-paragraph", thoughtPattern: "", dimNarration: true });
+  });
+  it("keeps known marks and drops unknown ones", () => {
+    const s = normalizeSettings({ dialogue: { marks: "dash", thoughts: "custom", thoughtPattern: "~(.+)~", dimNarration: false } }).dialogue;
+    expect(s).toEqual({ marks: "dash", thoughts: "custom", thoughtPattern: "~(.+)~", dimNarration: false });
+    expect(normalizeSettings({ dialogue: { marks: "guillemets", thoughts: "loud" } }).dialogue.marks).toBe("double");
+    expect(normalizeSettings({ dialogue: { marks: "guillemets", thoughts: "loud" } }).dialogue.thoughts).toBe("italic-paragraph");
+  });
+});

@@ -45,11 +45,12 @@ import { countWords } from "./domain/text/Dialogue";
 import { toDay } from "./domain/progress/Dates";
 import { summarizeDay } from "./domain/progress/ProgressSummary";
 import { splitScenes } from "./domain/text/Scenes";
-import { inScope, parseProjectFrontmatter, projectStatus, projectStreak, recentAdded, type ProjectSpec, type ProjectStatus } from "./domain/progress/Project";
+import { inScope, parseProjectFrontmatter, projectConventions, projectStatus, projectStreak, recentAdded, type ProjectSpec, type ProjectStatus } from "./domain/progress/Project";
 import { enabledStyleKinds } from "./domain/settings/Settings";
 import { LENS_LABELS, nextLens, toggleLens, type Lens } from "./domain/lens/Lens";
 import { EMPTY_WORD_LISTS, wordListsFacet, wordsExtension } from "./infrastructure/codemirror/wordsExtension";
 import { lensExtension } from "./infrastructure/codemirror/lensExtension";
+import { conventionsFacet, dialogueExtension, type ConventionsByScope } from "./infrastructure/codemirror/dialogueExtension";
 import { loadWordLists } from "./infrastructure/obsidian/VaultWordLists";
 import { BuildStoryMap } from "./application/use-cases/BuildStoryMap";
 import { AnalyzeSceneRelations } from "./application/use-cases/AnalyzeSceneRelations";
@@ -146,6 +147,7 @@ export default class CreativeZenModePlugin extends Plugin {
   private readonly settingsCompartment = new Compartment();
   private readonly projectsCompartment = new Compartment();
   private readonly wordsCompartment = new Compartment();
+  private readonly conventionsCompartment = new Compartment();
   /** The notes the Words lens read last, so a change to one of them reloads the lists. */
   private wordListPaths: readonly string[] = [];
   private wordListsKey = "";
@@ -194,6 +196,7 @@ export default class CreativeZenModePlugin extends Plugin {
 
     // Lenses: one reading pass at a time, everywhere. Each is a command that toggles it; the status-bar item cycles them.
     this.addCommand({ id: "lens-style", name: COMMANDS["lens-style"], callback: () => void this.setLens(toggleLens(this.current.lens, "style")) });
+    this.addCommand({ id: "lens-dialogue", name: COMMANDS["lens-dialogue"], callback: () => void this.setLens(toggleLens(this.current.lens, "dialogue")) });
     this.addCommand({ id: "lens-words", name: COMMANDS["lens-words"], callback: () => void this.setLens(toggleLens(this.current.lens, "words")) });
     this.addCommand({ id: "lens-next", name: COMMANDS["lens-next"], callback: () => void this.setLens(nextLens(this.current.lens)) });
     this.addCommand({ id: "lens-off", name: COMMANDS["lens-off"], callback: () => void this.setLens("none") });
@@ -699,8 +702,10 @@ export default class CreativeZenModePlugin extends Plugin {
       this.settingsCompartment.of(settingsFacet.of(this.current)),
       this.projectsCompartment.of(projectScopesFacet.of(this.projectScopes())),
       this.wordsCompartment.of(wordListsFacet.of(EMPTY_WORD_LISTS)),
+      this.conventionsCompartment.of(conventionsFacet.of(this.projectConventions())),
       activeNoteExtension((state) => state.field(editorInfoField, false)?.file?.path ?? null),
       lensExtension(),
+      dialogueExtension((state) => state.field(editorInfoField, false)?.file?.path ?? null),
       wordsExtension((state) => state.field(editorInfoField, false)?.file?.path ?? null),
       readabilityStatusExtension(profile, (p) => {
         readability.setText(statusLabel(p));
@@ -779,24 +784,37 @@ export default class CreativeZenModePlugin extends Plugin {
     if (this.scope.counts(path, text)) this.tracker.opened(path, countWords(text));
   }
 
-  /** Every declared project's folder (or note), `story: true` ones included — they are the story too. */
-  private projectScopes(): string[] {
+  /** Every declared project, `story: true` ones included — they are the story too. */
+  private projectSpecs(): ProjectSpec[] {
     return this.app.vault
       .getMarkdownFiles()
       .map((f) => parseProjectFrontmatter(this.app.metadataCache.getFileCache(f)?.frontmatter, f.path))
-      .filter((s): s is ProjectSpec => s !== null)
-      .map((s) => s.scope);
+      .filter((s): s is ProjectSpec => s !== null);
   }
 
-  /** Editors decide activation from the project list under the "projects" scope mode; push it only when it changes. */
+  /** Every declared project's folder (or note). */
+  private projectScopes(): string[] {
+    return this.projectSpecs().map((s) => s.scope);
+  }
+
+  /** The dialogue conventions project notes declare, by scope, for the dialogue lens. */
+  private projectConventions(specs: readonly ProjectSpec[] = this.projectSpecs()): ConventionsByScope {
+    const out: Record<string, ReturnType<typeof projectConventions>> = {};
+    for (const s of specs) { const c = projectConventions(s); if (Object.keys(c).length) out[s.scope] = c; }
+    return out;
+  }
+
+  /** Editors decide activation from the project list under the "projects" scope mode, and read the projects' conventions; push both only when they change. */
   private pushProjectScopes(): void {
-    const scopes = this.projectScopes();
-    const key = scopes.join("\n");
+    const specs = this.projectSpecs();
+    const scopes = specs.map((s) => s.scope);
+    const conventions = this.projectConventions(specs);
+    const key = JSON.stringify([scopes, conventions]);
     if (key === this.projectScopesKey) return;
     this.projectScopesKey = key;
     this.app.workspace.iterateAllLeaves((leaf) => {
       const editor = (leaf.view as { editor?: { cm?: { dispatch: (spec: unknown) => void } } }).editor;
-      editor?.cm?.dispatch({ effects: this.projectsCompartment.reconfigure(projectScopesFacet.of(scopes)) });
+      editor?.cm?.dispatch({ effects: [this.projectsCompartment.reconfigure(projectScopesFacet.of(scopes)), this.conventionsCompartment.reconfigure(conventionsFacet.of(conventions))] });
     });
   }
 

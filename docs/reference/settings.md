@@ -32,10 +32,14 @@ A [lens](/guide/lenses) is a reading pass: it colours every open note one way at
 
 | Setting | Default | What |
 |---|---|---|
-| Lens | Style checks | The one lens on, everywhere, kept between sessions: none, style checks, or words. The status-bar item and the *Lens:* commands are the same switch. |
+| Lens | Style checks | The one lens on, everywhere, kept between sessions: none, style checks, dialogue, or words. The status-bar item and the *Lens:* commands are the same switch. |
 | Rhythm tint underneath | on | With a lens on: keep the faint [rhythm](/guide/rhythm) tint under it. |
 | Kinds | all on | With the style checks lens: one chip per kind (clichés, passive voice, filter verbs, adverbs, repetition, nominalisations, weak verbs, metaphor candidates); click a chip to switch that kind off or on. See [Style checks](/guide/style-checks). |
 | Bad words note | `Creative Writer/Bad words.md` | The note holding your own overused words for the words lens: one heading per category, the words under it. A project note can name its own with `bad-words:`. |
+| Dialogue marks | Double quotes | How speech is written for the [dialogue lens](/guide/lenses#dialogue): double quotes, single quotes, dash lines (travessão), or none. A project note overrides with `dialogue:`. |
+| Thought marks | Whole paragraph in italics | How thought is written: a whole paragraph in italics, any italics, single quotes, a custom pattern, or none. Italics inside a sentence are emphasis and never count under the default. A project note overrides with `thoughts:`. |
+| Thought pattern | — | With *Custom pattern*: a regular expression tested against each paragraph; every match is a thought, or its first group when there is one. |
+| Dim narration | on | Under the dialogue lens, fade everything that is not speech or thought. |
 
 ## Manuscript
 

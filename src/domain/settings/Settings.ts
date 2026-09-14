@@ -1,6 +1,7 @@
 import { RhythmScale } from "../rhythm/RhythmScale";
 import { FINDING_KINDS, type FindingKind } from "../style/Finding";
 import { isLens, type Lens } from "../lens/Lens";
+import { DEFAULT_CONVENTIONS, DIALOGUE_MARKS, THOUGHT_MARKS, type DialogueConventions, type DialogueMarks, type ThoughtMarks } from "../dialogue/DialogueSpans";
 
 export type { Lens } from "../lens/Lens";
 import type { ScopeMode, ScopeSettings } from "../scope/NoteScope";
@@ -238,6 +239,7 @@ export interface PluginSettings {
   readonly rhythmUnderLens: boolean;
   readonly styleChecks: Readonly<Record<FindingKind, boolean>>;
   readonly words: WordsSettings;
+  readonly dialogue: DialogueSettings;
   /** Show the cursor paragraph's readability bands in the status bar. */
   readonly readabilityEnabled: boolean;
   readonly goals: GoalSettings;
@@ -317,6 +319,23 @@ function normalizeWords(raw: unknown): WordsSettings {
   return { note: normalizeNotePath(r.note) ?? DEFAULT_WORDS.note };
 }
 
+/** The Dialogue lens: how speech and thought are written, and whether narration dims under it. A project note can override the marks. */
+export interface DialogueSettings extends DialogueConventions {
+  readonly dimNarration: boolean;
+}
+
+export const DEFAULT_DIALOGUE: DialogueSettings = { ...DEFAULT_CONVENTIONS, dimNarration: true };
+
+function normalizeDialogue(raw: unknown): DialogueSettings {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  return {
+    marks: DIALOGUE_MARKS.includes(r.marks as DialogueMarks) ? (r.marks as DialogueMarks) : DEFAULT_DIALOGUE.marks,
+    thoughts: THOUGHT_MARKS.includes(r.thoughts as ThoughtMarks) ? (r.thoughts as ThoughtMarks) : DEFAULT_DIALOGUE.thoughts,
+    thoughtPattern: typeof r.thoughtPattern === "string" ? r.thoughtPattern : DEFAULT_DIALOGUE.thoughtPattern,
+    dimNarration: typeof r.dimNarration === "boolean" ? r.dimNarration : DEFAULT_DIALOGUE.dimNarration,
+  };
+}
+
 export interface GoalSettings {
   /** Words added per day; 0 = no daily goal (any writing day counts for streaks). */
   readonly dailyWords: number;
@@ -348,6 +367,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   rhythmUnderLens: true,
   styleChecks: DEFAULT_STYLE_CHECKS,
   words: DEFAULT_WORDS,
+  dialogue: DEFAULT_DIALOGUE,
   readabilityEnabled: true,
   goals: DEFAULT_GOALS,
   llm: DEFAULT_LLM_SETTINGS,
@@ -394,6 +414,7 @@ export function normalizeSettings(raw: unknown): PluginSettings {
     rhythmUnderLens: bool("rhythmUnderLens"),
     styleChecks: normalizeChecks(r.styleChecks),
     words: normalizeWords(r.words),
+    dialogue: normalizeDialogue(r.dialogue),
     readabilityEnabled: bool("readabilityEnabled"),
     goals: normalizeGoals(r.goals),
     llm: normalizeLlm(r.llm),

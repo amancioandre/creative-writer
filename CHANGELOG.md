@@ -8,6 +8,7 @@ Three revision passes from the way Maxwell Alexander Drake edits, designed on 20
 
 - **The settings pass.** Eight groups in the order a writer meets them (Where it runs, Writing, Lenses, Manuscript outline / comments / page, Stories and goals, Model assistant); rows that only matter while another is on stay hidden until then; one-line descriptions with the detail in the docs; the two manuscript view switches leave the tab; the style-check kinds become one row of chips.
 - **Lenses.** Style checks and Words are lenses: one on across the vault, kept between sessions, switched from the status-bar item or the `Lens:` commands (`Lens: style checks`, `Lens: words`, `Lens: next`, `Lens: off`). The rhythm tint stays underneath unless told not to; Zen Mode shows no lens.
+- **Dialogue lens.** Speech at full tint, thought at half, narration dimmed, so the talk can be read on its own. Speech is double quotes, single quotes, dash lines (the travessão) or none; a thought is a whole paragraph in italics by default (italics inside a sentence are emphasis and never count), any italics, single quotes, or a pattern of your own; a project note overrides both with `dialogue:` and `thoughts:`.
 - **Words lens.** Your own overused words from a note of your own, one heading per category, tinted wherever they occur with the category and the count in the note on hover; `bad-words:` in a project note names a list for that project.
 
 ## Unreleased — The plot grid

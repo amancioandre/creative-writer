@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { inScope, linkTarget, parseProjectFrontmatter, projectStatus, recentAdded } from "../../../src/domain/progress/Project";
+import { inScope, linkTarget, parseProjectFrontmatter, projectConventions, projectStatus, recentAdded } from "../../../src/domain/progress/Project";
 import { EMPTY_LOG, baselineWordCount, recordWordCount } from "../../../src/domain/progress/WritingLog";
 
 describe("parseProjectFrontmatter — story-ignore", () => {
@@ -124,5 +124,18 @@ describe("parseProjectFrontmatter — bad-words", () => {
   it("linkTarget strips the brackets, the alias and the heading", () => {
     expect(linkTarget("[[A#B|c]]")).toBe("A");
     expect(linkTarget(3)).toBeUndefined();
+  });
+});
+
+describe("parseProjectFrontmatter — dialogue and thoughts", () => {
+  it("reads the project's conventions and leaves them out when absent", () => {
+    const p = parseProjectFrontmatter({ story: true, dialogue: "travessão", thoughts: "~(.+)~" }, "Livro/Livro.md")!;
+    expect(p.dialogueMarks).toBe("dash");
+    expect(p.thoughtMarks).toBe("custom");
+    expect(p.thoughtPattern).toBe("~(.+)~");
+    expect(projectConventions(p)).toEqual({ marks: "dash", thoughts: "custom", thoughtPattern: "~(.+)~" });
+    const q = parseProjectFrontmatter({ story: true, thoughts: "italic" }, "Novel/Novel.md")!;
+    expect(projectConventions(q)).toEqual({ thoughts: "italic-paragraph" });
+    expect(projectConventions(parseProjectFrontmatter({ story: true }, "Novel/Novel.md")!)).toEqual({});
   });
 });

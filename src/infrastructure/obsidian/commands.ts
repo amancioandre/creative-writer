@@ -4,6 +4,7 @@
  */
 export const COMMANDS = {
   "lens-style": "Lens: style checks",
+  "lens-dialogue": "Lens: dialogue",
   "lens-words": "Lens: words",
   "lens-next": "Lens: next",
   "lens-off": "Lens: off",

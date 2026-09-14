@@ -64,7 +64,10 @@ type Row = ControlRow | RenderRow;
 interface Group { type: "group"; heading: string; items: Row[] }
 
 /** Keys whose value decides whether other rows are shown; a change to one re-renders the tab. */
-const PARENT_KEYS: ReadonlySet<string> = new Set(["scope.mode", "focusFadeEnabled", "rhythmEnabled", "lens", "manuscript.stripPreset", "llm.provider", "llm.onIdle"]);
+const PARENT_KEYS: ReadonlySet<string> = new Set(["scope.mode", "focusFadeEnabled", "rhythmEnabled", "lens", "dialogue.thoughts", "manuscript.stripPreset", "llm.provider", "llm.onIdle"]);
+
+const DIALOGUE_OPTIONS: Record<string, string> = { double: "Double quotes “ ”", single: "Single quotes ‘ ’", dash: "Dash lines — travessão", none: "None" };
+const THOUGHT_OPTIONS: Record<string, string> = { "italic-paragraph": "Whole paragraph in italics", "italic-any": "Any italics", "single-quotes": "Single quotes ‘ ’", custom: "Custom pattern", none: "None" };
 
 /**
  * Settings are described once as definitions (Obsidian 1.13+: rendered by
@@ -118,6 +121,10 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
         { name: "Rhythm tint underneath", desc: "Keep the faint sentence tint under the lens.", control: toggle("rhythmUnderLens"), visible: () => s().lens !== "none" },
         { name: "Kinds", desc: "Which style checks the lens shows. Hover a tint for the note.", render: (setting) => this.renderKindChips(setting), visible: () => s().lens === "style" },
         { name: "Bad words note", desc: "Your own overused words, one heading per category. A project note can name its own with bad-words.", control: text("words.note", DEFAULT_WORDS.note) },
+        { name: "Dialogue marks", desc: "How speech is written. A project note can override with dialogue:.", control: dropdown("dialogue.marks", DIALOGUE_OPTIONS) },
+        { name: "Thought marks", desc: "How thought is written. Italics inside a sentence are emphasis and never count. Override with thoughts:.", control: dropdown("dialogue.thoughts", THOUGHT_OPTIONS) },
+        { name: "Thought pattern", desc: "A regular expression; every match in a paragraph is a thought, group 1 when there is one.", control: text("dialogue.thoughtPattern", "^[_*](.+)[_*][.!?]?$"), visible: () => s().dialogue.thoughts === "custom" },
+        { name: "Dim narration", desc: "Under the dialogue lens, fade everything that is not speech or thought.", control: toggle("dialogue.dimNarration") },
       ]),
       group("Manuscript outline", [
         { name: "Folder levels as headings", desc: "Folder levels below the project folder that become headings. 0 = no outline.", control: slider("manuscript.folderDepth", 0, 6, 1) },

@@ -935,3 +935,11 @@ body.czm-zen .cm-line [class*="czm-style-"],
 body.czm-zen .cm-line .czm-words { background-color: transparent; border-bottom: none; }
 .czm-status-lens { cursor: pointer; }
 .czm-status-lens.is-off { color: var(--text-faint); }
+/* The Dialogue lens: speech at full tint, thought at half, narration dimmed; colour means a speaker here, so the rhythm tint goes. */
+.cm-editor { --czm-speech: #4a8fe2; }
+.cm-line .czm-speech { background-color: color-mix(in srgb, var(--czm-speech) 26%, transparent); border-radius: 2px; }
+.cm-line .czm-thought { background-color: color-mix(in srgb, var(--czm-speech) 13%, transparent); border-radius: 2px; }
+.cm-line .czm-narration { opacity: 0.45; }
+.czm-lens-dialogue .cm-line [class*="czm-rhythm-"] { background-color: transparent; }
+body.czm-zen .cm-line .czm-speech, body.czm-zen .cm-line .czm-thought { background-color: transparent; }
+body.czm-zen .cm-line .czm-narration { opacity: 1; }

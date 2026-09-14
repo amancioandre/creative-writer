@@ -1,6 +1,7 @@
 import { type Day, addDays, daysBetween, isDay } from "./Dates";
 import type { WritingLog } from "./WritingLog";
 import { pathInScope } from "../scope/NoteScope";
+import { parseDialogueMarks, parseThoughtMarks, type DialogueConventions, type DialogueMarks, type ThoughtMarks } from "../dialogue/DialogueSpans";
 
 /**
  * A project is declared in a note's front matter:
@@ -10,6 +11,8 @@ import { pathInScope } from "../scope/NoteScope";
  *   writing-daily: 500           (optional; words per day on this project; `writing-goal` is read as the same)
  *   story-ignore: [LOW, POV]     (optional; capitalised words the story map must not take for names)
  *   bad-words: [[Bad words]]     (optional; the project's own word list note for the Words lens)
+ *   dialogue: dash               (optional; how speech is written here: double, single, dash, none)
+ *   thoughts: italic-paragraph   (optional; how thought is written: italic-paragraph, italic-any, single-quotes, none, or a pattern)
  * The folder — or that one note — is what gets counted.
  *
  * Any note inside the project may carry `story-order: 3` to fix its place
@@ -40,6 +43,19 @@ export interface ProjectSpec {
   readonly plotTheme?: string;
   /** The project's own word list for the Words lens (`bad-words`), as a link target or path; absent, the global note. */
   readonly wordsNote?: string;
+  /** How speech and thought are written in this project (`dialogue`, `thoughts`); absent, the vault-wide setting. */
+  readonly dialogueMarks?: DialogueMarks;
+  readonly thoughtMarks?: ThoughtMarks;
+  readonly thoughtPattern?: string;
+}
+
+/** The conventions a project note declares, as the editor's override; empty when it declares none. */
+export function projectConventions(spec: Pick<ProjectSpec, "dialogueMarks" | "thoughtMarks" | "thoughtPattern">): Partial<DialogueConventions> {
+  return {
+    ...(spec.dialogueMarks ? { marks: spec.dialogueMarks } : {}),
+    ...(spec.thoughtMarks ? { thoughts: spec.thoughtMarks } : {}),
+    ...(spec.thoughtPattern !== undefined ? { thoughtPattern: spec.thoughtPattern } : {}),
+  };
 }
 
 /** `[[Bad words|the list]]`, `[[Bad words#Filtering]]`, `Notes/Bad words.md` → the target as written, alias and heading dropped. */
@@ -67,7 +83,15 @@ export function parseProjectFrontmatter(frontmatter: unknown, notePath: string):
   const ignoredNames = (Array.isArray(rawIgnore) ? rawIgnore : typeof rawIgnore === "string" ? rawIgnore.split(",") : []).filter((x): x is string => typeof x === "string").map((x) => x.trim()).filter(Boolean);
   const text = (key: "plot-pov" | "plot-time" | "plot-theme") => { const v = fm[key]; return typeof v === "string" && v.trim() ? { [key === "plot-pov" ? "plotPov" : key === "plot-time" ? "plotTime" : "plotTheme"]: v.trim() } : {}; };
   const wordsNote = linkTarget(fm["bad-words"]);
-  return { name, notePath, scope: noteScope ? notePath : folder, targetWords: hasTarget ? Math.floor(target) : 0, deadline, dailyWords: Number.isFinite(daily) && daily > 0 ? Math.floor(daily) : 0, ignoredNames, ...text("plot-pov"), ...text("plot-time"), ...text("plot-theme"), ...(wordsNote ? { wordsNote } : {}) };
+  const dialogueMarks = parseDialogueMarks(fm["dialogue"]);
+  const thoughts = parseThoughtMarks(fm["thoughts"]);
+  return {
+    name, notePath, scope: noteScope ? notePath : folder, targetWords: hasTarget ? Math.floor(target) : 0, deadline, dailyWords: Number.isFinite(daily) && daily > 0 ? Math.floor(daily) : 0, ignoredNames,
+    ...text("plot-pov"), ...text("plot-time"), ...text("plot-theme"),
+    ...(wordsNote ? { wordsNote } : {}),
+    ...(dialogueMarks ? { dialogueMarks } : {}),
+    ...(thoughts ? { thoughtMarks: thoughts.thoughts, ...(thoughts.thoughtPattern !== undefined ? { thoughtPattern: thoughts.thoughtPattern } : {}) } : {}),
+  };
 }
 
 function toIso(d: Date): Day {

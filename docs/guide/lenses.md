@@ -1,6 +1,6 @@
 # Lenses
 
-A lens is a reading pass. It colours every open note one way at a time, so a tint always means one thing: under the **style checks** lens a tint is a cliché, a passive, a filter verb; under the **words** lens it is one of your own overused words, coloured by category. One lens is on across the vault and is kept between sessions. Switching one on switches the other off.
+A lens is a reading pass. It colours every open note one way at a time, so a tint always means one thing: under the **style checks** lens a tint is a cliché, a passive, a filter verb; under the **dialogue** lens it is speech or thought; under the **words** lens it is one of your own overused words, coloured by category. One lens is on across the vault and is kept between sessions. Switching one on switches the other off.
 
 The idea comes from the way Maxwell Alexander Drake revises: a dialogue pass, then an accent pass, then a bad-words pass, each with its own highlight, never all at once. Five highlights on one page cannot be read; one at a time can.
 
@@ -9,13 +9,28 @@ What is not a lens stays under every lens: focus fade, the current line, typewri
 ## Switching
 
 - The status bar shows the lens on the right, *Lens: words*, or *No lens*. Click it for the next one.
-- Every lens is a command, and every lens command starts with **Lens:**, so typing `lens` in the palette lists them all: **Lens: style checks**, **Lens: words**, **Lens: next**, **Lens: off**. A lens command toggles its lens: on when another or none is on, off when it is the one on.
+- Every lens is a command, and every lens command starts with **Lens:**, so typing `lens` in the palette lists them all: **Lens: style checks**, **Lens: dialogue**, **Lens: words**, **Lens: next**, **Lens: off**. A lens command toggles its lens: on when another or none is on, off when it is the one on.
 - None ships with a hotkey, as with every command in this plugin; bind your own in Settings → Hotkeys, where the prefix keeps them together.
 - Settings → Lenses → **Lens** is the same switch as a dropdown.
 
 ## Style checks
 
 The offline [style checks](/guide/style-checks), one colour per kind, in the paragraph you are editing. Which kinds show is the row of chips under the lens.
+
+## Dialogue
+
+Speech at full tint, thought at half, narration dimmed, so you can read only the talk and ask Drake's question: does the dialogue carry the scene without the narration? If it does, the narration is making a scene that already works better; if it does not, the scene leans on narration to happen.
+
+How speech and thought are written is a convention, so it is a setting, and a project can override it in its [project note](/reference/front-matter#project-note):
+
+| | Settings → Lenses | Project note |
+|---|---|---|
+| Speech | **Dialogue marks**: double quotes “ ”, single quotes ‘ ’, dash lines (the travessão: a paragraph that opens with — is speech, and each further — toggles narration and speech), or none. | `dialogue: double` · `single` · `dash` · `none` |
+| Thought | **Thought marks**: a whole paragraph in italics (the default), any italics, single quotes, a custom pattern, or none. | `thoughts: italic-paragraph` · `italic-any` · `single-quotes` · `none`, or a regular expression of your own |
+
+Under the default, italics inside a sentence are emphasis and never a thought: `_Alone_ was generous` stays narration; `_He is guessing. He has to be guessing._` on a line of its own is a thought. A custom pattern is tested against each paragraph; every match is a thought, or its first group when the pattern has one. **Dim narration** fades everything that is not speech or thought; switch it off to keep the page at full strength with the tints on top.
+
+The dialogue lens hides the rhythm tint whatever the *Rhythm tint underneath* setting says: a colour here means one thing.
 
 ## Words
 

@@ -6,12 +6,12 @@
  * (focus fade, current line, typewriter, the rhythm meter in Zen Mode)
  * stay under every lens.
  */
-export type Lens = "none" | "style" | "words";
+export type Lens = "none" | "style" | "dialogue" | "words";
 
 /** In the order "Lens: next" walks them. */
-export const LENSES: readonly Lens[] = ["none", "style", "words"];
+export const LENSES: readonly Lens[] = ["none", "style", "dialogue", "words"];
 
-export const LENS_LABELS: Readonly<Record<Lens, string>> = { none: "No lens", style: "Style checks", words: "Words" };
+export const LENS_LABELS: Readonly<Record<Lens, string>> = { none: "No lens", style: "Style checks", dialogue: "Dialogue", words: "Words" };
 
 export function isLens(value: unknown): value is Lens {
   return typeof value === "string" && (LENSES as readonly string[]).includes(value);
