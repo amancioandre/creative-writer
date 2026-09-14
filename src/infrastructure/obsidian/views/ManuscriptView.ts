@@ -1,5 +1,6 @@
 import { ItemView, Menu, Notice, setIcon, type WorkspaceLeaf } from "obsidian";
 import { renderJumps, type PanelId } from "./PanelShell";
+import { onActivate } from "./keys";
 import type { ProjectSpec } from "../../../domain/progress/Project";
 import { EMPTY_MANUSCRIPT, type Manuscript, type ManuscriptBlock, type NoteItem } from "../../../domain/manuscript/Manuscript";
 import { locateInBlock } from "../../../domain/manuscript/Locate";
@@ -303,9 +304,9 @@ export class ManuscriptView extends ItemView {
       const el = this.blockAt(c.path, c.line);
       if (!el) continue;
       const marks = el.querySelector<HTMLElement>(".czm-ms-marks") ?? el.createSpan({ cls: "czm-ms-marks" });
-      const mark = marks.createSpan({ cls: `czm-ms-mark is-story is-${c.kind}`, attr: { title: c.text, "aria-label": c.text, role: "button", tabindex: "-1" } });
-      // The mark is the way to the other end: a click takes the page there, the editor following.
-      mark.addEventListener("click", (ev) => { ev.stopPropagation(); this.goTo(c.otherPath, c.otherLine); });
+      const mark = marks.createSpan({ cls: `czm-ms-mark is-story is-${c.kind}`, attr: { title: c.text, "aria-label": c.text, role: "button", tabindex: "0" } });
+      // The mark is the way to the other end: a click or Enter takes the page there, the editor following.
+      onActivate(mark, (ev) => { ev.stopPropagation(); this.goTo(c.otherPath, c.otherLine); });
     }
   }
 
@@ -319,8 +320,8 @@ export class ManuscriptView extends ItemView {
       const title = candidate ? `${m.name} — a name the map found, ${m.mentions} mention${m.mentions === 1 ? "" : "s"}. Click to make it a note, or to say it is not a name.` : `${m.name} — ${m.kind}, ${m.mentions} mention${m.mentions === 1 ? "" : "s"}`;
       const name = line.createSpan({ text: m.name, cls: `czm-ms-cast-name${m.path ? " is-link" : ""}${candidate ? " is-candidate" : ""}`, attr: { title } });
       name.style.setProperty("--czm-kind", colors[m.kind]);
-      if (m.path) name.addEventListener("click", (ev) => { ev.stopPropagation(); this.source.openLink(m.path!, sourcePath); });
-      else if (candidate) name.addEventListener("click", (ev) => { ev.stopPropagation(); this.candidateMenu(ev, m.name); });
+      if (m.path) onActivate(name, (ev) => { ev.stopPropagation(); this.source.openLink(m.path!, sourcePath); });
+      else if (candidate) onActivate(name, (ev) => { ev.stopPropagation(); this.candidateMenu(ev instanceof MouseEvent ? ev : new MouseEvent("click", { clientX: name.getBoundingClientRect().left, clientY: name.getBoundingClientRect().bottom }), m.name); });
     });
     return line;
   }
@@ -354,10 +355,10 @@ export class ManuscriptView extends ItemView {
 
   private renderConflicts(parent: HTMLElement, marks: readonly GutterMark[]): void {
     for (const c of marks) {
-      const row = parent.createDiv({ cls: "czm-ms-cm-row", attr: { role: "button", tabindex: "-1", title: "Open the other scene" } });
+      const row = parent.createDiv({ cls: "czm-ms-cm-row", attr: { role: "button", tabindex: "0", title: "Open the other scene" } });
       row.createSpan({ text: c.kind === "conflict" ? "clash" : c.kind, cls: `czm-ms-cm-badge is-${c.kind}` });
       row.createSpan({ text: c.text, cls: "czm-ms-cm-text" });
-      row.addEventListener("click", () => this.goTo(c.otherPath, c.otherLine));
+      onActivate(row, () => this.goTo(c.otherPath, c.otherLine));
       row.addEventListener("dblclick", () => this.source.reveal(c.otherPath, c.otherLine, 0, true));
     }
   }

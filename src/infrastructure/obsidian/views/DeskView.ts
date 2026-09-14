@@ -114,7 +114,7 @@ export function renderScenes(root: HTMLElement, scenes: readonly { scene: Scene;
     row.setAttribute("role", "button");
     row.setAttribute("tabindex", "0");
     row.addEventListener("click", () => reveal(scene.line));
-    row.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") reveal(scene.line); });
+    row.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); reveal(scene.line); } });
     const head = row.createDiv({ cls: "czm-desk-band-head" });
     head.createSpan({ text: scene.title || "(before first heading)", cls: "czm-desk-scene-title" });
     head.createSpan({ text: `${profile.wordCount.toLocaleString()} w`, cls: "czm-desk-band-name" });
@@ -146,7 +146,7 @@ export function renderEchoes(root: HTMLElement, found: DeskEchoes, reveal: (ref:
     const row = list.createDiv({ cls: `czm-desk-echo is-${echoVerdict(g)}`, attr: { role: "button", tabindex: "0", title: `“${g.text}” — ${g.stops.map((s) => s.scene.title || s.scene.path).join(", ")}` } });
     const go = () => reveal(g.stops[0]!.scene);
     row.addEventListener("click", go);
-    row.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") go(); });
+    row.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
     const head = row.createDiv({ cls: "czm-desk-band-head" });
     head.createSpan({ text: g.text, cls: "czm-desk-echo-text" });
     head.createSpan({ text: `${g.stops.length}×`, cls: "czm-desk-band-name" });

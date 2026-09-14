@@ -67,3 +67,21 @@ describe("StoryTimelineView", () => {
     expect(v.contentEl.textContent).toContain("No project yet");
   });
 });
+
+describe("StoryTimelineView keyboard", () => {
+  it("opens a note from the keyboard: the cast names and chapter names are tab stops that Enter follows", async () => {
+    const { v, calls } = open();
+    await v.onOpen();
+    const name = v.contentEl.querySelector<HTMLElement>(".czm-tl-col .is-link")!;
+    expect(name.getAttribute("tabindex")).toBe("0");
+    expect(name.getAttribute("role")).toBe("button");
+    name.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    expect(calls.opened).toHaveLength(1);
+    expect(calls.opened[0]).toMatch(/^Novel\//);
+    const chapter = v.contentEl.querySelector<HTMLElement>(".czm-tl-note .is-link")!;
+    const space = new KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true });
+    chapter.dispatchEvent(space);
+    expect(space.defaultPrevented).toBe(true);
+    expect(calls.opened).toEqual([calls.opened[0], "Novel/One.md"]);
+  });
+});

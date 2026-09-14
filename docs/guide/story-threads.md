@@ -127,7 +127,7 @@ Strips share the slots exactly, so a spike lines up with the scene above it at e
 | **Contradictions** | Open and dismissed counts; *Only contradictions*; *Show dismissed*. |
 | **Strips** | A toggle per strip. |
 
-**Ctrl/⌘ + wheel** zooms the axis horizontally around the pointer (the strips zoom with it); the view scrolls sideways like any wide page; **Fit** returns to one screen. The side column is docked, never floating over the chart; its state persists in the plugin settings. When nothing is drawn, the page says which filter is hiding what and offers the click that lifts it.
+**Ctrl/⌘ + wheel** zooms the axis horizontally around the pointer (the strips zoom with it), as do `+` and `-` and the zoom icons in the head; the view scrolls sideways like any wide page; **Fit** (or `f`) returns to one screen. Every scene bar and arc is a tab stop: Enter or Space selects it as a click would. The side column is docked, never floating over the chart; its state persists in the plugin settings. When nothing is drawn, the page says which filter is hiding what and offers the click that lifts it.
 
 ## Sync
 

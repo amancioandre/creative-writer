@@ -600,7 +600,10 @@ export default class CreativeZenModePlugin extends Plugin {
     const readability = this.addStatusBarItem();
     readability.addClass("czm-status-readability");
     readability.setAttribute("aria-label", "Readability of the current paragraph. Click for the whole note.");
+    readability.setAttribute("role", "button");
+    readability.tabIndex = 0;
     readability.addEventListener("click", () => void this.openDesk());
+    readability.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); void this.openDesk(); } });
 
     this.registerEditorExtension([
       this.settingsCompartment.of(settingsFacet.of(this.current)),

@@ -568,3 +568,29 @@ describe("WriterView keyboard", () => {
     expect(document.activeElement).toBe(el.querySelector(".czm-map-search"));
   });
 });
+
+describe("WriterView group keys", () => {
+  const key = (el: Element, k: string, init: KeyboardEventInit = {}) => el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...init }));
+
+  it("moves and resizes the selected group from the keyboard, and the help dialog takes focus", async () => {
+    const { el, file } = await open();
+    const r = el.querySelector<HTMLElement>(".czm-writer")!;
+    r.focus();
+    key(r, "1");
+    const id = el.querySelector(".czm-writer-group.is-selected")!.getAttribute("data-id")!;
+    const w0 = layoutBoard(buildBoard(baseNotes, EMPTY_WRITER_FILE)).groups.find((g) => g.group.def.id === id)!.rect.w;
+    key(r, "]", { altKey: true });
+    await tick(); await tick(); await tick();
+    expect(file().groups[id]!.w).toBe(w0 + 40);
+    key(r, "]");
+    await tick(); await tick(); await tick();
+    expect(file().groups[id]!.x).toBeGreaterThan(0);
+    expect(el.querySelector(".czm-writer-group.is-selected")!.getAttribute("data-id")).toBe(id);
+    key(r, "?");
+    expect(el.querySelector(".czm-writer-help")!.classList.contains("is-open")).toBe(true);
+    expect(document.activeElement).toBe(el.querySelector(".czm-writer-help-close"));
+    expect(el.querySelector(".czm-writer-help")!.textContent).toContain("Alt + [ ]");
+    (el.querySelector(".czm-writer-help-close") as HTMLElement).click();
+    expect(el.querySelector(".czm-writer-help")!.classList.contains("is-open")).toBe(false);
+  });
+});

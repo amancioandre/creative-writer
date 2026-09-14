@@ -1,6 +1,7 @@
 import { ItemView, Setting, setIcon, type WorkspaceLeaf } from "obsidian";
 import { couldNot, StatusLine } from "./StatusLine";
 import { PanelShell, type Fix, type PanelId } from "./PanelShell";
+import { inField, onActivate } from "./keys";
 import type { ProjectSpec } from "../../../domain/progress/Project";
 import { DEFAULT_DISPLAY, DEFAULT_FORCES, DEFAULT_STORY_COLORS, DEFAULT_STORY_MAP, DISPLAY_RANGES, FORCE_RANGES, STORY_KINDS, STORY_LAYERS, type DisplaySettings, type ForceSettings, type StoryEntityKind, type StoryLayer, type StoryMapSettings } from "../../../domain/settings/Settings";
 import { applyFilter, explainEmpty, neighbours, type GraphFilter } from "../../../domain/story/Filter";
@@ -52,6 +53,8 @@ export const KIND_LABEL: Record<StoryEntityKind, string> = { character: "Charact
 const FORCE_LABEL: Record<keyof ForceSettings, string> = { repulsion: "Repulsion", linkDistance: "Link distance", linkStrength: "Link strength", gravity: "Centre pull" };
 const DISPLAY_LABEL: Record<keyof DisplaySettings, string> = { nodeSize: "Node size", edgeWidth: "Edge thickness", edgeOpacity: "Edge opacity", labelSize: "Label size" };
 const MIN_ZOOM = 0.15, MAX_ZOOM = 5;
+/** How far an arrow key pans, in screen pixels. */
+const PAN_STEP = 60;
 
 type Selection = { kind: "node"; id: string } | { kind: "edge"; edge: Edge } | { kind: "new-edge"; from: string; to: string } | null;
 const ENTITY_EXITS: readonly [string, EntityKind, string][] = [["Character", "character", "czm-act-character"], ["Place", "location", "czm-act-place"], ["Item", "item", "czm-act-item"], ["Faction", "faction", "czm-act-faction"], ["Event", "event", "czm-act-event"]];
@@ -178,7 +181,7 @@ export class StoryMapView extends ItemView {
     this.search.addEventListener("input", () => { this.query = this.search.value; this.rebuild(); });
     this.svg = document.createElementNS(SVG, "svg");
     this.svg.setAttribute("class", "czm-map-svg");
-    this.svg.setAttribute("role", "img");
+    this.svg.setAttribute("role", "group");
     this.root.appendChild(this.svg);
     this.viewport = document.createElementNS(SVG, "g");
     this.svg.appendChild(this.viewport);
@@ -192,10 +195,18 @@ export class StoryMapView extends ItemView {
     this.composer = this.root.createDiv({ cls: "czm-map-new" });
     this.status = new StatusLine(this.root);
     this.root.addEventListener("keydown", (e) => {
-      if (e.key !== "Escape") return;
-      if (this.linking) { this.cancelLink(); return; }
-      if (this.composerAt) { this.closeComposer(); return; }
-      this.select(null);
+      if (e.key === "Escape") {
+        if (this.linking) { this.cancelLink(); return; }
+        if (this.composerAt) { this.closeComposer(); return; }
+        this.select(null);
+        return;
+      }
+      if (inField(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+      // The pointer's pan and zoom, from the keys: arrows pan, + and - zoom about the centre, f fits.
+      const pan = e.key === "ArrowLeft" ? [PAN_STEP, 0] : e.key === "ArrowRight" ? [-PAN_STEP, 0] : e.key === "ArrowUp" ? [0, PAN_STEP] : e.key === "ArrowDown" ? [0, -PAN_STEP] : null;
+      if (pan) { e.preventDefault(); this.view = { ...this.view, x: this.view.x + pan[0]!, y: this.view.y + pan[1]! }; this.paint(); return; }
+      if (e.key === "+" || e.key === "=" || e.key === "-") { e.preventDefault(); this.zoomAtCentre(e.key === "-" ? 0.8 : 1.25); return; }
+      if (e.key === "f") { e.preventDefault(); this.fit(); }
     });
     this.root.tabIndex = -1;
   }
@@ -296,7 +307,8 @@ export class StoryMapView extends ItemView {
       title.textContent = `${e.name} — ${KIND_LABEL[e.kind]}${e.mentions ? `, ${e.mentions} mention${e.mentions === 1 ? "" : "s"} in ${e.appearances.length} scene${e.appearances.length === 1 ? "" : "s"}` : ""}`;
       g.appendChild(title);
       this.attachNodeDrag(g, e.id);
-      g.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); ev.stopPropagation(); this.select({ kind: "node", id: e.id }); } });
+      // Enter on a node while connecting finishes the relationship, as a click would.
+      g.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); ev.stopPropagation(); if (this.linking && this.linking !== e.id) this.finishLink(e.id); else this.select({ kind: "node", id: e.id }); } });
       g.addEventListener("dblclick", (ev) => { ev.stopPropagation(); if (e.path) this.source.openNote(e.path); });
       nodesG.appendChild(g);
       this.nodeEls.set(e.id, g);
@@ -466,6 +478,11 @@ export class StoryMapView extends ItemView {
       ev.preventDefault();
       this.zoomAt(ev.clientX, ev.clientY, Math.exp(-ev.deltaY * 0.0015));
     }, { passive: false });
+  }
+
+  private zoomAtCentre(factor: number): void {
+    const r = this.svg.getBoundingClientRect();
+    this.zoomAt(r.left + (r.width || 800) / 2, r.top + (r.height || 600) / 2, factor);
   }
 
   zoomAt(clientX: number, clientY: number, factor: number): void {
@@ -891,7 +908,7 @@ this.renderCard(); this.paint();
         const row = list.createDiv({ cls: `czm-map-row czm-layer-${edge.layer}${edge.stale ? " is-stale" : ""}`, attr: { role: "button", tabindex: "0" } });
         row.createSpan({ text: other.name, cls: "czm-map-row-name" });
         row.createSpan({ text: edgeSummary(edge), cls: "czm-map-row-meta" });
-        row.addEventListener("click", () => this.select({ kind: "edge", edge }));
+        onActivate(row, () => this.select({ kind: "edge", edge }));
       }
     }
   }
@@ -993,8 +1010,7 @@ this.renderCard(); this.paint();
       const row = list.createDiv({ cls: "czm-map-row", attr: { role: "button", tabindex: "0" } });
       row.createSpan({ text: ref.title || "(opening)", cls: "czm-map-row-name" });
       row.createSpan({ text: basenameOf(ref.path), cls: "czm-map-row-meta" });
-      row.addEventListener("click", () => this.source.reveal(ref));
-      row.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") this.source.reveal(ref); });
+      onActivate(row, () => this.source.reveal(ref));
     }
     if (refs.length > shown.length) list.createDiv({ text: `+${refs.length - shown.length} more — see the timeline`, cls: "czm-map-hint" });
   }

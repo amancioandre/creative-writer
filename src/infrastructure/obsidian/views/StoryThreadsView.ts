@@ -1,6 +1,7 @@
 import { ItemView, Setting, setIcon, type WorkspaceLeaf } from "obsidian";
 import { couldNot, StatusLine } from "./StatusLine";
 import { PanelShell, type Fix, type PanelId } from "./PanelShell";
+import { inField, onActivate } from "./keys";
 import type { ProjectSpec } from "../../../domain/progress/Project";
 import { DEFAULT_THREADS, THREAD_KINDS, type StoryEntityKind, type ThreadKind, type ThreadsSettings } from "../../../domain/settings/Settings";
 import { basenameOf } from "../../../domain/story/EntityIndex";
@@ -151,7 +152,7 @@ export class StoryThreadsView extends ItemView {
     this.scroller = this.root.createDiv({ cls: "czm-th-scroll" });
     this.svg = document.createElementNS(SVG, "svg");
     this.svg.setAttribute("class", "czm-th-svg");
-    this.svg.setAttribute("role", "img");
+    this.svg.setAttribute("role", "group");
     this.scroller.appendChild(this.svg);
     // The arrowhead a directed arc ends in; one definition, referenced from the stylesheet.
     const defs = document.createElementNS(SVG, "defs");
@@ -177,7 +178,13 @@ export class StoryThreadsView extends ItemView {
     this.badge = this.root.createDiv({ cls: "czm-th-badge" });
     this.card = this.root.createDiv({ cls: "czm-map-card czm-th-card" });
     this.status = new StatusLine(this.root);
-    this.root.addEventListener("keydown", (e) => { if (e.key === "Escape") this.select(null); });
+    this.root.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { this.select(null); return; }
+      if (inField(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+      // The wheel's zoom, from the keys: + and - about the middle of the view, f or 0 back to one screen.
+      if (e.key === "+" || e.key === "=" || e.key === "-") { e.preventDefault(); this.zoomByKey(e.key === "-" ? 0.8 : 1.25); }
+      else if (e.key === "f" || e.key === "0") { e.preventDefault(); this.fit(); }
+    });
     this.root.tabIndex = -1;
   }
 
@@ -256,7 +263,8 @@ export class StoryThreadsView extends ItemView {
       const title = document.createElementNS(SVG, "title");
       title.textContent = `${basenameOf(scene.ref.path)} — ${scene.ref.title || "(opening)"} — ${scene.words.toLocaleString()} words`;
       rect.appendChild(title);
-      rect.addEventListener("click", (ev) => { ev.stopPropagation(); this.select(this.selection?.kind === "scene" && this.selection.index === slot.index ? null : { kind: "scene", index: slot.index }); });
+      rect.setAttribute("tabindex", "0"); rect.setAttribute("role", "button"); rect.setAttribute("aria-label", `${scene.ref.title || "(opening)"}, ${scene.words.toLocaleString()} words`);
+      onActivate(rect, (ev) => { ev.stopPropagation(); this.select(this.selection?.kind === "scene" && this.selection.index === slot.index ? null : { kind: "scene", index: slot.index }); }, { role: false });
       rect.addEventListener("dblclick", (ev) => { ev.stopPropagation(); this.source.reveal(scene.ref); });
       this.axisG.appendChild(rect);
     }
@@ -280,7 +288,8 @@ export class StoryThreadsView extends ItemView {
       path.appendChild(title);
       path.addEventListener("pointerenter", () => this.hover(arc, true));
       path.addEventListener("pointerleave", () => this.hover(arc, false));
-      path.addEventListener("click", (ev) => { ev.stopPropagation(); this.select(this.selection?.kind === "arc" && this.selection.arc === arc ? null : { kind: "arc", arc }); });
+      path.setAttribute("tabindex", "0"); path.setAttribute("role", "button"); path.setAttribute("aria-label", `${thread?.label ?? arc.threadId}${c ? ", contradiction" : ""}`);
+      onActivate(path, (ev) => { ev.stopPropagation(); this.select(this.selection?.kind === "arc" && this.selection.arc === arc ? null : { kind: "arc", arc }); }, { role: false });
       this.arcsG.appendChild(path);
       this.arcEls.set(arc, path);
     }
@@ -387,6 +396,11 @@ export class StoryThreadsView extends ItemView {
     this.placeCard();
   }
 
+  private zoomByKey(factor: number): void {
+    const r = this.scroller.getBoundingClientRect();
+    this.zoomAt(r.left + (r.width || 800) / 2, factor);
+  }
+
   fit(): void {
     this.zoomX = 1;
     this.renderChart();
@@ -415,7 +429,9 @@ export class StoryThreadsView extends ItemView {
     }
     this.shell.tools.empty();
     const tool = (icon: string, label: string, cls: string, onClick: () => void) => { const b = this.shell.tool(icon, label, onClick); b.addClass(cls); return b; };
-    tool("maximize", "Fit the whole manuscript in the view", "czm-map-fit", () => this.fit());
+    tool("zoom-in", "Zoom in (+)", "czm-th-zoom-in", () => this.zoomByKey(1.25));
+    tool("zoom-out", "Zoom out (−)", "czm-th-zoom-out", () => this.zoomByKey(0.8));
+    tool("maximize", "Fit the whole manuscript in the view (f)", "czm-map-fit", () => this.fit());
     if (this.project) tool("file-text", "Open Story threads.md, where hand-drawn threads live", "czm-th-note-btn", () => this.source.openNote(this.source.threadsNotePath(this.project!)));
   }
 
@@ -626,7 +642,7 @@ export class StoryThreadsView extends ItemView {
         const row = list.createDiv({ cls: `czm-map-row czm-th-row-${t.kind}`, attr: { role: "button", tabindex: "0" } });
         row.createSpan({ text: t.label, cls: "czm-map-row-name" });
         row.createSpan({ text: t.refs.find((r) => r.index === index)?.note || `${t.refs.length} stops`, cls: "czm-map-row-meta" });
-        row.addEventListener("click", () => { const arc = this.arcs.find((a) => a.threadId === t.id && !a.contradiction && (a.from === index || a.to === index)); if (arc) this.select({ kind: "arc", arc }); });
+        onActivate(row, () => { const arc = this.arcs.find((a) => a.threadId === t.id && !a.contradiction && (a.from === index || a.to === index)); if (arc) this.select({ kind: "arc", arc }); });
       }
       if (through.length > 12) list.createDiv({ text: `+${through.length - 12} more`, cls: "czm-map-hint" });
     }
@@ -662,14 +678,14 @@ export class StoryThreadsView extends ItemView {
   private stopList(refs: readonly ThreadRef[], thread: Thread): void {
     const list = this.card.createDiv({ cls: "czm-map-list" });
     for (const r of refs) {
-      const row = list.createDiv({ cls: `czm-map-row${r.unresolved ? " is-broken" : ""}`, attr: { role: "button", tabindex: "0" } });
+      // A broken stop is a line to read, not a button: it goes nowhere.
+      const row = list.createDiv({ cls: `czm-map-row${r.unresolved ? " is-broken" : ""}`, attr: r.unresolved ? {} : { role: "button", tabindex: "0" } });
       row.createSpan({ text: r.unresolved ? `“${r.unresolved}” — not found` : r.scene.title || "(opening)", cls: "czm-map-row-name" });
       if (r.role && r.role !== "touch") row.createSpan({ text: r.role, cls: `czm-th-role is-${r.role}` });
       row.createSpan({ text: r.unresolved ? "" : thread.kind === "fact" ? r.value ?? "" : r.note || (r.quote ? `“${r.quote}”` : basenameOf(r.scene.path)), cls: "czm-map-row-meta" });
       if (r.anchor === null) row.createSpan({ text: "quote not found", cls: "czm-map-warn czm-th-role-warn" });
       if (!r.unresolved) {
-        row.addEventListener("click", () => this.source.reveal(r.scene));
-        row.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") this.source.reveal(r.scene); });
+        onActivate(row, () => this.source.reveal(r.scene));
       }
     }
   }

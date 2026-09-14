@@ -385,3 +385,32 @@ describe("StoryThreadsView", () => {
     expect(sceneLink(ref("Novel/Chapter 3.md", ""))).toBe("Chapter 3");
   });
 });
+
+describe("StoryThreadsView keyboard", () => {
+  const key = (el: Element, k: string) => el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
+
+  it("makes bars and arcs tab stops that Enter or Space selects, and zooms and fits from keys and the head", async () => {
+    const { el } = await open();
+    const bar = el.querySelector<SVGRectElement>('.czm-th-bar[data-index="1"]')!;
+    expect(bar.getAttribute("tabindex")).toBe("0");
+    expect(bar.getAttribute("role")).toBe("button");
+    expect(bar.getAttribute("aria-label")).toContain("Creek");
+    key(bar, "Enter");
+    expect(el.querySelector(".czm-map-card.is-open")!.textContent).toContain("Creek");
+    const arc = el.querySelector<SVGPathElement>(".czm-arc-writer")!;
+    expect(arc.getAttribute("tabindex")).toBe("0");
+    key(arc, " ");
+    expect(el.querySelector(".czm-map-card.is-open .czm-map-kind")!.textContent).toBe("Yours");
+    expect(el.querySelector("svg")!.getAttribute("role")).toBe("group");
+    const svg = el.querySelector("svg")!;
+    const w0 = Number(svg.getAttribute("width"));
+    const root = el.querySelector<HTMLElement>(".czm-th")!;
+    key(root, "+");
+    expect(Number(svg.getAttribute("width"))).toBeCloseTo(w0 * 1.25, 0);
+    key(root, "f");
+    expect(Number(svg.getAttribute("width"))).toBeCloseTo(w0, 0);
+    (el.querySelector(".czm-th-zoom-in") as HTMLElement).click();
+    expect(Number(svg.getAttribute("width"))).toBeGreaterThan(w0);
+    expect(el.querySelector(".czm-map-row.is-broken")!.getAttribute("role")).toBeNull();
+  });
+});

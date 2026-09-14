@@ -43,7 +43,7 @@ Edges from a model reading whose scene has changed since are drawn **dashed** (s
 
 ## The map itself
 
-- **Pan** by dragging the background; **zoom** with the wheel (around the cursor); **Fit** in the head frames everything.
+- **Pan** by dragging the background or with the arrow keys; **zoom** with the wheel (around the cursor) or `+` and `-`; **Fit** in the head, or `f`, frames everything. **Connect…** works from the keyboard too: Tab to the other node and press Enter.
 - Nodes settle under a live force simulation and stop moving after a few seconds. **Drag** a node and its neighbours react; a dragged node stays **pinned** where you left it, and pinned positions are remembered in `Story map.md`, so the map opens the same way on the laptop. **Unpin** in the node's card lets it float again; **Shake** unpins everything and lets the layout settle, with an **Undo** in the status line that pins every hand-placed node back where it was.
 - Node radius scales with how often the entity is mentioned; edge thickness with how many scenes back it up.
 - A labelled edge — a relationship you drew, one the model read, or a reference — shows its word on the line itself, in small italics; click the word or the line for the card. When two nodes are joined more than once (*man owns horse*, *horse helps man*) the edges bend apart so each can be told from, and clicked, on its own. Label size 0 hides these too.

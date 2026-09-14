@@ -1,6 +1,7 @@
 import { ItemView, Setting, setIcon, type WorkspaceLeaf } from "obsidian";
 import { couldNot, StatusLine } from "./StatusLine";
 import { PanelShell, type PanelId } from "./PanelShell";
+import { onActivate } from "./keys";
 import type { ProjectSpec } from "../../../domain/progress/Project";
 import type { WriterSettings } from "../../../domain/settings/Settings";
 import { EMPTY_BOARD, type Board, type Card } from "../../../domain/writer/Board";
@@ -53,6 +54,8 @@ export interface WriterSource {
 
 const SVG = "http://www.w3.org/2000/svg";
 const MIN_ZOOM = 0.08, MAX_ZOOM = 3;
+/** How much a key resizes a group. */
+const GROUP_STEP = 40;
 /** Above this zoom a card shows its first lines. */
 const READ_ZOOM = 0.85;
 type Selection = { kind: "card"; path: string } | { kind: "group"; id: string } | { kind: "story"; scope: string } | { kind: "unfiled"; folder: string } | { kind: "new-story" } | { kind: "edge"; from: string; to: string } | null;
@@ -75,6 +78,8 @@ export const KEY_HELP: readonly (readonly [string, string])[] = [
   ["n · N · a", "New note here · New story · Add an existing note here"],
   ["Delete", "Take the card out of this group"],
   ["f · z · + −", "Fit the board · Fit the selection · Zoom"],
+  ["[ ] · Alt + [ ]", "Group: move it left or right in its row · narrower or wider"],
+  ["Alt + − =", "Group: shorter or taller"],
   ["/ · p · ?", "Find a card · Fold the panel · This list"],
   ["Esc", "Close the form, then the selection, then fit"],
 ];
@@ -206,6 +211,8 @@ export class WriterView extends ItemView {
     const table = this.help.createEl("table");
     for (const [keys, what] of KEY_HELP) { const tr = table.createEl("tr"); tr.createEl("td", { text: keys, cls: "czm-writer-help-keys" }); tr.createEl("td", { text: what }); }
     this.help.createDiv({ text: "Tab moves focus as it does everywhere; Ctrl and Cmd stay with Obsidian.", cls: "czm-map-hint" });
+    const closeHelp = this.help.createEl("button", { text: "Close", cls: "czm-writer-help-close" });
+    closeHelp.addEventListener("click", () => { this.help.classList.remove("is-open"); this.root.focus({ preventScroll: true }); });
     this.root.addEventListener("keydown", (e) => this.onKey(e));
     this.root.tabIndex = -1;
   }
@@ -652,6 +659,28 @@ export class WriterView extends ItemView {
     });
   }
 
+  /** Move the selected group one place left or right in its row, as a drag would; every rectangle in the row is written. */
+  private shiftGroup(id: string, dir: -1 | 1): void {
+    const pg = this.layout.groups.find((g) => g.group.def.id === id);
+    if (!pg) return;
+    const row = this.layout.groups.filter((g) => g.layer === pg.layer).sort((a, b) => a.rect.x - b.rect.x);
+    const i = row.indexOf(pg);
+    const neighbour = row[i + dir];
+    if (!neighbour) { this.flash(dir < 0 ? "Already first in its row." : "Already last in its row."); return; }
+    const x = dir < 0 ? neighbour.rect.x - 1 : neighbour.rect.x + neighbour.rect.w + 1;
+    for (const r of reorderedGroup(this.layout, id, x)) this.queue((file) => placeGroup(file, r.id, r.rect));
+    void this.flushFile().then(() => this.show());
+  }
+
+  /** Resize the selected group by a step, as the corner handle would. */
+  private nudgeGroup(id: string, dw: number, dh: number): void {
+    const pg = this.layout.groups.find((g) => g.group.def.id === id);
+    if (!pg) return;
+    const rect = { ...pg.rect, w: Math.max(MIN_GROUP_W, pg.rect.w + dw), h: Math.max(MIN_GROUP_H, pg.rect.h + dh) };
+    this.queue((file) => placeGroup(file, id, rect));
+    void this.flushFile().then(() => this.show());
+  }
+
   private attachResize(handle: SVGRectElement, pg: PlacedGroup): void {
     const id = pg.group.def.id;
     this.canvas.attachDrag(handle, {
@@ -828,7 +857,7 @@ export class WriterView extends ItemView {
         break;
       }
       case "fit": this.fit(); break;
-      case "help": this.help.classList.toggle("is-open"); break;
+      case "help": { const open = this.help.classList.toggle("is-open"); if (open) this.help.querySelector<HTMLButtonElement>(".czm-writer-help-close")?.focus(); else this.root.focus({ preventScroll: true }); break; }
     }
   }
 
@@ -850,8 +879,13 @@ export class WriterView extends ItemView {
       if (e.altKey) void this.carryCard(arrow);
       else if (e.shiftKey) this.moveCard(arrow);
       else this.moveBy(arrow);
-    } else if (e.altKey) handled = false;
-    else switch (e.key) {
+    } else if (e.altKey) {
+      // With a group selected: Alt+[ ] narrower or wider, Alt+- = shorter or taller.
+      if (sel?.kind === "group" && (e.key === "[" || e.key === "]")) this.nudgeGroup(sel.id, e.key === "[" ? -GROUP_STEP : GROUP_STEP, 0);
+      else if (sel?.kind === "group" && (e.key === "-" || e.key === "=" || e.key === "+")) this.nudgeGroup(sel.id, 0, e.key === "-" ? -GROUP_STEP : GROUP_STEP);
+      else handled = false;
+    } else switch (e.key) {
+      case "[": case "]": if (sel?.kind === "group") this.shiftGroup(sel.id, e.key === "[" ? -1 : 1); else handled = false; break;
       case "Escape":
         if (this.help.classList.contains("is-open")) this.help.classList.remove("is-open");
         else if (sel?.kind === "card" && this.zoomed !== null && this.layout.cards.get(sel.path)?.group === this.zoomed) this.select({ kind: "group", id: this.zoomed });
@@ -1153,7 +1187,7 @@ export class WriterView extends ItemView {
         const row = list.createDiv({ cls: "czm-map-row czm-writer-draws-row", attr: { role: "button", tabindex: "0" } });
         row.createSpan({ text: this.titleOf(p), cls: "czm-map-row-name" });
         row.createSpan({ text: (this.layout.cards.get(p)?.card.groups ?? []).map((g) => this.groupName(g)).join(", "), cls: "czm-map-row-meta" });
-        row.addEventListener("click", () => this.select({ kind: "card", path: p }));
+        onActivate(row, () => this.select({ kind: "card", path: p }));
       }
     }
     const links: [string, string | null][] = [["Grew from", story.idea], ["Voice", story.voice]];
@@ -1162,7 +1196,7 @@ export class WriterView extends ItemView {
       const row = this.card.createDiv({ cls: "czm-map-row", attr: { role: "button", tabindex: "0" } });
       row.createSpan({ text: label, cls: "czm-map-row-meta" });
       row.createSpan({ text: this.layout.cards.get(path)?.card.title ?? path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/, ""), cls: "czm-map-row-name" });
-      row.addEventListener("click", () => { if (this.layout.cards.has(path)) this.select({ kind: "card", path }); else this.source.openNote(path); });
+      onActivate(row, () => { if (this.layout.cards.has(path)) this.select({ kind: "card", path }); else this.source.openNote(path); });
     }
   }
 
@@ -1262,7 +1296,7 @@ export class WriterView extends ItemView {
       if (analyses.length) {
         this.card.createEl("h4", { text: "Analysis" });
         const list = this.card.createDiv({ cls: "czm-map-list czm-writer-analysis" });
-        for (const p of analyses) { const r = list.createDiv({ cls: "czm-map-row", attr: { role: "button", tabindex: "0" } }); r.createSpan({ text: this.titleOf(p), cls: "czm-map-row-name" }); r.addEventListener("click", () => this.select({ kind: "card", path: p })); }
+        for (const p of analyses) { const r = list.createDiv({ cls: "czm-map-row", attr: { role: "button", tabindex: "0" } }); r.createSpan({ text: this.titleOf(p), cls: "czm-map-row-name" }); onActivate(r, () => this.select({ kind: "card", path: p })); }
       }
     }
     if (c.groups.includes("voice")) {
@@ -1274,7 +1308,7 @@ export class WriterView extends ItemView {
           const r = list.createDiv({ cls: "czm-map-row czm-writer-adopter", attr: { role: "button", tabindex: "0" } });
           r.createSpan({ text: s.spec.name, cls: "czm-map-row-name" });
           r.createSpan({ text: s.fingerprint ? fingerprintLine(s.fingerprint) : "", cls: "czm-map-row-meta" });
-          r.addEventListener("click", () => this.select({ kind: "story", scope: s.spec.scope }));
+          onActivate(r, () => this.select({ kind: "story", scope: s.spec.scope }));
         }
         const blended = blendFingerprints(adopters.map((s) => s.fingerprint));
         if (blended) this.card.createDiv({ text: `On the page: ${fingerprintLine(blended)}`, cls: "czm-map-hint czm-writer-voice-print" });
@@ -1290,7 +1324,7 @@ export class WriterView extends ItemView {
         const story = this.stories.stories.find((s) => s.spec.name === name);
         const row = list.createDiv({ cls: "czm-map-row czm-writer-use-row", attr: { role: "button", tabindex: "0" } });
         row.createSpan({ text: name, cls: "czm-map-row-name" });
-        if (story) row.addEventListener("click", () => this.select({ kind: "story", scope: story.spec.scope }));
+        if (story) onActivate(row, () => this.select({ kind: "story", scope: story.spec.scope }));
       }
     }
     const linked = this.board.derived.filter((e) => e.from === path || e.to === path);
@@ -1305,7 +1339,7 @@ export class WriterView extends ItemView {
         row.createSpan({ text: names.length ? names.join(", ") : "", cls: "czm-map-row-meta" });
         const name = row.createEl("button", { text: names.length ? "Lines" : "Name…", cls: "czm-act-name-line" });
         name.addEventListener("click", (ev) => { ev.stopPropagation(); this.select({ kind: "edge", from: e.from, to: e.to }); });
-        row.addEventListener("click", () => this.select({ kind: "card", path: other }));
+        onActivate(row, () => this.select({ kind: "card", path: other }));
       }
     }
   }

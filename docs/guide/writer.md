@@ -75,6 +75,8 @@ Click anywhere on the board and the keys work; press `?` for the list on the boa
 | `Enter` | On a group: the new-note form. On a card or a story: open the note. |
 | `n` · `N` · `a` | New note here · New story · Add an existing note here, through the picker. |
 | `Delete` | Take the card out of this group: the tag comes off, the note stays. **Undo** in the status line puts it back. |
+| `[` `]` | Move the selected group left or right in its row, as a drag would. |
+| `Alt+[` `Alt+]` · `Alt+-` `Alt+=` | Make the selected group narrower or wider, shorter or taller. |
 | `f` · `z` · `+` `−` | Fit the board · Fit the selection · Zoom. |
 | `/` · `p` · `?` | Find a card · Fold the panel · The list of keys. |
 | `Esc` | Close the form, then step back from a card to its group, then clear the selection and fit the board. |

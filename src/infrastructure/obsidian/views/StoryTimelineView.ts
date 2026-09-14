@@ -5,6 +5,7 @@ import { EMPTY_GRAPH, type Entity, type SceneRef, type StoryGraph } from "../../
 import { basenameOf } from "../../../domain/story/EntityIndex";
 import { KIND_LABEL } from "./StoryMapView";
 import { PanelShell, type PanelId } from "./PanelShell";
+import { onActivate } from "./keys";
 
 export const STORY_TIMELINE_VIEW_TYPE = "creative-writer-story-timeline";
 
@@ -93,7 +94,7 @@ export class StoryTimelineView extends ItemView {
       const th = thead.createEl("th", { cls: "czm-tl-col", attr: { title: `${c.name} — ${KIND_LABEL[c.kind]}, ${c.appearances.length} scene${c.appearances.length === 1 ? "" : "s"}` } });
       th.style.setProperty("--czm-kind", settings.colors[c.kind]);
       const span = th.createSpan({ text: c.name });
-      if (c.path) { span.addClass("is-link"); span.addEventListener("click", () => this.source.openNote(c.path!)); }
+      if (c.path) { span.addClass("is-link"); onActivate(span, () => this.source.openNote(c.path!)); }
     }
     const tbody = table.createEl("tbody");
     let lastPath = "";
@@ -103,15 +104,14 @@ export class StoryTimelineView extends ItemView {
         const tr = tbody.createEl("tr", { cls: "czm-tl-note" });
         const th = tr.createEl("th", { attr: { colspan: String(columns.length + 1) } });
         const link = th.createSpan({ text: basenameOf(row.scene.path), cls: "is-link" });
-        link.addEventListener("click", () => this.source.openNote(row.scene.path));
+        onActivate(link, () => this.source.openNote(row.scene.path));
       }
       const tr = tbody.createEl("tr", { cls: "czm-tl-scene" });
       const th = tr.createEl("th", { cls: "czm-tl-scene-head", attr: { role: "button", tabindex: "0" } });
       th.createSpan({ text: `${row.bookmarked ? "★ " : ""}${row.scene.title || "(opening)"}`, cls: "czm-map-row-name" });
       th.createSpan({ text: `${row.words.toLocaleString()} w`, cls: "czm-map-row-meta" });
       if (row.events.length) th.createDiv({ text: row.events.join(" · "), cls: "czm-tl-events" });
-      th.addEventListener("click", () => this.source.reveal(row.scene));
-      th.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") this.source.reveal(row.scene); });
+      onActivate(th, () => this.source.reveal(row.scene));
       const present = new Set(row.present);
       for (const c of columns) {
         const on = present.has(c.id);

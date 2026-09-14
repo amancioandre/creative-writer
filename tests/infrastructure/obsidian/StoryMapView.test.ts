@@ -508,3 +508,33 @@ describe("StoryMapView", () => {
     });
   });
 });
+
+describe("StoryMapView keyboard", () => {
+  const key = (el: Element, k: string) => el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
+  const marta = "Novel/Characters/Marta Kovács.md", lisbon = "Novel/Places/Lisbon.md";
+
+  it("finishes a relationship with Enter on the other node, and pans, zooms and fits from keys", async () => {
+    const { el } = await open();
+    clickNode(el, marta);
+    (el.querySelector(".czm-act-connect") as HTMLElement).click();
+    expect(el.querySelector(".czm-map")!.classList.contains("is-linking")).toBe(true);
+    key(el.querySelector<SVGGElement>(`.czm-node[data-id="${lisbon}"]`)!, "Enter");
+    expect(el.querySelector(".czm-map")!.classList.contains("is-linking")).toBe(false);
+    expect(el.querySelector(".czm-map-card.is-open .czm-map-card-name")?.textContent).toBe("Marta Kovács — Lisbon");
+    key(el.querySelector<HTMLElement>(".czm-map")!, "Escape");
+    const g = el.querySelector("svg > g")!;
+    const before = g.getAttribute("transform");
+    const map = el.querySelector<HTMLElement>(".czm-map")!;
+    key(map, "ArrowLeft");
+    expect(g.getAttribute("transform")).not.toBe(before);
+    const panned = g.getAttribute("transform");
+    key(map, "+");
+    expect(g.getAttribute("transform")).not.toBe(panned);
+    expect(el.querySelector("svg")!.getAttribute("role")).toBe("group");
+    // A key typed in the search field is the field's, not the map's.
+    const search = el.querySelector<HTMLInputElement>(".czm-map-search")!;
+    const t = g.getAttribute("transform");
+    key(search, "ArrowLeft");
+    expect(g.getAttribute("transform")).toBe(t);
+  });
+});
