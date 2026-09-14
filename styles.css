@@ -483,33 +483,76 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-th-add button { align-self: flex-start; font-size: var(--font-ui-smaller); padding: 3px 8px; height: auto; }
 .czm-map-panel-actions .czm-th-read { grid-column: 1 / -1; }
 
-/* --- Story timeline -------------------------------------------------------- */
-.czm-tl { padding: 6px 8px; height: 100%; display: flex; flex-direction: column; gap: 6px; }
-.czm-tl-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.czm-tl-head .czm-map-search { max-width: 200px; }
-.czm-tl-wrap { overflow: auto; flex: 1; min-height: 0; }
-.czm-tl-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--font-ui-smaller); }
-.czm-tl-table th, .czm-tl-table td { padding: 2px 4px; text-align: left; font-weight: normal; }
-.czm-tl-table thead th { position: sticky; top: 0; background: var(--background-primary); z-index: 2; }
-.czm-tl-table thead th.czm-tl-corner { left: 0; z-index: 3; }
-/* Cast names read horizontally on the sticky header; the row scrolls sideways when the cast is wide. */
-.czm-tl-col { vertical-align: bottom; min-width: 96px; max-width: 160px; }
-.czm-tl-filler { width: 100%; padding: 0; }
-.czm-tl-col span { display: block; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--czm-kind, var(--text-muted)); font-weight: 600; }
-.czm-tl-note-total { margin-left: 10px; font-weight: normal; color: var(--text-muted); font-family: var(--font-monospace); }
+/* --- Plot grid ---------------------------------------------------------------
+   A scene is a row, a thread a column, the cell what the thread does in the scene.
+   The cast folds into one column of dots until its header is clicked. */
+.czm-pg { padding: 6px 8px; height: 100%; display: flex; flex-direction: column; gap: 6px; }
+.czm-pg-wrap { overflow: auto; flex: 1; min-height: 0; }
+.czm-pg-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--font-ui-smaller); }
+.czm-pg-table th, .czm-pg-table td { padding: 2px 4px; text-align: left; font-weight: normal; vertical-align: top; }
+.czm-pg-table thead th { position: sticky; top: 0; background: var(--background-primary); z-index: 2; vertical-align: bottom; border-bottom: 1px solid var(--background-modifier-border); }
+.czm-pg-table thead th.czm-pg-corner { left: 0; z-index: 3; }
+.czm-pg-col { min-width: 140px; max-width: 220px; }
+.czm-pg-col-words { min-width: 56px; max-width: 64px; text-align: right; }
+.czm-pg-col-plot { min-width: 180px; max-width: 240px; }
+.czm-pg-col-cast { min-width: 120px; }
+.czm-pg-col-name { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-normal); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* A stripe on the header says what kind of column it is: accent for the writer's threads, faint for what the code fills. */
+.czm-pg-col-thread .czm-pg-col-name::before { content: ""; width: 3px; height: 12px; border-radius: 2px; background: var(--interactive-accent); flex: 0 0 auto; }
+.czm-pg-kind-theme .czm-pg-col-name::before { background: var(--color-purple); }
+.czm-pg-kind-subplot .czm-pg-col-name::before { background: var(--text-accent); }
+.czm-pg-kind-free .czm-pg-col-name::before { background: var(--text-muted); }
+.czm-pg-col-thread.is-group-start { border-left: 1px solid var(--background-modifier-border); }
+.czm-pg-col-count { font-family: var(--font-monospace); font-size: 11px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.czm-pg-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--czm-kind, var(--text-muted)); flex: 0 0 auto; }
+.czm-pg-cast-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; box-shadow: none; height: auto; font-weight: 600; font-size: inherit; color: var(--text-normal); cursor: pointer; }
+.czm-pg-cast-toggle:hover { color: var(--text-accent); }
+.czm-pg-cast-toggle:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.czm-pg-chevron { display: inline-flex; color: var(--text-faint); }
+.czm-pg-chevron svg { width: 12px; height: 12px; }
+.czm-pg-filler { width: 100%; padding: 0; }
+.czm-pg-cast-row th { position: sticky; top: 0; background: var(--background-primary); z-index: 2; }
+.czm-pg-cast-name { vertical-align: bottom; min-width: 64px; max-width: 100px; }
+.czm-pg-cast-name span { display: block; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--czm-kind, var(--text-muted)); font-weight: 600; }
+.czm-pg-note th { position: sticky; left: 0; background: var(--background-secondary); font-weight: 600; padding-top: 8px; padding-bottom: 3px; }
+.czm-pg-note-total { margin-left: 10px; font-weight: normal; color: var(--text-muted); font-family: var(--font-monospace); font-variant-numeric: tabular-nums; }
+.czm-pg-act th { position: sticky; left: 0; background: var(--background-primary); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); padding-top: 12px; }
 .is-link { cursor: pointer; }
 .is-link:hover { text-decoration: underline; }
-.czm-tl-note th { position: sticky; left: 0; background: var(--background-secondary); font-weight: 600; padding-top: 6px; }
-.czm-tl-scene-head { position: sticky; left: 0; background: var(--background-primary); cursor: pointer; white-space: nowrap; min-width: 180px; z-index: 1; }
-.czm-tl-scene-head:hover { background: var(--background-modifier-hover); }
-.czm-tl-scene-head:focus-visible { background: var(--background-modifier-hover); outline: 2px solid var(--text-accent); outline-offset: -2px; }
-.czm-tl-scene-head .czm-map-row-meta { margin-left: 8px; }
-.czm-tl-events { white-space: normal; max-width: 260px; opacity: 0.6; font-size: var(--font-ui-smaller); }
-.czm-tl-scene:hover td { background: var(--background-modifier-hover); }
-/* Absence is nothing; the row rule carries the eye. Presence is a dot in the kind's colour. */
-.czm-tl-dot { text-align: center; }
-.czm-tl-scene td, .czm-tl-scene th { border-bottom: 1px solid color-mix(in srgb, var(--background-modifier-border) 60%, transparent); }
-.czm-tl-dot.is-on::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--czm-kind, var(--text-muted)); }
+.czm-pg-scene-head { position: sticky; left: 0; background: var(--background-primary); cursor: pointer; white-space: nowrap; min-width: 180px; z-index: 1; }
+.czm-pg-scene-head:hover { background: var(--background-modifier-hover); }
+.czm-pg-scene-head:focus-visible { background: var(--background-modifier-hover); outline: 2px solid var(--text-accent); outline-offset: -2px; }
+.czm-pg-scene-head .czm-map-row-meta { margin-left: 8px; }
+.czm-pg-scene.is-outline .czm-pg-scene-head { color: var(--text-muted); font-style: italic; }
+.czm-pg-scene td, .czm-pg-scene th { border-bottom: 1px solid color-mix(in srgb, var(--background-modifier-border) 60%, transparent); }
+.czm-pg-scene:hover td { background: var(--background-modifier-hover); }
+.czm-pg-words { text-align: right; font-family: var(--font-monospace); font-variant-numeric: tabular-nums; color: var(--text-muted); white-space: nowrap; }
+.czm-pg-plot { color: var(--text-muted); font-size: 11.5px; max-width: 240px; }
+/* A cell: a stop at a scene. Its edge says what its anchor says: nothing for a plan, a tick's colour for verified, a warning for broken. */
+.czm-pg-cell { min-height: 22px; padding: 2px 5px; border-radius: 4px; border: 1px solid transparent; line-height: 1.35; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; cursor: pointer; }
+.czm-pg-cell:hover { background: var(--background-modifier-hover); }
+.czm-pg-cell:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -1px; }
+.czm-pg-cell.is-empty { color: transparent; }
+.czm-pg-cell.is-empty:hover { border-color: var(--background-modifier-border); }
+.czm-pg-cell.is-verified { border-left: 2px solid var(--text-success); }
+.czm-pg-cell.is-broken { border-left: 2px solid var(--text-warning); }
+.czm-pg-cell.is-unmoved { color: var(--text-faint); font-style: italic; }
+.czm-pg-cell.is-unmoved .czm-pg-unmoved { font-size: 11px; }
+.czm-pg-role { color: var(--text-accent); font-size: 10px; flex: 0 0 auto; }
+.czm-pg-cell-text { flex: 1 1 auto; min-width: 0; }
+.czm-pg-more { color: var(--text-faint); font-family: var(--font-monospace); font-size: 11px; }
+/* The cast, folded: one dot per member in its kind's colour; absence keeps its place as a faint dot so the strip holds its shape. */
+.czm-pg-strip { display: inline-flex; gap: 3px; align-items: center; padding-top: 5px; }
+.czm-pg-strip-dot { display: block; width: 7px; height: 7px; border-radius: 50%; background: var(--background-modifier-border); }
+.czm-pg-strip-dot.is-on { background: var(--czm-kind, var(--text-muted)); }
+.czm-pg-cast-dot { text-align: center; }
+.czm-pg-cast-dot.is-on::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--czm-kind, var(--text-muted)); margin-top: 6px; }
+/* The key names the roles by their glyph, not a dot. */
+.czm-pg-key-role::before { width: auto; height: auto; border-radius: 0; background: none; color: var(--text-accent); font-size: 10px; }
+.czm-pg-key-role.is-plant::before { content: "▶"; }
+.czm-pg-key-role.is-payoff::before { content: "◀"; }
+.czm-pg-key-role.is-reversal::before { content: "▼"; }
+.czm-pg-key-role.is-arc::before { content: "▸ ▹ ◂"; letter-spacing: 1px; }
 .czm-map-exits { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 4px 0; }
 .czm-map-exits button { font-size: var(--font-ui-smaller); padding: 3px 6px; height: auto; border-left: 3px solid var(--czm-kind, var(--text-muted)); }
 .czm-map-alias { display: flex; gap: 4px; margin: 4px 0; }

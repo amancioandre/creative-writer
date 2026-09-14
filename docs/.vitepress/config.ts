@@ -48,7 +48,7 @@ export default defineConfig({
           text: "The story",
           items: [
             { text: "Story map", link: "/guide/story-map" },
-            { text: "Story timeline", link: "/guide/story-timeline" },
+            { text: "Plot grid", link: "/guide/plot-grid" },
             { text: "Story threads", link: "/guide/story-threads" },
             { text: "Manuscript", link: "/guide/manuscript" },
           ],

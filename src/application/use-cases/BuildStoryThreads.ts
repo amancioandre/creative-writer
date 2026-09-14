@@ -41,6 +41,11 @@ export class BuildStoryThreads {
   ) {}
 
   async execute(project: ProjectSpec): Promise<ThreadModel> {
+    return (await this.executeWithGraph(project)).model;
+  }
+
+  /** The model and the graph it was built on, for a view that needs both — the plot grid draws rows from one and columns from the other. */
+  async executeWithGraph(project: ProjectSpec): Promise<{ graph: StoryGraph; model: ThreadModel }> {
     const [notes, file, markdown] = await Promise.all([this.notes.notes(project), this.storyRepo.load(project), this.threadsRepo.load(project)]);
     const graph = this.map.graphFrom(project, notes, file);
     const found = this.echoes(project, graph, notes);
@@ -59,7 +64,7 @@ export class BuildStoryThreads {
     const semantic = semanticEchoPairs(file.echoes, sceneIndex, hashes, echoOptions(this.echoSources?.sensitivity() ?? "medium"));
     const said = new Set(found.pairs.map((p) => `${p.a.sentence}|${p.b.sentence}`));
     const echoes: Echoes = { groups: found.groups, pairs: [...found.pairs, ...semantic.pairs.filter((p) => !said.has(`${p.a.sentence}|${p.b.sentence}`))] };
-    return buildThreads(graph, file, parseStoryThreads(markdown), stale, this.options, textOf, echoes, { stored: file.echoes.length, stale: semantic.stale });
+    return { graph, model: buildThreads(graph, file, parseStoryThreads(markdown), stale, this.options, textOf, echoes, { stored: file.echoes.length, stale: semantic.stale }) };
   }
 
   /** The echo finder over the project's scenes in manuscript order, names excluded, cached by the prose. */

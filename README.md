@@ -35,11 +35,11 @@ One graph of a project. Characters, places and things are nodes (typed notes —
 
 `Open story map` or the ribbon icon
 
-### Story timeline
+### Plot grid
 
-Every scene in reading order down the side, the cast across the top, a dot where someone is present. The shape a story's absences make. Click a scene to jump, a name to open the note.
+Every scene in reading order down the side, your threads across the top, and in each cell what the thread is doing in the scene: the spreadsheet Rowling drew, grown out of the story timeline. Columns are the `## headings` of `Story threads.md`, typed as an arc, a theme or a subplot; a cell's edge says whether its stop is a plan, verified against the prose, or broken. The cast folds into one column of dots and spreads back out on a click.
 
-`Open story timeline`
+`Open plot grid`
 
 ### Manuscript: the whole story on one page
 

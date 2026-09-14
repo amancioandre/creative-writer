@@ -67,13 +67,17 @@ export interface PlotGrid {
   readonly columns: readonly GridColumn[];
   /** Headings whose prefix looked like a kind but was not one. */
   readonly unknownPrefixes: readonly string[];
+  /** Who appears in a scene: the timeline's columns, folded into one of the grid's until expanded. */
+  readonly cast: readonly Entity[];
   readonly cells: number;
   readonly filled: number;
   readonly verified: number;
   readonly broken: number;
 }
 
-export const EMPTY_PLOT_GRID: PlotGrid = { project: "", rows: [], columns: [], unknownPrefixes: [], cells: 0, filled: 0, verified: 0, broken: 0 };
+export const EMPTY_PLOT_GRID: PlotGrid = { project: "", rows: [], columns: [], unknownPrefixes: [], cast: [], cells: 0, filled: 0, verified: 0, broken: 0 };
+
+const CAST_ORDER: Record<Entity["kind"], number> = { character: 0, candidate: 1, faction: 2, location: 3, item: 4, event: 5, note: 6, reference: 7 };
 
 const KIND_ORDER: Record<ColumnKind, number> = { arc: 0, theme: 1, subplot: 2, free: 3 };
 
@@ -94,7 +98,10 @@ export function buildPlotGrid(graph: StoryGraph, model: ThreadModel): PlotGrid {
   const filled = columns.reduce((n, c) => n + c.filled, 0);
   const verified = columns.reduce((n, c) => n + c.verified, 0);
   const broken = columns.reduce((n, c) => n + c.broken, 0);
-  return { project: graph.project, rows, columns, unknownPrefixes, cells: rows.length * columns.length, filled, verified, broken };
+  const cast = graph.entities
+    .filter((e) => e.appearances.length > 0 && e.kind !== "note" && e.kind !== "reference")
+    .sort((a, b) => CAST_ORDER[a.kind] - CAST_ORDER[b.kind] || b.mentions - a.mentions);
+  return { project: graph.project, rows, columns, unknownPrefixes, cast, cells: rows.length * columns.length, filled, verified, broken };
 }
 
 /** The timeline's rows, and between them the headings the timeline left out for having no prose. */

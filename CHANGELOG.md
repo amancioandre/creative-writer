@@ -2,6 +2,13 @@
 
 Release notes for every version are on the [releases page](https://github.com/amancioandre/creative-writer/releases). This file carries the same text for the versions since it was started.
 
+## Unreleased — The plot grid
+
+The story timeline grows into a plot grid: a scene is a row, a hand-drawn thread from `Story threads.md` is a column, and the cell is what the thread is doing in the scene. Designed on 2026-09-13 (`docs/development/plot-grid.md`), built in eight increments.
+
+- **Plot grid** replaces the story timeline as a panel, under the same view type and command id, so an open timeline comes back as the grid and a bound hotkey still works. Rows are scenes under chapter and act bands, outline headings included; columns are the threads note's headings, grouped by kind; the cast folds into one column of dots and spreads back out on a click. Every cell shows its stop's role as a glyph and its anchor's state as an edge: plan, verified, broken.
+- **Columns have kinds.** `## Arc: [[Anna]]`, `## Theme: …`, `## Subplot: …` on a threads-note heading; a heading with no prefix is a free thread as before. An arc reads `want:`, `lie:`, `turn:`, `truth:` as roles on its stops and binds to its character on the map; once it holds a verified stop, a scene where the character is on the page and the arc has no stop reads *present, unmoved*.
+
 ## 0.9.1 — The tint
 
 The UX audit of 2026-09-13, built in fourteen slices: rhythm becomes a faint tint on the text, every panel answers what it did and how to undo it, the panels share one head and one docked side column, the keyboard reaches everything, colours mean one thing each, the desk leads with a verdict, the comments pane is one list with resolve, the board's cards carry their identity, the editor gets its polish and Zen its one indicator, every panel ends in a ⋯ menu that names its commands, and the whole thing stays steady under a real manuscript.

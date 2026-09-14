@@ -35,9 +35,9 @@ features:
   - title: Story map
     details: One graph of a project — characters, places, things — with links you wrote, scenes shared, and what a local model reads between the lines.
     link: /guide/story-map
-  - title: Story timeline
-    details: Every scene in order, the cast across the top, a dot where someone is present. The shape a story's absences make.
-    link: /guide/story-timeline
+  - title: Plot grid
+    details: Every scene down the side, your threads across the top, and in each cell what the thread is doing in the scene. Rowling's spreadsheet, with the cast folded into one column.
+    link: /guide/plot-grid
   - title: Local model, on command
     details: Ollama on your machine reads a paragraph for contextual findings, a scene for myth and archetype, a chapter for relationships and references. Never by default.
     link: /guide/model-assistant

@@ -8,7 +8,7 @@ export const PANELS: readonly { id: PanelId; label: string; icon: string }[] = [
   { id: "desk", label: "Writing desk", icon: "feather" },
   { id: "board", label: "Writer board", icon: "layout-dashboard" },
   { id: "map", label: "Story map", icon: "git-fork" },
-  { id: "timeline", label: "Story timeline", icon: "gantt-chart" },
+  { id: "timeline", label: "Plot grid", icon: "table" },
   { id: "threads", label: "Story threads", icon: "spline" },
   { id: "manuscript", label: "Manuscript", icon: "book-open" },
 ];

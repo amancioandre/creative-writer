@@ -22,7 +22,9 @@ All commands appear in the palette under **Creative Writer:**. None has a defaul
 | **Writer: next lane** / **previous lane** / **next group** / **previous group** / **new note in the focused group** / **add an existing note** / **new story** / **fit the board** / **show keyboard shortcuts** | The [writer board's keys](/guide/writer#the-keyboard) and its side column as commands, live while the board is the active tab, so they can be given hotkeys of your own. |
 | **Story map: add a node** / **fit the map** / **show all (leave the focus)** / **shake the layout** / **read project with model** / **reset filters** | The [story map's](/guide/story-map) head and side column as commands, live while the map is the active tab. |
 | **Story threads: zoom in** / **zoom out** / **fit the manuscript** / **open Story threads.md** / **read project for facts** | The [story threads'](/guide/story-threads) head and side column as commands, live while the threads are the active tab. |
-| **Story timeline: clear the search** | Live while the timeline is the active tab. |
+| **Plot grid: clear the search** | Live while the grid is the active tab. |
+| **Plot grid: fold or expand the cast** | Live while the grid is the active tab. One column of dots, or one column per name. |
+| **Plot grid: open Story threads.md** | Live while the grid is the active tab. |
 | **Manuscript: toggle prose only** / **toggle the comments pane** / **toggle the ruler** / **toggle story marks** / **toggle echoes** | The [manuscript's](/guide/manuscript) toolbar switches as commands, live while the manuscript is the active tab. |
 
 Every panel's head ends in a **⋯** menu that repeats these actions as rows; each row names the command it is, so what you find in the menu you can find in Settings → Hotkeys.

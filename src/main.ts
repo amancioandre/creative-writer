@@ -63,7 +63,8 @@ import { PromoteIdea } from "./application/use-cases/PromoteIdea";
 import { WRITER_VIEW_TYPE, WriterView, type WriterSource } from "./infrastructure/obsidian/views/WriterView";
 import { WRITER_EXTENSION, renameCard } from "./domain/writer/WriterFile";
 import { writerTag } from "./domain/writer/Tags";
-import { STORY_TIMELINE_VIEW_TYPE, StoryTimelineView } from "./infrastructure/obsidian/views/StoryTimelineView";
+import { PLOT_GRID_VIEW_TYPE, PlotGridView } from "./infrastructure/obsidian/views/PlotGridView";
+import { BuildPlotGrid } from "./application/use-cases/BuildPlotGrid";
 import { STORY_THREADS_VIEW_TYPE, StoryThreadsView } from "./infrastructure/obsidian/views/StoryThreadsView";
 import { StoryThreadsNoteRepository } from "./infrastructure/obsidian/StoryThreadsNoteRepository";
 import { BuildStoryThreads } from "./application/use-cases/BuildStoryThreads";
@@ -272,9 +273,6 @@ export default class CreativeZenModePlugin extends Plugin {
       reveal: (ref: SceneRef) => void this.revealScene(ref.path, ref.line),
       settings: () => this.current.storyMap,
     };
-    this.registerView(STORY_TIMELINE_VIEW_TYPE, (leaf: WorkspaceLeaf) => new StoryTimelineView(leaf, storySource));
-    this.addCommand({ id: "open-story-timeline", name: COMMANDS["open-story-timeline"], callback: () => void this.openStoryTimeline(null) });
-    this.viewCommands(StoryTimelineView, [["story-timeline-clear-search", "clear-search"]]);
     this.registerView(STORY_MAP_VIEW_TYPE, (leaf: WorkspaceLeaf) => new StoryMapView(leaf, {
       ...storySource,
       activeNotePath: () => this.app.workspace.getActiveViewOfType(MarkdownView)?.file?.path ?? null,
@@ -360,7 +358,7 @@ export default class CreativeZenModePlugin extends Plugin {
       jumpTo: (to) => this.jumpTo(to, null),
       openStory: (view, spec) => {
         if (view === "map") void this.openStoryMap().then(() => (this.app.workspace.getLeavesOfType(STORY_MAP_VIEW_TYPE)[0]?.view as StoryMapView | undefined)?.show(spec));
-        else if (view === "timeline") void this.openStoryTimeline(spec);
+        else if (view === "timeline") void this.openPlotGrid(spec);
         else if (view === "threads") void this.openStoryThreads(spec);
         else if (view === "manuscript") void this.openManuscript(spec);
         else void this.openDesk();
@@ -431,7 +429,7 @@ export default class CreativeZenModePlugin extends Plugin {
     ]);
     this.addRibbonIcon("layout-dashboard", "Open writer", () => void this.openWriter());
     this.registerEvent(this.app.vault.on("rename", (file, oldPath) => { if (file instanceof TFile && file.extension === "md") void writerRepo.update((f) => renameCard(f, oldPath, file.path)).then(() => this.refreshWriter()); }));
-    this.addRibbonIcon("gantt-chart", "Open story timeline", () => void this.openStoryTimeline(null));
+    this.addRibbonIcon("table", "Open plot grid", () => void this.openPlotGrid(null));
     this.addCommand({
       id: "read-note-for-story-map",
       name: "Read this note with model (story map)",
@@ -440,6 +438,15 @@ export default class CreativeZenModePlugin extends Plugin {
     // Story threads: the same graph laid out as one line, with facts read per scene and hand-drawn threads from `Story threads.md`.
     const threadsRepo = new StoryThreadsNoteRepository(notes);
     const buildThreads = new BuildStoryThreads(buildStoryMap, projectNotes, storyRepo, threadsRepo, undefined, { segmenter: new IntlSentenceSegmenter(), sensitivity: () => this.current.threads.echoSensitivity });
+    // The plot grid: the timeline grown up. Same view type, so leaves open across the update come back as the grid.
+    const buildPlotGrid = new BuildPlotGrid(buildThreads);
+    this.registerView(PLOT_GRID_VIEW_TYPE, (leaf: WorkspaceLeaf) => new PlotGridView(leaf, {
+      ...storySource,
+      build: (project) => buildPlotGrid.execute(project),
+      threadsNotePath: (project) => StoryThreadsNoteRepository.pathFor(project),
+    }));
+    this.addCommand({ id: "open-story-timeline", name: COMMANDS["open-story-timeline"], callback: () => void this.openPlotGrid(null) });
+    this.viewCommands(PlotGridView, [["story-timeline-clear-search", "clear-search"], ["plot-grid-toggle-cast", "toggle-cast"], ["plot-grid-open-note", "open-note"]]);
     const editThread = new EditStoryThread(threadsRepo);
     this.registerView(STORY_THREADS_VIEW_TYPE, (leaf: WorkspaceLeaf) => new StoryThreadsView(leaf, {
       projects: storySource.projects,
@@ -775,18 +782,18 @@ export default class CreativeZenModePlugin extends Plugin {
       case "desk": void this.openDesk(); break;
       case "board": void this.openWriter(); break;
       case "map": void this.openStoryMap(project); break;
-      case "timeline": void this.openStoryTimeline(project); break;
+      case "timeline": void this.openPlotGrid(project); break;
       case "threads": void this.openStoryThreads(project); break;
       case "manuscript": void this.openManuscript(project); break;
     }
   }
 
-  private async openStoryTimeline(project: ProjectSpec | null): Promise<void> {
-    const existing = this.app.workspace.getLeavesOfType(STORY_TIMELINE_VIEW_TYPE)[0];
+  private async openPlotGrid(project: ProjectSpec | null): Promise<void> {
+    const existing = this.app.workspace.getLeavesOfType(PLOT_GRID_VIEW_TYPE)[0];
     const leaf = existing ?? this.app.workspace.getLeaf("split", "vertical");
-    if (!existing) await leaf.setViewState({ type: STORY_TIMELINE_VIEW_TYPE, active: true });
+    if (!existing) await leaf.setViewState({ type: PLOT_GRID_VIEW_TYPE, active: true });
     await this.app.workspace.revealLeaf(leaf);
-    const view = leaf.view as StoryTimelineView;
+    const view = leaf.view as PlotGridView;
     if (project) await view.show(project); else await view.onOpen();
   }
 
@@ -885,13 +892,13 @@ export default class CreativeZenModePlugin extends Plugin {
   /** The metadata cache fires `resolved` on every edit; a rebuild every couple of seconds is plenty for a map. */
   private refreshStoryMap(): void {
     const ws = this.app.workspace;
-    const open = ws.getLeavesOfType(STORY_MAP_VIEW_TYPE).length + ws.getLeavesOfType(STORY_TIMELINE_VIEW_TYPE).length + ws.getLeavesOfType(STORY_THREADS_VIEW_TYPE).length;
+    const open = ws.getLeavesOfType(STORY_MAP_VIEW_TYPE).length + ws.getLeavesOfType(PLOT_GRID_VIEW_TYPE).length + ws.getLeavesOfType(STORY_THREADS_VIEW_TYPE).length;
     if (open === 0) return;
     if (this.storyMapRefreshTimer !== null) window.clearTimeout(this.storyMapRefreshTimer);
     this.storyMapRefreshTimer = window.setTimeout(() => {
       this.storyMapRefreshTimer = null;
       for (const l of ws.getLeavesOfType(STORY_MAP_VIEW_TYPE)) void (l.view as StoryMapView).refresh();
-      for (const l of ws.getLeavesOfType(STORY_TIMELINE_VIEW_TYPE)) void (l.view as StoryTimelineView).refresh();
+      for (const l of ws.getLeavesOfType(PLOT_GRID_VIEW_TYPE)) void (l.view as PlotGridView).refresh();
       for (const l of ws.getLeavesOfType(STORY_THREADS_VIEW_TYPE)) void (l.view as StoryThreadsView).refresh();
       for (const l of ws.getLeavesOfType(MANUSCRIPT_VIEW_TYPE)) void (l.view as ManuscriptView).refresh();
     }, 2000);

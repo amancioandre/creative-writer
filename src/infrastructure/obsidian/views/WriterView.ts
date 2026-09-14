@@ -1190,7 +1190,7 @@ export class WriterView extends ItemView {
     const actions = this.card.createDiv({ cls: "czm-map-card-actions" });
     const btn = (text: string, cls: string, onClick: () => void) => { const b = actions.createEl("button", { text, cls }); b.addEventListener("click", onClick); return b; };
     btn("Map", "czm-act-story-map", () => this.source.openStory("map", story.spec));
-    btn("Timeline", "czm-act-story-timeline", () => this.source.openStory("timeline", story.spec));
+    btn("Plot grid", "czm-act-story-timeline", () => this.source.openStory("timeline", story.spec));
     btn("Threads", "czm-act-story-threads", () => this.source.openStory("threads", story.spec));
     btn("Manuscript", "czm-act-story-manuscript", () => this.source.openStory("manuscript", story.spec));
     if (story.target > 0) btn("Desk", "czm-act-story-desk", () => this.source.openStory("desk", story.spec));
