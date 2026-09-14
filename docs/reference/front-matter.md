@@ -27,6 +27,7 @@ The note whose front matter declares a [project](/guide/projects). Any note in t
 | `bad-words` | `[[Bad words]]` or a path | The project's own word list for the [words lens](/guide/lenses#words): notes inside the project use it instead of the vault-wide note. |
 | `dialogue` | `double`, `single`, `dash`, `none` | How speech is written in this project, for the [dialogue lens](/guide/lenses#dialogue); `quotes` and `travessão` are read too. Absent, the vault-wide setting. |
 | `thoughts` | `italic-paragraph`, `italic-any`, `single-quotes`, `none`, or a regular expression | How thought is written in this project. Anything that is not a preset is taken as a pattern: every match in a paragraph is a thought. |
+| `speakers` | list or comma string, e.g. `[Mara, Tomas #c8773a]` | The cast the [dialogue lens](/guide/lenses#who-is-speaking) attributes speech to, in this order; a name with no note is a speaker too; `#hex` pins a colour. Absent, every character note the project can see. |
 
 ## Entity notes
 
@@ -37,6 +38,7 @@ Notes that are people, places and things in the story.
 | `type` (or `kind`, `entity`) | `character`, `person`, `location`, `place`, `setting`, `item`, `object`, `artifact`, `faction`, `organisation`, `house`, `event`… | The node's kind. A folder named `Characters/`, `Places/`, `Items/`, `Factions/`, `Events/` (and synonyms) types its notes without this key; the key wins over the folder. |
 | `aliases` | list or string (Obsidian's own property) | Other names the prose uses: `[Marti, M.]`. Written by the map's *Alias of…*. |
 | `name` | text | Treated as an extra alias. |
+| `colour` (or `color`) | `"#c8773a"` | A character's speaker colour under the [dialogue lens](/guide/lenses#who-is-speaking). Absent, one from the palette in cast order. |
 
 Created by the map's *Character · Place · Item · Faction · Event* exits as:
 

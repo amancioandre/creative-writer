@@ -13,6 +13,7 @@ import { parseDialogueMarks, parseThoughtMarks, type DialogueConventions, type D
  *   bad-words: [[Bad words]]     (optional; the project's own word list note for the Words lens)
  *   dialogue: dash               (optional; how speech is written here: double, single, dash, none)
  *   thoughts: italic-paragraph   (optional; how thought is written: italic-paragraph, italic-any, single-quotes, none, or a pattern)
+ *   speakers: [Mara, Tomas #c8773a] (optional; the cast the dialogue lens attributes to, in order, a colour pinned with #hex)
  * The folder — or that one note — is what gets counted.
  *
  * Any note inside the project may carry `story-order: 3` to fix its place
@@ -47,6 +48,8 @@ export interface ProjectSpec {
   readonly dialogueMarks?: DialogueMarks;
   readonly thoughtMarks?: ThoughtMarks;
   readonly thoughtPattern?: string;
+  /** The cast the dialogue lens attributes speech to (`speakers`), names as written; absent, every character note the project can see. */
+  readonly speakers?: readonly string[];
 }
 
 /** The conventions a project note declares, as the editor's override; empty when it declares none. */
@@ -84,12 +87,15 @@ export function parseProjectFrontmatter(frontmatter: unknown, notePath: string):
   const text = (key: "plot-pov" | "plot-time" | "plot-theme") => { const v = fm[key]; return typeof v === "string" && v.trim() ? { [key === "plot-pov" ? "plotPov" : key === "plot-time" ? "plotTime" : "plotTheme"]: v.trim() } : {}; };
   const wordsNote = linkTarget(fm["bad-words"]);
   const dialogueMarks = parseDialogueMarks(fm["dialogue"]);
+  const rawSpeakers = fm["speakers"];
+  const speakers = (Array.isArray(rawSpeakers) ? rawSpeakers : typeof rawSpeakers === "string" ? rawSpeakers.split(",") : []).filter((x): x is string => typeof x === "string").map((x) => x.trim()).filter(Boolean);
   const thoughts = parseThoughtMarks(fm["thoughts"]);
   return {
     name, notePath, scope: noteScope ? notePath : folder, targetWords: hasTarget ? Math.floor(target) : 0, deadline, dailyWords: Number.isFinite(daily) && daily > 0 ? Math.floor(daily) : 0, ignoredNames,
     ...text("plot-pov"), ...text("plot-time"), ...text("plot-theme"),
     ...(wordsNote ? { wordsNote } : {}),
     ...(dialogueMarks ? { dialogueMarks } : {}),
+    ...(speakers.length ? { speakers } : {}),
     ...(thoughts ? { thoughtMarks: thoughts.thoughts, ...(thoughts.thoughtPattern !== undefined ? { thoughtPattern: thoughts.thoughtPattern } : {}) } : {}),
   };
 }

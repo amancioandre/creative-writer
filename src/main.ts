@@ -50,7 +50,9 @@ import { enabledStyleKinds } from "./domain/settings/Settings";
 import { LENS_LABELS, nextLens, toggleLens, type Lens } from "./domain/lens/Lens";
 import { EMPTY_WORD_LISTS, wordListsFacet, wordsExtension } from "./infrastructure/codemirror/wordsExtension";
 import { lensExtension } from "./infrastructure/codemirror/lensExtension";
-import { conventionsFacet, dialogueExtension, type ConventionsByScope } from "./infrastructure/codemirror/dialogueExtension";
+import { conventionsFacet, dialogueExtension, rostersFacet, type ConventionsByScope, type RostersByScope } from "./infrastructure/codemirror/dialogueExtension";
+import { buildRoster } from "./domain/dialogue/Speakers";
+import type { EntityNote } from "./domain/story/EntityIndex";
 import { loadWordLists } from "./infrastructure/obsidian/VaultWordLists";
 import { BuildStoryMap } from "./application/use-cases/BuildStoryMap";
 import { AnalyzeSceneRelations } from "./application/use-cases/AnalyzeSceneRelations";
@@ -148,6 +150,7 @@ export default class CreativeZenModePlugin extends Plugin {
   private readonly projectsCompartment = new Compartment();
   private readonly wordsCompartment = new Compartment();
   private readonly conventionsCompartment = new Compartment();
+  private readonly rostersCompartment = new Compartment();
   /** The notes the Words lens read last, so a change to one of them reloads the lists. */
   private wordListPaths: readonly string[] = [];
   private wordListsKey = "";
@@ -703,6 +706,7 @@ export default class CreativeZenModePlugin extends Plugin {
       this.projectsCompartment.of(projectScopesFacet.of(this.projectScopes())),
       this.wordsCompartment.of(wordListsFacet.of(EMPTY_WORD_LISTS)),
       this.conventionsCompartment.of(conventionsFacet.of(this.projectConventions())),
+      this.rostersCompartment.of(rostersFacet.of(this.projectRosters())),
       activeNoteExtension((state) => state.field(editorInfoField, false)?.file?.path ?? null),
       lensExtension(),
       dialogueExtension((state) => state.field(editorInfoField, false)?.file?.path ?? null),
@@ -804,17 +808,31 @@ export default class CreativeZenModePlugin extends Plugin {
     return out;
   }
 
-  /** Editors decide activation from the project list under the "projects" scope mode, and read the projects' conventions; push both only when they change. */
+  /** The cast per project, and the vault-wide cast under "" for notes outside every project, for the dialogue lens. */
+  private projectRosters(specs: readonly ProjectSpec[] = this.projectSpecs()): RostersByScope {
+    const notes: EntityNote[] = this.app.vault.getMarkdownFiles().map((f) => ({ path: f.path, frontmatter: this.app.metadataCache.getFileCache(f)?.frontmatter }));
+    const scopes = specs.map((s) => s.scope);
+    const out: Record<string, ReturnType<typeof buildRoster>> = { "": buildRoster(notes, null, scopes) };
+    for (const s of specs) out[s.scope] = buildRoster(notes, s.scope, scopes, s.speakers);
+    return out;
+  }
+
+  /** Editors decide activation from the project list under the "projects" scope mode, and read the projects' conventions and casts; push them only when they change. */
   private pushProjectScopes(): void {
     const specs = this.projectSpecs();
     const scopes = specs.map((s) => s.scope);
     const conventions = this.projectConventions(specs);
-    const key = JSON.stringify([scopes, conventions]);
+    const rosters = this.projectRosters(specs);
+    const key = JSON.stringify([scopes, conventions, rosters]);
     if (key === this.projectScopesKey) return;
     this.projectScopesKey = key;
     this.app.workspace.iterateAllLeaves((leaf) => {
       const editor = (leaf.view as { editor?: { cm?: { dispatch: (spec: unknown) => void } } }).editor;
-      editor?.cm?.dispatch({ effects: [this.projectsCompartment.reconfigure(projectScopesFacet.of(scopes)), this.conventionsCompartment.reconfigure(conventionsFacet.of(conventions))] });
+      editor?.cm?.dispatch({ effects: [
+        this.projectsCompartment.reconfigure(projectScopesFacet.of(scopes)),
+        this.conventionsCompartment.reconfigure(conventionsFacet.of(conventions)),
+        this.rostersCompartment.reconfigure(rostersFacet.of(rosters)),
+      ] });
     });
   }
 

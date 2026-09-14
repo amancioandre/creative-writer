@@ -322,9 +322,11 @@ function normalizeWords(raw: unknown): WordsSettings {
 /** The Dialogue lens: how speech and thought are written, and whether narration dims under it. A project note can override the marks. */
 export interface DialogueSettings extends DialogueConventions {
   readonly dimNarration: boolean;
+  /** Attribute speech to the cast and tint it in the speaker's colour; off, one colour for all speech. */
+  readonly speakerColours: boolean;
 }
 
-export const DEFAULT_DIALOGUE: DialogueSettings = { ...DEFAULT_CONVENTIONS, dimNarration: true };
+export const DEFAULT_DIALOGUE: DialogueSettings = { ...DEFAULT_CONVENTIONS, dimNarration: true, speakerColours: true };
 
 function normalizeDialogue(raw: unknown): DialogueSettings {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
@@ -333,6 +335,7 @@ function normalizeDialogue(raw: unknown): DialogueSettings {
     thoughts: THOUGHT_MARKS.includes(r.thoughts as ThoughtMarks) ? (r.thoughts as ThoughtMarks) : DEFAULT_DIALOGUE.thoughts,
     thoughtPattern: typeof r.thoughtPattern === "string" ? r.thoughtPattern : DEFAULT_DIALOGUE.thoughtPattern,
     dimNarration: typeof r.dimNarration === "boolean" ? r.dimNarration : DEFAULT_DIALOGUE.dimNarration,
+    speakerColours: typeof r.speakerColours === "boolean" ? r.speakerColours : DEFAULT_DIALOGUE.speakerColours,
   };
 }
 

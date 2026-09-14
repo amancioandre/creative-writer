@@ -139,3 +139,11 @@ describe("parseProjectFrontmatter — dialogue and thoughts", () => {
     expect(projectConventions(parseProjectFrontmatter({ story: true }, "Novel/Novel.md")!)).toEqual({});
   });
 });
+
+describe("parseProjectFrontmatter — speakers", () => {
+  it("reads the cast as a list or a comma string, names as written", () => {
+    expect(parseProjectFrontmatter({ story: true, speakers: ["Mara", " Tomas #c8773a "] }, "N/N.md")!.speakers).toEqual(["Mara", "Tomas #c8773a"]);
+    expect(parseProjectFrontmatter({ story: true, speakers: "Mara, Tomas" }, "N/N.md")!.speakers).toEqual(["Mara", "Tomas"]);
+    expect(parseProjectFrontmatter({ story: true }, "N/N.md")!.speakers).toBeUndefined();
+  });
+});

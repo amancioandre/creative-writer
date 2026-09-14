@@ -40,6 +40,7 @@ A [lens](/guide/lenses) is a reading pass: it colours every open note one way at
 | Thought marks | Whole paragraph in italics | How thought is written: a whole paragraph in italics, any italics, single quotes, a custom pattern, or none. Italics inside a sentence are emphasis and never count under the default. A project note overrides with `thoughts:`. |
 | Thought pattern | — | With *Custom pattern*: a regular expression tested against each paragraph; every match is a thought, or its first group when there is one. |
 | Dim narration | on | Under the dialogue lens, fade everything that is not speech or thought. |
+| Speaker colours | on | Attribute each line to the cast and tint it in the speaker's colour (`colour:` in the character note, else the palette in cast order), grey when nobody can be pinned; hover for who and how. Off: one colour. |
 
 ## Manuscript
 

@@ -30,6 +30,19 @@ How speech and thought are written is a convention, so it is a setting, and a pr
 
 Under the default, italics inside a sentence are emphasis and never a thought: `_Alone_ was generous` stays narration; `_He is guessing. He has to be guessing._` on a line of its own is a thought. A custom pattern is tested against each paragraph; every match is a thought, or its first group when the pattern has one. **Dim narration** fades everything that is not speech or thought; switch it off to keep the page at full strength with the tints on top.
 
+### Who is speaking
+
+With a cast, each paragraph of speech is tinted in its speaker's colour, and the hover says who and how that was decided. The cast is the project's character notes (a `type: character` or a `Characters/` folder, as for the [story map](/guide/story-map)), their names and `aliases`, plus character notes outside every project, a shared cast folder say. A note's `colour: "#c8773a"` is its speaker colour; the rest take one from a palette of eight in cast order. A project note can narrow and order the cast with `speakers: [Mara, Tomas #c8773a]`, names with no note included, a colour pinned with `#hex`.
+
+Attribution is a guess, and it says how good a guess:
+
+- **dialogue tag**: a name next to a speech verb in the paragraph, *“Yes, well,” Tomas said.*
+- **named in the paragraph**: the one character named outside the quotes, *“You came alone?” Tomas did not look up.*
+- **turn-taking**: the voice before the last one in a two-voice exchange, or, when only one voice has spoken, the one other character named in the scene. A thought is given to the one listening and does not take a turn.
+- **speaker not found**: grey. No tag, no name, no clean turn; more than two narration paragraphs since the last line, or a heading or scene break, starts the exchange over.
+
+A grey line is a question, not an error: add a tag, or leave it. Switch **Speaker colours** off for one colour and no attribution.
+
 The dialogue lens hides the rhythm tint whatever the *Rhythm tint underneath* setting says: a colour here means one thing.
 
 ## Words

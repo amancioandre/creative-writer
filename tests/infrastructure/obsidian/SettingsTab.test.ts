@@ -50,7 +50,7 @@ describe("CreativeZenSettingsTab", () => {
       const all = names(defs());
       expect(all).toEqual(expect.arrayContaining([
         "Enabled", "Notes", "Folders", "Typewriter scrolling", "Current line", "Focus fade", "Paragraph strength", "Far text strength", "Paragraph rhythm", "Rhythm tiers", "Zen Mode goes fullscreen",
-        "Readability in the status bar", "Lens", "Rhythm tint underneath", "Kinds", "Bad words note", "Dialogue marks", "Thought marks", "Thought pattern", "Dim narration",
+        "Readability in the status bar", "Lens", "Rhythm tint underneath", "Kinds", "Bad words note", "Dialogue marks", "Thought marks", "Thought pattern", "Dim narration", "Speaker colours",
         "Model", "Analyse automatically", "Ollama URL", "Ollama model", "Claude model", "Anthropic API key", "Daily spending cap (USD)",
         "Writing log note", "Echoes on the page", "Echo sensitivity", "Stories folder", "Daily word goal",
       ]));

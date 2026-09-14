@@ -1,12 +1,15 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { EditorState } from "@codemirror/state";
-import { conventionsFacet, conventionsFor, dialogueExtension, paragraphsIn } from "../../../src/infrastructure/codemirror/dialogueExtension";
+import { conventionsFacet, conventionsFor, dialogueExtension, paragraphsIn, rosterFor, rostersFacet } from "../../../src/infrastructure/codemirror/dialogueExtension";
+import { allFindings } from "../../../src/infrastructure/codemirror/findingsTooltip";
 import { DEFAULT_SETTINGS } from "../../../src/domain/settings/Settings";
 import { mount, type Harness } from "./helpers";
 
 const DOC = "“You came alone?” Tomas did not look up.\n\n_He is guessing._\n\nThe keeper snorted.";
 const texts = (h: Harness, cls: string) => Array.from(h.view.dom.querySelectorAll<HTMLElement>(`.${cls}`)).map((m) => m.textContent);
-const ext = (path: string | null, byScope = {}) => [conventionsFacet.of(byScope), dialogueExtension(() => path)];
+const ROSTER = { "": [{ id: "m", name: "Mara", aliases: [], colour: "#111111" }, { id: "t", name: "Tomas", aliases: [], colour: "#222222" }] };
+const ext = (path: string | null, byScope = {}, rosters = {}) => [conventionsFacet.of(byScope), rostersFacet.of(rosters), dialogueExtension(() => path)];
+const styles = (h: Harness, cls: string) => Array.from(h.view.dom.querySelectorAll<HTMLElement>(`.${cls}`)).map((m) => m.getAttribute("style"));
 
 describe("dialogueExtension", () => {
   let h: Harness;
@@ -39,6 +42,37 @@ describe("dialogueExtension", () => {
     h.destroy();
     h = mount(dash, ext("elsewhere.md", { "livro/": { marks: "dash" } }), { lens: "dialogue" });
     expect(texts(h, "czm-speech")).toEqual(["“Not speech here.”"]);
+  });
+});
+
+describe("dialogueExtension — speakers", () => {
+  let h: Harness;
+  afterEach(() => h?.destroy());
+  const EXCHANGE = "Mara stepped in.\n\n“You came alone?” Tomas did not look up.\n\n“Yes.”\n\n_He is guessing._\n\n***\n\n“Hello?”";
+
+  it("tints speech in the speaker's colour, grey when nobody can be pinned, and says who on hover", () => {
+    h = mount(EXCHANGE, ext("ch1.md", {}, ROSTER), { lens: "dialogue" });
+    expect(styles(h, "czm-speech")).toEqual(["--czm-speech: #222222", "--czm-speech: #111111", "--czm-speech: #8a8a8a"]);
+    expect(styles(h, "czm-thought")).toEqual(["--czm-speech: #222222"]);
+    expect(allFindings(h.view).map((f) => f.note)).toEqual(["Tomas · named in the paragraph", "Mara · turn-taking", "Tomas · turn-taking", "speaker not found · no tag or name in this paragraph and no clean turn-taking"]);
+  });
+
+  it("one colour and no hover without a cast, or when speaker colours are off", () => {
+    h = mount(EXCHANGE, ext("ch1.md"), { lens: "dialogue" });
+    expect(styles(h, "czm-speech")).toEqual([null, null, null]);
+    expect(allFindings(h.view)).toEqual([]);
+    h.destroy();
+    h = mount(EXCHANGE, ext("ch1.md", {}, ROSTER), { lens: "dialogue", dialogue: { ...DEFAULT_SETTINGS.dialogue, speakerColours: false } });
+    expect(styles(h, "czm-speech")).toEqual([null, null, null]);
+  });
+
+  it("uses the project's cast inside the project and follows a cast change", () => {
+    const rosters = { ...ROSTER, "book/": [{ id: "i", name: "Ilse", aliases: [], colour: "#333333" }] };
+    h = mount("“Go,” Ilse said.", ext("book/ch1.md", {}, rosters), { lens: "dialogue" });
+    expect(styles(h, "czm-speech")).toEqual(["--czm-speech: #333333"]);
+    expect(rosterFor(rosters, "book/ch1.md")[0]!.name).toBe("Ilse");
+    expect(rosterFor(rosters, "elsewhere.md")[0]!.name).toBe("Mara");
+    expect(rosterFor({}, "elsewhere.md")).toEqual([]);
   });
 });
 
