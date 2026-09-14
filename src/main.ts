@@ -65,6 +65,7 @@ import { WRITER_EXTENSION, renameCard } from "./domain/writer/WriterFile";
 import { writerTag } from "./domain/writer/Tags";
 import { PLOT_GRID_VIEW_TYPE, PlotGridView } from "./infrastructure/obsidian/views/PlotGridView";
 import { BuildPlotGrid } from "./application/use-cases/BuildPlotGrid";
+import { SnapshotPlotGrid } from "./application/use-cases/SnapshotPlotGrid";
 import { STORY_THREADS_VIEW_TYPE, StoryThreadsView } from "./infrastructure/obsidian/views/StoryThreadsView";
 import { StoryThreadsNoteRepository } from "./infrastructure/obsidian/StoryThreadsNoteRepository";
 import { BuildStoryThreads } from "./application/use-cases/BuildStoryThreads";
@@ -440,7 +441,9 @@ export default class CreativeZenModePlugin extends Plugin {
     const buildThreads = new BuildStoryThreads(buildStoryMap, projectNotes, storyRepo, threadsRepo, undefined, { segmenter: new IntlSentenceSegmenter(), sensitivity: () => this.current.threads.echoSensitivity });
     // The plot grid: the timeline grown up. Same view type, so leaves open across the update come back as the grid.
     const buildPlotGrid = new BuildPlotGrid(buildThreads);
+    const snapshotPlotGrid = new SnapshotPlotGrid(buildPlotGrid, notes);
     const editThread = new EditStoryThread(threadsRepo);
+    const segmenter = new IntlSentenceSegmenter();
     this.registerView(PLOT_GRID_VIEW_TYPE, (leaf: WorkspaceLeaf) => new PlotGridView(leaf, {
       ...storySource,
       build: (project) => buildPlotGrid.execute(project),
@@ -453,12 +456,19 @@ export default class CreativeZenModePlugin extends Plugin {
       setProjectKey: (project, key, value) => this.setTextKey(project.notePath, key, value),
       gridSettings: () => this.current.plotGrid,
       updateGridSettings: (next) => void this.updateSettings({ ...this.current, plotGrid: next }),
+      sentences: async (project, scene) => {
+        const note = (await projectNotes.notes(project)).find((n) => n.path === scene.path);
+        const prose = note?.scenes.find((s) => s.line === scene.line && s.title === scene.title)?.prose ?? "";
+        return prose.split(/\n\s*\n/).flatMap((para) => segmenter.segment(para).map((s) => s.text.trim())).filter(Boolean);
+      },
+      snapshot: (project) => snapshotPlotGrid.execute(project),
     }));
     this.addCommand({ id: "open-story-timeline", name: COMMANDS["open-story-timeline"], callback: () => void this.openPlotGrid(null) });
     this.viewCommands(PlotGridView, [
       ["story-timeline-clear-search", "clear-search"], ["plot-grid-toggle-cast", "toggle-cast"], ["plot-grid-open-note", "open-note"], ["plot-grid-toggle-panel", "toggle-panel"], ["plot-grid-new-column", "new-column"],
       ["plot-grid-fold-arcs", "fold-arcs"], ["plot-grid-fold-themes", "fold-themes"], ["plot-grid-fold-subplots", "fold-subplots"], ["plot-grid-fold-threads", "fold-threads"],
       ["plot-grid-hide-column", "hide-column"], ["plot-grid-show-hidden", "show-hidden"], ["plot-grid-toggle-unmoved", "toggle-unmoved"], ["plot-grid-focus-search", "focus-search"], ["plot-grid-help", "help"],
+      ["plot-grid-audit", "audit"], ["plot-grid-snapshot", "snapshot"], ["plot-grid-next-issue", "next-issue"], ["plot-grid-previous-issue", "previous-issue"], ["plot-grid-anchor", "anchor"],
     ]);
     this.registerView(STORY_THREADS_VIEW_TYPE, (leaf: WorkspaceLeaf) => new StoryThreadsView(leaf, {
       projects: storySource.projects,

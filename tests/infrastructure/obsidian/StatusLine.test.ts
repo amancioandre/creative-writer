@@ -69,4 +69,15 @@ describe("StatusLine", () => {
     expect(line.text).toBe("");
     expect(line.el.classList.contains("is-open")).toBe(false);
   });
+
+  it("carries one named action that is not an undo", () => {
+    const host = document.createElement("div");
+    const line = new StatusLine(host);
+    let ran = 0;
+    line.action("Wrote a note", "Open", () => { ran++; });
+    expect(line.el.textContent).toBe("Wrote a noteOpen");
+    (line.el.querySelector(".czm-status-action") as HTMLElement).click();
+    expect(ran).toBe(1);
+    expect(line.text).toBe("");
+  });
 });

@@ -604,6 +604,23 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-pg-toggle.is-on::after { left: 16px; }
 .czm-pg-toggle:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .czm-pg-help { width: 380px; }
+/* Audit view: one shape per state, filled as certainty grows; the header counts follow. */
+.czm-pg-state-glyph { font-size: 10px; margin-right: 4px; vertical-align: 1px; }
+.czm-pg-state-glyph.is-plan { color: var(--text-faint); }
+.czm-pg-state-glyph.is-verified { color: var(--text-success); }
+.czm-pg-state-glyph.is-broken { color: var(--text-warning); }
+.czm-pg.is-audit .czm-pg-cell.is-plan { border-left: 2px solid var(--text-faint); }
+.czm-pg-key-state::before { width: auto; height: auto; border-radius: 0; background: none; font-size: 10px; }
+.czm-pg-key-state.is-plan::before { content: "◇"; color: var(--text-faint); }
+.czm-pg-key-state.is-verified::before { content: "◆"; color: var(--text-success); }
+.czm-pg-key-state.is-broken::before { content: "◈"; color: var(--text-warning); }
+/* The anchor picker: the scene's sentences, near matches of a lost quote marked. */
+.czm-pg-picker { max-height: 220px; overflow: auto; margin-top: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); background: var(--background-primary); }
+.czm-pg-picker-row { display: flex; gap: 6px; align-items: baseline; padding: 4px 8px; font-size: var(--font-ui-smaller); cursor: pointer; border-bottom: 1px solid color-mix(in srgb, var(--background-modifier-border) 60%, transparent); }
+.czm-pg-picker-row:hover, .czm-pg-picker-row:focus-visible { background: var(--background-modifier-hover); outline: none; }
+.czm-pg-picker-row.is-near .czm-pg-picker-text { color: var(--text-accent); }
+.czm-pg-picker-text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.czm-pg-pick { flex: 0 0 auto; }
 /* The key names the roles by their glyph, not a dot. */
 .czm-pg-key-role::before { width: auto; height: auto; border-radius: 0; background: none; color: var(--text-accent); font-size: 10px; }
 .czm-pg-key-role.is-plant::before { content: "▶"; }

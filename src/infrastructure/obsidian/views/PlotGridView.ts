@@ -9,6 +9,7 @@ import type { StopToAdd } from "../../../application/use-cases/EditStoryThread";
 import { KIND_LABEL } from "./StoryMapView";
 import { PanelShell, showOverflow, type MenuEntry, type PanelId } from "./PanelShell";
 import { COLUMN_KINDS } from "../../../domain/threads/StoryThreadsNote";
+import { rankSentences } from "../../../domain/plot/Snapshot";
 import { StatusLine, couldNot } from "./StatusLine";
 import { inField, onActivate } from "./keys";
 
@@ -40,6 +41,10 @@ export interface PlotGridSource {
   /** The grid's layout as the writer last left it, and where it is kept. */
   gridSettings(): PlotGridSettings;
   updateGridSettings(next: PlotGridSettings): void;
+  /** The scene's prose as sentences, for the anchor picker. */
+  sentences(project: ProjectSpec, scene: SceneRef): Promise<string[]>;
+  /** Writes the grid as a dated table beside the project; resolves to the path written. */
+  snapshot(project: ProjectSpec): Promise<string>;
   /** Opens a sibling panel, for the same project where the panel takes one. */
   jumpTo(to: PanelId, project: ProjectSpec | null): void;
 }
@@ -57,7 +62,7 @@ export function sceneLink(ref: SceneRef): string {
 
 interface Selection { readonly col: number; readonly row: number }
 
-export type PlotGridAction = "clear-search" | "toggle-cast" | "open-note" | "toggle-panel" | "new-column" | "fold-arcs" | "fold-themes" | "fold-subplots" | "fold-threads" | "hide-column" | "show-hidden" | "focus-search" | "help" | "toggle-unmoved";
+export type PlotGridAction = "clear-search" | "toggle-cast" | "open-note" | "toggle-panel" | "new-column" | "fold-arcs" | "fold-themes" | "fold-subplots" | "fold-threads" | "hide-column" | "show-hidden" | "focus-search" | "help" | "toggle-unmoved" | "audit" | "snapshot" | "next-issue" | "previous-issue" | "anchor";
 
 /** The keys of the grid, as `?` lists them: the loop a writer runs all day. Folds, hiding and the search are commands, bindable in Settings → Hotkeys. */
 export const KEY_HELP: readonly (readonly [string, string])[] = [
@@ -67,9 +72,15 @@ export const KEY_HELP: readonly (readonly [string, string])[] = [
   ["Escape", "Editing: put the line back · Cell: back to the row's name"],
   ["Shift + Enter", "Editing: a new line"],
   ["Delete", "Take the stop out, with Undo"],
+  ["\"", "Anchor: pick a sentence of the scene; on a broken stop, the near matches first"],
+  ["n · p", "Next and previous broken anchor"],
   ["o", "Open the scene, at the anchor when there is one"],
+  ["v", "Audit view: every cell by its state, every header by its count"],
   ["?", "This list"],
 ];
+
+/** What a cell's state looks like in audit view: one shape, filled as certainty increases. */
+export const STATE_GLYPH: Record<"plan" | "verified" | "broken", string> = { plan: "◇", verified: "◆", broken: "◈" };
 
 const SPECIAL_LABEL: Record<SpecialColumn, string> = { pov: "POV", time: "Time", "main-theme": "Main theme" };
 const SPECIAL_KEY: Record<SpecialColumn, "plot-pov" | "plot-time" | "plot-theme"> = { pov: "plot-pov", time: "plot-time", "main-theme": "plot-theme" };
@@ -90,6 +101,10 @@ export class PlotGridView extends ItemView {
   /** A column picked from its header or the side column, with no cell: the side column's Column section follows it. */
   private column: number | null = null;
   private help: HTMLElement | null = null;
+  /** Audit view: cells drawn by their state, headers by their counts. Not remembered: it is a lens, put on to look. */
+  private audit = false;
+  /** The anchor picker's sentences, once asked for; keyed by scene. */
+  private picker: { key: string; sentences: string[] } | null = null;
   private editing = false;
   private generation = 0;
   private shell: PanelShell | null = null;
@@ -187,6 +202,9 @@ export class PlotGridView extends ItemView {
       { label: "Hide the selected column", icon: "eye-off", command: "plot-grid-hide-column", disabled: this.current() === null, onClick: () => this.run("hide-column") },
       { label: `Show hidden columns${this.hidden.length ? ` (${this.hidden.length})` : ""}`, icon: "eye", command: "plot-grid-show-hidden", disabled: this.hidden.length === 0, onClick: () => this.run("show-hidden") },
       { label: "Present, unmoved", command: "plot-grid-toggle-unmoved", checked: this.settings.unmoved, onClick: () => this.run("toggle-unmoved") },
+      { label: "Audit view", icon: "scan-search", command: "plot-grid-audit", checked: this.audit, onClick: () => this.run("audit") },
+      { label: "Next broken anchor", command: "plot-grid-next-issue", disabled: this.grid.broken === 0, onClick: () => this.run("next-issue") },
+      { label: "Snapshot the grid", icon: "camera", command: "plot-grid-snapshot", disabled: !this.project, onClick: () => this.run("snapshot") },
       "-",
       { label: "Toggle panel", icon: "sliders-horizontal", command: "plot-grid-toggle-panel", checked: this.panelOpen, onClick: () => this.run("toggle-panel") },
       { label: "Find a column", icon: "search", command: "plot-grid-focus-search", onClick: () => this.run("focus-search") },
@@ -215,7 +233,52 @@ export class PlotGridView extends ItemView {
       case "focus-search": this.search?.focus(); this.search?.select(); break;
       case "help": { const open = this.help?.classList.toggle("is-open"); if (open) this.help?.querySelector<HTMLButtonElement>(".czm-writer-help-close")?.focus(); else if (this.selection) this.cellEl(this.selection)?.focus(); break; }
       case "toggle-unmoved": this.save({ unmoved: !this.settings.unmoved }); this.renderTable(); break;
+      case "audit": this.audit = !this.audit; this.renderTable(); if (this.selection) this.select(this.selection, false); break;
+      case "snapshot": void this.snapshot(); break;
+      case "next-issue": this.walk(1); break;
+      case "previous-issue": this.walk(-1); break;
+      case "anchor": void this.openPicker(); break;
     }
+  }
+
+  /** The next or previous cell in reading order whose anchor is broken; wraps around, says so when there is none. */
+  private walk(step: 1 | -1): void {
+    const cols = this.shown.length, rows = this.rows.length;
+    if (!cols || !rows) return;
+    const total = cols * rows;
+    const start = this.selection ? this.selection.row * cols + this.selection.col : step > 0 ? -1 : total;
+    for (let i = 1; i <= total; i++) {
+      const at = ((start + step * i) % total + total) % total;
+      const col = at % cols, row = Math.floor(at / cols);
+      const cell = this.shown[col]!.cells[this.rows[row]!.index]!;
+      if (cell.state === "broken") { this.select({ col, row }); return; }
+    }
+    this.status?.say("No broken anchors.");
+  }
+
+  private async snapshot(): Promise<void> {
+    const project = this.project;
+    if (!project) return;
+    let path: string;
+    try { path = await this.source.snapshot(project); } catch (e) { this.status?.fail(couldNot("write the snapshot", e)); return; }
+    this.status?.action(`Wrote ${basenameOf(path)}.md`, "Open", () => this.source.openNote(path));
+  }
+
+  /** The anchor picker in the side column: the scene's sentences, the near matches of a lost quote first; Enter attaches one. */
+  private async openPicker(): Promise<void> {
+    const sel = this.selected, project = this.project;
+    if (!sel || !project) return;
+    const key = `${sel.row.scene.path}#${sel.row.scene.title}`;
+    if (this.picker?.key !== key) {
+      let sentences: string[];
+      try { sentences = await this.source.sentences(project, sel.row.scene); } catch (e) { this.status?.fail(couldNot("read the scene", e)); return; }
+      this.picker = { key, sentences };
+    }
+    this.save({ panelOpen: true }); this.shell?.setSideOpen(true);
+    this.renderSide();
+    const list = this.shell?.side.querySelector<HTMLElement>(".czm-pg-picker");
+    list?.querySelector<HTMLElement>(".czm-pg-picker-row")?.focus();
+    if (!this.picker.sentences.length) this.status?.say(sel.row.outline ? "No prose under this heading yet." : "No sentences found in the scene.");
   }
 
   /** The column the writer is on: the selected cell's, or the one picked from a header. */
@@ -265,7 +328,9 @@ export class PlotGridView extends ItemView {
       .filter((e) => !q || e.name.toLowerCase().includes(q) || e.aliases.some((a) => a.toLowerCase().includes(q)));
     const unknown = grid.unknownPrefixes.length ? ` · ${grid.unknownPrefixes.length} heading${grid.unknownPrefixes.length === 1 ? "" : "s"} not read as a kind (${grid.unknownPrefixes.map((p) => `${p}:`).join(", ")})` : "";
     const hid = this.hidden.length ? ` · ${this.hidden.length} hidden` : "";
-    shell.setState(`${rows.length} scene${rows.length === 1 ? "" : "s"} · ${plural(columns.length, "column")} · ${cast.length} in the cast${hid}${q ? ` · “${this.query.trim()}”` : ""}${unknown}`, q ? { label: "Clear", cls: "czm-pg-clear", onClick: () => { this.clearSearch(); } } : this.hidden.length ? { label: "Show hidden", cls: "czm-pg-show-hidden", onClick: () => this.run("show-hidden") } : null);
+    root.classList.toggle("is-audit", this.audit);
+    const auditLine = this.audit ? `${plural(grid.cells, "cell")} · ${grid.filled} filled · ${grid.verified} verified · ${grid.broken} broken` : `${rows.length} scene${rows.length === 1 ? "" : "s"} · ${plural(columns.length, "column")} · ${cast.length} in the cast`;
+    shell.setState(`${auditLine}${hid}${q ? ` · “${this.query.trim()}”` : ""}${unknown}`, q ? { label: "Clear", cls: "czm-pg-clear", onClick: () => { this.clearSearch(); } } : this.hidden.length ? { label: "Show hidden", cls: "czm-pg-show-hidden", onClick: () => this.run("show-hidden") } : null);
     this.renderSide();
     if (rows.length === 0) { shell.empty("No scenes yet — headings become scenes, with prose under them or not."); return; }
     this.renderKey(cast);
@@ -291,7 +356,8 @@ export class PlotGridView extends ItemView {
       name.createSpan({ text: c.heading.name, cls: "czm-pg-col-title" });
       onActivate(name, () => this.pickColumn(col));
       const sub = th.createDiv({ cls: "czm-pg-col-sub" });
-      sub.createSpan({ text: c.special ? `${SPECIAL_LABEL[c.special].toLowerCase()} · ${c.filled} of ${rows.length}` : `${c.filled} of ${rows.length}`, cls: "czm-pg-col-count" });
+      const audit = this.audit ? ` · ${c.verified} ${STATE_GLYPH.verified}${c.broken ? ` · ${c.broken} ${STATE_GLYPH.broken}` : ""}` : "";
+      sub.createSpan({ text: `${c.special ? `${SPECIAL_LABEL[c.special].toLowerCase()} · ` : ""}${c.filled} of ${rows.length}${audit}`, cls: "czm-pg-col-count" });
       const more = sub.createEl("button", { cls: "clickable-icon czm-pg-col-more", attr: { "aria-label": `${c.heading.name}: column menu`, "aria-haspopup": "menu" } });
       setIcon(more, "more-horizontal");
       more.addEventListener("click", (ev) => { ev.stopPropagation(); this.pickColumn(col, false); showOverflow(ev, this.columnMenu(c)); });
@@ -379,6 +445,7 @@ export class PlotGridView extends ItemView {
       if (row.pov?.entity) dot.setCssProps({ "--czm-kind": this.source.settings().colors[row.pov.entity.kind] });
       el.createSpan({ text: stop.note, cls: "czm-pg-cell-text" });
     } else if (stop) {
+      if (this.audit) el.createSpan({ text: STATE_GLYPH[cell.state as "plan" | "verified" | "broken"], cls: `czm-pg-state-glyph is-${cell.state}`, attr: { title: cell.state } });
       const glyph = stop.role ? ROLE_GLYPH[stop.role] : "";
       if (glyph && stop.role) el.createSpan({ text: glyph, cls: `czm-pg-role is-${stop.role}`, attr: { title: stop.role } });
       el.createSpan({ text: stop.note || (stop.quote ? `“${stop.quote}”` : ""), cls: "czm-pg-cell-text" });
@@ -494,7 +561,13 @@ export class PlotGridView extends ItemView {
     if (!shell) return;
     const settings = this.source.settings();
     const kinds = this.castExpanded ? (Object.keys(KIND_LABEL) as Entity["kind"][]).filter((k) => cast.some((c) => c.kind === k)).map((k) => ({ label: KIND_LABEL[k], color: settings.colors[k], cls: `czm-key-${k}` })) : [];
+    const audit = this.audit ? [
+      { label: "plan", color: "", cls: "czm-pg-key-state is-plan" },
+      { label: "verified", color: "", cls: "czm-pg-key-state is-verified" },
+      { label: "broken", color: "", cls: "czm-pg-key-state is-broken" },
+    ] : [];
     shell.key([
+      ...audit,
       { label: "plant", color: "", cls: "czm-pg-key-role is-plant" },
       { label: "payoff", color: "", cls: "czm-pg-key-role is-payoff" },
       { label: "reversal · turn", color: "", cls: "czm-pg-key-role is-reversal" },
@@ -583,6 +656,10 @@ export class PlotGridView extends ItemView {
       case "Delete": case "Backspace": if (at && this.selected?.cell.stop) { ev.preventDefault(); void this.removeCell(); } break;
       case "o": if (this.selected) { ev.preventDefault(); const s = this.selected; this.source.reveal(s.cell.stop?.anchor ? { ...s.row.scene, line: s.cell.stop.anchor.line } : s.row.scene); } break;
       case "?": ev.preventDefault(); this.run("help"); break;
+      case "v": ev.preventDefault(); this.run("audit"); break;
+      case "n": ev.preventDefault(); this.walk(1); break;
+      case "p": ev.preventDefault(); this.walk(-1); break;
+      case '"': ev.preventDefault(); void this.openPicker(); break;
     }
   }
 
@@ -640,7 +717,13 @@ export class PlotGridView extends ItemView {
     else this.renderColumnSection(colOne, picked);
     const columns = this.grid.columns;
     const colSection = shell.section("Columns", `${columns.length}${this.hidden.length ? ` · ${this.hidden.length} hidden` : ""}${this.grid.unknownPrefixes.length ? ` · ${this.grid.unknownPrefixes.length} unread` : ""}`, "pg-columns", true);
-    const rowsSection = shell.section("Rows", this.settings.unmoved ? "unmoved on" : "", "pg-rows", false);
+    const rowsSection = shell.section("Rows", [this.settings.unmoved ? "unmoved on" : "", this.audit ? "audit" : ""].filter(Boolean).join(" · "), "pg-rows", false);
+    const auditRow = rowsSection.createDiv({ cls: "setting-item mod-toggle" });
+    const auditInfo = auditRow.createDiv({ cls: "setting-item-info" });
+    auditInfo.createDiv({ text: "Audit view", cls: "setting-item-name" });
+    auditInfo.createDiv({ text: `Every cell by its state: ${STATE_GLYPH.plan} plan · ${STATE_GLYPH.verified} verified · ${STATE_GLYPH.broken} broken`, cls: "setting-item-description" });
+    const auditToggle = auditRow.createDiv({ cls: "setting-item-control" }).createEl("button", { cls: `czm-pg-toggle czm-pg-audit-toggle${this.audit ? " is-on" : ""}`, attr: { role: "switch", "aria-checked": String(this.audit), "aria-label": "Audit view" } });
+    auditToggle.addEventListener("click", () => this.run("audit"));
     const unmovedRow = rowsSection.createDiv({ cls: "setting-item mod-toggle" });
     const info = unmovedRow.createDiv({ cls: "setting-item-info" });
     info.createDiv({ text: "Present, unmoved", cls: "setting-item-name" });
@@ -719,8 +802,30 @@ export class PlotGridView extends ItemView {
     for (const r of roles) { const o = roleSelect.createEl("option", { text: r === "touch" ? "touch (no role)" : `${ROLE_GLYPH[r]} ${r}`.trim() }); o.value = r; if ((stop?.role ?? "touch") === r) o.selected = true; }
     const quote = section.createDiv({ cls: "czm-pg-field" });
     quote.createDiv({ text: "Anchor · a sentence in the scene", cls: "czm-pg-field-label" });
-    const quoteInput = quote.createEl("input", { cls: "czm-pg-quote", attr: { type: "text", placeholder: "a few words quoted from the scene", "aria-label": "Anchor: a quote from the scene" } });
+    const quoteRow = quote.createDiv({ cls: "czm-pg-new" });
+    const quoteInput = quoteRow.createEl("input", { cls: "czm-pg-quote", attr: { type: "text", placeholder: "a few words quoted from the scene", "aria-label": "Anchor: a quote from the scene" } });
     quoteInput.value = stop?.quote ?? "";
+    const pick = quoteRow.createEl("button", { text: "Pick…", cls: "czm-pg-new-add czm-pg-pick", attr: { title: "Pick a sentence of the scene (\")" } });
+    pick.addEventListener("click", () => void this.openPicker());
+    const key = `${row.scene.path}#${row.scene.title}`;
+    if (this.picker?.key === key) {
+      const ranked = rankSentences(this.picker.sentences, cell.state === "broken" ? stop?.quote ?? null : null);
+      const list = quote.createDiv({ cls: "czm-pg-picker", attr: { role: "listbox", "aria-label": cell.state === "broken" ? "Sentences of the scene, near matches of the lost quote first" : "Sentences of the scene" } });
+      if (!ranked.length) list.createDiv({ text: "No sentences here yet.", cls: "czm-map-absent" });
+      ranked.slice(0, 40).forEach((r) => {
+        const rowEl = list.createDiv({ cls: `czm-pg-picker-row${r.score >= 0.5 ? " is-near" : ""}`, attr: { role: "option", tabindex: "0", title: r.text } });
+        rowEl.createSpan({ text: r.text, cls: "czm-pg-picker-text" });
+        if (r.score > 0) rowEl.createSpan({ text: `${Math.round(r.score * 100)}%`, cls: "czm-map-row-meta" });
+        const attach = () => { this.picker = null; void this.writeCell(column, row, stop, noteInput.value.trim() || stop?.note || "", { role: roleSelect.value as StopRole, quote: r.text.trim() }); };
+        rowEl.addEventListener("click", attach);
+        rowEl.addEventListener("keydown", (ev) => {
+          if (ev.key === "Enter") { ev.preventDefault(); ev.stopPropagation(); attach(); }
+          else if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); this.picker = null; this.renderSide(); if (this.selection) this.cellEl(this.selection)?.focus(); }
+          else if (ev.key === "ArrowDown") { ev.preventDefault(); (rowEl.nextElementSibling as HTMLElement | null)?.focus(); }
+          else if (ev.key === "ArrowUp") { ev.preventDefault(); (rowEl.previousElementSibling as HTMLElement | null)?.focus(); }
+        });
+      });
+    }
     const note = section.createDiv({ cls: "czm-pg-field" });
     note.createDiv({ text: "Note", cls: "czm-pg-field-label" });
     const noteInput = note.createEl("textarea", { cls: "czm-pg-note-field", attr: { rows: "2", placeholder: "What the thread does here", "aria-label": "Note" } });

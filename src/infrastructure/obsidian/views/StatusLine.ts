@@ -41,6 +41,14 @@ export class StatusLine {
     this.expire(UNDO_MS);
   }
 
+  /** Something done, with one thing to do about it that is not an undo: "Wrote Plot grid · 2026-09-13.md" with Open. */
+  action(message: string, label: string, run: () => void): void {
+    this.render(message, null, false);
+    const btn = this.el.createEl("button", { text: label, cls: "czm-status-undo czm-status-action" });
+    btn.addEventListener("click", () => { this.clear(); run(); });
+    this.expire(UNDO_MS);
+  }
+
   /** A failure: stays until the next message, announced as an alert. Say what could not be done and why. */
   fail(message: string): void {
     this.render(message, null, true);

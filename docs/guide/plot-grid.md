@@ -38,6 +38,14 @@ Everything typed into the grid is a line in `Story threads.md`; the grid writes 
 - **Columns**: the side column lists every column by kind with its count; **New column** takes a heading, `Arc: [[Anna]]`, `Theme: …`, `Subplot: …` or a plain name, and writes it to the note as an empty section, ready to fill. The ✕ on a column arms, and a second click deletes the heading and every stop under it.
 - Every write reports in the status line with **Undo** for eight seconds: a changed cell goes back to its previous line, a written one is removed, a removed one is written back, a deleted column comes back with its stops.
 
+## Before the draft and after it
+
+The grid is used twice, and the two uses are one cell in two states. Before a scene has prose, a cell is a **plan**: a stop with no anchor, typed from the outline; a heading with no prose is a row all the same. Once the scene is written, the same cell can be checked against the page: a plan becomes **verified** when it carries a quote the grid finds in the prose, **broken** when the quote no longer matches.
+
+- **Audit view** (`v`, the side column's *Rows* section, or the command) draws every cell by its state, ◇ plan · ◆ verified · ◈ broken, every header by its counts, and the state line as *40 cells · 12 filled · 8 verified · 3 broken*. It is a lens, not a screen: same rows, same columns, same scroll. It is not remembered.
+- **Anchoring** (`"`, or **Pick…** beside the anchor field) lists the scene's sentences in the side column; on a broken stop, the sentences nearest the lost quote come first, marked with how much they share. Enter, or a click, writes the sentence as the stop's anchor. `n` and `p` walk the broken anchors, so repair is three keys: `n`, `"`, Enter.
+- **Snapshot the grid** (⋯ menu, or the command) writes the grid as a dated markdown table beside the project, `Plot grid · 2026-09-13.md`, one row per scene, one column per thread, each cell its stop with the role and a ✓ where verified. The status line names the file with **Open**. It is never read back (its front matter says so), so keep it, diff it, or delete it: two snapshots side by side are the outline against the draft.
+
 ## Keys
 
 Click anywhere on the grid and the keys work; press `?` for the list on the grid itself. Tab is never taken: it moves the focus as it does everywhere in Obsidian, and Ctrl and Cmd stay with Obsidian's own hotkeys. Nothing is bound by default.
@@ -48,7 +56,10 @@ Click anywhere on the grid and the keys work; press `?` for the list on the grid
 | `Enter` | Edit the cell in place. Editing: `Enter` saves, `Shift+Enter` a new line, `Escape` puts the line back. |
 | `Escape` | On a cell: back to the row's name. |
 | `Delete` | Take the stop out, with Undo. |
+| `"` | Anchor: pick a sentence of the scene; on a broken stop, the near matches first. |
+| `n` `p` | Next and previous broken anchor. |
 | `o` | Open the scene, at the anchor when there is one. |
+| `v` | Audit view. |
 | `?` | The list. |
 
 Folding a group, hiding a column, showing the hidden ones, the search, the panel and *Present, unmoved* are commands, each named in the ⋯ menu, so a key of your own can be bound in Settings → Hotkeys.

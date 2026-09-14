@@ -61,6 +61,12 @@ creative-writer-storymap: 3
 
 followed by a short explanation and one ```` ```json ```` block: relation readings and fact readings per scene, the model's verdict per contradiction, sentence pairs the embedding model found alike, contradictions you dismissed, and pinned node positions. The flag keeps the plugin from reading its own note as a chapter; a version-1 or version-2 note (before facts, or before intents and echoes, existed) loads as is. Safe to delete — you would re-run the readings.
 
+## Plot grid snapshot
+
+| Key | Value | Effect |
+|---|---|---|
+| `creative-writer-grid-snapshot` | `1` | Written by **Snapshot the grid**, with `creative-writer: false`, so the table is never read back as a chapter. |
+
 ## Manuscript export note
 
 `<Name> (manuscript).md` in the project folder is written by **Export** on the manuscript page and carries `creative-writer: false` and `creative-writer-manuscript: 1`, so it is never counted or read as a chapter. A snapshot; export again to refresh it.

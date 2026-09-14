@@ -13,7 +13,7 @@ import { DEFAULT_PLOT_GRID, DEFAULT_STORY_MAP, type PlotGridSettings } from "../
 
 const novel: ProjectSpec = { name: "Novel", scope: "Novel/", targetWords: 1, deadline: null, dailyWords: 0, notePath: "Novel/Project.md", ignoredNames: [] };
 const one = `# Camp\nMarta woke before Ilse at the gate of Lisbon.\n\n# Creek\nIlse found the creek alone.\n\n# Later\n`;
-const two = `# Return\nMarta came back to Lisbon.\n`;
+const two = `# Return\nMarta came back to Lisbon. The gate of Lisbon was shut.\n`;
 const note = (path: string, body: string, extra: Partial<ProjectNote> = {}): ProjectNote => ({ path, frontmatter: {}, links: [], bookmarked: false, bookmarkedHeadings: [], scenes: splitScenes(body), text: body, ...extra });
 const notes = [note("Novel/Characters/Marta Kovács.md", ""), note("Novel/Characters/Ilse.md", ""), note("Novel/Places/Lisbon.md", ""), note("Novel/Part one/One.md", one, { bookmarkedHeadings: ["Creek"] }), note("Novel/Part two/Two.md", two)];
 const file = putReading(EMPTY_STORY_MAP_FILE, { scene: { path: "Novel/Part one/One.md", title: "Camp", line: 0 }, hash: textHash(splitScenes(one)[0]!.prose), model: "m", relations: [], references: [], events: [{ summary: "Dawn walk", participants: [], evidence: "x" }] });
@@ -46,6 +46,8 @@ function open(overrides: Partial<PlotGridSource> = {}, threads = threadsNote) {
     setProjectKey: async (_p, key, value) => { calls.writes.push(`${key}=${value ?? ""}`); const k = key === "plot-pov" ? "plotPov" : key === "plot-time" ? "plotTime" : "plotTheme"; spec = { ...spec, [k]: value ?? undefined }; },
     gridSettings: () => prefs,
     updateGridSettings: (next) => { prefs = next; },
+    sentences: async (_p, scene) => { calls.writes.push(`sentences ${scene.title}`); return scene.title === "Camp" ? ["Marta woke before Ilse at the gate of Lisbon."] : scene.title === "Return" ? ["Marta came back to Lisbon.", "The gate of Lisbon was shut."] : []; },
+    snapshot: async () => { calls.writes.push("snapshot"); return "Novel/Plot grid · 2026-09-13.md"; },
     openNote: (p) => { calls.opened.push(p); }, reveal: (r) => { calls.revealed.push(`${r.title}@${r.line}`); }, jumpTo: (to) => { calls.jumps.push(to); },
     settings: () => DEFAULT_STORY_MAP,
     threadsNotePath: () => "Novel/Story threads.md",
@@ -77,7 +79,7 @@ describe("PlotGridView", () => {
     const el = v.contentEl;
     expect([...el.querySelectorAll(".czm-pg-act th")].map((s) => s.textContent)).toEqual(["Part one", "Part two"]);
     expect([...el.querySelectorAll(".czm-pg-note .is-link")].map((s) => s.textContent)).toEqual(["One", "Two"]);
-    expect([...el.querySelectorAll(".czm-pg-note-total")].map((s) => s.textContent)).toEqual(["3 scenes · 14 words · 3 of the cast", "1 scene · 5 words · 2 of the cast"]);
+    expect([...el.querySelectorAll(".czm-pg-note-total")].map((s) => s.textContent)).toEqual(["3 scenes · 14 words · 3 of the cast", "1 scene · 11 words · 2 of the cast"]);
     expect([...el.querySelectorAll(".czm-pg-col-thread .czm-pg-col-title")].map((s) => s.textContent)).toEqual(["Ilse", "The gate"]);
     expect([...el.querySelectorAll(".czm-pg-col-thread .czm-pg-col-count")].map((s) => s.textContent)).toEqual(["2 of 4", "3 of 4"]);
     expect(el.querySelector(".czm-pg-col-thread .czm-pg-dot")).not.toBeNull();
@@ -321,6 +323,60 @@ describe("PlotGridView", () => {
     expect(note()).toContain("## Subplot: What we owe");
   });
 
+  it("audit view draws every cell by its state and the headers by their counts; n and p walk the broken anchors", async () => {
+    const { v } = open();
+    await v.onOpen();
+    const el = v.contentEl;
+    el.querySelector<HTMLElement>('.czm-pg-cell[data-col="0"][data-row="0"]')!.click();
+    el.querySelector<HTMLElement>('.czm-pg-cell[data-col="0"][data-row="0"]')!.dispatchEvent(new KeyboardEvent("keydown", { key: "v", bubbles: true }));
+    expect(el.querySelector(".czm-pg")?.classList.contains("is-audit")).toBe(true);
+    expect(el.querySelector(".czm-shell-state-text")?.textContent).toBe("8 cells · 5 filled · 3 verified · 1 broken");
+    expect([...el.querySelectorAll(".czm-pg-col-thread .czm-pg-col-count")].map((s) => s.textContent)).toEqual(["2 of 4 · 2 ◆", "3 of 4 · 1 ◆ · 1 ◈"]);
+    expect([...el.querySelectorAll('.czm-pg-cell[data-col="1"] .czm-pg-state-glyph')].map((g) => g.textContent)).toEqual(["◆", "◇", "◈"]);
+    expect(el.querySelectorAll(".czm-pg-key-state")).toHaveLength(3);
+    el.querySelector<HTMLElement>('.czm-pg-cell[data-col="0"][data-row="0"]')!.dispatchEvent(new KeyboardEvent("keydown", { key: "n", bubbles: true }));
+    expect(el.querySelector(".czm-pg-cell.is-selected")?.getAttribute("data-row")).toBe("3");
+    expect(el.querySelector(".czm-pg-cell.is-selected")?.classList.contains("is-broken")).toBe(true);
+    el.querySelector<HTMLElement>(".czm-pg-cell.is-selected")!.dispatchEvent(new KeyboardEvent("keydown", { key: "p", bubbles: true }));
+    expect(el.querySelector(".czm-pg-cell.is-selected")?.getAttribute("data-row")).toBe("3");
+    v.run("audit");
+    expect(el.querySelector(".czm-pg")?.classList.contains("is-audit")).toBe(false);
+  });
+
+  it('" opens the anchor picker with the near matches of a lost quote first, and Enter re-anchors the stop', async () => {
+    const { v, calls, note } = open();
+    await v.onOpen();
+    const el = v.contentEl;
+    const broken = el.querySelector<HTMLElement>('.czm-pg-cell[data-col="1"][data-row="3"]')!;
+    broken.click();
+    broken.dispatchEvent(new KeyboardEvent("keydown", { key: '"', bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(calls.writes).toContain("sentences Return");
+    const rows = [...el.querySelectorAll(".czm-pg-picker-row")];
+    expect(rows.map((r) => r.querySelector(".czm-pg-picker-text")?.textContent)).toEqual(["The gate of Lisbon was shut.", "Marta came back to Lisbon."]);
+    expect(rows[0]!.classList.contains("is-near")).toBe(true);
+    rows[0]!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(note()).toContain('- [[Two#Return]] — payoff: "The gate of Lisbon was shut." broken anchor');
+    expect(el.querySelector('.czm-pg-cell[data-col="1"][data-row="3"]')?.classList.contains("is-verified")).toBe(true);
+    // An outline scene has nothing to pick from, and says so.
+    el.querySelector<HTMLElement>('.czm-pg-cell[data-col="1"][data-row="2"]')!.click();
+    v.run("anchor");
+    await new Promise((r) => setTimeout(r, 20));
+    expect(el.querySelector(".czm-map-status")?.textContent).toContain("No prose under this heading yet");
+  });
+
+  it("snapshots the grid and says where it wrote", async () => {
+    const { v, calls } = open();
+    await v.onOpen();
+    v.run("snapshot");
+    await new Promise((r) => setTimeout(r, 20));
+    expect(calls.writes).toContain("snapshot");
+    expect(v.contentEl.querySelector(".czm-map-status")?.textContent).toBe("Wrote Plot grid · 2026-09-13.mdOpen");
+    (v.contentEl.querySelector(".czm-status-action") as HTMLElement).click();
+    expect(calls.opened).toEqual(["Novel/Plot grid · 2026-09-13.md"]);
+  });
+
   it("lists its keys behind ? and closes the list again", async () => {
     const { v } = open();
     await v.onOpen();
@@ -328,7 +384,7 @@ describe("PlotGridView", () => {
     el.querySelector<HTMLElement>('.czm-pg-cell[data-col="0"][data-row="0"]')!.click();
     el.querySelector<HTMLElement>('.czm-pg-cell[data-col="0"][data-row="0"]')!.dispatchEvent(new KeyboardEvent("keydown", { key: "?", bubbles: true }));
     expect(el.querySelector(".czm-pg-help")?.classList.contains("is-open")).toBe(true);
-    expect(el.querySelectorAll(".czm-pg-help tr")).toHaveLength(8);
+    expect(el.querySelectorAll(".czm-pg-help tr")).toHaveLength(11);
     (el.querySelector(".czm-writer-help-close") as HTMLElement).click();
     expect(el.querySelector(".czm-pg-help")?.classList.contains("is-open")).toBe(false);
   });
