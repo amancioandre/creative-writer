@@ -8,7 +8,7 @@ npm run build       # typecheck + bundle
 npm test
 ```
 
-`npm run release:check` runs all three; CI and the release workflow run them too, so a tag whose lint fails never becomes a release. Do not skip or disable a rule to get past it. If a rule is wrong for this project, turn it off in `eslint.config.mjs` with a comment saying why.
+`npm run release:check` runs all three plus `npm run docs:build`, because the docs site is VitePress and a bare `<word>` placeholder in prose is a Vue tag to it (the 0.11.0 docs deploy failed on `<service>`); write placeholders in backticks or words; CI and the release workflow run them too, so a tag whose lint fails never becomes a release. Do not skip or disable a rule to get past it. If a rule is wrong for this project, turn it off in `eslint.config.mjs` with a comment saying why.
 
 ## The Obsidian directory review
 
