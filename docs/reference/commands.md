@@ -9,6 +9,7 @@ All commands appear in the palette under **Creative Writer:**. None has a defaul
 | **Toggle Zen Mode** | Hide or show ribbon, tabs, sidebars, status bar and title bar (and go fullscreen if *Zen Mode goes fullscreen* is on). |
 | **Toggle everywhere** | Flip the master switch, *Enabled*, for all editor features. |
 | **Toggle for this note** | Write `creative-writer: true` or `false` into the active note's front matter. |
+| **Show release note** | The one-time note about the running version: what changed, the release page, and the feedback form. Shown by itself once after install and once after a minor or major update; this brings it back. |
 | **Lens: style checks** / **Lens: dialogue** / **Lens: words** / **Lens: accents** | Switch that [lens](/guide/lenses) on, everywhere; run it again to switch it off. One lens at a time. |
 | **Lens: next** / **Lens: off** | Cycle through the lenses, or show the plain page. The status-bar item opens a menu of the same rows. |
 | **Dialogue: tag the speaker** | Open the [speaker box](/guide/lenses#the-speaker-box) on the cursor's sentence, armed for the keyboard: arrows choose, Enter pins the speaker as a hidden `%% Name %%` comment, Escape closes. Needs the dialogue or accents lens. |

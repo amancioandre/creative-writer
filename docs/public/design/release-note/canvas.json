@@ -1,0 +1,63 @@
+{
+ "artboards": [
+  {
+   "file": "Main.dc.html",
+   "title": "Update \u00b7 light",
+   "x": 0,
+   "y": 0,
+   "w": 880,
+   "h": 600
+  },
+  {
+   "file": "UpdateDark.dc.html",
+   "title": "Update \u00b7 dark",
+   "x": 980,
+   "y": 0,
+   "w": 880,
+   "h": 600
+  },
+  {
+   "file": "WelcomeLight.dc.html",
+   "title": "Welcome \u00b7 light",
+   "x": 0,
+   "y": 760,
+   "w": 880,
+   "h": 600
+  },
+  {
+   "file": "WelcomeDark.dc.html",
+   "title": "Welcome \u00b7 dark",
+   "x": 980,
+   "y": 760,
+   "w": 880,
+   "h": 600
+  },
+  {
+   "file": "BannerAlternate.dc.html",
+   "title": "Alternate: a quiet banner instead of a modal",
+   "x": 0,
+   "y": 1520,
+   "w": 880,
+   "h": 600
+  }
+ ],
+ "annotations": [
+  {
+   "id": "tokens",
+   "x": 1960,
+   "y": 0,
+   "w": 300,
+   "text": "Lifted from Obsidian 1.13.7 app.css: modal 560px, radius 12px, 1px border base-40, padding 16px; title 20px/600 lh 1.3; body 15px; buttons 30px, 13px, radius 5px, input shadow; mod-cta on --interactive-accent (hsl 258 88% 66%; accent-1 in light); cover rgba(220,220,220,.4) / rgba(10,10,10,.4); close = clickable-icon at 6px/6px.\n\nThe modal never blocks: Close, Esc and \u2715 all dismiss; the seen version is written before it opens."
+  },
+  {
+   "id": "why-banner",
+   "x": 980,
+   "y": 1520,
+   "w": 300,
+   "text": "Alternate kept beside the deliverable: a one-line banner at the top of the note is quieter than a modal and never covers prose, but it competes with the editor for attention on every launch until dismissed, and Obsidian has no standard banner surface. The modal is Obsidian's own vocabulary for a one-time notice."
+  }
+ ],
+ "launch": {
+  "view": "canvas"
+ }
+}

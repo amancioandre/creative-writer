@@ -24,6 +24,19 @@ Every release is re-reviewed by the community directory with the rules in `eslin
 
 Vault enumeration and clipboard access show up as "Recommendation" in the review. They are inherent to the plugin (the board scans tags; the writer protocol command copies text) and are documented in the README, not something to remove.
 
+## Popups, promotion and data collection
+
+Researched against the Developer policies on 2026-09-16 (the rules are on docs.obsidian.md under Community directory). A popup that links to a feedback or newsletter form is a **static ad within the plugin's own interface**, which the directory allows only when the README discloses it. Everything below keeps the plugin on the right side of that line:
+
+- **Hard-code the popup.** Text and link ship in the bundle. Never fetch its content, a banner, or a "latest message" from the network: that is a dynamic ad and a listed violation.
+- **Nothing leaves the machine without a click.** No install ping, no version check, no counter, no identifier in the URL. Opening the form is the user's action; the form collects on its own side. Client-side telemetry gets a plugin removed.
+- **Once per install and once per minor or major version.** Persist the seen version *before* opening the modal so a crash cannot make it recur. Never on patch releases, never as a `Notice` on every launch, never blocking. A setting turns it off; a command reopens it.
+- **Disclose it in the README** under Privacy: that the plugin shows a one-time note after install and after updates, which service hosts the form, and what the link carries.
+- **Money goes through `fundingUrl` only.** The plugin is labelled Free; a newsletter or feedback form keeps it Free, a paid subscription link would not. Never put a payment or donation link in the popup.
+- The modal is plugin DOM like any other: `createDiv`/`createEl`, classes in `styles.css`, sentence case, no default hotkey.
+
+Design and copy: `docs/development/release-note.md`.
+
 ## Tests and the DOM
 
 `tests/setup.ts` mirrors the Obsidian DOM helpers in jsdom (`createEl`/`createDiv`/`createSpan` on `Node`, `setCssStyles`/`setCssProps` on `HTMLElement`). When source starts using another Obsidian helper, add it there and to the `declare global` block in `tests/stubs/obsidian.ts`, and stub the standard API in tests, never the deprecated one.

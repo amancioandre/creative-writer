@@ -219,6 +219,23 @@ export function textToTags(text: string): TagSpec[] {
   return normalizeTags(text.split(/[\n,]/).map((line) => { const [name, color] = line.trim().split(/\s+/); return { name, color }; }));
 }
 
+/** The release note: a modal once after install and once after a minor or major update. */
+export interface ReleaseNoteSettings {
+  readonly enabled: boolean;
+  /** The last manifest version a note was shown (or silently passed) for; "" on a fresh install. */
+  readonly seenVersion: string;
+}
+
+export const DEFAULT_RELEASE_NOTE: ReleaseNoteSettings = { enabled: true, seenVersion: "" };
+
+export function normalizeReleaseNote(raw: unknown): ReleaseNoteSettings {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  return {
+    enabled: typeof r.enabled === "boolean" ? r.enabled : DEFAULT_RELEASE_NOTE.enabled,
+    seenVersion: typeof r.seenVersion === "string" ? r.seenVersion.trim() : DEFAULT_RELEASE_NOTE.seenVersion,
+  };
+}
+
 export interface PluginSettings {
   /** Master switch; the "Toggle Creative Writer" command flips it. */
   readonly enabled: boolean;
@@ -252,6 +269,7 @@ export interface PluginSettings {
   readonly manuscript: ManuscriptSettings;
   readonly writer: WriterSettings;
   readonly plotGrid: PlotGridSettings;
+  readonly releaseNote: ReleaseNoteSettings;
 }
 
 /** The plot grid's layout as the writer last left it: what is folded, what is hidden, whether the cast is spread out. */
@@ -385,6 +403,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   manuscript: DEFAULT_MANUSCRIPT,
   writer: DEFAULT_WRITER,
   plotGrid: DEFAULT_PLOT_GRID,
+  releaseNote: DEFAULT_RELEASE_NOTE,
 };
 
 const clampInt = (v: number, min: number, max: number) => Math.min(max, Math.max(min, Math.floor(v)));
@@ -432,6 +451,7 @@ export function normalizeSettings(raw: unknown): PluginSettings {
     plotGrid: normalizePlotGrid(r.plotGrid),
     manuscript: normalizeManuscript(r.manuscript),
     writer: normalizeWriter(r.writer),
+    releaseNote: normalizeReleaseNote(r.releaseNote),
   };
 }
 

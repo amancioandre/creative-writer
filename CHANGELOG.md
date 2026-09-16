@@ -2,6 +2,10 @@
 
 Release notes for every version are on the [releases page](https://github.com/amancioandre/creative-writer/releases). This file carries the same text for the versions since it was started.
 
+## 0.11.0 — The release note
+
+- **The release note.** Once after install and once after a minor or major update, a modal with the version's headline, three bullets, and a link to the feedback form ([tally.so/r/obJ6AN](https://tally.so/r/obJ6AN)). It is built into the plugin: nothing is fetched, nothing is sent unless the link is opened, and the seen version is saved before the window opens so it can never recur. Never on a patch release, never while Zen Mode is on. A toggle under Settings → Where it runs, *Release notes*, turns it off; the *Show release note* command brings it back. The README's Privacy section discloses it, as the directory's policy on pop-ups asks.
+
 ## 0.10.1 — One tooltip
 
 - **One tooltip per control.** Obsidian draws a tooltip from a control's `aria-label`, and the browser draws its own from `title`; controls carrying both showed the two on top of each other. Every such control keeps only the label: the manuscript toolbar, reading-time span, ruler segments and gutter marks, the comments pane's resolve button (now "Resolve: a check mark at the end of the comment" / "Reopen: take the check mark out of the comment"), the panel shell's jump, tool, ⋯ and toggle buttons, the plot grid's cast dots and column delete ("Delete column X and every stop under it"), and the status-bar readability item, whose label now carries the band hint.

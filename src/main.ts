@@ -12,6 +12,8 @@ import { CompromiseTagger } from "./infrastructure/nlp/CompromiseTagger";
 import { BrysbaertConcreteness } from "./infrastructure/nlp/BrysbaertConcreteness";
 import { DomWorkspaceChrome } from "./infrastructure/obsidian/DomWorkspaceChrome";
 import { PluginDataSettingsRepository } from "./infrastructure/obsidian/PluginDataSettingsRepository";
+import { ReleaseNoteModal } from "./infrastructure/obsidian/ReleaseNoteModal";
+import { releaseNoteDecision } from "./domain/release/ReleaseNote";
 import { CreativeZenSettingsTab } from "./infrastructure/obsidian/SettingsTab";
 import { settingsFacet } from "./infrastructure/codemirror/settingsFacet";
 import { activeNoteExtension, projectScopesFacet } from "./infrastructure/codemirror/activeNote";
@@ -510,6 +512,7 @@ export default class CreativeZenModePlugin extends Plugin {
     this.registerView(WRITER_VIEW_TYPE, (leaf: WorkspaceLeaf) => new WriterView(leaf, writerSource));
     this.registerExtensions([WRITER_EXTENSION], WRITER_VIEW_TYPE);
     this.addCommand({ id: "open-writer", name: COMMANDS["open-writer"], callback: () => void this.openWriter() });
+    this.addCommand({ id: "show-release-note", name: COMMANDS["show-release-note"], callback: () => this.openReleaseNote("update") });
     // The board's keys and its side column, as commands too, so they can be rebound in Settings → Hotkeys. Live only while the board is the active view.
     this.viewCommands(WriterView, [
       ["writer-next-lane", "next-lane"], ["writer-previous-lane", "previous-lane"], ["writer-next-group", "next-group"], ["writer-previous-group", "previous-group"],
@@ -745,6 +748,7 @@ export default class CreativeZenModePlugin extends Plugin {
       const md = this.app.workspace.getActiveViewOfType(MarkdownView);
       if (md?.file) this.observe(md.file.path, md.editor.getValue());
       void this.reloadWordLists();
+      void this.maybeShowReleaseNote();
     }));
 
     const readability = this.addStatusBarItem();
@@ -1318,6 +1322,22 @@ export default class CreativeZenModePlugin extends Plugin {
     // Editor extensions are torn down by Obsidian; Zen Mode's body class is ours to remove.
     void this.zen.deactivate();
     void this.tracker.flush();
+  }
+
+  /**
+   * Once after install, once after a minor or major update, never while Zen Mode is on (next launch, then).
+   * The seen version is saved before the modal opens, so a crash costs one note, never a recurring one.
+   */
+  private async maybeShowReleaseNote(): Promise<void> {
+    if (this.zen.isActive) return;
+    const note = this.current.releaseNote;
+    const { kind, seen } = releaseNoteDecision(note.seenVersion, this.manifest.version, note.enabled);
+    if (seen !== note.seenVersion) await this.updateSettings({ ...this.current, releaseNote: { ...note, seenVersion: seen } });
+    if (kind) this.openReleaseNote(kind);
+  }
+
+  private openReleaseNote(kind: "welcome" | "update"): void {
+    new ReleaseNoteModal(this.app, kind, this.manifest.version, (url) => { window.open(url); }).open();
   }
 
   private async updateSettings(next: PluginSettings): Promise<void> {

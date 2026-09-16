@@ -971,3 +971,14 @@ body.czm-zen .cm-line .czm-accent-uses, body.czm-zen .cm-line .czm-accent-never 
 .czm-style-tooltip-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
 .czm-style-tooltip-action { height: auto; padding: 1px 8px; border-radius: 10px; font-size: var(--font-ui-smaller); color: var(--text-muted); background: transparent; border: 1px solid var(--background-modifier-border); box-shadow: none; }
 .czm-style-tooltip-action:hover { color: var(--text-normal); background: var(--background-modifier-hover); }
+
+/* ---- Release note: the one-time modal after install and after a minor or major update ---- */
+.czm-rn-body { display: flex; flex-direction: column; gap: 10px; }
+.czm-rn-headline { font-weight: var(--font-medium); }
+.czm-rn-list { margin: 0; padding-left: 22px; }
+.czm-rn-list li { margin-bottom: 4px; }
+.czm-rn-ask { margin: 6px 0 0; color: var(--text-muted); }
+.czm-rn .modal-button-container { align-items: center; }
+.czm-rn .modal-button-container button { flex-shrink: 0; }
+/* The footer gives way first: it shrinks to an ellipsis so the three buttons never wrap onto a second line. */
+.czm-rn-foot { flex: 1 1 0; min-width: 0; margin-right: auto; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--font-ui-smaller); color: var(--text-faint); }

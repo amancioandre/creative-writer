@@ -97,6 +97,8 @@ Install [Harper](https://writewithharper.com) alongside — it is the intended c
 
 No network requests. The only exception is the optional model assistant, which talks to the Ollama address you configure (default `localhost`), or to Anthropic's API if you choose Claude and give it a key. Progress, story readings and the plot grid's readings are stored as plain Markdown notes in your vault.
 
+After you install the plugin, and once after each minor update, it shows a short note about what changed with a link to a feedback form hosted on [Tally](https://tally.so/r/obJ6AN). The note is built into the plugin: nothing is fetched, nothing is sent unless you open the link, and the link carries nothing about you or your vault. Turn it off under Settings → Where it runs → Release notes; *Show release note* in the command palette brings it back.
+
 ## FAQ
 
 **How is this different from Longform?** Longform organises scenes into a manuscript and compiles it to a file. Creative Writer works on the prose inside the scenes and on the story as a graph; its manuscript page is for reading the draft whole, and its export is one plain note, not a build pipeline. They coexist happily; Longform projects are read as ordinary folders.
@@ -111,7 +113,7 @@ Creative Writer is free and MIT-licensed, built in evenings around a day job. If
 
 [![GitHub Sponsors](https://img.shields.io/badge/GitHub%20Sponsors-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/amancioandre)
 
-Bug reports and ideas: [GitHub issues](https://github.com/amancioandre/creative-writer/issues). Full documentation: [amancioandre.github.io/creative-writer](https://amancioandre.github.io/creative-writer/).
+Bug reports and ideas: [GitHub issues](https://github.com/amancioandre/creative-writer/issues). Two minutes on how it is going for you: [the feedback form](https://tally.so/r/obJ6AN). News of the Creative Suite, roughly one letter per release: [the newsletter on Substack](https://andramnc.substack.com). Full documentation: [amancioandre.github.io/creative-writer](https://amancioandre.github.io/creative-writer/).
 
 ## Contributing
 

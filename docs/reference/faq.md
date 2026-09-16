@@ -2,6 +2,9 @@
 
 ## Editor
 
+**A window opened after the update.**
+That is the release note: once after install and once after each minor or major update, a few lines on what changed and a link to the feedback form. It never shows on a patch release, never on every launch, and every button dismisses it. Nothing is fetched to show it and nothing is sent unless you open the link. Turn it off under Settings → Where it runs → Release notes; *Show release note* in the command palette opens it any time.
+
 **Nothing is tinted or faded in my note.**
 Check *Enabled* in settings, the *Notes* mode ([Where it runs](/guide/where-it-runs)), and the note's own `creative-writer:` line. Reading view has no editor; switch to Live Preview or Source.
 

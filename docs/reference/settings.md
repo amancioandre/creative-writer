@@ -9,6 +9,7 @@ Settings → Community plugins → Creative Writer. Everything here is stored in
 | Enabled | on | Master switch for the editor features. The *Toggle everywhere* command flips it. |
 | Notes | Project folders and every other note | One rule for everything: the notes the editor tools run in are the notes the daily goal, the project totals, the story map and the threads count. A declared project (`writing-target` or `story: true` in a note's front matter) is always in; the mode decides what else is. Side material stays out with `creative-writer: false` in its front matter, wherever it lives; `creative-writer: true` lets a note in whatever the mode. The plugin's own notes (writing log, story map, threads) are never counted. See [Where it runs](/guide/where-it-runs). |
 | Folders | — | Shown with *Project folders and these folders*: one vault-relative folder per line. |
+| Release notes | on | Once after install and once after each minor or major update, a short note about what changed with a link to the feedback form. Built into the plugin; nothing is fetched or sent unless you open the link. Off does not clear the version already seen. *Show release note* in the palette opens it any time. |
 
 ## Writing
 

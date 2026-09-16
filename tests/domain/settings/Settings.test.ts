@@ -182,3 +182,11 @@ describe("dialogue settings", () => {
     expect(normalizeSettings({ dialogue: { marks: "guillemets", thoughts: "loud" } }).dialogue.thoughts).toBe("italic-paragraph");
   });
 });
+
+describe("release note settings", () => {
+  it("defaults to on with no seen version, and narrows persisted values", () => {
+    expect(normalizeSettings(undefined).releaseNote).toEqual({ enabled: true, seenVersion: "" });
+    expect(normalizeSettings({ releaseNote: { enabled: false, seenVersion: " 0.10.1 " } }).releaseNote).toEqual({ enabled: false, seenVersion: "0.10.1" });
+    expect(normalizeSettings({ releaseNote: { enabled: "no", seenVersion: 3 } }).releaseNote).toEqual({ enabled: true, seenVersion: "" });
+  });
+});

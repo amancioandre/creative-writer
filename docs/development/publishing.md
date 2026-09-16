@@ -31,6 +31,8 @@ git push --follow-tags
 ```
 CI lints, builds, attests and creates the release; the directory picks up the new version and re-runs its review. Users on the community list get the update automatically.
 
+**On a minor or major bump**, before `npm version`: rewrite `UPDATE` in `src/domain/release/notes.ts` (one headline, at most three bullets, the same story as the changelog entry, shorter). That is what the release note shows once after the update; a patch release leaves it alone and shows nothing.
+
 ## What the review has failed on, and the rule that now catches it
 
 The 0.8.0 review (2026-09-05) failed on `no-static-styles-assignment` and warned on `prefer-create-el`, a deprecated `caretRangeFromPoint`, a partially supported `text-decoration` and a duplicate `display`. Each is now a lint error:

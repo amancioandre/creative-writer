@@ -4,7 +4,7 @@ What the plugin writes, where, and what travels between your machines.
 
 | File | Where | Holds | Syncs with Obsidian Sync? |
 |---|---|---|---|
-| `data.json` | `.obsidian/plugins/creative-writer/` | Settings, including the lens that is on, the story map's filters, colours, display and forces, the threads' and the plot grid's layout; the Claude key and spend | Only if *Settings → Sync → Installed community plugins* is on. |
+| `data.json` | `.obsidian/plugins/creative-writer/` | Settings, including the lens that is on, the story map's filters, colours, display and forces, the threads' and the plot grid's layout; the Claude key and spend; the last version the release note was shown for | Only if *Settings → Sync → Installed community plugins* is on. |
 | `Creative Writer/Writing log.md` (path in Settings → Stories and goals) | Inside the vault | The writing log: per day, per file, words added and cut — the streaks and the heatmap | **Yes** — a Markdown note. |
 | `progress.json` | `.obsidian/plugins/creative-writer/` | The log's old home (before 0.4). Imported into the note once, then left untouched. | No — and no longer needed. |
 | `Story map.md` | Inside each project folder | Model readings per scene — relationships, references, events, and (separately, with their own hash) facts — the model's verdict on what each contradiction means, the sentence pairs the embedding model found alike (pairs only, never vectors), the [plot grid](/guide/plot-grid#reading-with-the-model)'s readings per cell with whether you dismissed them, plus the contradictions you dismissed in the threads view and where you pinned nodes by hand | **Yes** — it is a Markdown note, and every sync method carries Markdown. |

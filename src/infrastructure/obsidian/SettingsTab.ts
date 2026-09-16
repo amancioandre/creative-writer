@@ -104,6 +104,7 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
         { name: "Enabled", desc: "Master switch. The \"Toggle everywhere\" command flips it.", control: toggle("enabled") },
         { name: "Notes", desc: `Which notes the tools, the counts and the story map take in. ${this.scopeLine()}`, control: dropdown("scope.mode", SCOPE_OPTIONS) },
         { name: "Folders", desc: "One vault-relative folder per line, e.g. storytelling/novel.", control: textarea("scope.foldersText", "storytelling", 3), visible: () => s().scope.mode === "folders" },
+        { name: "Release notes", desc: "Show a short note once after an update, with a link to send feedback.", control: toggle("releaseNote.enabled") },
       ]),
       group("Writing", [
         { name: "Typewriter scrolling", desc: "Keep the line you are writing centred.", control: toggle("typewriterEnabled") },

@@ -18,6 +18,18 @@ export class Plugin {
   async loadData(): Promise<unknown> { return this.data; }
   async saveData(d: unknown): Promise<void> { this.data = d; }
 }
+export class Modal {
+  modalEl: HTMLElement = document.createElement("div");
+  titleEl: HTMLElement = document.createElement("div");
+  contentEl: HTMLElement = document.createElement("div");
+  opened = false;
+  constructor(public app: App) { this.modalEl.append(this.titleEl, this.contentEl); }
+  setTitle(t: string): this { this.titleEl.textContent = t; return this; }
+  open(): void { this.opened = true; this.onOpen(); }
+  close(): void { this.opened = false; this.onClose(); }
+  onOpen(): void {}
+  onClose(): void {}
+}
 export class PluginSettingTab {
   containerEl: HTMLElement = document.createElement("div");
   constructor(public app: App, public plugin: Plugin) {}
