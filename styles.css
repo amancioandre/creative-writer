@@ -286,10 +286,20 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-edge { stroke: var(--text-faint); stroke-linecap: round; opacity: var(--czm-edge-opacity, 0.55); cursor: pointer; }
 .czm-edge.czm-layer-internal { stroke: var(--interactive-accent); }
 .czm-edge.czm-layer-external { stroke: var(--text-muted); stroke-dasharray: 2 3; }
-.czm-edge-relationship { opacity: min(1, calc(var(--czm-edge-opacity, 0.55) + 0.35)); }
+/* The model's relationships: dotted, so a reading is never mistaken for a line you wrote. */
+.czm-edge-relationship { stroke-dasharray: 2 4; opacity: min(1, calc(var(--czm-edge-opacity, 0.55) + 0.35)); }
 .czm-edge.is-stale { stroke-dasharray: 4 3; opacity: 0.4; }
 /* Hand-drawn relationships: solid, warm, a touch heavier, always on top. */
 .czm-edge-authored { stroke: var(--text-accent); opacity: min(1, calc(var(--czm-edge-opacity, 0.55) + 0.4)); }
+/* The arrowhead at the end a relationship leads to: filled for yours, hollow for the model's. */
+.czm-edge-head { fill: var(--text-accent); stroke: none; pointer-events: none; opacity: min(1, calc(var(--czm-edge-opacity, 0.55) + 0.4)); }
+.czm-edge-head-relationship { fill: var(--background-primary); stroke: var(--interactive-accent); stroke-width: 1.2px; stroke-linejoin: round; }
+.czm-edge-head.is-stale { opacity: 0.4; }
+.czm-edge-head.is-conflict { fill: var(--color-red); }
+.czm-edge-head-relationship.is-conflict { fill: var(--background-primary); stroke: var(--color-red); }
+.czm-edge-head.is-selected { fill: var(--text-normal); opacity: 1; }
+.czm-edge-head-relationship.is-selected { fill: var(--background-primary); stroke: var(--text-normal); }
+.czm-edge-head.is-dim { opacity: 0.06; }
 /* A pair the writer and the model describe differently: the model's line dashed red underneath, the writer's on top, also red. */
 .czm-edge.is-conflict { stroke: var(--color-red); }
 .czm-edge-relationship.is-conflict { stroke-dasharray: 6 4; opacity: 0.9; }
@@ -299,6 +309,7 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 /* The relationship's word on the line itself, rotated along it, haloed so it reads over other edges. */
 .czm-edge-label { fill: var(--text-muted); font-size: calc(var(--czm-label-size, 11px) * 0.85); font-style: italic; cursor: pointer; user-select: none; dominant-baseline: middle; paint-order: stroke; stroke: var(--background-primary); stroke-width: 3px; stroke-linejoin: round; }
 .czm-edge-label-authored { fill: var(--text-accent); }
+.czm-edge-label-relationship { fill: var(--interactive-accent); }
 .czm-edge-label.is-selected { fill: var(--text-normal); font-weight: 600; }
 .czm-edge-label.is-dim { opacity: 0.06; }
 .czm-no-labels .czm-edge-label { display: none; }

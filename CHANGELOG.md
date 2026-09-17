@@ -2,6 +2,10 @@
 
 Release notes for every version are on the [releases page](https://github.com/amancioandre/creative-writer/releases). This file carries the same text for the versions since it was started.
 
+## 0.12.0 — Relationships read one way
+
+- **Relationships read one way.** A relationship on the story map is a sentence from the note holding the line to the note it links: *Alice → son → Kevin*. Every written or model-read relationship now carries an arrowhead at the end the sentence lands on, the two directions of one pair (Alice's *son*, Kevin's *mother*) are drawn as one line with a word at each end, and the node card says *→ son* or *← mother* so the side is never in doubt. The wikilink inside a relationship line no longer draws a second grey *linked* edge over it, and the model's relationships are dotted with a hollow head where yours are solid with a filled one, so the two are told apart at a glance.
+
 ## 0.11.0 — The release note
 
 - **The release note.** Once after install and once after a minor or major update, a modal with the version's headline, three bullets, and a link to the feedback form ([tally.so/r/obJ6AN](https://tally.so/r/obJ6AN)). It is built into the plugin: nothing is fetched, nothing is sent unless the link is opened, and the seen version is saved before the window opens so it can never recur. Never on a patch release, never while Zen Mode is on. A toggle under Settings → Where it runs, *Release notes*, turns it off; the *Show release note* command brings it back. The README's Privacy section discloses it, as the directory's policy on pop-ups asks.

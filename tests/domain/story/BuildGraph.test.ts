@@ -147,6 +147,30 @@ describe("buildStoryGraph", () => {
       expect(sister.conflict).toEqual([]);
     });
 
+    it("stands in for the wikilink it is made of: a pair with a written relationship gets no plain link edge", () => {
+      const g2 = buildStoryGraph("Novel", withRelations, EMPTY_STORY_MAP_FILE);
+      const between = (a: string, b: string) => g2.edges.filter((e) => (e.from === a && e.to === b) || (e.from === b && e.to === a));
+      const kinds = between("Novel/Characters/Marta Kovács.md", "Novel/Characters/Ilse.md").map((e) => e.kind);
+      expect(kinds).toContain("authored");
+      expect(kinds).not.toContain("link");
+      expect(g.edges.some((e) => e.kind === "link" && e.from === "Novel/Characters/Marta Kovács.md" && e.to === "Novel/Characters/Ilse.md")).toBe(true);
+      // A chapter's link to a character is still a link.
+      expect(between("Novel/Chapters/Two.md", "Novel/Characters/Marta Kovács.md").map((e) => e.kind)).toContain("link");
+    });
+
+    it("keeps a line in each note as its own directed edge, even with the same word both ways", () => {
+      const both = withRelations.map((n) => (n.path === "Novel/Characters/Ilse.md"
+        ? { ...n, relations: [{ target: "Marta Kovács", targetPath: "Novel/Characters/Marta Kovács.md", label: "sister", line: 2 }] }
+        : n));
+      const g2 = buildStoryGraph("Novel", both, EMPTY_STORY_MAP_FILE);
+      const sisters = g2.edges.filter((e) => e.kind === "authored" && e.label === "sister");
+      expect(sisters.map((e) => [e.from, e.to])).toEqual([
+        ["Novel/Characters/Ilse.md", "Novel/Characters/Marta Kovács.md"],
+        ["Novel/Characters/Marta Kovács.md", "Novel/Characters/Ilse.md"],
+      ]);
+      expect(sisters.map((e) => e.evidence[0]!.path)).toEqual(sisters.map((e) => e.from));
+    });
+
     it("flags a pair where the writer and the model disagree, on both edges, and not where they agree", () => {
       const camp = splitScenes(chapterOne)[0]!;
       const file = putReading(EMPTY_STORY_MAP_FILE, {

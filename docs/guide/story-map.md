@@ -33,8 +33,8 @@ Unknown names are collected too: a capital letter mid-sentence is the signal. Ca
 
 | Layer | Edges | Where they come from |
 |---|---|---|
-| **Links** (grey; **accent** for drawn) | *linked* — a wikilink one note makes to another; *appears* — an entity and the chapter it is mentioned in; *yours* — a relationship you drew on the map or wrote under `## Relationships` | `metadataCache`; the writer's own links and lines |
-| **Scenes** (accent colour) | *N scenes together* — two entities mentioned in the same scene, thicker with more shared scenes; *labelled relationships* ("sister", "owes money to") | offline extraction; the model reading |
+| **Links** (grey; **accent** for drawn) | *linked* — a wikilink one note makes to another; *appears* — an entity and the chapter it is mentioned in; *yours* — a relationship you drew on the map or wrote under `## Relationships`, solid with a filled arrowhead | `metadataCache`; the writer's own links and lines |
+| **Scenes** (accent colour) | *N scenes together* — two entities mentioned in the same scene, thicker with more shared scenes; *labelled relationships* the model read ("sister", "owes money to"), dotted with a hollow arrowhead | offline extraction; the model reading |
 | **References** (grey, dotted) | an entity → an outside reference, labelled with the model's note ("myth: descent with a rule not to look back") | the model reading |
 
 A **scene** is a heading and the prose under it. Every extracted edge carries the scenes that justify it; click the edge to see them and jump to any.
@@ -46,7 +46,7 @@ Edges from a model reading whose scene has changed since are drawn **dashed** (s
 - **Pan** by dragging the background or with the arrow keys; **zoom** with the wheel (around the cursor) or `+` and `-`; **Fit** in the head, or `f`, frames everything. **Connect…** works from the keyboard too: Tab to the other node and press Enter.
 - Nodes settle under a live force simulation and stop moving after a few seconds. **Drag** a node and its neighbours react; a dragged node stays **pinned** where you left it, and pinned positions are remembered in `Story map.md`, so the map opens the same way on the laptop. **Unpin** in the node's card lets it float again; **Shake** unpins everything and lets the layout settle, with an **Undo** in the status line that pins every hand-placed node back where it was.
 - Node radius scales with how often the entity is mentioned; edge thickness with how many scenes back it up.
-- A labelled edge — a relationship you drew, one the model read, or a reference — shows its word on the line itself, in small italics; click the word or the line for the card. When two nodes are joined more than once (*man owns horse*, *horse helps man*) the edges bend apart so each can be told from, and clicked, on its own. Label size 0 hides these too.
+- A labelled edge — a relationship you drew, one the model read, or a reference — shows its word on the line itself, in small italics; click the word or the line for the card. A relationship also has an arrowhead, and reads as a sentence in the arrow's direction: *Alice → son → Kevin* is Alice's son, Kevin. When each of two notes holds a line about the other, the map draws one line with an arrowhead and a word at each end, each word by the node it leads to; click near an end for that end's card. Lines of different origin between the same pair (*man owns horse*, the model's *horse helps man*) bend apart so each can be told from, and clicked, on its own. Label size 0 hides the words, not the arrowheads.
 - Bookmarked notes (Obsidian's Bookmarks core plugin) get a ★.
 - Click the background or press Esc to deselect. Double-click a node to open its note.
 
@@ -122,7 +122,9 @@ What gets written is a list line in the first node's note:
 
 Write those lines by hand if you prefer; the map reads them the same way. Wikilinks, markdown links and bare names all work, and so do `:` and `-` as separators. The section can be `## Relationships` or `## Relations`, at any heading level. Lines under other headings are ignored.
 
-Drawn relationships are in the **accent** colour and always painted on top. Their card says which note holds the line and jumps to it.
+**The label describes the linked note, as seen from the note holding the line.** Read a line as a sentence, this note → label → that note: in Alice's note `- [[Kevin]] — son` says *Alice → son → Kevin*, Kevin is her son; in Kevin's note `- [[Alice]] — mother` says his mother is Alice. On the map the arrowhead points at the note the sentence lands on, and the node card lists the line as *→ son* from Alice's side and *← son* from Kevin's. A line that reads the other way round (`- [[Kevin]] — wife` in Mary Ann's note, meaning she is his wife) shows up as an arrow pointing at the wrong person; write it from the end it describes instead: `- [[Mary Ann]] — wife` in Kevin's note.
+
+Drawn relationships are in the **accent** colour, solid, with a filled arrowhead, and always painted on top; the model's are dotted with a hollow arrowhead, so a reading is never mistaken for a line you wrote. The wikilink inside a relationship line *is* the relationship: a pair with a written line gets no second, grey *linked* edge for it. Their card says which note holds the line and jumps to it.
 
 ### When you and the model disagree
 

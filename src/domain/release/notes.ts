@@ -27,10 +27,10 @@ export const WELCOME: NoteCopy = {
 };
 
 export const UPDATE: NoteCopy = {
-  headline: "A note after updates, and a way to talk back",
+  headline: "Relationships on the story map read one way",
   bullets: [
-    "This note: once after install and once after a minor update, never on a patch",
-    "Tell me how it goes opens a two-minute form; nothing is sent otherwise",
-    "Turn it off under Settings → Where it runs → Release notes",
+    "A line under Relationships is a sentence: this note → label → that note, and the map draws the arrow",
+    "Two notes that name each other share one line, a word at each end; no grey link doubles it",
+    "The model's relationships are dotted with a hollow head, yours solid with a filled one",
   ],
 };

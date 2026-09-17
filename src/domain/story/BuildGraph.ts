@@ -149,7 +149,8 @@ export function buildStoryGraph(project: string, notes: readonly ProjectNote[], 
   const edges = new Map<string, Edge>();
   const add = (from: string, to: string, kind: EdgeKind, source: Edge["source"], label: string, evidence: SceneRef | null, stale = false) => {
     if (from === to) return;
-    const key = `${kind}|${label.toLowerCase()}|${pairKey(from, to)}`;
+    // A written relationship is directed (who holds the line matters); everything else merges A–B with B–A.
+    const key = `${kind}|${label.toLowerCase()}|${kind === "authored" ? `${from} ${to}` : pairKey(from, to)}`;
     const cur = edges.get(key);
     if (cur) {
       const ev = evidence && !cur.evidence.some((e) => sceneKey(e) === sceneKey(evidence)) ? [...cur.evidence, evidence] : cur.evidence;
@@ -157,10 +158,28 @@ export function buildStoryGraph(project: string, notes: readonly ProjectNote[], 
     } else edges.set(key, { from, to, kind, layer: layerOf(kind), source, weight: 1, label, evidence: evidence ? [evidence] : [], stale, conflict: [] });
   };
 
-  // Explicit layer: links the writer wrote, and which note an entity appears in.
   const nodeIds = new Set(entities.map((e) => e.id));
+  const names = new NameLookup<string>();
+  for (const e of entities) {
+    names.add(e.name, e.id);
+    for (const a of e.aliases) names.add(a, e.id);
+  }
+
+  // Relationships the writer drew by hand, written in the note they start from; resolved first because they stand in for the link they are made of.
+  const authored: { from: string; to: string; label: string; line: number }[] = [];
   for (const note of sorted) {
-    for (const target of new Set(note.links)) if (nodeIds.has(target) && nodeIds.has(note.path)) add(note.path, target, "link", "structure", "", null);
+    if (!nodeIds.has(note.path)) continue;
+    for (const rel of note.relations ?? []) {
+      const to = rel.targetPath && nodeIds.has(rel.targetPath) ? rel.targetPath : names.resolve(basenameOf(rel.target));
+      if (to) authored.push({ from: note.path, to, label: rel.label, line: rel.line });
+    }
+  }
+  const related = new Set(authored.map((r) => pairKey(r.from, r.to)));
+
+  // Explicit layer: links the writer wrote, and which note an entity appears in. The wikilink inside a
+  // relationship line is that relationship, not a second edge; a pair with a written relationship gets no plain link.
+  for (const note of sorted) {
+    for (const target of new Set(note.links)) if (nodeIds.has(target) && nodeIds.has(note.path) && !related.has(pairKey(note.path, target))) add(note.path, target, "link", "structure", "", null);
   }
   for (const s of sceneMentions) {
     for (const id of s.ids) if (isNode(id) && nodeIds.has(s.note.path)) add(id, s.note.path, "appearance", "extracted", "", s.ref);
@@ -172,21 +191,8 @@ export function buildStoryGraph(project: string, notes: readonly ProjectNote[], 
     for (let a = 0; a < ids.length; a++) for (let b = a + 1; b < ids.length; b++) add(ids[a]!, ids[b]!, "co-occurrence", "extracted", "", s.ref);
   }
 
-  const names = new NameLookup<string>();
-  for (const e of entities) {
-    names.add(e.name, e.id);
-    for (const a of e.aliases) names.add(a, e.id);
-  }
-
-  // Authored layer: relationships the writer drew by hand, written in the note they start from.
-  for (const note of sorted) {
-    if (!nodeIds.has(note.path)) continue;
-    for (const rel of note.relations ?? []) {
-      const to = rel.targetPath && nodeIds.has(rel.targetPath) ? rel.targetPath : names.resolve(basenameOf(rel.target));
-      if (!to) continue;
-      add(note.path, to, "authored", "writer", rel.label, { path: note.path, title: RELATIONS_TITLE, line: rel.line });
-    }
-  }
+  // Authored layer: the writer's own lines. Read each as a sentence, holder → label → target ("Alice → son → Kevin").
+  for (const r of authored) add(r.from, r.to, "authored", "writer", r.label, { path: r.from, title: RELATIONS_TITLE, line: r.line });
 
   // Model layers: relations (internal) and references (external), keyed back to entities by name.
   const hashes = new Map(sceneMentions.map((s) => [sceneKey(s.ref), textHash(s.scene.prose)]));

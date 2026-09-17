@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { WorkspaceLeaf, Setting } from "obsidian";
-import { STORY_MAP_VIEW_TYPE, StoryMapView, edgeGeometry, edgeLanes, edgeSummary, type StoryMapSource } from "../../../src/infrastructure/obsidian/views/StoryMapView";
+import { STORY_MAP_VIEW_TYPE, StoryMapView, arrowHead, edgeGeometry, edgeLanes, edgeStrands, edgeSummary, edgeSummaryFrom, type StoryMapSource } from "../../../src/infrastructure/obsidian/views/StoryMapView";
 import { buildStoryGraph, type ProjectNote, type ProjectRelation } from "../../../src/domain/story/BuildGraph";
 import { splitScenes } from "../../../src/domain/text/Scenes";
 import { EMPTY_STORY_MAP_FILE, putReading, type Layout } from "../../../src/domain/story/StoryMapFile";
@@ -319,12 +319,40 @@ describe("StoryMapView", () => {
   it("summarises edges", () => {
     const base = { from: "a", to: "b", layer: "internal" as const, source: "extracted" as const, weight: 2, label: "", evidence: [], stale: false, conflict: [] };
     expect(edgeSummary({ ...base, kind: "co-occurrence" })).toBe("2 scenes together");
-    expect(edgeSummary({ ...base, kind: "relationship", label: "rival" })).toBe("rival");
+    expect(edgeSummary({ ...base, kind: "relationship", label: "rival" })).toBe("rival · model");
     expect(edgeSummary({ ...base, kind: "link" })).toBe("linked");
     expect(edgeSummary({ ...base, kind: "reference" })).toBe("reference");
     expect(edgeSummary({ ...base, kind: "appearance" })).toBe("appears · 2");
     expect(edgeSummary({ ...base, kind: "authored", label: "sister" })).toBe("sister · yours");
     expect(edgeSummary({ ...base, kind: "authored" })).toBe("related · yours");
+    // From an end, a relationship says which way it reads: a → son → b is "→ son" from a and "← son" from b.
+    expect(edgeSummaryFrom({ ...base, kind: "authored", label: "son" }, "a")).toBe("→ son · yours");
+    expect(edgeSummaryFrom({ ...base, kind: "authored", label: "son" }, "b")).toBe("← son · yours");
+    expect(edgeSummaryFrom({ ...base, kind: "relationship", label: "rival" }, "b")).toBe("← rival · model");
+    expect(edgeSummaryFrom({ ...base, kind: "co-occurrence" }, "a")).toBe("2 scenes together");
+  });
+
+  it("draws the two directions of one written relationship as one line, a word and an arrowhead at each end", () => {
+    const base = { layer: "explicit" as const, source: "writer" as const, weight: 1, evidence: [], stale: false, conflict: [] };
+    const son = { ...base, kind: "authored" as const, from: "alice", to: "kevin", label: "son" };
+    const mother = { ...base, kind: "authored" as const, from: "kevin", to: "alice", label: "mother" };
+    const heir = { ...base, kind: "authored" as const, from: "alice", to: "kevin", label: "heir" };
+    const model = { ...base, kind: "relationship" as const, from: "kevin", to: "alice", label: "parent" };
+    const strands = edgeStrands([son, heir, mother, model]);
+    expect(strands.map((s) => s.edges.map((e) => e.label))).toEqual([["son", "mother"], ["heir"], ["parent"]]);
+    expect(strands[0]).toMatchObject({ a: "alice", b: "kevin" });
+    const lanes = edgeLanes([son, heir, mother, model]);
+    expect(lanes.get(son)).toBe(lanes.get(mother));
+    expect(new Set([lanes.get(son), lanes.get(heir), lanes.get(model)]).size).toBe(3);
+    // Along a straight line the curve is the chord; the head points at the node it leads to and stops at its circle.
+    const geo = edgeGeometry({ x: 0, y: 0 }, { x: 100, y: 0 }, 0, true);
+    expect(geo.at(0.7)).toEqual({ x: 70, y: 0 });
+    expect(geo.tangent(1)).toEqual({ x: 1, y: 0 });
+    expect(arrowHead(geo, true, 10, 1)).toBe("M89.0 0.0L81.0 3.6L81.0 -3.6Z");
+    expect(arrowHead(geo, false, 10, 1)).toBe("M11.0 0.0L19.0 -3.6L19.0 3.6Z");
+    const bent = edgeGeometry({ x: 0, y: 0 }, { x: 100, y: 0 }, 0.5, true);
+    expect(bent.at(0.5)).toEqual(bent.mid);
+    expect(bent.tangent(1).y).toBeLessThan(0);
   });
 
   describe("drawing by hand", () => {
