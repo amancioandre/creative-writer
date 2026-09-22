@@ -142,7 +142,8 @@ describe("writer settings", () => {
     const { normalizePlotGrid, DEFAULT_PLOT_GRID } = await import("../../../src/domain/settings/Settings");
     expect(normalizePlotGrid(undefined)).toEqual(DEFAULT_PLOT_GRID);
     expect(normalizePlotGrid({ panelOpen: false, castExpanded: true, folded: { arc: true, bogus: true }, hidden: { "Novel/": ["Time", 3, " "], "Other/": [] }, unmoved: false, sections: { "pg-cell": false, x: "no" } }))
-      .toEqual({ panelOpen: false, castExpanded: true, folded: { arc: true, theme: false, subplot: false, free: false }, hidden: { "Novel/": ["Time"] }, unmoved: false, sections: { "pg-cell": false } });
+      .toEqual({ panelOpen: false, castExpanded: true, folded: { arc: true, theme: false, subplot: false, free: false }, hidden: { "Novel/": ["Time"] }, unmoved: false, sections: { "pg-cell": false }, frozen: {}, templatesFolder: "Creative Writer/Templates" });
+    expect(normalizePlotGrid({ frozen: { "Novel/": " POV ", "Other/": 3 }, templatesFolder: "/My templates/" })).toMatchObject({ frozen: { "Novel/": "POV" }, templatesFolder: "My templates" });
   });
 });
 

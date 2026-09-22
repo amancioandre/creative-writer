@@ -150,6 +150,7 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
       ]),
       group("Stories and goals", [
         { name: "Stories folder", desc: "Where the writer board keeps its stories. Empty = the vault root.", control: text("writer.storiesFolder", "storytelling") },
+        { name: "Grid templates folder", desc: "Where Save as template writes, and where Start from a template looks for your own notes carrying creative-writer-template.", control: text("plotGrid.templatesFolder", "Creative Writer/Templates") },
         { name: "Daily word goal", desc: "Words added per day for the streak. 0 = any day you write counts.", control: slider("goals.dailyWords", 0, 5000, 50) },
         { name: "Writing log note", desc: "Daily counts, kept in the vault so they sync.", control: text("goals.logNote", DEFAULT_GOALS.logNote) },
       ]),

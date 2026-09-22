@@ -80,6 +80,7 @@ Three groups for the [manuscript](/guide/manuscript) page. *Prose only* and the 
 
 | Setting | Default | What |
 |---|---|---|
+| Grid templates folder | `Creative Writer/Templates` | Where the plot grid's **Save as template…** writes, and where **Start from a template…** looks for your own notes carrying `creative-writer-template`. See [templates](/guide/plot-grid#templates-a-starting-shape). |
 | Stories folder | none | Vault-relative folder where your stories live. A promoted idea is scaffolded there, a new writer card goes there, the writer file is created there, and folders under it with prose but no project declaration are listed as unfiled on the writer board. Empty = the vault root, and no unfiled row. See the [writer protocol](/reference/writer-file). |
 | Daily word goal | 500 | Words added per day, in the notes the scope takes in, for the streak and the desk's bar. 0 = any day you write counts. |
 | Writing log note | `Creative Writer/Writing log.md` | Vault-relative path of the note that keeps the log (words added and cut per day), so streaks sync with the vault. Takes effect at the next save; reload to read from a new path. |

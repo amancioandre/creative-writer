@@ -1,7 +1,7 @@
 import { ItemView, setIcon, type WorkspaceLeaf } from "obsidian";
 import type { ProjectSpec } from "../../../domain/progress/Project";
 import type { PlotGridSettings, StoryMapSettings } from "../../../domain/settings/Settings";
-import { EMPTY_PLOT_GRID, type ColumnKind, type GridCell, type GridColumn, type GridRow, type PlotGrid, type SpecialColumn } from "../../../domain/plot/PlotGrid";
+import { EMPTY_PLOT_GRID, GROUP_TOKEN, blockOf, blockOrder, type ColumnKind, type GridCell, type GridColumn, type GridRow, type PlotGrid, type SpecialColumn } from "../../../domain/plot/PlotGrid";
 import type { Entity, SceneRef } from "../../../domain/story/StoryGraph";
 import { basenameOf } from "../../../domain/story/EntityIndex";
 import { ARC_ROLES, THREAD_ROLES, type StopRole, type ThreadRef } from "../../../domain/threads/Thread";
@@ -9,12 +9,18 @@ import type { StopToAdd } from "../../../application/use-cases/EditStoryThread";
 import { KIND_LABEL } from "./StoryMapView";
 import { PanelShell, showOverflow, type MenuEntry, type PanelId } from "./PanelShell";
 import { COLUMN_KINDS } from "../../../domain/threads/StoryThreadsNote";
-import { rankSentences } from "../../../domain/plot/Snapshot";
+import { rankSentences, type SnapshotTable } from "../../../domain/plot/Snapshot";
 import type { AnalyzeProgress } from "../../../application/use-cases/AnalyzeSceneRelations";
 import type { ProposalsResult } from "../../../application/use-cases/ProposeColumns";
 import type { ColumnProposal } from "../../../domain/plot/Proposals";
 import { StatusLine, couldNot } from "./StatusLine";
 import { inField, onActivate } from "./keys";
+import { insertAct, insertChapter, insertScene, moveHeading, removeHeading, renameHeading, setLogline } from "../../../domain/plot/Outline";
+import { describeScaffold, type ScaffoldPlan, type ScaffoldShape } from "../../../domain/plot/Scaffold";
+import type { ScaffoldResult } from "../../../application/use-cases/ScaffoldManuscript";
+import type { ApplyResult } from "../../../application/use-cases/ApplyTemplate";
+import type { ApplyChoices, ApplyPlan, StoryTemplate } from "../../../domain/plot/Templates";
+import { findGaps, type Gap } from "../../../domain/plot/Gaps";
 
 /** The timeline's type string, kept so leaves open across the update come back as the grid. */
 export const PLOT_GRID_VIEW_TYPE = "creative-writer-story-timeline";
@@ -40,7 +46,7 @@ export interface PlotGridSource {
   /** The heading rewritten: a rename, or a kind set by its prefix. */
   renameThread(project: ProjectSpec, from: string, to: string): Promise<void>;
   /** Writes or clears a text key in the project note's front matter: `plot-pov`, `plot-time`, `plot-theme`. */
-  setProjectKey(project: ProjectSpec, key: "plot-pov" | "plot-time" | "plot-theme", value: string | null): Promise<void>;
+  setProjectKey(project: ProjectSpec, key: "plot-pov" | "plot-time" | "plot-theme" | "plot-beats" | "plot-order", value: string | null): Promise<void>;
   /** The grid's layout as the writer last left it, and where it is kept. */
   gridSettings(): PlotGridSettings;
   updateGridSettings(next: PlotGridSettings): void;
@@ -65,6 +71,29 @@ export interface PlotGridSource {
   readProject(project: ProjectSpec, signal: AbortSignal, onProgress: (p: AnalyzeProgress) => void): Promise<number>;
   /** Opens a sibling panel, for the same project where the panel takes one. */
   jumpTo(to: PanelId, project: ProjectSpec | null): void;
+  /** Where the project's outline note is, or would be. */
+  outlinePath(project: ProjectSpec): string;
+  /** Read, change, write the outline note, creating it the first time; both texts come back so a row action can be undone exactly. */
+  updateOutline(project: ProjectSpec, change: (markdown: string) => string): Promise<{ before: string; after: string }>;
+  /** Points every stop at one scene link to another, after a planned scene is renamed. Resolves to how many lines changed. */
+  relinkStops(project: ProjectSpec, from: string, to: string): Promise<number>;
+  /** What Build the manuscript would write, for the sheet: nothing is touched. Null without an outline. */
+  scaffoldPreview(project: ProjectSpec, shape: ScaffoldShape): Promise<ScaffoldPlan | null>;
+  /** The build: notes written, stops relinked, the outline marked built. The result carries its undo. */
+  scaffold(project: ProjectSpec, shape: ScaffoldShape): Promise<ScaffoldResult>;
+  /** The templates on offer: the built-ins, then the writer's own from the templates folder. */
+  templates(): Promise<readonly StoryTemplate[]>;
+  /** What applying a template with these choices would write; nothing is touched. */
+  planTemplate(project: ProjectSpec, template: StoryTemplate, choices: ApplyChoices, cast: readonly { name: string; kind: string; path: string | null }[]): Promise<ApplyPlan>;
+  /** Writes the plan: headings to the threads note, structure to the outline, jobs to the project note. The result carries its undo. */
+  applyTemplate(project: ProjectSpec, plan: ApplyPlan): Promise<ApplyResult>;
+  /** The grid as it stands saved as a template note; resolves to the path written. */
+  saveTemplate(project: ProjectSpec, name: string, parts: { columns: boolean; rows: boolean }): Promise<string>;
+  templatesFolder(): string;
+  /** The project's dated snapshots, newest first, as the tabs list them. */
+  snapshots(project: ProjectSpec): Promise<readonly { path: string; day: string; label: string }[]>;
+  /** A snapshot note read back as its table. */
+  readSnapshot(path: string): Promise<SnapshotTable>;
 }
 
 export const KIND_GROUP: Record<ColumnKind, string> = { arc: "Arcs", theme: "Themes", subplot: "Subplots", free: "Threads" };
@@ -80,7 +109,10 @@ export function sceneLink(ref: SceneRef): string {
 
 interface Selection { readonly col: number; readonly row: number }
 
-export type PlotGridAction = "clear-search" | "toggle-cast" | "open-note" | "toggle-panel" | "new-column" | "fold-arcs" | "fold-themes" | "fold-subplots" | "fold-threads" | "hide-column" | "show-hidden" | "focus-search" | "help" | "toggle-unmoved" | "audit" | "snapshot" | "next-issue" | "previous-issue" | "anchor" | "read-column" | "check-column" | "read-all" | "dismiss-reading" | "stop-reading" | "propose-columns" | "export";
+/** One stretch of the header: a single column with a job, an open group of columns, or a folded group drawn as one narrow cell. */
+interface Segment { readonly kind: ColumnKind; readonly block: string; readonly single: GridColumn | null; readonly columns: GridColumn[]; readonly folded: boolean }
+
+export type PlotGridAction = "clear-search" | "toggle-cast" | "open-note" | "toggle-panel" | "new-column" | "new-scene" | "new-chapter" | "new-act" | "open-outline" | "build-manuscript" | "start-template" | "save-template" | "fold-arcs" | "fold-themes" | "fold-subplots" | "fold-threads" | "hide-column" | "show-hidden" | "focus-search" | "help" | "toggle-unmoved" | "audit" | "snapshot" | "next-issue" | "previous-issue" | "anchor" | "read-column" | "check-column" | "read-all" | "dismiss-reading" | "stop-reading" | "propose-columns" | "export";
 
 /** Rows are drawn this many at a time; past the first chunk, the next is drawn as the last row comes into view. */
 export const ROW_CHUNK = 60;
@@ -104,8 +136,10 @@ export const KEY_HELP: readonly (readonly [string, string])[] = [
 /** What a cell's state looks like in audit view: one shape, filled as certainty increases. */
 export const STATE_GLYPH: Record<"plan" | "verified" | "broken", string> = { plan: "◇", verified: "◆", broken: "◈" };
 
-const SPECIAL_LABEL: Record<SpecialColumn, string> = { pov: "POV", time: "Time", "main-theme": "Main theme" };
-const SPECIAL_KEY: Record<SpecialColumn, "plot-pov" | "plot-time" | "plot-theme"> = { pov: "plot-pov", time: "plot-time", "main-theme": "plot-theme" };
+const SPECIAL_LABEL: Record<SpecialColumn, string> = { pov: "POV", time: "Time", "main-theme": "Main theme", beats: "Plot point" };
+const SPECIAL_KEY: Record<SpecialColumn, "plot-pov" | "plot-time" | "plot-theme" | "plot-beats"> = { pov: "plot-pov", time: "plot-time", "main-theme": "plot-theme", beats: "plot-beats" };
+/** The jobs drawn in the derived block after Plot, rather than among the kinds. */
+const DERIVED: readonly (SpecialColumn | null)[] = ["time", "pov", "beats"];
 
 /**
  * The plot grid: every scene of the project in reading order down the
@@ -131,6 +165,22 @@ export class PlotGridView extends ItemView {
   private running: { controller: AbortController; column: GridColumn | null; what: string } | null = null;
   /** The model's proposals, with the writer's ticks, until they are added or put away. */
   private proposals: { list: ColumnProposal[]; picked: Set<string> } | null = null;
+  /** The build sheet: the shape chosen and what that shape would write, until it is built or put away. */
+  private sheet: { shape: ScaffoldShape; plan: ScaffoldPlan | null; loading: boolean } | null = null;
+  /** The template sheet: the templates on offer, the one chosen, the writer's choices about it, and what they would write. */
+  private templateSheet: { list: readonly StoryTemplate[]; chosen: number; choices: { rows: boolean; columns: boolean; ticked: Set<string>; names: Record<string, string>; bindings: Record<string, string> }; plan: ApplyPlan | null; loading: boolean } | null = null;
+  /** The save sheet: a name for the template and which parts of the grid go into it. */
+  private saveSheet: { name: string; columns: boolean; rows: boolean } | null = null;
+  /** What the grid can count for itself: thin columns and unmoved stretches, over the written scenes. */
+  private gaps: readonly Gap[] = [];
+  /** The templates, fetched once for the column picker; null until asked for. */
+  private templateList: readonly StoryTemplate[] | null = null;
+  /** The block being dragged by its header: a single column with a job, or a whole kind group. */
+  private dragging: string | null = null;
+  /** The snapshots the tabs offer, and which one is open: null is the grid itself. */
+  private snapshots: readonly { path: string; day: string; label: string }[] = [];
+  private tab: string | null = null;
+  private snapshotTable: SnapshotTable | null = null;
   /** How many rows are in the table so far, and what draws the next chunk. */
   private drawn = 0;
   private drawMore: ((upTo?: number) => void) | null = null;
@@ -157,6 +207,14 @@ export class PlotGridView extends ItemView {
   /** The headings hidden in this project. */
   private get hidden(): readonly string[] { return this.project ? this.settings.hidden[this.project.scope] ?? [] : []; }
   private setHidden(names: readonly string[]): void { if (this.project) this.save({ hidden: { ...this.settings.hidden, [this.project.scope]: names } }); }
+  /** The heading of the last column frozen beside Scene and Plot in this project, or null for the two alone. */
+  private get frozenHeading(): string | null { return this.project ? this.settings.frozen[this.project.scope] ?? null : null; }
+  private setFrozen(heading: string | null): void {
+    if (!this.project) return;
+    const frozen = { ...this.settings.frozen };
+    if (heading) frozen[this.project.scope] = heading; else delete frozen[this.project.scope];
+    this.save({ frozen });
+  }
 
   getViewType(): string { return PLOT_GRID_VIEW_TYPE; }
   getDisplayText(): string { return "Plot grid"; }
@@ -168,11 +226,15 @@ export class PlotGridView extends ItemView {
 
   async show(project: ProjectSpec | null, keepStatus = false): Promise<void> {
     const generation = ++this.generation;
-    this.project = project;
-    if (!project) { this.grid = EMPTY_PLOT_GRID; this.render(); return; }
-    const grid = await this.source.build(project);
+    // The spec is read again by scope, so a key just written to the project note (a job given to a column) is seen on the next draw.
+    const fresh = project ? this.source.projects().find((p) => p.scope === project.scope) ?? project : null;
+    this.project = fresh;
+    if (!fresh) { this.grid = EMPTY_PLOT_GRID; this.render(); return; }
+    const [grid, snapshots] = await Promise.all([this.source.build(fresh), this.source.snapshots(fresh).catch(() => [])]);
     if (generation !== this.generation) return;
     this.grid = grid;
+    this.snapshots = snapshots;
+    if (this.tab && !snapshots.some((s) => s.path === this.tab)) { this.tab = null; this.snapshotTable = null; }
     this.render(keepStatus);
   }
 
@@ -238,6 +300,9 @@ export class PlotGridView extends ItemView {
     const f = this.settings.folded;
     return [
       { label: "New column…", icon: "plus", command: "plot-grid-new-column", disabled: !this.project, onClick: () => this.run("new-column") },
+      { label: "New scene", icon: "file-plus", command: "plot-grid-new-scene", disabled: !this.project || !!this.grid.plan?.outline.built, onClick: () => this.run("new-scene") },
+      { label: "New chapter", command: "plot-grid-new-chapter", disabled: !this.project || !!this.grid.plan?.outline.built, onClick: () => this.run("new-chapter") },
+      { label: "New act", command: "plot-grid-new-act", disabled: !this.project || !!this.grid.plan?.outline.built, onClick: () => this.run("new-act") },
       { label: this.castExpanded ? "Fold the cast" : "Expand the cast", icon: "users", command: "plot-grid-toggle-cast", checked: this.castExpanded, onClick: () => this.run("toggle-cast") },
       { label: "Fold the arcs", command: "plot-grid-fold-arcs", checked: f.arc, onClick: () => this.run("fold-arcs") },
       { label: "Fold the themes", command: "plot-grid-fold-themes", checked: f.theme, onClick: () => this.run("fold-themes") },
@@ -249,6 +314,9 @@ export class PlotGridView extends ItemView {
       { label: "Present, unmoved", command: "plot-grid-toggle-unmoved", checked: this.settings.unmoved, onClick: () => this.run("toggle-unmoved") },
       { label: "Audit view", icon: "scan-search", command: "plot-grid-audit", checked: this.audit, onClick: () => this.run("audit") },
       { label: "Next broken anchor", command: "plot-grid-next-issue", disabled: this.grid.broken === 0, onClick: () => this.run("next-issue") },
+      { label: "Start from a template…", icon: "layout-template", command: "plot-grid-start-template", disabled: !this.project, onClick: () => this.run("start-template") },
+      { label: "Save as template…", command: "plot-grid-save-template", disabled: !this.project || (this.grid.columns.length === 0 && !this.grid.plan), onClick: () => this.run("save-template") },
+      { label: "Build the manuscript…", icon: "folder-plus", command: "plot-grid-build-manuscript", disabled: !this.grid.plan, onClick: () => this.run("build-manuscript") },
       { label: "Snapshot the grid", icon: "camera", command: "plot-grid-snapshot", disabled: !this.project, onClick: () => this.run("snapshot") },
       { label: "Export the grid to a note", icon: "file-output", command: "plot-grid-export", disabled: !this.project, onClick: () => this.run("export") },
       "-",
@@ -262,9 +330,19 @@ export class PlotGridView extends ItemView {
       { label: "Find a column", icon: "search", command: "plot-grid-focus-search", onClick: () => this.run("focus-search") },
       { label: "Keyboard shortcuts", icon: "keyboard", command: "plot-grid-help", onClick: () => this.run("help") },
       { label: "Open Story threads.md", icon: "file-text", command: "plot-grid-open-note", disabled: !this.project, onClick: () => this.run("open-note") },
+      { label: "Open Outline.md", command: "plot-grid-open-outline", disabled: !this.grid.plan, onClick: () => this.run("open-outline") },
       "-",
       { label: "Clear the search", icon: "x", command: "story-timeline-clear-search", disabled: !this.query.trim(), onClick: () => this.run("clear-search") },
     ];
+  }
+
+  /** Opens the side column and the section an action is about to use, and puts the focus where it asks. */
+  private openSide(section: string, focus?: string): void {
+    this.save({ panelOpen: true });
+    this.shell?.setSideOpen(true);
+    this.renderSide();
+    this.shell?.reveal(section);
+    if (focus) this.shell?.side.querySelector<HTMLElement>(focus)?.focus();
   }
 
   /** The head's actions, as the commands and the ⋯ menu reach them. */
@@ -274,8 +352,15 @@ export class PlotGridView extends ItemView {
       case "clear-search": this.clearSearch(); break;
       case "toggle-cast": this.save({ castExpanded: !this.castExpanded }); this.renderTable(); break;
       case "open-note": if (this.project) this.source.openNote(this.source.threadsNotePath(this.project)); break;
+      case "open-outline": if (this.project && this.grid.plan) this.source.openNote(this.grid.plan.path); break;
+      case "new-scene": void this.newScene(null); break;
+      case "new-chapter": void this.newChapter(null); break;
+      case "new-act": void this.newAct(); break;
+      case "build-manuscript": void this.openBuildSheet(); break;
+      case "start-template": void this.openTemplateSheet(); break;
+      case "save-template": this.saveSheet = { name: this.project?.name ?? "", columns: this.grid.columns.length > 0, rows: !!this.grid.plan && !this.grid.plan.outline.built }; this.openSide("pg-save-template", ".czm-pg-save-name"); break;
       case "toggle-panel": this.save({ panelOpen: !this.panelOpen }); this.shell?.setSideOpen(this.panelOpen); break;
-      case "new-column": this.save({ panelOpen: true }); this.shell?.setSideOpen(true); this.renderSide(); (this.shell?.side.querySelector(".czm-pg-new-name") as HTMLInputElement | null)?.focus(); break;
+      case "new-column": this.openSide("pg-columns", ".czm-pg-new-name"); break;
       case "fold-arcs": fold("arc"); break;
       case "fold-themes": fold("theme"); break;
       case "fold-subplots": fold("subplot"); break;
@@ -293,7 +378,7 @@ export class PlotGridView extends ItemView {
       case "anchor": void this.openPicker(); break;
       case "read-column": { const c = this.current(); if (c) void this.readColumns([c], "reading"); break; }
       case "check-column": { const c = this.current(); if (c) void this.readColumns([c], "checking"); break; }
-      case "read-all": void this.readColumns(this.grid.columns.filter((c) => c.special !== "pov" && c.special !== "time"), "reading"); break;
+      case "read-all": void this.readColumns(this.grid.columns.filter((c) => !DERIVED.includes(c.special)), "reading"); break;
       case "dismiss-reading": void this.dismissReading(); break;
       case "stop-reading": this.running?.controller.abort(); break;
       case "propose-columns": void this.proposeColumns(); break;
@@ -315,12 +400,12 @@ export class PlotGridView extends ItemView {
     this.running = null;
     this.renderTools();
     if ("needsReading" in result) {
-      this.status?.action("Nothing to propose from yet: no scene has been read for its events.", "Read the project", () => void this.readProject());
+      if (result.canRead) this.status?.action("Nothing to propose from yet: no scene has been read for its events.", "Read the project", () => void this.readProject());
+      else this.status?.fail("Nothing to propose from yet: no scene has prose to read, and no planned scene has a logline. Write a line in the Plot column of a few rows, then ask again.");
       return;
     }
     this.proposals = { list: [...result.proposals], picked: new Set(result.proposals.filter((p) => !p.existing).map((p) => p.heading)) };
-    this.save({ panelOpen: true }); this.shell?.setSideOpen(true);
-    this.renderSide();
+    this.openSide("pg-proposals");
     this.status?.say(result.proposals.length ? `${plural(result.proposals.length, "column")} proposed from ${plural(result.scenesRead, "scene")} read. Tick the ones to add.` : `The model proposed nothing from ${plural(result.scenesRead, "scene")} read.`);
     this.shell?.side.querySelector<HTMLElement>(".czm-pg-proposal input")?.focus();
   }
@@ -420,8 +505,7 @@ export class PlotGridView extends ItemView {
       try { sentences = await this.source.sentences(project, sel.row.scene); } catch (e) { this.status?.fail(couldNot("read the scene", e)); return; }
       this.picker = { key, sentences };
     }
-    this.save({ panelOpen: true }); this.shell?.setSideOpen(true);
-    this.renderSide();
+    this.openSide("pg-cell");
     const list = this.shell?.side.querySelector<HTMLElement>(".czm-pg-picker");
     list?.querySelector<HTMLElement>(".czm-pg-picker-row")?.focus();
     if (!this.picker.sentences.length) this.status?.say(sel.row.outline ? "No prose under this heading yet." : "No sentences found in the scene.");
@@ -454,6 +538,8 @@ export class PlotGridView extends ItemView {
     shell.main.querySelector(".czm-shell-empty")?.remove();
     if (!this.project) { shell.setState("No project"); shell.empty("No project yet — put story: true (or writing-target: 50000) in a note's front matter and its folder becomes one."); this.renderSide(); return; }
     const grid = this.grid;
+    this.renderTabs(root);
+    if (this.tab) { this.renderSnapshot(root); return; }
     // The project note is the container, not a scene of the story.
     const notePath = this.project.notePath;
     const rows = grid.rows.filter((r) => r.scene.path !== notePath);
@@ -462,11 +548,20 @@ export class PlotGridView extends ItemView {
     const settings = this.source.settings();
     const hidden = new Set(this.hidden.map((h) => h.toLowerCase()));
     const folded = this.settings.folded;
-    const columns = grid.columns
+    const visible = grid.columns
       .filter((c) => !hidden.has(c.heading.heading.toLowerCase()))
-      .filter((c) => c.special === "pov" || c.special === "time" || !folded[c.heading.kind])
       .filter((c) => !q || c.heading.name.toLowerCase().includes(q) || c.heading.heading.toLowerCase().includes(q));
+    const columns = visible.filter((c) => DERIVED.includes(c.special) || !folded[c.heading.kind]);
     this.shown = columns;
+    // The header walks blocks: a single column with a job, an open group spanning its columns, or a folded group as one narrow cell.
+    const segments: Segment[] = [];
+    for (const c of visible) {
+      const block = blockOf(c);
+      const last = segments.at(-1);
+      if (DERIVED.includes(c.special)) { segments.push({ kind: c.heading.kind, block, single: c, columns: [c], folded: false }); continue; }
+      if (last && last.block === block && !last.single) { last.columns.push(c); continue; }
+      segments.push({ kind: c.heading.kind, block, single: null, columns: [c], folded: folded[c.heading.kind] });
+    }
     if (this.selection && (this.selection.col >= columns.length || this.selection.row >= rows.length)) this.selection = null;
     if (this.column !== null && this.column >= columns.length) this.column = null;
     const cast = grid.cast
@@ -475,11 +570,23 @@ export class PlotGridView extends ItemView {
     const unknown = grid.unknownPrefixes.length ? ` · ${grid.unknownPrefixes.length} heading${grid.unknownPrefixes.length === 1 ? "" : "s"} not read as a kind (${grid.unknownPrefixes.map((p) => `${p}:`).join(", ")})` : "";
     const hid = this.hidden.length ? ` · ${this.hidden.length} hidden` : "";
     const awaiting = grid.readings ? ` · ${plural(grid.readings, "reading")} awaiting you` : "";
+    this.gaps = findGaps(grid);
+    const gapsLine = this.gaps.length ? ` · ${plural(this.gaps.length, "gap")}` : "";
     root.classList.toggle("is-audit", this.audit);
-    const auditLine = this.audit ? `${plural(grid.cells, "cell")} · ${grid.filled} filled · ${grid.verified} verified · ${grid.broken} broken` : `${rows.length} scene${rows.length === 1 ? "" : "s"} · ${plural(columns.length, "column")} · ${cast.length} in the cast`;
-    shell.setState(`${auditLine}${awaiting}${hid}${q ? ` · “${this.query.trim()}”` : ""}${unknown}`, q ? { label: "Clear", cls: "czm-pg-clear", onClick: () => { this.clearSearch(); } } : this.hidden.length ? { label: "Show hidden", cls: "czm-pg-show-hidden", onClick: () => this.run("show-hidden") } : null);
+    const foldedGroups = segments.filter((sg) => sg.folded);
+    const foldedLine = foldedGroups.length ? ` · ${foldedGroups.reduce((n, sg) => n + sg.columns.length, 0)} in ${plural(foldedGroups.length, "folded group")}` : "";
+    const auditLine = this.audit ? `${plural(grid.cells, "cell")} · ${grid.filled} filled · ${grid.verified} verified · ${grid.broken} broken` : `${rows.length} scene${rows.length === 1 ? "" : "s"} · ${plural(columns.length, "column")}${foldedLine} · ${cast.length} in the cast`;
+    shell.setState(`${auditLine}${awaiting}${gapsLine}${hid}${q ? ` · “${this.query.trim()}”` : ""}${unknown}`, q ? { label: "Clear", cls: "czm-pg-clear", onClick: () => { this.clearSearch(); } } : this.hidden.length ? { label: "Show hidden", cls: "czm-pg-show-hidden", onClick: () => this.run("show-hidden") } : null);
     this.renderSide();
-    if (rows.length === 0) { shell.empty("No scenes yet — headings become scenes, with prose under them or not."); return; }
+    if (rows.length === 0) {
+      const plan = grid.plan;
+      shell.empty(plan?.outline.built ? `The outline was built on ${plan.outline.built}, and no chapter note has a heading yet — write one, or start a new outline.` : "No scenes yet — a row is a scene. Start the outline here, and the grid writes it to Outline.md until you build the chapters; start from a shape someone has already worked out; or write headings in a chapter note.", [
+        { label: "New scene", cls: "czm-pg-fix-scene", onClick: () => this.run("new-scene") },
+        { label: "Start from a template…", cls: "czm-pg-fix-template", onClick: () => this.run("start-template") },
+        ...(plan ? [{ label: "Open Outline.md", cls: "czm-pg-fix-outline", onClick: () => this.run("open-outline") }] : []),
+      ]);
+      return;
+    }
     this.renderKey(cast);
     if (columns.length === 0 && grid.columns.length === 0) {
       shell.empty("No columns yet. Name one — Arc: [[Anna]], Theme: what we owe the dead, Subplot: the letter — or let the model propose some from the events it has read.", [{ label: "New column", cls: "czm-pg-fix-new", onClick: () => this.run("new-column") }, { label: "Propose columns…", cls: "czm-pg-fix-propose", onClick: () => this.run("propose-columns") }, { label: "Open Story threads.md", cls: "czm-pg-fix-note", onClick: () => this.run("open-note") }]);
@@ -489,19 +596,70 @@ export class PlotGridView extends ItemView {
     this.renderEyebrow(root, grid, cast.length);
     const wrap = root.createDiv({ cls: "czm-pg-wrap" });
     const table = wrap.createEl("table", { cls: "czm-pg-table", attr: { "aria-label": "Plot grid" } });
-    const thead = table.createEl("thead").createEl("tr");
-    thead.createEl("th", { text: "Scene", cls: "czm-pg-corner", attr: { scope: "col" } });
-    thead.createEl("th", { text: "Words", cls: "czm-pg-col czm-pg-col-words", attr: { scope: "col" } });
-    thead.createEl("th", { text: "Plot", cls: "czm-pg-col czm-pg-col-plot", attr: { scope: "col", title: "The model's events for the scene, from Story map.md" } });
+    const theadEl = table.createEl("thead");
+    const thead = theadEl.createEl("tr");
+    // Scene and Plot stay put while the threads scroll; the writer can freeze further, up to a column of their choosing.
+    const frozenUpTo = this.frozenHeading ? columns.findIndex((c) => c.heading.heading === this.frozenHeading) : -1;
+    const frozenCount = 2 + frozenUpTo + 1;
+    // Over the columns: one cell per block, with the group's name, its count and a caret; a folded group is one narrow cell with the name written down it.
+    const groups = theadEl.createEl("tr", { cls: "czm-pg-groups" });
+    theadEl.prepend(groups);
+    groups.createEl("th", { cls: "czm-pg-corner czm-pg-group-corner is-frozen", attr: { colspan: "2", "data-fcol": "0" } });
+    for (const seg of segments) {
+      const th = groups.createEl("th", { cls: `czm-pg-group czm-pg-group-${seg.single ? "single" : seg.kind}${seg.folded ? " is-folded" : ""}`, attr: { colspan: String(seg.folded ? 1 : seg.columns.length), scope: "colgroup" } });
+      if (seg.single) { th.createSpan({ text: SPECIAL_LABEL[seg.single.special!], cls: "czm-pg-group-title" }); continue; }
+      const btn = th.createEl("button", { cls: "czm-pg-group-toggle", attr: { "aria-expanded": String(!seg.folded), "aria-label": `${KIND_GROUP[seg.kind]}: ${seg.columns.length}, ${seg.folded ? "folded, click to show" : "shown, click to fold"}`, title: seg.folded ? `${KIND_GROUP[seg.kind]}: ${seg.columns.map((c) => c.heading.name).join(", ")}` : `Fold the ${KIND_GROUP[seg.kind].toLowerCase()}` } });
+      const caret = btn.createSpan({ cls: "czm-pg-group-caret" });
+      setIcon(caret, seg.folded ? "chevron-right" : "chevron-down");
+      // Folded, the cell is as narrow as the column under it: the caret alone, the name written down the column header below.
+      if (!seg.folded) {
+        btn.createSpan({ text: KIND_GROUP[seg.kind], cls: "czm-pg-group-title" });
+        btn.createSpan({ text: String(seg.columns.length), cls: "czm-pg-group-count" });
+      }
+      btn.addEventListener("click", () => this.run(seg.kind === "arc" ? "fold-arcs" : seg.kind === "theme" ? "fold-themes" : seg.kind === "subplot" ? "fold-subplots" : "fold-threads"));
+    }
+    const castGroup = groups.createEl("th", { cls: `czm-pg-group czm-pg-group-cast${this.castExpanded ? "" : " is-folded"}`, attr: { colspan: String(this.castExpanded ? Math.max(1, cast.length) : 1), scope: "colgroup" } });
+    const castToggle = castGroup.createEl("button", { cls: "czm-pg-group-toggle czm-pg-cast-toggle", attr: { "aria-expanded": String(this.castExpanded), "aria-label": `Cast: ${cast.length}, ${this.castExpanded ? "one column per name, click to fold" : "folded into one column, click to expand"}`, title: this.castExpanded ? "Fold the cast into one column of dots" : `Cast: ${cast.map((e) => e.name).join(", ")}. Click to expand into one column per name` } });
+    const castCaret = castToggle.createSpan({ cls: "czm-pg-group-caret" });
+    setIcon(castCaret, this.castExpanded ? "chevron-down" : "chevron-right");
+    // Folded, the caret alone, as every folded group: the name is written down the column header under it.
+    if (this.castExpanded) {
+      castToggle.createSpan({ text: "Cast", cls: "czm-pg-group-title" });
+      castToggle.createSpan({ text: String(cast.length), cls: "czm-pg-group-count" });
+    }
+    castToggle.addEventListener("click", () => this.run("toggle-cast"));
+    groups.createEl("th", { cls: "czm-pg-filler" });
+    const corner = thead.createEl("th", { cls: `czm-pg-corner is-frozen${frozenCount === 1 ? " is-frozen-edge" : ""}`, attr: { scope: "col", "data-fcol": "0" } });
+    corner.createSpan({ text: "Scene" });
+    corner.createSpan({ text: "words under the name", cls: "czm-pg-corner-hint" });
+    thead.createEl("th", { text: "Plot", cls: `czm-pg-col czm-pg-col-plot is-frozen${frozenCount === 2 ? " is-frozen-edge" : ""}`, attr: { scope: "col", "data-fcol": "1", title: "The model's events for the scene, from Story map.md; a planned scene's logline" } });
     let lastGroup = "";
-    columns.forEach((c, col) => {
-      const group = c.special === "pov" || c.special === "time" ? "derived" : c.heading.kind;
-      const th = thead.createEl("th", { cls: `czm-pg-col czm-pg-col-thread czm-pg-kind-${c.heading.kind}${c.special ? ` czm-pg-special-${c.special}` : ""}${group !== lastGroup ? " is-group-start" : ""}${this.column === col ? " is-current" : ""}`, attr: { scope: "col", title: `${c.heading.name} — ${c.special ? SPECIAL_LABEL[c.special] : KIND_GROUP[c.heading.kind]}, ${c.filled} of ${rows.length} scenes` } });
+    const headerOf = (c: GridColumn, col: number) => {
+      const group = DERIVED.includes(c.special) ? "derived" : c.heading.kind;
+      const frozen = col <= frozenUpTo;
+      const block = blockOf(c);
+      const th = thead.createEl("th", { cls: `czm-pg-col czm-pg-col-thread czm-pg-kind-${c.heading.kind}${c.special ? ` czm-pg-special-${c.special}` : ""}${group !== lastGroup ? " is-group-start" : ""}${this.column === col ? " is-current" : ""}${frozen ? " is-frozen" : ""}${col === frozenUpTo ? " is-frozen-edge" : ""}`, attr: { scope: "col", draggable: "true", "data-block": block, title: `${c.heading.name} — ${c.special ? SPECIAL_LABEL[c.special] : KIND_GROUP[c.heading.kind]}, ${c.filled} of ${rows.length} scenes. Drag to move ${DERIVED.includes(c.special) ? "this column" : `the ${KIND_GROUP[c.heading.kind].toLowerCase()} together`}`, ...(frozen ? { "data-fcol": String(2 + col) } : {}) } });
+      this.dragHandlers(th, block);
       lastGroup = group;
+      return th;
+    };
+    const headers = new Map<GridColumn, HTMLElement>();
+    for (const seg of segments) {
+      if (seg.folded) {
+        // The folded group's own cell: the name written down it, a line the body continues to the last scene.
+        const th = thead.createEl("th", { cls: `czm-pg-col czm-pg-fold czm-pg-kind-${seg.kind}`, attr: { scope: "col", title: `${KIND_GROUP[seg.kind]}: ${seg.columns.map((c) => c.heading.name).join(", ")}. Click the caret above to show them.` } });
+        th.createSpan({ text: `${KIND_GROUP[seg.kind]} · ${seg.columns.length}`, cls: "czm-pg-fold-name", attr: { "aria-hidden": "true" } });
+        continue;
+      }
+      for (const c of seg.columns) headers.set(c, headerOf(c, columns.indexOf(c)));
+    }
+    columns.forEach((c, col) => {
+      const th = headers.get(c)!;
       const name = th.createDiv({ cls: "czm-pg-col-name", attr: { role: "button", tabindex: "0", "aria-label": `${c.heading.name}: select the column` } });
       if (c.entity) { const dot = name.createSpan({ cls: "czm-pg-dot", attr: { "aria-label": KIND_LABEL[c.entity.kind] } }); dot.setCssProps({ "--czm-kind": settings.colors[c.entity.kind] }); }
       name.createSpan({ text: c.heading.name, cls: "czm-pg-col-title" });
       onActivate(name, () => this.pickColumn(col));
+      name.addEventListener("dblclick", (ev) => { ev.preventDefault(); this.renameColumnInPlace(c); });
       const sub = th.createDiv({ cls: "czm-pg-col-sub" });
       const audit = this.audit ? ` · ${c.verified} ${STATE_GLYPH.verified}${c.broken ? ` · ${c.broken} ${STATE_GLYPH.broken}` : ""}` : "";
       sub.createSpan({ text: `${c.special ? `${SPECIAL_LABEL[c.special].toLowerCase()} · ` : ""}${c.filled} of ${rows.length}${audit}`, cls: "czm-pg-col-count" });
@@ -510,46 +668,59 @@ export class PlotGridView extends ItemView {
       more.addEventListener("click", (ev) => { ev.stopPropagation(); this.pickColumn(col, false); showOverflow(ev, this.columnMenu(c)); });
       th.addEventListener("contextmenu", (ev) => { ev.preventDefault(); this.pickColumn(col, false); showOverflow(ev, this.columnMenu(c)); });
     });
-    const castTh = thead.createEl("th", { cls: `czm-pg-col czm-pg-col-cast${this.castExpanded ? " is-expanded" : ""}`, attr: { scope: "col", colspan: String(this.castExpanded ? Math.max(1, cast.length) : 1) } });
-    const castBtn = castTh.createEl("button", { cls: "czm-pg-cast-toggle", attr: { "aria-expanded": String(this.castExpanded), "aria-label": this.castExpanded ? "Fold the cast into one column" : "Expand the cast into one column per name" } });
-    castBtn.createSpan({ text: "Cast", cls: "czm-pg-col-title" });
-    castBtn.createSpan({ text: String(cast.length), cls: "czm-pg-col-count" });
-    const chevron = castBtn.createSpan({ cls: "czm-pg-chevron" });
-    setIcon(chevron, this.castExpanded ? "chevron-left" : "chevron-right");
-    castBtn.addEventListener("click", () => this.run("toggle-cast"));
+    // The cast's column headers: one per name when expanded, as the threads have one per column; folded, one quiet cell over the dots.
+    if (this.castExpanded && cast.length) {
+      for (const e of cast) {
+        const th = thead.createEl("th", { cls: "czm-pg-col czm-pg-cast-name", attr: { scope: "col", title: `${e.name} — ${KIND_LABEL[e.kind]}, ${plural(e.appearances.length, "scene")}` } });
+        th.setCssProps({ "--czm-kind": settings.colors[e.kind] });
+        const span = th.createSpan({ text: e.name });
+        if (e.path) { span.addClass("is-link"); onActivate(span, () => this.source.openNote(e.path!)); }
+      }
+    } else {
+      const th = thead.createEl("th", { cls: "czm-pg-col czm-pg-col-cast czm-pg-fold czm-pg-fold-cast", attr: { scope: "col", title: `Cast: ${cast.map((e) => e.name).join(", ")}. Click the caret above to expand.` } });
+      th.createSpan({ text: `Cast · ${cast.length}`, cls: "czm-pg-fold-name", attr: { "aria-hidden": "true" } });
+    }
     // A filler column takes the slack, so the columns stay close together however wide the pane.
     thead.createEl("th", { cls: "czm-pg-filler" });
-    if (this.castExpanded) this.renderCastNames(table, columns.length, cast, settings);
     const tbody = table.createEl("tbody");
-    const span = 3 + columns.length + (this.castExpanded ? Math.max(1, cast.length) : 1) + 1;
+    const span = 2 + columns.length + segments.filter((sg) => sg.folded).length + (this.castExpanded ? Math.max(1, cast.length) : 1) + 1;
     const scope = this.project.scope;
-    let lastPath = "", lastAct = "";
+    let lastChapter = "", lastAct = "";
     this.drawn = 0;
     this.sentinel?.disconnect(); this.sentinel = null;
     // A long manuscript is drawn a chunk at a time: the first sixty rows now, the next sixty as the last one scrolls into view.
     const draw = (upTo: number) => {
       for (let i = this.drawn; i < Math.min(upTo, rows.length); i++) {
         const row = rows[i]!;
-        const act = actOf(row.scene.path, scope);
+        // A row from a chapter note takes its chapter from the note and its act from the folder; a planned row carries both from the outline.
+        const group = row.group;
+        const act = group ? (group.act ? `${row.scene.path}#act${group.actLine}` : "") : actOf(row.scene.path, scope);
         if (act !== lastAct) {
           lastAct = act;
-          if (act) tbody.createEl("tr", { cls: "czm-pg-act" }).createEl("th", { text: act, attr: { colspan: String(span), scope: "rowgroup" } });
+          if (act) {
+            const th = tbody.createEl("tr", { cls: `czm-pg-act${group ? " is-outline" : ""}` }).createEl("th", { attr: { colspan: String(span), scope: "rowgroup" } });
+            th.createSpan({ text: group ? group.act : act, cls: group ? "is-link czm-pg-group-name" : "" });
+            if (group) { th.createSpan({ text: "outline · no folder yet", cls: "czm-pg-note-total" }); this.groupControls(th, row, "act"); }
+          }
         }
-        if (row.scene.path !== lastPath) {
-          lastPath = row.scene.path;
-          const tr = tbody.createEl("tr", { cls: "czm-pg-note" });
+        const chapterKey = group ? `${row.scene.path}#chapter${group.chapterLine}` : row.scene.path;
+        if (chapterKey !== lastChapter) {
+          lastChapter = chapterKey;
+          const tr = tbody.createEl("tr", { cls: `czm-pg-note${group ? " is-outline" : ""}` });
           const th = tr.createEl("th", { attr: { colspan: String(span), scope: "rowgroup" } });
-          const link = th.createSpan({ text: basenameOf(row.scene.path), cls: "is-link" });
-          onActivate(link, () => this.source.openNote(row.scene.path));
+          const link = th.createSpan({ text: group ? group.chapter || "(no chapter)" : basenameOf(row.scene.path), cls: "is-link czm-pg-group-name" });
+          onActivate(link, () => { if (group) this.source.reveal({ path: row.scene.path, title: group.chapter, line: Math.max(0, group.chapterLine) }); else this.source.openNote(row.scene.path); });
           // The one structural question the row can answer: how much of the book, and how much of the cast, this chapter holds.
-          const chapter = rows.filter((r) => r.scene.path === row.scene.path);
+          const chapter = rows.filter((r) => (r.group ? `${r.scene.path}#chapter${r.group.chapterLine}` : r.scene.path) === chapterKey);
           const words = chapter.reduce((n, r) => n + r.words, 0);
           const names = new Set(chapter.flatMap((r) => r.present).filter((id) => cast.some((c) => c.id === id))).size;
-          th.createSpan({ text: `${plural(chapter.length, "scene")} · ${words.toLocaleString()} words · ${names} of the cast`, cls: "czm-pg-note-total" });
+          th.createSpan({ text: group ? `${plural(chapter.length, "scene")} · outline · no note yet` : `${plural(chapter.length, "scene")} · ${words.toLocaleString()} words · ${names} of the cast`, cls: "czm-pg-note-total" });
+          if (group) this.groupControls(th, row, "chapter");
         }
-        this.renderRow(tbody, row, columns, cast, settings);
+        this.renderRow(tbody, row, columns, cast, settings, frozenUpTo, segments);
         this.drawn = i + 1;
       }
+      this.applyFreeze(wrap, table, frozenCount);
       this.sentinel?.disconnect(); this.sentinel = null;
       const last = tbody.lastElementChild;
       if (this.drawn < rows.length && last && typeof IntersectionObserver !== "undefined") {
@@ -566,18 +737,60 @@ export class PlotGridView extends ItemView {
     if (row >= this.drawn && this.drawMore) this.drawMore(row + 1);
   }
 
-  private renderRow(tbody: HTMLElement, row: GridRow, columns: readonly GridColumn[], cast: readonly Entity[], settings: StoryMapSettings): void {
+  /**
+   * Frozen columns are sticky, each offset by the width of the ones before it, measured from the header once the table is
+   * drawn. A freeze that would take more than three fifths of the pane stops at the last column that fits, so the threads
+   * always have room to scroll.
+   */
+  private applyFreeze(wrap: HTMLElement, table: HTMLElement, frozenCount: number): void {
+    const heads = [...table.querySelectorAll<HTMLElement>("thead tr:not(.czm-pg-groups) th[data-fcol]")].sort((a, b) => Number(a.dataset.fcol) - Number(b.dataset.fcol));
+    const limit = wrap.clientWidth ? wrap.clientWidth * 0.6 : Number.POSITIVE_INFINITY;
+    let left = 0, kept = 0;
+    const lefts = new Map<string, number>();
+    for (const th of heads) {
+      const width = th.getBoundingClientRect().width;
+      if (kept >= 2 && left + width > limit) break;
+      lefts.set(th.dataset.fcol!, left);
+      left += width;
+      kept++;
+    }
+    for (const cell of table.querySelectorAll<HTMLElement>("[data-fcol]")) {
+      const at = lefts.get(cell.dataset.fcol!);
+      if (at === undefined) { cell.classList.remove("is-frozen", "is-frozen-edge"); continue; }
+      cell.setCssStyles({ left: `${at}px` });
+      cell.classList.toggle("is-frozen-edge", Number(cell.dataset.fcol) === kept - 1);
+    }
+    if (kept < frozenCount) this.status?.say(`Frozen up to ${kept - 2 >= 0 && this.shown[kept - 2] ? `“${this.shown[kept - 2]!.heading.name}”` : "Plot"}: the pane is too narrow to freeze further.`);
+  }
+
+  private renderRow(tbody: HTMLElement, row: GridRow, columns: readonly GridColumn[], cast: readonly Entity[], settings: StoryMapSettings, frozenUpTo = -1, segments: readonly Segment[] | null = null): void {
     const rowIndex = this.rows.indexOf(row);
     const tr = tbody.createEl("tr", { cls: `czm-pg-scene${row.outline ? " is-outline" : ""}`, attr: { "data-row": String(rowIndex) } });
-    const th = tr.createEl("th", { cls: `czm-pg-scene-head${row.pov ? " has-pov" : ""}`, attr: { role: "button", tabindex: "0", scope: "row" } });
+    const th = tr.createEl("th", { cls: `czm-pg-scene-head is-frozen${row.pov ? " has-pov" : ""}${frozenUpTo < 0 ? "" : ""}`, attr: { role: "button", tabindex: "0", scope: "row", "data-fcol": "0" } });
     // A 3px chip in the POV character's colour rides the sticky column, so the eye's owner survives sideways scrolling.
     if (row.pov) { th.setCssProps({ "--czm-pov": row.pov.entity ? settings.colors[row.pov.entity.kind] : "var(--text-faint)" }); th.title = `POV: ${row.pov.name}`; }
     th.createSpan({ text: `${row.bookmarked ? "★ " : ""}${row.scene.title || "(opening)"}`, cls: "czm-map-row-name" });
-    if (row.outline) th.createSpan({ text: "outline", cls: "czm-map-row-meta", attr: { title: "A heading with no prose yet: a scene planned, not written" } });
+    if (row.outline) th.createSpan({ text: "outline", cls: "czm-map-row-meta", attr: { title: row.group ? "A scene planned in Outline.md, not written: build the manuscript to make it a heading in a chapter note" : "A heading with no prose yet: a scene planned, not written" } });
     onActivate(th, () => this.source.reveal(row.scene));
-    tr.createEl("td", { text: row.outline ? "" : row.words.toLocaleString(), cls: "czm-pg-words" });
-    tr.createEl("td", { text: row.events.join(" · "), cls: "czm-pg-plot" });
-    columns.forEach((c, col) => this.renderCell(tr, c, c.cells[row.index]!, row, { col, row: rowIndex }));
+    if (row.group) {
+      const more = th.createEl("button", { cls: "clickable-icon czm-pg-row-more", attr: { "aria-label": `${row.scene.title}: row menu`, "aria-haspopup": "menu" } });
+      setIcon(more, "more-horizontal");
+      more.addEventListener("click", (ev) => { ev.stopPropagation(); showOverflow(ev, this.rowMenu(row)); });
+      th.addEventListener("contextmenu", (ev) => { ev.preventDefault(); showOverflow(ev, this.rowMenu(row)); });
+    }
+    // The word count sits under the name, so the frozen block is the name and the plot and nothing else.
+    if (!row.outline) th.createDiv({ text: `${row.words.toLocaleString()} words`, cls: "czm-pg-scene-words" });
+    const plot = tr.createEl("td", { text: row.group ? row.logline ?? "" : row.events.join(" · "), cls: `czm-pg-plot is-frozen${row.group ? " is-logline" : ""}`, attr: { "data-fcol": "1" } });
+    if (row.group) {
+      plot.setAttribute("title", "The logline, kept as a comment under the heading in Outline.md; click to write it");
+      plot.setAttribute("role", "button"); plot.setAttribute("tabindex", "-1");
+      plot.addEventListener("click", () => this.editLogline(row, plot));
+    }
+    const fallback: Segment = { kind: "free", block: "", single: null, columns: [...columns], folded: false };
+    for (const seg of segments ?? [fallback]) {
+      if (seg.folded) { tr.createEl("td", { cls: `czm-pg-fold-td czm-pg-kind-${seg.kind}`, attr: { "aria-hidden": "true" } }); continue; }
+      for (const c of seg.columns) { const col = columns.indexOf(c); this.renderCell(tr, c, c.cells[row.index]!, row, { col, row: rowIndex }, col <= frozenUpTo); }
+    }
     if (this.castExpanded) {
       const present = new Set(row.present);
       for (const e of cast) {
@@ -598,8 +811,8 @@ export class PlotGridView extends ItemView {
     tr.createEl("td", { cls: "czm-pg-filler" });
   }
 
-  private renderCell(tr: HTMLElement, column: GridColumn, cell: GridCell, row: GridRow, at: Selection): void {
-    const td = tr.createEl("td", { cls: `czm-pg-cell-td czm-pg-kind-${column.heading.kind}${column.special ? ` czm-pg-special-${column.special}` : ""}` });
+  private renderCell(tr: HTMLElement, column: GridColumn, cell: GridCell, row: GridRow, at: Selection, frozen = false): void {
+    const td = tr.createEl("td", { cls: `czm-pg-cell-td czm-pg-kind-${column.heading.kind}${column.special ? ` czm-pg-special-${column.special}` : ""}${frozen ? " is-frozen" : ""}`, attr: frozen ? { "data-fcol": String(2 + at.col) } : {} });
     const where = `${column.heading.name} at ${row.scene.title || basenameOf(row.scene.path)}`;
     const selected = this.selection?.col === at.col && this.selection?.row === at.row;
     const stop = cell.stop;
@@ -643,21 +856,68 @@ export class PlotGridView extends ItemView {
     const theme = bar.createDiv({ cls: "czm-pg-theme" });
     if (main) { theme.createSpan({ text: "Main theme", cls: "czm-pg-theme-label" }); theme.createSpan({ text: main.heading.name, cls: "czm-pg-theme-name" }); theme.createSpan({ text: `${main.filled} of ${this.rows.length} scenes`, cls: "czm-pg-col-count" }); }
     else theme.createSpan({ text: "No main theme yet — a theme column's menu has Use as main theme.", cls: "czm-pg-theme-label" });
-    const pills = bar.createDiv({ cls: "czm-pg-pills", attr: { role: "group", "aria-label": "Column groups" } });
-    const hidden = new Set(this.hidden.map((h) => h.toLowerCase()));
-    for (const kind of COLUMN_KINDS) {
-      const inKind = grid.columns.filter((c) => c.heading.kind === kind && c.special !== "pov" && c.special !== "time" && !hidden.has(c.heading.heading.toLowerCase()));
-      if (!inKind.length) continue;
-      const folded = this.settings.folded[kind];
-      const pill = pills.createEl("button", { cls: `czm-pg-pill${folded ? " is-folded" : ""}`, attr: { "aria-pressed": String(!folded), "aria-label": `${KIND_GROUP[kind]}: ${inKind.length}, ${folded ? "folded" : "shown"}` } });
-      pill.createSpan({ text: KIND_GROUP[kind], cls: "czm-pg-pill-name" });
-      pill.createSpan({ text: folded ? `${inKind.length} folded` : String(inKind.length), cls: "czm-pg-pill-count" });
-      pill.addEventListener("click", () => this.run(kind === "arc" ? "fold-arcs" : kind === "theme" ? "fold-themes" : kind === "subplot" ? "fold-subplots" : "fold-threads"));
+    void castCount;
+  }
+
+  // ---- snapshots as tabs -----------------------------------------------------------
+
+  /** Over the table: the grid itself, then one tab per dated snapshot, newest first, named by its day and the label the writer gave the note. */
+  private renderTabs(root: HTMLElement): void {
+    if (!this.snapshots.length) return;
+    const bar = root.createDiv({ cls: "czm-pg-tabs", attr: { role: "tablist", "aria-label": "Snapshots" } });
+    const tab = (label: string, path: string | null, title: string) => {
+      const b = bar.createEl("button", { text: label, cls: `czm-pg-tab${this.tab === path ? " is-active" : ""}`, attr: { role: "tab", "aria-selected": String(this.tab === path), title } });
+      b.addEventListener("click", () => void this.openTab(path));
+    };
+    tab("Now", null, "The grid as it stands");
+    for (const snap of this.snapshots) tab(snapshotLabel(snap), snap.path, `${basenameOf(snap.path)} · rename the note to name the tab`);
+  }
+
+  private async openTab(path: string | null): Promise<void> {
+    if (path === this.tab) return;
+    this.tab = path;
+    this.snapshotTable = null;
+    this.selection = null;
+    if (path) {
+      try { this.snapshotTable = await this.source.readSnapshot(path); } catch (e) { this.tab = null; this.status?.fail(couldNot("read the snapshot", e)); }
     }
-    const cast = pills.createEl("button", { cls: `czm-pg-pill${this.castExpanded ? "" : " is-folded"}`, attr: { "aria-pressed": String(this.castExpanded), "aria-label": `Cast: ${castCount}, ${this.castExpanded ? "expanded" : "folded"}` } });
-    cast.createSpan({ text: "Cast", cls: "czm-pg-pill-name" });
-    cast.createSpan({ text: this.castExpanded ? String(castCount) : `${castCount} folded`, cls: "czm-pg-pill-count" });
-    cast.addEventListener("click", () => this.run("toggle-cast"));
+    this.renderTable();
+  }
+
+  /** A snapshot drawn as the grid draws itself, read only: chapter bands, scenes with their counts, the cells as text. */
+  private renderSnapshot(root: HTMLElement): void {
+    const shell = this.shell, snap = this.snapshots.find((s) => s.path === this.tab), table = this.snapshotTable;
+    if (!shell || !snap) return;
+    this.rows = []; this.shown = [];
+    shell.setState(`Snapshot · ${snapshotLabel(snap)} · read only${table ? ` · ${plural(table.rows.length, "scene")} · ${plural(table.columns.length, "column")}` : ""}`, { label: "Open note", cls: "czm-pg-open-snapshot", onClick: () => this.source.openNote(snap.path) });
+    this.renderSide();
+    if (!table) { shell.empty("Reading the snapshot…"); return; }
+    if (!table.rows.length) { shell.empty("This snapshot has no table the grid can read.", [{ label: "Open note", cls: "czm-pg-open-snapshot", onClick: () => this.source.openNote(snap.path) }]); return; }
+    const bar = root.createDiv({ cls: "czm-pg-eyebrow" });
+    bar.createSpan({ text: table.summary || `${basenameOf(snap.path)}: a snapshot, never read back.`, cls: "czm-pg-theme-label" });
+    const wrap = root.createDiv({ cls: "czm-pg-wrap" });
+    const t = wrap.createEl("table", { cls: "czm-pg-table is-snapshot", attr: { "aria-label": `Snapshot ${snapshotLabel(snap)}` } });
+    const thead = t.createEl("thead").createEl("tr");
+    thead.createEl("th", { text: "Scene", cls: "czm-pg-corner is-frozen", attr: { scope: "col", "data-fcol": "0" } });
+    for (const c of table.columns) thead.createEl("th", { cls: "czm-pg-col czm-pg-col-thread", attr: { scope: "col" } }).createDiv({ cls: "czm-pg-col-name" }).createSpan({ text: c, cls: "czm-pg-col-title" });
+    thead.createEl("th", { cls: "czm-pg-filler" });
+    const tbody = t.createEl("tbody");
+    let lastChapter: string | null = null;
+    for (const row of table.rows) {
+      if (row.chapter !== lastChapter) { lastChapter = row.chapter; tbody.createEl("tr", { cls: "czm-pg-note" }).createEl("th", { text: row.chapter, attr: { colspan: String(table.columns.length + 2), scope: "rowgroup" } }); }
+      const tr = tbody.createEl("tr", { cls: `czm-pg-scene${row.outline ? " is-outline" : ""}` });
+      const th = tr.createEl("th", { cls: "czm-pg-scene-head is-frozen", attr: { scope: "row", "data-fcol": "0" } });
+      th.createSpan({ text: row.scene, cls: "czm-map-row-name" });
+      if (row.outline) th.createSpan({ text: "outline", cls: "czm-map-row-meta" });
+      else if (row.words) th.createDiv({ text: `${row.words} words`, cls: "czm-pg-scene-words" });
+      for (const cell of row.cells) {
+        const td = tr.createEl("td", { cls: "czm-pg-cell-td" });
+        const state = cell.endsWith("✓") ? "verified" : cell.endsWith("✗") ? "broken" : cell ? "plan" : "empty";
+        td.createDiv({ text: cell.replace(/\s*[✓✗]\s*$/, ""), cls: `czm-pg-cell is-${state}`, attr: { title: cell } });
+      }
+      tr.createEl("td", { cls: "czm-pg-filler" });
+    }
+    this.applyFreeze(wrap, t, 1);
   }
 
   /** A header or a side-column row picks a column: the side column shows it; with `moveCell` the selection lands in it too. */
@@ -669,23 +929,110 @@ export class PlotGridView extends ItemView {
     this.renderSide();
   }
 
+  /** Dragging a header moves its block: a single column with a job goes alone, a kind group goes together. The drop side is the pointer's half of the target. */
+  private dragHandlers(th: HTMLElement, block: string): void {
+    th.addEventListener("dragstart", (ev) => {
+      this.dragging = block;
+      ev.dataTransfer?.setData("text/plain", block);
+      this.body?.querySelectorAll<HTMLElement>(`thead th[data-block="${attrValue(block)}"]`).forEach((el) => el.classList.add("is-dragging"));
+    });
+    th.addEventListener("dragend", () => { this.dragging = null; this.body?.querySelectorAll(".is-dragging, .is-drop-before, .is-drop-after").forEach((el) => el.classList.remove("is-dragging", "is-drop-before", "is-drop-after")); });
+    th.addEventListener("dragover", (ev) => {
+      if (!this.dragging || this.dragging === block) return;
+      ev.preventDefault();
+      const rect = th.getBoundingClientRect();
+      const after = ev.clientX > rect.left + rect.width / 2;
+      this.body?.querySelectorAll(".is-drop-before, .is-drop-after").forEach((el) => el.classList.remove("is-drop-before", "is-drop-after"));
+      const cells = [...(this.body?.querySelectorAll<HTMLElement>(`thead th[data-block="${attrValue(block)}"]`) ?? [])];
+      (after ? cells.at(-1) : cells[0])?.classList.add(after ? "is-drop-after" : "is-drop-before");
+    });
+    th.addEventListener("drop", (ev) => {
+      const from = this.dragging;
+      if (!from || from === block) return;
+      ev.preventDefault();
+      const rect = th.getBoundingClientRect();
+      void this.moveBlock(from, block, ev.clientX > rect.left + rect.width / 2 ? "after" : "before");
+    });
+  }
+
+  /** The blocks as drawn, from the project's order and what it left out. */
+  private blocks(): string[] {
+    const p = this.project;
+    return blockOrder({ time: p?.plotTime, pov: p?.plotPov, beats: p?.plotBeats, order: p?.plotOrder });
+  }
+
+  /** Writes the new block order to the project note as `plot-order`, with Undo; the grid redraws from it. */
+  private async moveBlock(from: string, to: string, side: "before" | "after"): Promise<void> {
+    const project = this.project;
+    if (!project) return;
+    const order = this.blocks().filter((b) => b !== from);
+    const at = order.indexOf(to);
+    if (at < 0) return;
+    order.splice(side === "after" ? at + 1 : at, 0, from);
+    await this.writeOrder(project, order, `Moved ${this.blockLabel(from)} ${side} ${this.blockLabel(to)}`);
+  }
+
+  /** The column's block one step left or right, for the keyboard. */
+  private async nudgeBlock(c: GridColumn, direction: -1 | 1): Promise<void> {
+    const project = this.project;
+    if (!project) return;
+    const order = this.blocks();
+    const block = blockOf(c);
+    // A group with no column drawn is skipped, so a move is always one the eye can see.
+    const drawn = new Set(this.grid.columns.map((col) => blockOf(col)));
+    const i = order.indexOf(block);
+    let j = i + direction;
+    while (j >= 0 && j < order.length && !drawn.has(order[j]!)) j += direction;
+    if (i < 0 || j < 0 || j >= order.length) { this.status?.say(`${this.blockLabel(block)} is already at the ${direction < 0 ? "left" : "right"} edge.`); return; }
+    const target = order[j]!;
+    const next = order.filter((b) => b !== block);
+    next.splice(next.indexOf(target) + (direction > 0 ? 1 : 0), 0, block);
+    await this.writeOrder(project, next, `Moved ${this.blockLabel(block)} ${direction < 0 ? "left" : "right"}`);
+  }
+
+  private blockLabel(block: string): string {
+    const kind = (Object.keys(GROUP_TOKEN) as ColumnKind[]).find((k) => GROUP_TOKEN[k] === block);
+    return kind ? `the ${KIND_GROUP[kind].toLowerCase()}` : `“${this.grid.columns.find((c) => c.heading.heading === block)?.heading.name ?? block}”`;
+  }
+
+  private async writeOrder(project: ProjectSpec, order: readonly string[], what: string): Promise<void> {
+    const before = project.plotOrder?.length ? project.plotOrder.join(", ") : null;
+    try { await this.source.setProjectKey(project, "plot-order", order.join(", ")); } catch (e) { this.status?.fail(couldNot("write plot-order", e)); return; }
+    await new Promise((r) => window.setTimeout(r, 300));
+    await this.show(project, true);
+    this.status?.undoable(`${what}: plot-order written to the project note`, async () => { await this.source.setProjectKey(project, "plot-order", before); await new Promise((r) => window.setTimeout(r, 300)); await this.show(project, true); });
+  }
+
   /** A column's menu: its kind, its job for the project, and the column itself. Every row names its command where it has one. */
   private columnMenu(c: GridColumn): readonly (MenuEntry | "-")[] {
     const kindRows: MenuEntry[] = COLUMN_KINDS.map((kind) => ({ label: `Kind: ${kind === "free" ? "free thread" : kind}`, checked: c.heading.kind === kind, onClick: () => void this.setKind(c, kind) }));
-    const jobRows: MenuEntry[] = (["pov", "time", "main-theme"] as SpecialColumn[]).map((job) => ({ label: c.special === job ? `Stop using as ${SPECIAL_LABEL[job]}` : `Use as ${SPECIAL_LABEL[job]}`, checked: c.special === job, onClick: () => void this.setSpecial(c, job) }));
+    const jobRows: MenuEntry[] = (["pov", "time", "beats", "main-theme"] as SpecialColumn[]).map((job) => ({ label: c.special === job ? `Stop using as ${SPECIAL_LABEL[job]}` : `Use as ${SPECIAL_LABEL[job]}`, checked: c.special === job, onClick: () => void this.setSpecial(c, job) }));
     return [
-      { label: "Rename…", icon: "pencil", onClick: () => { this.save({ panelOpen: true }); this.shell?.setSideOpen(true); this.renderSide(); (this.shell?.side.querySelector(".czm-pg-rename") as HTMLInputElement | null)?.focus(); } },
+      { label: "Rename…", icon: "pencil", onClick: () => this.renameColumnInPlace(c) },
+      { label: DERIVED.includes(c.special) ? "Move left" : `Move the ${KIND_GROUP[c.heading.kind].toLowerCase()} left`, icon: "arrow-left", onClick: () => void this.nudgeBlock(c, -1) },
+      { label: DERIVED.includes(c.special) ? "Move right" : `Move the ${KIND_GROUP[c.heading.kind].toLowerCase()} right`, icon: "arrow-right", onClick: () => void this.nudgeBlock(c, 1) },
+      "-",
       ...kindRows,
       "-",
       ...jobRows,
       "-",
-      { label: "Read this column with the model…", icon: "sparkles", command: "plot-grid-read-column", disabled: !!this.running || c.special === "pov" || c.special === "time", onClick: () => void this.readColumns([c], "reading") },
+      { label: "Read this column with the model…", icon: "sparkles", command: "plot-grid-read-column", disabled: !!this.running || DERIVED.includes(c.special), onClick: () => void this.readColumns([c], "reading") },
       { label: "Check this column against the draft…", command: "plot-grid-check-column", disabled: !!this.running || c.filled === 0, onClick: () => void this.readColumns([c], "checking") },
       { label: `Dismiss all readings${c.readings ? ` (${c.readings})` : ""}`, disabled: c.readings === 0, onClick: () => { if (this.project) void this.source.dismissColumnReadings(this.project, c.heading.heading).then(() => this.show(this.project, true)); } },
       "-",
+      { label: "Freeze up to here", icon: "panel-left", checked: this.frozenHeading === c.heading.heading, onClick: () => { const on = this.frozenHeading === c.heading.heading; this.setFrozen(on ? null : c.heading.heading); this.renderTable(); this.status?.say(on ? "Scene and Plot stay put; the threads scroll." : `Frozen up to “${c.heading.name}”: it stays put with Scene and Plot while the rest scroll.`); } },
       { label: "Hide column", icon: "eye-off", command: "plot-grid-hide-column", onClick: () => this.hideColumn(c) },
-      { label: "Delete column…", icon: "x", onClick: () => { this.save({ panelOpen: true }); this.shell?.setSideOpen(true); this.renderSide(); const del = this.shell?.side.querySelector<HTMLButtonElement>(`.czm-pg-col-delete[data-heading="${CSS.escape(c.heading.heading)}"]`); del?.click(); del?.focus(); } },
+      { label: "Delete column…", icon: "x", onClick: () => { this.openSide("pg-columns"); const del = this.shell?.side.querySelector<HTMLButtonElement>(`.czm-pg-col-delete[data-heading="${attrValue(c.heading.heading)}"]`); del?.click(); del?.focus(); } },
     ];
+  }
+
+  /** The heading as a field in the column's own header, where the menu was opened: Enter saves, Escape puts it back. The side column's field stays as the other way. */
+  private renameColumnInPlace(c: GridColumn): void {
+    const col = this.shown.indexOf(c);
+    const th = col >= 0 ? this.body?.querySelectorAll<HTMLElement>("thead th.czm-pg-col-thread")[col] : null;
+    const name = th?.querySelector<HTMLElement>(".czm-pg-col-name");
+    if (!name) { this.openSide("pg-column", ".czm-pg-rename"); return; }
+    this.inlineRename(name, c.heading.heading, `Rename the column ${c.heading.name}`, (heading) => this.renameColumn(c, heading));
   }
 
   /** Rewrites the heading with the kind's prefix, keeping the name; an arc keeps its link. */
@@ -719,19 +1066,6 @@ export class PlotGridView extends ItemView {
     this.status?.say(off ? `“${c.heading.name}” is no longer the ${SPECIAL_LABEL[job]} column.` : `“${c.heading.name}” is the ${SPECIAL_LABEL[job]} column: ${SPECIAL_KEY[job]} written to the project note.`);
     // The project spec is read from the note; the rebuild picks the change up once the cache has it.
     window.setTimeout(() => void this.refresh(), 300);
-  }
-
-  /** The cast's names, one per expanded column, as a row under the header so they read horizontally. */
-  private renderCastNames(table: HTMLElement, before: number, cast: readonly Entity[], settings: StoryMapSettings): void {
-    const tr = table.createEl("thead").createEl("tr", { cls: "czm-pg-cast-row" });
-    tr.createEl("th", { cls: "czm-pg-corner", attr: { colspan: String(3 + before) } });
-    for (const e of cast) {
-      const th = tr.createEl("th", { cls: "czm-pg-cast-name", attr: { scope: "col", title: `${e.name} — ${KIND_LABEL[e.kind]}, ${plural(e.appearances.length, "scene")}` } });
-      th.setCssProps({ "--czm-kind": settings.colors[e.kind] });
-      const span = th.createSpan({ text: e.name });
-      if (e.path) { span.addClass("is-link"); onActivate(span, () => this.source.openNote(e.path!)); }
-    }
-    tr.createEl("th", { cls: "czm-pg-filler" });
   }
 
   /** The key in the corner: the roles, and the cast's kinds when they are spread out. */
@@ -900,9 +1234,11 @@ export class PlotGridView extends ItemView {
     else this.renderColumnSection(colOne, picked);
     const columns = this.grid.columns;
     const colSection = shell.section("Columns", `${columns.length}${this.hidden.length ? ` · ${this.hidden.length} hidden` : ""}${this.grid.unknownPrefixes.length ? ` · ${this.grid.unknownPrefixes.length} unread` : ""}`, "pg-columns", true);
+    if (this.gaps.length) this.renderGaps(shell.section("Gaps", plural(this.gaps.length, "finding"), "pg-gaps", true));
     const modelSection = shell.section("Model", this.source.modelLabel() || "off", "pg-model", false);
     modelSection.createDiv({ text: this.source.modelLabel() ? `${this.source.modelLabel()}. Read… asks what each thread does in each scene and leaves a reading in the empty cells; you write the cell in your own words, or dismiss it. The model never writes a cell, and never a chapter.` : "No model. Set Model to Local (Ollama) or Claude in Creative Writer settings to read columns.", cls: "czm-map-absent" });
-    const rowsSection = shell.section("Rows", [this.settings.unmoved ? "unmoved on" : "", this.audit ? "audit" : ""].filter(Boolean).join(" · "), "pg-rows", false);
+    const rowsSection = shell.section("Rows", [this.grid.plan && !this.grid.plan.outline.built ? `${plural(this.grid.plan.outline.scenes, "planned scene")}` : "", this.settings.unmoved ? "unmoved on" : "", this.audit ? "audit" : ""].filter(Boolean).join(" · "), "pg-rows", false);
+    this.renderOutlineBlock(rowsSection);
     const auditRow = rowsSection.createDiv({ cls: "setting-item mod-toggle" });
     const auditInfo = auditRow.createDiv({ cls: "setting-item-info" });
     auditInfo.createDiv({ text: "Audit view", cls: "setting-item-name" });
@@ -943,11 +1279,15 @@ export class PlotGridView extends ItemView {
     const submit = () => { const name = input.value.trim(); if (!name) return; button.disabled = true; void this.addColumn(name).finally(() => { button.disabled = false; }); };
     button.addEventListener("click", submit);
     input.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); submit(); } });
+    this.renderColumnPicker(colSection);
     const propose = colSection.createDiv({ cls: "czm-map-panel-actions czm-pg-propose-row" });
     const proposeBtn = propose.createEl("button", { text: "Propose columns…", cls: "czm-pg-propose", attr: { title: "Ask the model which threads run through the book, from the events it has read" } });
     proposeBtn.disabled = !!this.running;
     proposeBtn.addEventListener("click", () => this.run("propose-columns"));
     if (this.proposals) this.renderProposals(shell.section("Proposed columns", `${this.proposals.picked.size} of ${this.proposals.list.length} ticked`, "pg-proposals", true));
+    if (this.sheet && this.grid.plan) this.renderBuildSheet(shell.section("Build the manuscript", this.sheet.plan ? `${plural(this.sheet.plan.files.length, "note")}` : "", "pg-build", true));
+    if (this.templateSheet) this.renderTemplateSheet(shell.section("Start from a template", this.templateSheet.list[this.templateSheet.chosen]?.name ?? "", "pg-template", true));
+    if (this.saveSheet) this.renderSaveSheet(shell.section("Save as template", "", "pg-save-template", true));
   }
 
   /** The model's proposals: a tick each, the sentence, the scenes; Add writes the ticked ones as empty headings. */
@@ -996,7 +1336,7 @@ export class PlotGridView extends ItemView {
     const jobs = section.createDiv({ cls: "czm-pg-field" });
     jobs.createDiv({ text: "Job for the project", cls: "czm-pg-field-label" });
     const jobRow = jobs.createDiv({ cls: "czm-map-panel-actions czm-pg-jobs" });
-    for (const job of ["pov", "time", "main-theme"] as SpecialColumn[]) {
+    for (const job of ["pov", "time", "beats", "main-theme"] as SpecialColumn[]) {
       const b = jobRow.createEl("button", { text: SPECIAL_LABEL[job], cls: `czm-pg-job${c.special === job ? " is-on" : ""}`, attr: { "aria-pressed": String(c.special === job), title: c.special === job ? `Stop using as ${SPECIAL_LABEL[job]}` : `Use as ${SPECIAL_LABEL[job]}: writes ${SPECIAL_KEY[job]} to the project note` } });
       b.addEventListener("click", () => void this.setSpecial(c, job));
     }
@@ -1089,14 +1429,486 @@ export class PlotGridView extends ItemView {
     }
   }
 
-  private async addColumn(name: string): Promise<void> {
+  // ---- the outline: rows written before the chapters exist ----------------------
+
+  /** The Rows section's Outline block: where the plan lives, what it holds, and the way to build it or start it. */
+  private renderOutlineBlock(section: HTMLElement): void {
+    const plan = this.grid.plan;
+    const box = section.createDiv({ cls: "czm-pg-outline" });
+    const head = box.createDiv({ cls: "czm-pg-outline-head" });
+    head.createSpan({ text: "Outline", cls: "czm-pg-field-label" });
+    head.createSpan({ text: !plan ? "none yet" : plan.outline.built ? "built" : "not built yet", cls: "czm-map-row-meta" });
+    if (!plan) {
+      box.createDiv({ text: "No outline yet. New scene starts one in Outline.md: scenes, chapters and acts you plan here, before any chapter note exists.", cls: "czm-map-absent" });
+    } else if (plan.outline.built) {
+      box.createDiv({ text: `Built on ${plan.outline.built}, Outline.md kept as the record. Rows come from the chapter notes now.`, cls: "czm-map-absent" });
+    } else {
+      box.createDiv({ text: `${basenameOf(plan.path)}.md · ${plural(plan.outline.scenes, "scene")} in ${plural(plan.outline.chapters, "chapter")}${plan.outline.acts.some((a) => a.title) ? ` and ${plural(plan.outline.acts.filter((a) => a.title).length, "act")}` : ""}`, cls: "czm-map-absent" });
+    }
+    const actions = box.createDiv({ cls: "czm-map-panel-actions czm-pg-outline-actions" });
+    if (!plan?.outline.built) {
+      const scene = actions.createEl("button", { text: "New scene", cls: "czm-pg-outline-scene" });
+      scene.addEventListener("click", () => this.run("new-scene"));
+      const chapter = actions.createEl("button", { text: "New chapter", cls: "czm-pg-outline-chapter" });
+      chapter.addEventListener("click", () => this.run("new-chapter"));
+      const act = actions.createEl("button", { text: "New act", cls: "czm-pg-outline-act" });
+      act.addEventListener("click", () => this.run("new-act"));
+    }
+    if (plan) {
+      const build = actions.createEl("button", { text: plan.outline.built ? "Build again…" : "Build the manuscript…", cls: `czm-pg-outline-build${plan.outline.built ? "" : " mod-cta"}`, attr: { title: plan.outline.built ? "Write any scene the outline has gained since as a heading in its chapter note" : "Turn the outline into folders, chapter notes and scene headings, and point every stop at them" } });
+      build.addEventListener("click", () => this.run("build-manuscript"));
+      const open = box.createDiv({ cls: "czm-map-panel-actions" }).createSpan({ text: "Open Outline.md", cls: "is-link czm-pg-outline-open" });
+      onActivate(open, () => this.run("open-outline"));
+    }
+  }
+
+  /** The build sheet in the side column: the plan as a small tree, the shape, the promise, Build and Cancel. */
+  private async openBuildSheet(shape: ScaffoldShape = this.sheet?.shape ?? "chapters"): Promise<void> {
+    const project = this.project;
+    if (!project || !this.grid.plan) return;
+    this.sheet = { shape, plan: null, loading: true };
+    this.openSide("pg-build");
+    let plan: ScaffoldPlan | null;
+    try { plan = await this.source.scaffoldPreview(project, shape); } catch (e) { this.sheet = null; this.renderSide(); this.status?.fail(couldNot("plan the build", e)); return; }
+    if (!this.sheet || this.sheet.shape !== shape) return;
+    this.sheet = { shape, plan, loading: false };
+    this.openSide("pg-build", ".czm-pg-build-go, .czm-pg-build-cancel");
+  }
+
+  private renderBuildSheet(section: HTMLElement): void {
+    const sheet = this.sheet, plan = this.grid.plan, project = this.project;
+    if (!sheet || !plan || !project) return;
+    const folder = plan.path.slice(0, plan.path.lastIndexOf("/") + 1);
+    const p = sheet.plan;
+    section.createDiv({ text: sheet.loading ? "Reading what is already there…" : !p ? "There is no outline to build from." : p.files.length === 0 ? "Every planned scene is already a heading in its chapter note. Nothing to write." : `This will ${p.created ? `create ${plural(p.created, "note")}${p.folders.length ? ` in ${plural(p.folders.length, "folder")}` : ""}` : "write into existing notes"} from ${basenameOf(plan.path)}.md: ${plural(p.scenes, "scene heading")}${p.skipped.length ? `, ${p.skipped.length} already there` : ""}. Scene headings are written as ## lines with nothing under them${p.files.some((f) => /<!--/.test(f.content)) ? ", the logline as a hidden comment" : ""}.`, cls: "czm-map-absent" });
+    if (p && p.files.length) {
+      const tree = section.createEl("pre", { cls: "czm-pg-build-tree", attr: { "aria-label": "What will be written" } });
+      tree.setText(describeScaffold(p, folder).join("\n"));
+    }
+    const shapes = section.createDiv({ cls: "czm-pg-field" });
+    shapes.createDiv({ text: "Shape", cls: "czm-pg-field-label" });
+    const group = shapes.createDiv({ cls: "czm-pg-build-shapes", attr: { role: "radiogroup", "aria-label": "Shape" } });
+    const opt = (value: ScaffoldShape, label: string, hint: string) => {
+      const row = group.createEl("label", { cls: `czm-pg-build-shape${sheet.shape === value ? " is-on" : ""}` });
+      const radio = row.createEl("input", { attr: { type: "radio", name: "czm-pg-build-shape", value } });
+      radio.checked = sheet.shape === value;
+      radio.addEventListener("change", () => { if (radio.checked) void this.openBuildSheet(value); });
+      const text = row.createDiv();
+      text.createDiv({ text: label, cls: "czm-pg-build-shape-name" });
+      text.createDiv({ text: hint, cls: "czm-map-row-meta" });
+    };
+    opt("chapters", "One note per chapter", `${plural(plan.outline.chapters, "note")}${plan.outline.acts.some((a) => a.title) ? `, one folder per act` : ""}, story-order in each`);
+    opt("one-note", "One note for the whole story", "Draft.md, scenes as headings; chapters and acts fold away");
+    section.createDiv({ text: "Every stop in Story threads.md is relinked to the new notes. Nothing that already exists is touched, except a note that gains a heading it lacked. Undo removes only what the build created and that is still exactly as written.", cls: "czm-map-absent" });
+    const foot = section.createDiv({ cls: "czm-pg-proposals-foot" });
+    const cancel = foot.createEl("button", { text: "Cancel", cls: "czm-pg-build-cancel" });
+    cancel.addEventListener("click", () => { this.sheet = null; this.renderSide(); });
+    const go = foot.createEl("button", { text: "Build", cls: "czm-pg-build-go mod-cta" });
+    go.disabled = sheet.loading || !p || p.files.length === 0;
+    go.addEventListener("click", () => { go.disabled = true; void this.build(sheet.shape); });
+  }
+
+  /** Findings the grid counted, each followed to its cells with Show: no model, no judgement, an exact number. */
+  private renderGaps(section: HTMLElement): void {
+    section.createDiv({ text: "Counted from the written scenes: a column with a stop in few of them, a character on the page for a stretch while the arc says nothing. What to do about it is yours.", cls: "czm-map-absent" });
+    for (const gap of this.gaps) {
+      const box = section.createDiv({ cls: `czm-pg-gap is-${gap.kind}` });
+      box.createDiv({ text: gap.text, cls: "czm-pg-gap-text" });
+      const acts = box.createDiv({ cls: "czm-map-panel-actions" });
+      const show = acts.createEl("button", { text: "Show", cls: "czm-pg-gap-show" });
+      show.addEventListener("click", () => {
+        const col = this.shown.findIndex((c) => c.heading.heading === gap.column);
+        const row = this.rows.findIndex((r) => r.index === gap.rows[0]);
+        if (col < 0 || row < 0) { this.status?.say("That column is hidden or folded."); return; }
+        this.select({ col, row });
+      });
+    }
+  }
+
+  /** One column from a template, without applying the whole of it: a dropdown grouped by template, an arc placeholder spelled out per character. */
+  private renderColumnPicker(section: HTMLElement): void {
+    const row = section.createDiv({ cls: "czm-pg-new czm-pg-pick-row" });
+    const select = row.createEl("select", { cls: "dropdown czm-pg-pick-column", attr: { "aria-label": "Add a column from a template" } });
+    const head = select.createEl("option", { text: this.templateList ? "From a template…" : "From a template… (loading)" });
+    head.value = "";
+    if (!this.templateList) {
+      void this.source.templates().then((list) => { this.templateList = list; if (this.shell?.side.contains(select)) this.renderSide(); }).catch(() => { this.templateList = []; });
+      return;
+    }
+    const have = new Set(this.grid.columns.map((c) => c.heading.heading.toLowerCase()));
+    const names = new Set(this.grid.columns.map((c) => `${c.heading.kind}|${c.heading.name.toLowerCase()}`));
+    for (const t of this.templateList) {
+      const options: { heading: string; job: string }[] = [];
+      for (const c of t.columns) {
+        const job = t.jobs.time === c.heading ? "time" : t.jobs.pov === c.heading ? "POV" : t.jobs.beats === c.heading ? "plot point" : t.jobs.theme === c.heading ? "main theme" : "";
+        const headings = c.placeholder === "every-character" ? this.grid.characters.map((e) => `Arc: [[${basenameOf(e.path!)}]]`) : c.placeholder === "arc" ? this.grid.characters.map((e) => `Arc: [[${basenameOf(e.path!)}]]`) : [c.heading];
+        for (const h of headings) {
+          if (have.has(h.toLowerCase()) || names.has(`${c.kind}|${(c.placeholder ? h.replace(/^Arc:\s*\[\[|\]\]$/g, "") : c.name).toLowerCase()}`)) continue;
+          if (!options.some((o) => o.heading.toLowerCase() === h.toLowerCase())) options.push({ heading: h, job });
+        }
+      }
+      if (!options.length) continue;
+      const group = select.createEl("optgroup", { attr: { label: t.name } });
+      for (const o of options) { const opt = group.createEl("option", { text: o.job ? `${o.heading} · ${o.job}` : o.heading }); opt.value = `${t.name}\u0000${o.heading}`; }
+    }
+    select.addEventListener("change", () => {
+      const [templateName, heading] = select.value.split("\u0000");
+      if (!heading) return;
+      const t = this.templateList?.find((x) => x.name === templateName);
+      const job: SpecialColumn | null = t?.jobs.time && (t.jobs.time === heading) ? "time" : t?.jobs.pov === heading ? "pov" : t?.jobs.beats === heading ? "beats" : t?.jobs.theme === heading ? "main-theme" : null;
+      select.disabled = true;
+      void this.addColumn(heading, job);
+    });
+  }
+
+  // ---- templates: a starting shape, written as headings ----------------------------
+
+  private async openTemplateSheet(): Promise<void> {
+    const project = this.project;
+    if (!project) return;
+    let list: readonly StoryTemplate[];
+    try { list = await this.source.templates(); } catch (e) { this.status?.fail(couldNot("list the templates", e)); return; }
+    this.templateSheet = { list, chosen: 0, choices: this.defaultChoices(list[0]), plan: null, loading: false };
+    this.openSide("pg-template");
+    await this.replanTemplate();
+    this.openSide("pg-template", ".czm-pg-template-row input");
+  }
+
+  private defaultChoices(t: StoryTemplate | undefined): { rows: boolean; columns: boolean; ticked: Set<string>; names: Record<string, string>; bindings: Record<string, string> } {
+    return { rows: !!t?.structure, columns: !!t?.columns.length, ticked: new Set(t?.columns.map((c) => c.heading) ?? []), names: {}, bindings: {} };
+  }
+
+  private async replanTemplate(): Promise<void> {
+    const sheet = this.templateSheet, project = this.project;
+    const t = sheet?.list[sheet.chosen];
+    if (!sheet || !project || !t) return;
+    sheet.loading = true;
+    // Every character with a note, on the page or not yet: before any prose, an arc can still be bound.
+    const cast = this.grid.characters.map((e) => ({ name: e.name, kind: e.kind, path: e.path }));
+    let plan: ApplyPlan | null = null;
+    try { plan = await this.source.planTemplate(project, t, { ...sheet.choices }, cast); } catch (e) { this.status?.fail(couldNot("plan the template", e)); }
+    if (this.templateSheet !== sheet) return;
+    sheet.plan = plan; sheet.loading = false;
+    this.renderSide();
+    this.shell?.reveal("pg-template");
+  }
+
+  private renderTemplateSheet(section: HTMLElement): void {
+    const sheet = this.templateSheet, project = this.project;
+    if (!sheet || !project) return;
+    const t = sheet.list[sheet.chosen];
+    const list = section.createDiv({ cls: "czm-pg-template-list", attr: { role: "radiogroup", "aria-label": "Templates" } });
+    let lastOwn = false;
+    sheet.list.forEach((tpl, i) => {
+      const own = tpl.path !== null;
+      if (i === 0 || own !== lastOwn) { list.createDiv({ text: own ? `Yours · ${this.source.templatesFolder()}` : "Built in", cls: "czm-pg-side-kind" }); lastOwn = own; }
+      const row = list.createEl("label", { cls: `czm-pg-template-row${i === sheet.chosen ? " is-on" : ""}` });
+      const radio = row.createEl("input", { attr: { type: "radio", name: "czm-pg-template", value: String(i), "aria-label": tpl.name } });
+      radio.checked = i === sheet.chosen;
+      radio.addEventListener("change", () => { if (!radio.checked) return; sheet.chosen = i; sheet.choices = this.defaultChoices(tpl); void this.replanTemplate(); });
+      row.createSpan({ text: tpl.name, cls: "czm-pg-template-name" });
+      row.createSpan({ text: [tpl.outline.scenes ? plural(tpl.outline.scenes, "scene") : "", tpl.columns.length ? plural(tpl.columns.length, "column") : ""].filter(Boolean).join(" · "), cls: "czm-map-row-meta" });
+    });
+    if (!sheet.list.length) list.createDiv({ text: "No templates.", cls: "czm-map-absent" });
+    if (!t) return;
+    const parts = section.createDiv({ cls: "czm-pg-field" });
+    parts.createDiv({ text: "Apply", cls: "czm-pg-field-label" });
+    const partRow = parts.createDiv({ cls: "czm-pg-template-parts" });
+    const part = (key: "rows" | "columns", label: string, has: boolean) => {
+      const l = partRow.createEl("label", { cls: `czm-pg-template-part${has ? "" : " is-off"}` });
+      const box = l.createEl("input", { attr: { type: "checkbox", "aria-label": label } });
+      box.checked = has && sheet.choices[key];
+      box.disabled = !has;
+      box.addEventListener("change", () => { sheet.choices[key] = box.checked; void this.replanTemplate(); });
+      l.createSpan({ text: has ? label : `${label} · none in this template` });
+    };
+    part("rows", "Rows", !!t.structure);
+    part("columns", "Columns", t.columns.length > 0);
+    if (t.columns.length && sheet.choices.columns) {
+      const cols = section.createDiv({ cls: "czm-pg-field" });
+      cols.createDiv({ text: "Columns · untick to leave one out, name what is a placeholder", cls: "czm-pg-field-label" });
+      const cast = this.grid.characters.map((e) => e.name);
+      for (const c of t.columns) {
+        const row = cols.createDiv({ cls: "czm-pg-template-col" });
+        const tick = row.createEl("input", { attr: { type: "checkbox", "aria-label": `Include ${c.heading}` } });
+        tick.checked = sheet.choices.ticked.has(c.heading);
+        tick.addEventListener("change", () => { if (tick.checked) sheet.choices.ticked.add(c.heading); else sheet.choices.ticked.delete(c.heading); void this.replanTemplate(); });
+        const job = t.jobs.time === c.heading ? "time" : t.jobs.pov === c.heading ? "POV" : t.jobs.beats === c.heading ? "plot point" : t.jobs.theme === c.heading ? "main theme" : "";
+        if (c.placeholder === "every-character") {
+          row.createSpan({ text: `Arc: every character`, cls: "czm-pg-template-col-name" });
+          row.createSpan({ text: `${plural(cast.length, "arc")} from the cast`, cls: "czm-map-row-meta" });
+        } else if (c.placeholder === "arc") {
+          row.createSpan({ text: "Arc:", cls: "czm-pg-template-col-name" });
+          const select = row.createEl("select", { cls: "dropdown czm-pg-template-bind", attr: { "aria-label": `${c.name}: bind to a character` } });
+          const none = select.createEl("option", { text: `${c.name} (as written)` }); none.value = "";
+          for (const name of cast) { const o = select.createEl("option", { text: name }); o.value = name; }
+          select.value = sheet.choices.bindings[c.heading] ?? "";
+          select.addEventListener("change", () => { sheet.choices.bindings[c.heading] = select.value; void this.replanTemplate(); });
+        } else {
+          row.createSpan({ text: c.kind === "free" ? "" : `${c.kind.charAt(0).toUpperCase()}${c.kind.slice(1)}:`, cls: "czm-pg-template-col-name" });
+          const field = row.createEl("input", { cls: "czm-pg-template-rename", attr: { type: "text", "aria-label": `${c.heading}: name`, placeholder: c.name } });
+          field.value = sheet.choices.names[c.heading] ?? "";
+          field.addEventListener("change", () => { sheet.choices.names[c.heading] = field.value.trim(); void this.replanTemplate(); });
+          field.addEventListener("keydown", (ev) => { ev.stopPropagation(); if (ev.key === "Enter") { ev.preventDefault(); field.blur(); } });
+        }
+        if (job) row.createSpan({ text: job, cls: "czm-pg-side-job" });
+      }
+    }
+    const p = sheet.plan;
+    const preview = section.createDiv({ cls: "czm-pg-field" });
+    preview.createDiv({ text: "What gets written", cls: "czm-pg-field-label" });
+    const lines: string[] = [];
+    if (p) {
+      if (p.headings.length) { lines.push("Story threads.md"); lines.push(...p.headings.map((h) => `  ## ${h}`)); }
+      if (p.skipped.length) lines.push(`  ${plural(p.skipped.length, "heading")} already there: ${p.skipped.join(", ")}`);
+      if (p.structure) { lines.push(`Outline.md · ${plural(p.scenes, "scene")}`); for (const a of t.outline.acts) lines.push(`  ${a.title || "(no act)"}: ${a.chapters.flatMap((c) => c.scenes).map((sc) => sc.title).join(", ")}`); }
+      const jobs = Object.entries(p.jobs).map(([k, v]) => `${k === "theme" ? "main theme" : k === "pov" ? "POV" : k === "beats" ? "plot point" : k}: ${v}`);
+      if (p.structure && (p.jobs.beats || project.plotBeats)) lines.push(`Plot point · one stop per scene from the template's beats`);
+      if (jobs.length) lines.push(`Project note · ${jobs.join(" · ")}`);
+    }
+    const tree = preview.createEl("pre", { cls: "czm-pg-build-tree", attr: { "aria-label": "What will be written" } });
+    tree.setText(sheet.loading ? "Reading what is already there…" : lines.length ? lines.join("\n") : "Nothing to write with these choices.");
+    section.createDiv({ text: "Headings only: nothing is written under them, and nothing that exists changes. Columns keep the template's order inside each kind; the grid groups columns by kind.", cls: "czm-map-absent" });
+    const foot = section.createDiv({ cls: "czm-pg-proposals-foot" });
+    const cancel = foot.createEl("button", { text: "Cancel", cls: "czm-pg-template-cancel" });
+    cancel.addEventListener("click", () => { this.templateSheet = null; this.renderSide(); });
+    const go = foot.createEl("button", { text: "Apply", cls: "czm-pg-template-go mod-cta" });
+    go.disabled = sheet.loading || !p || (p.headings.length === 0 && !p.structure && Object.keys(p.jobs).length === 0);
+    go.addEventListener("click", () => { go.disabled = true; void this.applyTemplate(); });
+  }
+
+  private async applyTemplate(): Promise<void> {
+    const sheet = this.templateSheet, project = this.project;
+    const t = sheet?.list[sheet.chosen];
+    if (!sheet || !sheet.plan || !project || !t) return;
+    let result: ApplyResult;
+    try { result = await this.source.applyTemplate(project, sheet.plan); } catch (e) { this.status?.fail(couldNot(`apply “${t.name}”`, e)); this.renderSide(); return; }
+    this.templateSheet = null;
+    this.selection = null;
+    // The project note's keys are read on the next build; a short wait lets the cache catch up before the redraw.
+    await new Promise((r) => window.setTimeout(r, Object.keys(result.plan.jobs).length ? 300 : 0));
+    await this.show(project, true);
+    const jobs = Object.keys(result.plan.jobs).length;
+    const what = [result.plan.structure ? `${plural(result.plan.scenes, "scene")} in ${plural(t.outline.acts.filter((a) => a.title).length, "act")}` : "", result.added.length ? plural(result.added.length, "column") : "", jobs ? `${plural(jobs, "job")} set` : "", result.beatStops ? `${plural(result.beatStops, "plot point")} filled` : ""].filter(Boolean).join(", ");
+    this.status?.undoable(`Applied ${t.name}: ${what || "nothing new"}`, async () => { await result.undo(); await new Promise((r) => window.setTimeout(r, jobs ? 300 : 0)); await this.show(project, true); });
+  }
+
+  private renderSaveSheet(section: HTMLElement): void {
+    const sheet = this.saveSheet, project = this.project;
+    if (!sheet || !project) return;
+    const name = section.createDiv({ cls: "czm-pg-field" });
+    name.createDiv({ text: "Name", cls: "czm-pg-field-label" });
+    const field = name.createEl("input", { cls: "czm-pg-save-name", attr: { type: "text", "aria-label": "Template name", placeholder: "Noir in five moves" } });
+    field.value = sheet.name;
+    field.addEventListener("input", () => { sheet.name = field.value; });
+    field.addEventListener("keydown", (ev) => { ev.stopPropagation(); if (ev.key === "Enter") { ev.preventDefault(); void this.saveTemplate(); } });
+    section.createDiv({ text: `Folder · ${this.source.templatesFolder() || "the vault root"} (set in Creative Writer settings)`, cls: "czm-map-absent" });
+    const parts = section.createDiv({ cls: "czm-pg-field" });
+    parts.createDiv({ text: "Includes", cls: "czm-pg-field-label" });
+    const partRow = parts.createDiv({ cls: "czm-pg-template-parts" });
+    const part = (key: "columns" | "rows", label: string, has: boolean, hint: string) => {
+      const l = partRow.createEl("label", { cls: `czm-pg-template-part${has ? "" : " is-off"}` });
+      const box = l.createEl("input", { attr: { type: "checkbox", "aria-label": label } });
+      box.checked = has && sheet[key]; box.disabled = !has;
+      box.addEventListener("change", () => { sheet[key] = box.checked; });
+      l.createSpan({ text: `${label} · ${hint}` });
+    };
+    part("columns", "Columns", this.grid.columns.length > 0, this.grid.columns.length ? `${plural(this.grid.columns.length, "heading")}, jobs kept` : "none yet");
+    part("rows", "Rows", !!this.grid.plan && !this.grid.plan.outline.built, this.grid.plan && !this.grid.plan.outline.built ? `${plural(this.grid.plan.outline.scenes, "scene")} from Outline.md, loglines and beats kept` : "no outline");
+    section.createDiv({ text: "Stops, readings and prose are not copied. The note gets creative-writer-template in its front matter and never overwrites one with the same name.", cls: "czm-map-absent" });
+    const foot = section.createDiv({ cls: "czm-pg-proposals-foot" });
+    const cancel = foot.createEl("button", { text: "Cancel", cls: "czm-pg-save-cancel" });
+    cancel.addEventListener("click", () => { this.saveSheet = null; this.renderSide(); });
+    const go = foot.createEl("button", { text: "Save", cls: "czm-pg-save-go mod-cta" });
+    go.addEventListener("click", () => { go.disabled = true; void this.saveTemplate().finally(() => { go.disabled = false; }); });
+  }
+
+  private async saveTemplate(): Promise<void> {
+    const sheet = this.saveSheet, project = this.project;
+    if (!sheet || !project) return;
+    const name = sheet.name.trim();
+    if (!name) { this.status?.fail("Give the template a name."); return; }
+    let path: string;
+    try { path = await this.source.saveTemplate(project, name, { columns: sheet.columns, rows: sheet.rows }); } catch (e) { this.status?.fail(couldNot("save the template", e)); return; }
+    this.saveSheet = null;
+    this.renderSide();
+    this.status?.action(`Saved ${path}`, "Open", () => this.source.openNote(path));
+  }
+
+  private async build(shape: ScaffoldShape): Promise<void> {
+    const project = this.project;
+    if (!project) return;
+    let result: ScaffoldResult;
+    try { result = await this.source.scaffold(project, shape); } catch (e) { this.status?.fail(couldNot("build the manuscript", e)); this.sheet = null; this.renderSide(); return; }
+    this.sheet = null;
+    this.selection = null;
+    await this.show(project, true);
+    const p = result.plan;
+    this.status?.undoable(`Built ${plural(p.created, "note")}${p.folders.length ? ` in ${plural(p.folders.length, "folder")}` : ""}, ${plural(p.scenes, "scene")}, ${plural(result.relinked, "stop")} relinked`, async () => { await result.undo(); await this.show(project, true); });
+  }
+
+  /** A planned scene's menu: more rows around it, its name, its place, and taking it out. */
+  private rowMenu(row: GridRow): readonly (MenuEntry | "-")[] {
+    return [
+      { label: "New scene below", icon: "file-plus", command: "plot-grid-new-scene", onClick: () => void this.newScene(row) },
+      { label: "New chapter below", command: "plot-grid-new-chapter", onClick: () => void this.newChapter(row) },
+      { label: "New act", command: "plot-grid-new-act", onClick: () => void this.newAct() },
+      "-",
+      { label: "Rename…", icon: "pencil", onClick: () => this.renameRow(row) },
+      { label: "Logline…", onClick: () => { const td = this.body?.querySelector<HTMLElement>(`.czm-pg-scene[data-row="${this.rows.indexOf(row)}"] .czm-pg-plot`); if (td) this.editLogline(row, td); } },
+      { label: "Move up", icon: "arrow-up", onClick: () => void this.moveRow(row, -1) },
+      { label: "Move down", icon: "arrow-down", onClick: () => void this.moveRow(row, 1) },
+      "-",
+      { label: "Delete scene", icon: "x", onClick: () => void this.deleteRow(row) },
+    ];
+  }
+
+  /** The ⋯ on an outline chapter's or act's header row: rename, move, add after, delete. */
+  private groupControls(th: HTMLElement, row: GridRow, level: "chapter" | "act"): void {
+    const group = row.group;
+    if (!group) return;
+    const line = level === "chapter" ? group.chapterLine : group.actLine;
+    if (line < 0) return;
+    const name = level === "chapter" ? group.chapter : group.act;
+    const menu = (): readonly (MenuEntry | "-")[] => [
+      ...(level === "chapter" ? [{ label: "New chapter below", command: "plot-grid-new-chapter", onClick: () => void this.newChapter(row) } as MenuEntry, "-" as const] : []),
+      { label: `Rename ${level}…`, icon: "pencil", onClick: () => this.inlineRename(th.querySelector<HTMLElement>(".czm-pg-group-name") ?? th, name, `Rename the ${level}`, (title) => this.writeOutline(`Renamed “${name}” to “${title}”`, (md) => renameHeading(md, line, title))) },
+      { label: `Move ${level} up`, icon: "arrow-up", onClick: () => void this.writeOutline(`Moved “${name}” up`, (md) => moveHeading(md, line, -1)) },
+      { label: `Move ${level} down`, icon: "arrow-down", onClick: () => void this.writeOutline(`Moved “${name}” down`, (md) => moveHeading(md, line, 1)) },
+      "-",
+      { label: `Delete ${level} and its scenes`, icon: "x", onClick: () => void this.writeOutline(`Deleted “${name}” and everything under it`, (md) => removeHeading(md, line)) },
+    ];
+    const more = th.createEl("button", { cls: "clickable-icon czm-pg-row-more", attr: { "aria-label": `${name || level}: ${level} menu`, "aria-haspopup": "menu" } });
+    setIcon(more, "more-horizontal");
+    more.addEventListener("click", (ev) => { ev.stopPropagation(); showOverflow(ev, menu()); });
+    th.addEventListener("contextmenu", (ev) => { ev.preventDefault(); showOverflow(ev, menu()); });
+  }
+
+  /** One write to Outline.md with Undo: the note as it was comes back whole, and anything done alongside is undone with it. */
+  private async writeOutline(what: string, change: (markdown: string) => string, alongside: { forward: () => Promise<void>; back: () => Promise<void> } | null = null, then?: () => void): Promise<void> {
+    const project = this.project;
+    if (!project) return;
+    let result: { before: string; after: string };
+    try {
+      result = await this.source.updateOutline(project, change);
+      await alongside?.forward();
+    } catch (e) { this.status?.fail(couldNot(what.replace(/^\w/, (c) => c.toLowerCase()), e)); return; }
+    if (result.before === result.after) { this.status?.say("Nothing to change there."); return; }
+    await this.show(project, true);
+    then?.();
+    this.status?.undoable(what, async () => { await this.source.updateOutline(project, () => result.before); await alongside?.back(); await this.show(project, true); });
+  }
+
+  /** A scene after this row, or at the end of the plan; the new row opens for its name. */
+  private async newScene(after: GridRow | null): Promise<void> {
+    const at = after?.group ? after.scene.line : null;
+    await this.writeOutline("New scene written to Outline.md", (md) => insertScene(md, at), null, () => this.openNewRow(after));
+  }
+
+  private async newChapter(after: GridRow | null): Promise<void> {
+    const at = after?.group && after.group.chapterLine >= 0 ? after.group.chapterLine : null;
+    await this.writeOutline("New chapter written to Outline.md, with a first scene", (md) => insertChapter(md, at), null, () => this.openNewRow(after));
+  }
+
+  private async newAct(): Promise<void> {
+    await this.writeOutline("New act written to Outline.md, with a chapter and a scene", (md) => insertAct(md), null, () => this.openNewRow(null));
+  }
+
+  /** The row just written, "New scene" nearest after the one it was added from, or the last: focus lands on it and its name opens for typing. */
+  private openNewRow(after: GridRow | null): void {
+    const fresh = this.rows.filter((r) => r.group && r.scene.title === "New scene" && (!after || r.scene.line > after.scene.line));
+    const row = after ? fresh[0] : fresh.at(-1);
+    if (!row) return;
+    this.renameRow(row);
+  }
+
+  /** The scene's name as a field in its row; Enter saves, Escape puts it back. A renamed scene keeps its stops: the threads note is relinked. */
+  private renameRow(row: GridRow): void {
+    const i = this.rows.indexOf(row);
+    if (i < 0 || !row.group) return;
+    this.ensureRow(i);
+    const th = this.body?.querySelector<HTMLElement>(`.czm-pg-scene[data-row="${i}"] .czm-pg-scene-head`);
+    if (!th) return;
+    const project = this.project;
+    this.inlineRename(th, row.scene.title, "Rename the scene", async (title) => {
+      if (!project) return;
+      const from = sceneLink(row.scene), to = `${basenameOf(row.scene.path)}#${title}`;
+      await this.writeOutline(`Renamed “${row.scene.title}” to “${title}”`, (md) => renameHeading(md, row.scene.line, title), { forward: async () => { await this.source.relinkStops(project, from, to); }, back: async () => { await this.source.relinkStops(project, to, from); } });
+    });
+  }
+
+  /** A field in place of a name; a blur saves like Enter, so a click elsewhere is not a lost rename. */
+  private inlineRename(host: HTMLElement, current: string, label: string, save: (title: string) => Promise<void>): void {
+    if (this.editing) return;
+    this.editing = true;
+    host.empty();
+    host.addClass("is-renaming");
+    const input = host.createEl("input", { cls: "czm-pg-row-rename", attr: { type: "text", "aria-label": label } });
+    input.value = current;
+    let done = false;
+    const finish = (ok: boolean) => {
+      if (done) return;
+      done = true;
+      this.editing = false;
+      const title = input.value.trim();
+      if (ok && title && title !== current) void save(title); else this.renderTable();
+    };
+    input.addEventListener("keydown", (ev) => { ev.stopPropagation(); if (ev.key === "Escape") { ev.preventDefault(); finish(false); } else if (ev.key === "Enter") { ev.preventDefault(); finish(true); } });
+    input.addEventListener("click", (ev) => ev.stopPropagation());
+    input.addEventListener("blur", () => finish(true));
+    input.focus();
+    input.select();
+  }
+
+  /** The logline as a field in the Plot cell: a comment under the heading in Outline.md, never prose. */
+  private editLogline(row: GridRow, td: HTMLElement): void {
+    if (this.editing || !row.group) return;
+    this.editing = true;
+    td.empty();
+    td.addClass("is-editing");
+    const field = td.createEl("textarea", { cls: "czm-pg-editor czm-pg-logline-field", attr: { rows: "1", "aria-label": `Logline for ${row.scene.title}`, placeholder: "What happens here, in a line" } });
+    field.value = row.logline ?? "";
+    const grow = () => { field.setCssStyles({ height: "auto" }); field.setCssStyles({ height: `${field.scrollHeight}px` }); };
+    field.addEventListener("input", grow);
+    let done = false;
+    const finish = (save: boolean) => {
+      if (done) return;
+      done = true;
+      this.editing = false;
+      const text = field.value.trim();
+      if (save && text !== (row.logline ?? "")) void this.writeOutline(text ? `Logline written for “${row.scene.title}”` : `Logline removed from “${row.scene.title}”`, (md) => setLogline(md, row.scene.line, text));
+      else this.renderTable();
+    };
+    field.addEventListener("keydown", (ev) => { ev.stopPropagation(); if (ev.key === "Escape") { ev.preventDefault(); finish(false); } else if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); finish(true); } });
+    field.addEventListener("click", (ev) => ev.stopPropagation());
+    field.addEventListener("blur", () => finish(true));
+    field.focus();
+    grow();
+    field.setSelectionRange(field.value.length, field.value.length);
+  }
+
+  private async moveRow(row: GridRow, direction: -1 | 1): Promise<void> {
+    if (!row.group) return;
+    await this.writeOutline(`Moved “${row.scene.title}” ${direction < 0 ? "up" : "down"}`, (md) => moveHeading(md, row.scene.line, direction));
+  }
+
+  private async deleteRow(row: GridRow): Promise<void> {
+    if (!row.group) return;
+    await this.writeOutline(`Deleted “${row.scene.title}” from Outline.md; its stops stay in Story threads.md until you take them out`, (md) => removeHeading(md, row.scene.line));
+  }
+
+  /** Writes the heading; a column picked from a template with a job takes the job too, unless the project already gave it to another column. */
+  private async addColumn(name: string, job: SpecialColumn | null = null): Promise<void> {
     const project = this.project;
     if (!project) return;
     try {
       await this.source.addThread(project, name);
     } catch (e) { this.status?.fail(couldNot(`add “${name}”`, e)); return; }
+    const taken = job === "time" ? project.plotTime : job === "pov" ? project.plotPov : job === "beats" ? project.plotBeats : job === "main-theme" ? project.plotTheme : undefined;
+    const given = job && !taken;
+    if (given) { await this.source.setProjectKey(project, SPECIAL_KEY[job], name).catch(() => undefined); await new Promise((r) => window.setTimeout(r, 300)); }
     await this.show(project, true);
-    this.status?.say(`Column “${name}” written to Story threads.md.`);
+    this.status?.say(`Column “${name}” written to Story threads.md${given ? `, and it is the ${SPECIAL_LABEL[job]} column` : job && taken ? ` (the ${SPECIAL_LABEL[job]} job stays with “${taken}”)` : ""}.`);
     const col = this.shown.findIndex((c) => c.heading.heading.toLowerCase() === name.trim().toLowerCase());
     if (col >= 0) this.select({ col, row: 0 });
   }
@@ -1119,6 +1931,17 @@ export class PlotGridView extends ItemView {
 }
 
 function plural(n: number, word: string): string { return `${n} ${word}${n === 1 ? "" : "s"}`; }
+
+/** "13 Sept" from the snapshot's day, and the label the writer gave the note after it: "13 Sept · before the rewrite". */
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "June", "July", "Aug", "Sept", "Oct", "Nov", "Dec"];
+function snapshotLabel(snap: { day: string; label: string }): string {
+  const [, m, d] = snap.day.split("-").map(Number);
+  const date = m && d && MONTHS[m - 1] ? `${d} ${MONTHS[m - 1]}` : snap.day;
+  return snap.label ? `${date} · ${snap.label}` : date;
+}
+
+/** A value inside a quoted attribute selector: the two characters that would end it are escaped. */
+function attrValue(v: string): string { return v.replace(/["\\]/g, "\\$&"); }
 
 /** The folder a note sits in below the project, read as its act; a note in the project's root has none. */
 export function actOf(path: string, scope: string): string {

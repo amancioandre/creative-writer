@@ -81,7 +81,8 @@ export function looksLikeName(surface: string, tagger?: PosTagger): boolean {
 export function buildStoryGraph(project: string, notes: readonly ProjectNote[], file: StoryMapFile, options: BuildOptions = DEFAULT_BUILD_OPTIONS): StoryGraph {
   const sorted = [...notes].sort(compareNotes);
   const index = new EntityIndex(sorted);
-  const isSceneNote = (note: ProjectNote) => !index.entities.some((e) => e.path === note.path); // an entity's own note is not a scene
+  // An entity's own note is not a scene, and neither is the plugin's own data note, whether or not it carries its front matter.
+  const isSceneNote = (note: ProjectNote) => !index.entities.some((e) => e.path === note.path) && !PLUGIN_NOTE_NAMES.has(basenameOf(note.path));
 
   // Pass 1: unknown names seen mid-sentence anywhere become familiar, so pass 2 can count them at sentence start too.
   const familiar = new Set<string>();
@@ -142,7 +143,6 @@ export function buildStoryGraph(project: string, notes: readonly ProjectNote[], 
   }
   for (const note of sorted) {
     if (!isSceneNote(note)) continue;
-    if (basenameOf(note.path) === "Story map" || basenameOf(note.path) === "Story threads") continue;
     entities.push({ id: note.path, name: basenameOf(note.path), kind: "note", path: note.path, aliases: [], bookmarked: note.bookmarked, appearances: [], mentions: 0 });
   }
 
@@ -233,6 +233,9 @@ export function buildStoryGraph(project: string, notes: readonly ProjectNote[], 
 
   return { project, entities, edges: markConflicts([...edges.values()]), timeline, headings };
 }
+
+/** Notes the plugin writes beside a project, never read as chapters even when written by hand without their front matter. */
+export const PLUGIN_NOTE_NAMES: ReadonlySet<string> = new Set(["Story map", "Story threads"]);
 
 /** The heading an authored relationship's evidence points at. */
 export const RELATIONS_TITLE = "Relationships";

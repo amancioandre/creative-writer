@@ -7,6 +7,16 @@ export interface VaultLike {
   modify(file: unknown, content: string): Promise<void>;
   create(path: string, content: string): Promise<unknown>;
   createFolder(path: string): Promise<unknown>;
+  /** Only the build's undo deletes: a note it created and that is still exactly what it wrote. */
+  delete(file: unknown): Promise<void>;
+  /** The disk under the index: `vault.delete` cannot take a folder in every Obsidian build, the adapter's `rmdir` can, and `list` says whether it is truly empty first. */
+  adapter: { list(path: string): Promise<{ files: string[]; folders: string[] }>; rmdir(path: string, recursive: boolean): Promise<void> };
+}
+
+/** The note IO with the two removals the build's undo needs. */
+export interface NoteVaultIO extends NoteVaultLike {
+  remove(path: string): Promise<void>;
+  removeFolderIfEmpty(path: string): Promise<boolean>;
 }
 
 /**
@@ -14,9 +24,19 @@ export interface VaultLike {
  * on first write. A file is anything `getAbstractFileByPath` returns
  * without `children`; a folder has them.
  */
-export function vaultNoteIO(vault: VaultLike): NoteVaultLike {
+export function vaultNoteIO(vault: VaultLike): NoteVaultIO {
   const isFile = (p: string) => { const f = vault.getAbstractFileByPath(p); return !!f && f.children === undefined; };
   return {
+    remove: async (p) => { const f = vault.getAbstractFileByPath(p); if (f && f.children === undefined) await vault.delete(f); },
+    removeFolderIfEmpty: async (p) => {
+      const f = vault.getAbstractFileByPath(p);
+      if (!f || f.children === undefined) return false;
+      // The index can lag a deletion; the disk is asked, so a folder with anything still in it is never touched.
+      const on = await vault.adapter.list(p);
+      if (on.files.length || on.folders.length) return false;
+      await vault.adapter.rmdir(p, true);
+      return true;
+    },
     exists: async (p) => isFile(p),
     read: async (p) => vault.cachedRead(vault.getAbstractFileByPath(p)),
     write: async (p, content) => {

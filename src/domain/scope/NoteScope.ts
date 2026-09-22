@@ -2,6 +2,7 @@ import { STORY_MAP_FLAG } from "../story/StoryMapFile";
 import { STORY_THREADS_FLAG } from "../threads/StoryThreadsNote";
 import { WRITING_LOG_FLAG } from "../progress/WritingLogNote";
 import { MANUSCRIPT_EXPORT_FLAG } from "../manuscript/Export";
+import { OUTLINE_FLAG } from "../plot/Outline";
 
 /**
  * Where the plugin runs — and what it counts. One rule for every feature:
@@ -20,7 +21,7 @@ export interface ScopeSettings {
 export const FRONTMATTER_KEY = "creative-writer";
 
 /** Front-matter keys that mark a note as one the plugin wrote itself; never prose, never counted, never read. */
-export const PLUGIN_DATA_FLAGS: readonly string[] = [WRITING_LOG_FLAG, STORY_MAP_FLAG, STORY_THREADS_FLAG, MANUSCRIPT_EXPORT_FLAG];
+export const PLUGIN_DATA_FLAGS: readonly string[] = [WRITING_LOG_FLAG, STORY_MAP_FLAG, STORY_THREADS_FLAG, MANUSCRIPT_EXPORT_FLAG, OUTLINE_FLAG];
 
 export function isPluginDataNote(frontmatter: unknown): boolean {
   if (!frontmatter || typeof frontmatter !== "object") return false;

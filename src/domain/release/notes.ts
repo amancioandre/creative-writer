@@ -27,10 +27,10 @@ export const WELCOME: NoteCopy = {
 };
 
 export const UPDATE: NoteCopy = {
-  headline: "Relationships on the story map read one way",
+  headline: "The plot grid starts before the chapters exist",
   bullets: [
-    "A line under Relationships is a sentence: this note → label → that note, and the map draws the arrow",
-    "Two notes that name each other share one line, a word at each end; no grey link doubles it",
-    "The model's relationships are dotted with a hollow head, yours solid with a filled one",
+    "New scene writes the plan to Outline.md; Build the manuscript turns it into folders and chapter notes, with Undo",
+    "Start from a template: Three acts, Save the Cat, Hero's journey, Story analysis, or a note of your own",
+    "Snapshots as tabs, groups with a caret, blocks you can drag, and a plot point column with a job",
   ],
 };

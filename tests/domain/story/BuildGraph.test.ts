@@ -224,3 +224,16 @@ describe("looksLikeName", () => {
     expect(g.entities.filter((e) => e.kind === "candidate").map((e) => e.name)).toEqual(["Bear"]);
   });
 });
+
+describe("the plugin's own notes", () => {
+  it("never reads Story threads or Story map as a chapter, front matter or not", () => {
+    const notes: ProjectNote[] = [
+      { path: "Novel/Story threads.md", frontmatter: {}, links: [], bookmarked: false, bookmarkedHeadings: [], scenes: splitScenes("## Arc: [[Anna]]\n\n## Subplot: The letter\n") },
+      { path: "Novel/Story map.md", frontmatter: {}, links: [], bookmarked: false, bookmarkedHeadings: [], scenes: splitScenes("## Data\nnot prose") },
+      { path: "Novel/One.md", frontmatter: {}, links: [], bookmarked: false, bookmarkedHeadings: [], scenes: splitScenes("# Camp\nAnna woke.") },
+    ];
+    const graph = buildStoryGraph("Novel", notes, EMPTY_STORY_MAP_FILE);
+    expect(graph.headings?.map((h) => h.path)).toEqual(["Novel/One.md"]);
+    expect(graph.entities.map((e) => e.path)).toEqual(["Novel/One.md"]);
+  });
+});

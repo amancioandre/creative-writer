@@ -171,6 +171,10 @@ Plan · verified · broken from anchors; `v`; counts in headers and the state li
 
 `ColumnProposer` port over the same adapters; input is the project's events and cast, output at most eight kinded threads with evidence scenes, arcs for the cast first. The list, the checkboxes, the headings written. **Deliverable:** an empty grid is two clicks from a scaffolded one.
 
+### 8 — Outline first (0.13.0)
+
+Rows before chapters. `domain/plot/Outline.ts` reads and edits `Outline.md` (`#` act, `##` chapter, `###` scene, an HTML comment as the logline; `insertScene`, `insertChapter`, `insertAct`, `renameHeading`, `setLogline`, `moveHeading`, `removeHeading`, `markBuilt`); `outlineRows` in `PlotGrid.ts` appends its scenes as outline rows carrying a `RowGroup` (chapter and act by heading, since every row shares one path), and `resolveThreadRef` already places `[[Outline#Scene]]` stops in them. `domain/text/Comments.ts` strips `<!-- -->` and `%% %%` alike, across lines, in `proseParagraphs` and `splitScenes`. `domain/plot/Scaffold.ts` plans the build purely (paths, contents, relinks, what is skipped) and `ScaffoldManuscript` writes it, relinks the threads note, marks the outline built, and hands back an exact undo. The view groups by `row.group`, gives planned rows and their header rows a ⋯ menu, edits names and loglines in place, and draws the build sheet in the side column. The outline note carries `creative-writer-outline`, one of the plugin-data flags, so nothing else reads it.
+
 ### 7 — Long books
 
 Row virtualisation past fifty scenes; fit row heights; *Export grid* is *Snapshot the grid* without the date, plus optional CSV. **Deliverable:** a 120-scene manuscript scrolls without stutter.

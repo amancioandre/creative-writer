@@ -42,6 +42,43 @@ export function snapshotNote(grid: PlotGrid, project: ProjectSpec, day: string |
   return lines.join("\n") + "\n";
 }
 
+/** A snapshot read back for the tabs: the columns and rows of its table, as text. Read-only; the note is never edited from the grid. */
+export interface SnapshotTable {
+  readonly columns: readonly string[];
+  readonly rows: readonly { readonly chapter: string; readonly scene: string; readonly words: string; readonly outline: boolean; readonly cells: readonly string[] }[];
+  /** The line of explanation the snapshot carries, without its comment marks. */
+  readonly summary: string;
+}
+
+const SNAPSHOT_NAME = /^Plot grid · (\d{4}-\d{2}-\d{2})(?: · (.+))?$/;
+
+/** `Plot grid · 2026-09-13 · before the rewrite` → the day and the label the writer gave it by renaming the note. Null for any other note. */
+export function snapshotName(path: string): { day: string; label: string } | null {
+  const m = SNAPSHOT_NAME.exec(basenameOf(path));
+  return m ? { day: m[1]!, label: m[2]?.trim() ?? "" } : null;
+}
+
+export function parseSnapshot(markdown: string): SnapshotTable {
+  const lines = markdown.split("\n");
+  const summary = lines.map((l) => /^%%\s*(.*?)\s*%%$/.exec(l.trim())?.[1]).find((x): x is string => !!x) ?? "";
+  const table = lines.filter((l) => l.trim().startsWith("|"));
+  if (table.length < 2) return { columns: [], rows: [], summary };
+  const split = (l: string) => l.trim().replace(/^\||\|$/g, "").split(/(?<!\\)\|/).map((c) => c.replace(/\\\|/g, "|").trim());
+  const head = split(table[0]!);
+  const columns = head.slice(2);
+  const rows: { chapter: string; scene: string; words: string; outline: boolean; cells: string[] }[] = [];
+  let chapter = "";
+  for (const line of table.slice(2)) {
+    const cells = split(line);
+    const first = cells[0] ?? "";
+    const band = /^\*\*(.+)\*\*$/.exec(first);
+    if (band && cells.slice(1).every((c) => !c)) { chapter = band[1]!; continue; }
+    const outline = /\*\(outline\)\*$/.test(first);
+    rows.push({ chapter, scene: first.replace(/\s*\*\(outline\)\*$/, ""), words: cells[1] ?? "", outline, cells: columns.map((_, i) => cells[i + 2] ?? "") });
+  }
+  return { columns, rows, summary };
+}
+
 function cellOf(cell: GridCell): string {
   if (!cell.stop) return "";
   const s = cell.stop;

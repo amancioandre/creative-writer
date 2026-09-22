@@ -3,6 +3,8 @@
  * list items, block quotes' markers, code fences, tables, front matter and
  * inline markup are not the writer's sentences and would skew every metric.
  */
+import { stripComments, type CommentState } from "./Comments";
+
 export interface ProseParagraph {
   readonly text: string;
   /** 0-based line range in the source, inclusive. */
@@ -23,6 +25,7 @@ export function proseParagraphs(markdown: string): ProseParagraph[] {
     if (end > 0) start = end + 1;
   }
 
+  let comment: CommentState = null;
   let buffer: string[] = [];
   let first = -1;
   const flush = (lastLine: number) => {
@@ -38,11 +41,20 @@ export function proseParagraphs(markdown: string): ProseParagraph[] {
       flush(i - 1);
       continue;
     }
-    if (inFence || raw.trim() === "" || SKIP_LINE.test(raw)) {
+    if (inFence || raw.trim() === "") {
       flush(i - 1);
       continue;
     }
-    const clean = stripInlineMarkup(raw.replace(/^\s*>\s?/, ""));
+    // A comment is not prose, in either syntax, however many lines it runs. A line that is only a comment is
+    // neither a paragraph nor a break in one: the writer's hidden note sits inside the paragraph it annotates.
+    const stripped = stripComments(raw, comment);
+    comment = stripped.state;
+    if (stripped.text.trim() === "") continue;
+    if (SKIP_LINE.test(stripped.text)) {
+      flush(i - 1);
+      continue;
+    }
+    const clean = stripInlineMarkup(stripped.text.replace(/^\s*>\s?/, ""));
     if (first < 0) first = i;
     buffer.push(clean);
   }
@@ -54,6 +66,7 @@ export function proseParagraphs(markdown: string): ProseParagraph[] {
 export function stripInlineMarkup(line: string): string {
   return line
     .replace(/%%.*?%%/g, "")
+    .replace(/<!--.*?-->/g, "")
     .replace(/`[^`]*`/g, "")
     .replace(/!\[\[[^\]]*\]\]/g, "")
     .replace(/\[\[([^\]|]*)\|?([^\]]*)\]\]/g, (_m, target: string, alias: string) => alias || target)

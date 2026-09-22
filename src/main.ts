@@ -90,6 +90,12 @@ import { CostLedger, costOf, PRICES } from "./domain/style/llm/CostLedger";
 import type { ColumnAnalyser } from "./application/ports/ColumnAnalyser";
 import { STORY_THREADS_VIEW_TYPE, StoryThreadsView } from "./infrastructure/obsidian/views/StoryThreadsView";
 import { StoryThreadsNoteRepository } from "./infrastructure/obsidian/StoryThreadsNoteRepository";
+import { OutlineNoteRepository } from "./infrastructure/obsidian/OutlineNoteRepository";
+import { ScaffoldManuscript } from "./application/use-cases/ScaffoldManuscript";
+import { ApplyTemplate } from "./application/use-cases/ApplyTemplate";
+import { parseSnapshot, snapshotName } from "./domain/plot/Snapshot";
+import { VaultTemplates } from "./infrastructure/obsidian/VaultTemplates";
+import { relinkThreadItems } from "./domain/threads/StoryThreadsNote";
 import { BuildStoryThreads } from "./application/use-cases/BuildStoryThreads";
 import { EditStoryThread } from "./application/use-cases/EditStoryThread";
 import { AnalyzeSceneFacts } from "./application/use-cases/AnalyzeSceneFacts";
@@ -530,7 +536,10 @@ export default class CreativeZenModePlugin extends Plugin {
     const threadsRepo = new StoryThreadsNoteRepository(notes);
     const buildThreads = new BuildStoryThreads(buildStoryMap, projectNotes, storyRepo, threadsRepo, undefined, { segmenter: new IntlSentenceSegmenter(), sensitivity: () => this.current.threads.echoSensitivity });
     // The plot grid: the timeline grown up. Same view type, so leaves open across the update come back as the grid.
-    const buildPlotGrid = new BuildPlotGrid(buildThreads);
+    const outlineRepo = new OutlineNoteRepository(notes);
+    const scaffold = new ScaffoldManuscript(outlineRepo, threadsRepo, notes, () => toDay(new Date()));
+    const templates = new ApplyTemplate(new VaultTemplates(this.app, notes, () => this.current.plotGrid.templatesFolder), threadsRepo, outlineRepo, { set: (project, key, value) => this.setTextKey(project.notePath, key, value) });
+    const buildPlotGrid = new BuildPlotGrid(buildThreads, outlineRepo);
     const snapshotPlotGrid = new SnapshotPlotGrid(buildPlotGrid, notes);
     const editThread = new EditStoryThread(threadsRepo);
     const segmenter = new IntlSentenceSegmenter();
@@ -538,6 +547,26 @@ export default class CreativeZenModePlugin extends Plugin {
       ...storySource,
       build: (project) => buildPlotGrid.execute(project),
       threadsNotePath: (project) => StoryThreadsNoteRepository.pathFor(project),
+      outlinePath: (project) => outlineRepo.pathFor(project),
+      updateOutline: (project, change) => outlineRepo.update(project, change),
+      templates: () => templates.list(),
+      planTemplate: (project, template, choices, cast) => templates.plan(project, template, choices, cast),
+      applyTemplate: (project, plan) => templates.execute(project, plan),
+      saveTemplate: (project, name, parts) => templates.save(project, name, parts),
+      templatesFolder: () => this.current.plotGrid.templatesFolder,
+      snapshots: async (project) => {
+        const folder = project.scope.endsWith("/") || project.scope === "" ? project.scope : project.scope.slice(0, project.scope.lastIndexOf("/") + 1);
+        return this.app.vault.getMarkdownFiles()
+          .filter((f) => f.path.startsWith(folder) && !f.path.slice(folder.length).includes("/"))
+          .map((f) => ({ path: f.path, named: snapshotName(f.path) }))
+          .filter((x): x is { path: string; named: { day: string; label: string } } => x.named !== null)
+          .map((x) => ({ path: x.path, day: x.named.day, label: x.named.label }))
+          .sort((a, b) => b.day.localeCompare(a.day) || a.label.localeCompare(b.label));
+      },
+      readSnapshot: async (path) => parseSnapshot(await notes.read(path)),
+      scaffoldPreview: (project, shape) => scaffold.preview(project, shape),
+      scaffold: (project, shape) => scaffold.execute(project, shape),
+      relinkStops: async (project, from, to) => { let changed = 0; await threadsRepo.update(project, (md) => { const r = relinkThreadItems(md, from, to); changed = r.changed; return r.markdown; }); return changed; },
       addStops: (project, thread, stops) => editThread.addStops(project, thread, stops),
       removeFromThread: (project, thread, link) => editThread.removeRef(project, thread, link),
       addThread: (project, name) => editThread.addThread(project, name),
@@ -579,6 +608,7 @@ export default class CreativeZenModePlugin extends Plugin {
     this.addCommand({ id: "open-story-timeline", name: COMMANDS["open-story-timeline"], callback: () => void this.openPlotGrid(null) });
     this.viewCommands(PlotGridView, [
       ["story-timeline-clear-search", "clear-search"], ["plot-grid-toggle-cast", "toggle-cast"], ["plot-grid-open-note", "open-note"], ["plot-grid-toggle-panel", "toggle-panel"], ["plot-grid-new-column", "new-column"],
+      ["plot-grid-new-scene", "new-scene"], ["plot-grid-new-chapter", "new-chapter"], ["plot-grid-new-act", "new-act"], ["plot-grid-open-outline", "open-outline"], ["plot-grid-build-manuscript", "build-manuscript"], ["plot-grid-start-template", "start-template"], ["plot-grid-save-template", "save-template"],
       ["plot-grid-fold-arcs", "fold-arcs"], ["plot-grid-fold-themes", "fold-themes"], ["plot-grid-fold-subplots", "fold-subplots"], ["plot-grid-fold-threads", "fold-threads"],
       ["plot-grid-hide-column", "hide-column"], ["plot-grid-show-hidden", "show-hidden"], ["plot-grid-toggle-unmoved", "toggle-unmoved"], ["plot-grid-focus-search", "focus-search"], ["plot-grid-help", "help"],
       ["plot-grid-audit", "audit"], ["plot-grid-snapshot", "snapshot"], ["plot-grid-next-issue", "next-issue"], ["plot-grid-previous-issue", "previous-issue"], ["plot-grid-anchor", "anchor"],

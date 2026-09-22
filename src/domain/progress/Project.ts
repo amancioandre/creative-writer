@@ -42,6 +42,10 @@ export interface ProjectSpec {
   readonly plotPov?: string;
   readonly plotTime?: string;
   readonly plotTheme?: string;
+  /** The column that says which step of the framework a scene is at (`plot-beats`): the plot point. */
+  readonly plotBeats?: string;
+  /** The grid's block order (`plot-order`): the headings of the single columns with a job and the kind groups, left to right, as the writer dragged them. */
+  readonly plotOrder?: readonly string[];
   /** The project's own word list for the Words lens (`bad-words`), as a link target or path; absent, the global note. */
   readonly wordsNote?: string;
   /** How speech and thought are written in this project (`dialogue`, `thoughts`); absent, the vault-wide setting. */
@@ -84,7 +88,9 @@ export function parseProjectFrontmatter(frontmatter: unknown, notePath: string):
   const daily = Number(fm["writing-daily"] ?? fm["writing-goal"]);
   const rawIgnore = fm["story-ignore"];
   const ignoredNames = (Array.isArray(rawIgnore) ? rawIgnore : typeof rawIgnore === "string" ? rawIgnore.split(",") : []).filter((x): x is string => typeof x === "string").map((x) => x.trim()).filter(Boolean);
-  const text = (key: "plot-pov" | "plot-time" | "plot-theme") => { const v = fm[key]; return typeof v === "string" && v.trim() ? { [key === "plot-pov" ? "plotPov" : key === "plot-time" ? "plotTime" : "plotTheme"]: v.trim() } : {}; };
+  const text = (key: "plot-pov" | "plot-time" | "plot-theme" | "plot-beats") => { const v = fm[key]; return typeof v === "string" && v.trim() ? { [key === "plot-pov" ? "plotPov" : key === "plot-time" ? "plotTime" : key === "plot-theme" ? "plotTheme" : "plotBeats"]: v.trim() } : {}; };
+  const rawOrder = fm["plot-order"];
+  const plotOrder = (Array.isArray(rawOrder) ? rawOrder : typeof rawOrder === "string" ? rawOrder.split(",") : []).filter((x): x is string => typeof x === "string").map((x) => x.trim()).filter(Boolean);
   const wordsNote = linkTarget(fm["bad-words"]);
   const dialogueMarks = parseDialogueMarks(fm["dialogue"]);
   const rawSpeakers = fm["speakers"];
@@ -92,7 +98,8 @@ export function parseProjectFrontmatter(frontmatter: unknown, notePath: string):
   const thoughts = parseThoughtMarks(fm["thoughts"]);
   return {
     name, notePath, scope: noteScope ? notePath : folder, targetWords: hasTarget ? Math.floor(target) : 0, deadline, dailyWords: Number.isFinite(daily) && daily > 0 ? Math.floor(daily) : 0, ignoredNames,
-    ...text("plot-pov"), ...text("plot-time"), ...text("plot-theme"),
+    ...text("plot-pov"), ...text("plot-time"), ...text("plot-theme"), ...text("plot-beats"),
+    ...(plotOrder.length ? { plotOrder } : {}),
     ...(wordsNote ? { wordsNote } : {}),
     ...(dialogueMarks ? { dialogueMarks } : {}),
     ...(speakers.length ? { speakers } : {}),

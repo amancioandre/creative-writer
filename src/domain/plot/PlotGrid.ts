@@ -3,6 +3,7 @@ import { sceneKey, type Entity, type SceneRef, type StoryGraph } from "../story/
 import { parseColumnHeading, resolveThreadRef, type ColumnHeading, type ColumnKind } from "../threads/StoryThreadsNote";
 import type { Thread, ThreadModel, ThreadRef } from "../threads/Thread";
 import type { GridReading } from "../story/StoryMapFile";
+import type { Outline } from "./Outline";
 
 export { parseColumnHeading, type ColumnHeading, type ColumnKind } from "../threads/StoryThreadsNote";
 
@@ -41,14 +42,17 @@ export interface GridCell {
   readonly presentUnmoved: boolean;
 }
 
-/** A column the project note names for a job: `plot-pov`, `plot-time`, `plot-theme`. */
-export type SpecialColumn = "pov" | "time" | "main-theme";
+/** A column the project note names for a job: `plot-pov`, `plot-time`, `plot-theme`, `plot-beats` (the plot point: which step of the framework a scene is at). */
+export type SpecialColumn = "pov" | "time" | "main-theme" | "beats";
 
 /** What the project note names as the grid's POV, Time and main theme columns, by heading. */
 export interface SpecialColumns {
   readonly pov?: string;
   readonly time?: string;
   readonly theme?: string;
+  readonly beats?: string;
+  /** Block tokens left to right, as `plot-order` holds them: a single column's heading, or a kind group's word. Missing blocks follow in the default order. */
+  readonly order?: readonly string[];
   /** The project note's path: its own prose is the container, not a scene of the story. */
   readonly notePath?: string;
 }
@@ -77,6 +81,14 @@ export interface GridColumn {
   readonly rowIndex: ReadonlyMap<string, number>;
 }
 
+/** Where an outline row sits in the plan: the chapter and act it was written under, by heading, since every outline row shares one note. */
+export interface RowGroup {
+  readonly act: string;
+  readonly actLine: number;
+  readonly chapter: string;
+  readonly chapterLine: number;
+}
+
 export interface GridRow {
   readonly scene: SceneRef;
   /** Position on the manuscript axis, counting outline headings. */
@@ -91,6 +103,16 @@ export interface GridRow {
   readonly outline: boolean;
   /** Whose eyes the scene is seen through, from the POV column: the name written, and the character it names when the map knows one. */
   readonly pov: { readonly name: string; readonly entity: Entity | null } | null;
+  /** Set on a row planned in the outline note: its chapter and act there. A row from a chapter note takes both from its path. */
+  readonly group?: RowGroup;
+  /** The outline's logline for a planned scene, shown where the model's events would go. */
+  readonly logline?: string;
+}
+
+/** The outline note as the grid reads it: where it is, what it holds, and whether it has been built. */
+export interface OutlinePlan {
+  readonly path: string;
+  readonly outline: Outline;
 }
 
 export interface PlotGrid {
@@ -108,9 +130,13 @@ export interface PlotGrid {
   readonly broken: number;
   /** Open readings awaiting the writer, over every column. */
   readonly readings: number;
+  /** The outline note, when the project has one: its rows are the planned scenes until it is built. */
+  readonly plan: OutlinePlan | null;
+  /** Every character with a note, on the page or not yet: what a template's arc can be bound to before any prose exists. */
+  readonly characters: readonly Entity[];
 }
 
-export const EMPTY_PLOT_GRID: PlotGrid = { project: "", rows: [], columns: [], unknownPrefixes: [], cast: [], cells: 0, filled: 0, verified: 0, broken: 0, readings: 0 };
+export const EMPTY_PLOT_GRID: PlotGrid = { project: "", rows: [], columns: [], unknownPrefixes: [], cast: [], cells: 0, filled: 0, verified: 0, broken: 0, readings: 0, plan: null, characters: [] };
 
 /** The model's readings and the scenes' current hashes, so a reading of a scene that changed since is drawn stale. */
 export interface GridReadings {
@@ -123,19 +149,36 @@ const CAST_ORDER: Record<Entity["kind"], number> = { character: 0, candidate: 1,
 
 const KIND_ORDER: Record<ColumnKind, number> = { arc: 0, theme: 1, subplot: 2, free: 3 };
 
+/** The word a kind group goes by in `plot-order`. */
+export const GROUP_TOKEN: Record<ColumnKind, string> = { arc: "arcs", theme: "themes", subplot: "subplots", free: "threads" };
+
+/** A column's block: itself when it has a job that stands alone (Time, POV, the plot point), else its kind group. The main theme stays with the themes. */
+export function blockOf(column: { readonly heading: ColumnHeading; readonly special: SpecialColumn | null }): string {
+  return column.special === "time" || column.special === "pov" || column.special === "beats" ? column.heading.heading : GROUP_TOKEN[column.heading.kind];
+}
+
+/** The blocks in the order they are drawn: what `plot-order` says first, then whatever it left out in the default order. */
+export function blockOrder(special: SpecialColumns): string[] {
+  const defaults = [special.time, special.pov, special.beats, GROUP_TOKEN.arc, GROUP_TOKEN.theme, GROUP_TOKEN.subplot, GROUP_TOKEN.free].filter((t): t is string => !!t);
+  const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  const chosen = (special.order ?? []).filter((t) => defaults.some((d) => same(d, t))).map((t) => defaults.find((d) => same(d, t))!);
+  return [...chosen.filter((t, i) => chosen.findIndex((x) => same(x, t)) === i), ...defaults.filter((d) => !chosen.some((c) => same(c, d)))];
+}
+
 /**
  * Rows are the graph's headings in manuscript order (the timeline's rows
  * plus outline headings), columns the writer's threads from the threads
  * model, whose refs already carry each stop's anchor.
  */
-export function buildPlotGrid(graph: StoryGraph, model: ThreadModel, special: SpecialColumns = {}, read: GridReadings = NO_READINGS): PlotGrid {
-  const bare = gridRows(graph, special.notePath);
+export function buildPlotGrid(graph: StoryGraph, model: ThreadModel, special: SpecialColumns = {}, read: GridReadings = NO_READINGS, plan: OutlinePlan | null = null): PlotGrid {
+  const bare = gridRows(graph, special.notePath, plan);
   const rowIndex = new Map(bare.map((r) => [sceneKey(r.scene), r.index]));
   const writer = model.threads.filter((t) => t.kind === "writer");
   const same = (a: string, b: string | undefined) => !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
-  const specialOf = (heading: string): SpecialColumn | null => same(heading, special.time) ? "time" : same(heading, special.pov) ? "pov" : same(heading, special.theme) ? "main-theme" : null;
-  // Time and POV first, then the kinds in order, the main theme first among the themes, note order within each.
-  const rank = (c: { heading: ColumnHeading; special: SpecialColumn | null }) => c.special === "time" ? -2 : c.special === "pov" ? -1 : KIND_ORDER[c.heading.kind] * 2 + (c.special === "main-theme" ? 0 : 1);
+  const specialOf = (heading: string): SpecialColumn | null => same(heading, special.time) ? "time" : same(heading, special.pov) ? "pov" : same(heading, special.beats) ? "beats" : same(heading, special.theme) ? "main-theme" : null;
+  // Blocks as the writer ordered them (Time, POV and the plot point alone, the kinds as groups), the main theme first among the themes, note order within each.
+  const blocks = blockOrder(special);
+  const rank = (c: { heading: ColumnHeading; special: SpecialColumn | null }) => { const i = blocks.findIndex((b) => b.toLowerCase() === blockOf(c).toLowerCase()); return (i < 0 ? blocks.length + KIND_ORDER[c.heading.kind] : i) * 2 + (c.special === "main-theme" ? 0 : 1); };
   const columns = writer
     .map((thread, order) => ({ thread, order, heading: parseColumnHeading(thread.label), special: specialOf(thread.label) }))
     .sort((a, b) => rank(a) - rank(b) || a.order - b.order)
@@ -153,11 +196,12 @@ export function buildPlotGrid(graph: StoryGraph, model: ThreadModel, special: Sp
   const cast = graph.entities
     .filter((e) => e.appearances.length > 0 && e.kind !== "note" && e.kind !== "reference")
     .sort((a, b) => CAST_ORDER[a.kind] - CAST_ORDER[b.kind] || b.mentions - a.mentions);
-  return { project: graph.project, rows, columns, unknownPrefixes, cast, cells: rows.length * columns.length, filled, verified, broken, readings };
+  const characters = graph.entities.filter((e) => e.kind === "character" && e.path);
+  return { project: graph.project, rows, columns, unknownPrefixes, cast, cells: rows.length * columns.length, filled, verified, broken, readings, plan, characters };
 }
 
-/** The timeline's rows, and between them the headings the timeline left out for having no prose. */
-export function gridRows(graph: StoryGraph, notePath?: string): GridRow[] {
+/** The timeline's rows, between them the headings the timeline left out for having no prose, and after them the scenes still only planned in the outline note. */
+export function gridRows(graph: StoryGraph, notePath?: string, plan: OutlinePlan | null = null): GridRow[] {
   const byKey = new Map(graph.timeline.map((r) => [sceneKey(r.scene), r]));
   const headings = graph.headings ?? graph.timeline.map((r) => r.scene);
   const rows: GridRow[] = [];
@@ -168,6 +212,17 @@ export function gridRows(graph: StoryGraph, notePath?: string): GridRow[] {
     // Prose before the first heading that has no prose is not a scene of anything.
     if (!scene.title) continue;
     rows.push({ scene, index: rows.length, words: 0, bookmarked: false, present: [], events: [], outline: true, pov: null });
+  }
+  if (plan && !plan.outline.built) for (const row of outlineRows(plan)) rows.push({ ...row, index: rows.length });
+  return rows;
+}
+
+/** One outline row per planned scene, in the note's order, each carrying the chapter and act it was written under. */
+export function outlineRows(plan: OutlinePlan): GridRow[] {
+  const rows: GridRow[] = [];
+  for (const act of plan.outline.acts) for (const chapter of act.chapters) for (const scene of chapter.scenes) {
+    const group: RowGroup = { act: act.title, actLine: act.line, chapter: chapter.title, chapterLine: chapter.line };
+    rows.push({ scene: { path: plan.path, title: scene.title, line: scene.line }, index: rows.length, words: 0, bookmarked: false, present: [], events: [], outline: true, pov: null, group, ...(scene.logline ? { logline: scene.logline } : {}) });
   }
   return rows;
 }

@@ -21,7 +21,7 @@ const repo = (file: StoryMapFile) => ({ load: async () => file, save: async () =
 describe("ProposeColumns", () => {
   it("says so when no scene has events to propose from", async () => {
     const analyser: ColumnAnalyser = { name: "f", rulebook: "v", read: async () => ({}), check: async () => ({}), propose: async () => { throw new Error("should not be asked"); } };
-    expect(await new ProposeColumns(repo(EMPTY_STORY_MAP_FILE), analyser).execute(novel, grid, graph, new AbortController().signal)).toEqual({ needsReading: true });
+    expect(await new ProposeColumns(repo(EMPTY_STORY_MAP_FILE), analyser).execute(novel, grid, graph, new AbortController().signal)).toEqual({ needsReading: true, canRead: true });
   });
 
   it("briefs the model with the events per scene, the cast and the existing columns, and validates what comes back", async () => {
@@ -35,5 +35,21 @@ describe("ProposeColumns", () => {
       { kind: "arc", name: "Anna", why: "Learns to open it.", scenes: ["Arrival", "Dinner"], heading: "Arc: [[Anna]]", existing: false },
       { kind: "subplot", name: "The letter", why: "", scenes: ["Arrival"], heading: "Subplot: The letter", existing: true },
     ] });
+  });
+});
+
+describe("ProposeColumns on the paper grid", () => {
+  it("briefs the model with the loglines of planned scenes and the whole typed cast, before any prose exists", async () => {
+    const { parseOutline } = await import("../../src/domain/plot/Outline");
+    const { EMPTY_THREAD_MODEL } = await import("../../src/domain/threads/Thread");
+    const bare = buildStoryGraph("Novel", notes.slice(0, 2), EMPTY_STORY_MAP_FILE);
+    const plan = { path: "Novel/Outline.md", outline: { ...parseOutline("## One\n### Arrival\n<!-- Anna lands with a letter -->\n### Dinner\n"), flagged: true } };
+    const planned = buildPlotGrid(bare, EMPTY_THREAD_MODEL, {}, undefined, plan);
+    expect(briefOf(EMPTY_STORY_MAP_FILE, planned, bare)).toEqual({ scenes: [{ title: "Arrival", events: ["Anna lands with a letter"] }, { title: "Dinner", events: [] }], cast: [{ name: "Anna", kind: "character" }, { name: "Marta", kind: "character" }], existing: [] });
+    const analyser: ColumnAnalyser = { name: "f", rulebook: "v", read: async () => ({}), check: async () => ({}), propose: async () => ({ columns: [{ kind: "arc", name: "Anna", why: "", scenes: ["Arrival"] }] }) };
+    expect(await new ProposeColumns(repo(EMPTY_STORY_MAP_FILE), analyser).execute(novel, planned, bare, new AbortController().signal)).toMatchObject({ scenesRead: 1, proposals: [{ heading: "Arc: [[Anna]]" }] });
+    // With no logline anywhere and no prose, there is nothing to read either.
+    const empty = buildPlotGrid(bare, EMPTY_THREAD_MODEL, {}, undefined, { path: "Novel/Outline.md", outline: { ...parseOutline("## One\n### Arrival\n"), flagged: true } });
+    expect(await new ProposeColumns(repo(EMPTY_STORY_MAP_FILE), analyser).execute(novel, empty, bare, new AbortController().signal)).toEqual({ needsReading: true, canRead: false });
   });
 });

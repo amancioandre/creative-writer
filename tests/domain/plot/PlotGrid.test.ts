@@ -7,6 +7,7 @@ import { EMPTY_STORY_MAP_FILE } from "../../../src/domain/story/StoryMapFile";
 import { parseStoryThreads } from "../../../src/domain/threads/StoryThreadsNote";
 import { EMPTY_GRAPH } from "../../../src/domain/story/StoryGraph";
 import { EMPTY_THREAD_MODEL } from "../../../src/domain/threads/Thread";
+import { parseOutline } from "../../../src/domain/plot/Outline";
 
 const one = `# The station\nAnna pocketed the letter without reading it. Marta was named by the porter.\n\n# Dinner\nMarta asked after the letter; Ilse's chair was empty.\n\n# The quarry\n`;
 const two = `# The reading\nThe letter was addressed to her mother. Anna read it to Marta and Ilse.\n`;
@@ -119,5 +120,53 @@ describe("buildPlotGrid", () => {
     // The project note's own prose is the container, not a scene.
     expect(buildPlotGrid(graph, model, { notePath: "Novel/One.md" }).rows.map((r) => r.scene.title)).toEqual(["The reading"]);
     expect(gridRows({ ...EMPTY_GRAPH, timeline: [{ scene: { path: "a.md", title: "S", line: 0 }, words: 3, bookmarked: true, present: [], events: [] }] })[0]).toMatchObject({ index: 0, words: 3, bookmarked: true, outline: false });
+  });
+});
+
+describe("rows from the outline note", () => {
+  const outlineNote = `# Act I\n## The perfect record\n### 1 Gainesville courtroom\n<!-- Kevin wins a case he knows he should lose -->\n### 4 The recess bathroom\n## The offer\n### 12 The New York invitation\n`;
+  const plan = { path: "Novel/Outline.md", outline: { ...parseOutline(outlineNote), flagged: true } };
+  const stops = parseStoryThreads(`## Subplot: The Cullen trial\n- [[Outline#1 Gainesville courtroom]] — the file lands on his desk\n- [[Outline#Nowhere]] — a lost one\n`);
+  const planned = buildPlotGrid(graph, buildThreads(graph, EMPTY_STORY_MAP_FILE, stops, new Set(), undefined, (p) => text.get(p)), {}, undefined, plan);
+
+  it("draws every planned scene as an outline row after the chapters, carrying its chapter, act and logline", () => {
+    const rows = planned.rows.slice(4);
+    expect(rows.map((r) => [r.scene.title, r.outline, r.group?.act, r.group?.chapter, r.logline ?? ""])).toEqual([
+      ["1 Gainesville courtroom", true, "Act I", "The perfect record", "Kevin wins a case he knows he should lose"],
+      ["4 The recess bathroom", true, "Act I", "The perfect record", ""],
+      ["12 The New York invitation", true, "Act I", "The offer", ""],
+    ]);
+    expect(rows[0]!.scene).toEqual({ path: "Novel/Outline.md", title: "1 Gainesville courtroom", line: 2 });
+    expect(planned.plan).toBe(plan);
+  });
+
+  it("resolves a stop written against an outline scene into its cell, as a plan", () => {
+    const col = planned.columns.find((c) => c.heading.name === "The Cullen trial")!;
+    expect(col.cells[4]).toMatchObject({ state: "plan", stop: { note: "the file lands on his desk" } });
+    expect(col.unresolved.map((u) => u.unresolved)).toEqual(["Outline#Nowhere"]);
+  });
+
+  it("draws no rows from a built outline, and none without one", () => {
+    const built = { path: "Novel/Outline.md", outline: parseOutline(`---\ncreative-writer-outline-built: 2026-09-22\n---\n${outlineNote}`) };
+    expect(buildPlotGrid(graph, model, {}, undefined, built).rows).toHaveLength(4);
+    expect(buildPlotGrid(graph, model).plan).toBeNull();
+  });
+
+  it("an outline-only project has rows before it has any chapter", () => {
+    const empty = buildStoryGraph("Novel", notes.slice(0, 3), EMPTY_STORY_MAP_FILE);
+    expect(buildPlotGrid(empty, EMPTY_THREAD_MODEL, {}, undefined, plan).rows.map((r) => r.index)).toEqual([0, 1, 2]);
+    expect(buildPlotGrid(EMPTY_GRAPH, EMPTY_THREAD_MODEL).rows).toEqual([]);
+  });
+});
+
+describe("block order", () => {
+  it("draws Time, POV and the plot point alone and the kinds as groups, in the project's order, the rest after in the default order", async () => {
+    const { blockOrder, blockOf } = await import("../../../src/domain/plot/PlotGrid");
+    expect(blockOrder({ time: "Time", pov: "POV" })).toEqual(["Time", "POV", "arcs", "themes", "subplots", "threads"]);
+    expect(blockOrder({ time: "Time", pov: "POV", beats: "Plot point", order: ["arcs", "plot point", "bogus", "Themes"] })).toEqual(["arcs", "Plot point", "themes", "Time", "POV", "subplots", "threads"]);
+    expect(blockOf({ heading: parseColumnHeading("Theme: Debt"), special: "main-theme" })).toBe("themes");
+    expect(blockOf({ heading: parseColumnHeading("When"), special: "time" })).toBe("When");
+    const ordered = buildPlotGrid(graph, model, { theme: "Theme: What we owe the dead", order: ["subplots", "threads", "themes", "arcs"] });
+    expect(ordered.columns.map((c) => c.heading.name)).toEqual(["The letter", "Salt on the wind", "What we owe the dead", "Anna"]);
   });
 });

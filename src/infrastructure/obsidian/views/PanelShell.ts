@@ -188,6 +188,14 @@ export class PanelShell {
     return d;
   }
 
+  /** Unfolds a section an action is about to put something in, and remembers it open, so a field the writer asked for is never hidden in a folded section. */
+  reveal(cls: string): HTMLDetailsElement | null {
+    const d = this.side.querySelector<HTMLDetailsElement>(`details.czm-map-section-${cls}`);
+    if (!d) return null;
+    if (!d.open) { d.open = true; this.opts.sections?.onToggle(cls, true); }
+    return d;
+  }
+
   /** The key in the surface's corner: what each colour on it means. An empty list removes it. */
   key(items: readonly KeyItem[]): void {
     this.keyEl?.remove();

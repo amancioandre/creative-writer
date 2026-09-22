@@ -1,3 +1,4 @@
+import { stripComments, type CommentState } from "./Comments";
 import { proseParagraphs } from "./ProseParagraphs";
 
 /** A heading and everything under it until the next heading of any level. */
@@ -18,6 +19,7 @@ export function splitScenes(markdown: string): Scene[] {
   const paragraphs = proseParagraphs(markdown);
   const headings: { title: string; level: number; line: number }[] = [];
   let inFence = false;
+  let comment: CommentState = null;
   let start = 0;
   if (lines[0] === "---") {
     const end = lines.indexOf("---", 1);
@@ -27,7 +29,10 @@ export function splitScenes(markdown: string): Scene[] {
     const raw = lines[i]!;
     if (/^\s*(```|~~~)/.test(raw)) inFence = !inFence;
     if (inFence) continue;
-    const m = HEADING.exec(raw);
+    // A heading inside a comment is commented out, not a scene.
+    const stripped = stripComments(raw, comment);
+    comment = stripped.state;
+    const m = HEADING.exec(stripped.text);
     if (m) headings.push({ title: m[2]!, level: m[1]!.length, line: i });
   }
 

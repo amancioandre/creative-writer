@@ -37,3 +37,25 @@ describe("snapshot", () => {
     expect(rankSentences(s, "").map((r) => r.score)).toEqual([0, 0, 0]);
   });
 });
+
+describe("a snapshot read back", () => {
+  it("names the day and the label from the file, and parses the table into chapters, scenes and cells", async () => {
+    const { parseSnapshot, snapshotName, snapshotNote } = await import("../../../src/domain/plot/Snapshot");
+    expect(snapshotName("Novel/Plot grid · 2026-09-13.md")).toEqual({ day: "2026-09-13", label: "" });
+    expect(snapshotName("Novel/Plot grid · 2026-09-13 · before the rewrite.md")).toEqual({ day: "2026-09-13", label: "before the rewrite" });
+    expect(snapshotName("Novel/Plot grid.md")).toBeNull();
+    const md = `---\ncreative-writer: false\ncreative-writer-grid-snapshot: 1\n---\n%% Novel: the plot grid on 2026-09-13. 3 scenes. %%\n\n| Scene | Words | Anna | The letter \\| B |\n| --- | ---: | --- | --- |\n| **One** | | | |\n| Camp | 1,480 | want: to be seen ✓ | plant: pockets it (+1) |\n| Later *(outline)* |  |  |  |\n| **Two** | | | |\n| Return | 900 |  | payoff ✗ |\n`;
+    const t = parseSnapshot(md);
+    expect(t.summary).toBe("Novel: the plot grid on 2026-09-13. 3 scenes.");
+    expect(t.columns).toEqual(["Anna", "The letter | B"]);
+    expect(t.rows).toEqual([
+      { chapter: "One", scene: "Camp", words: "1,480", outline: false, cells: ["want: to be seen ✓", "plant: pockets it (+1)"] },
+      { chapter: "One", scene: "Later", words: "", outline: true, cells: ["", ""] },
+      { chapter: "Two", scene: "Return", words: "900", outline: false, cells: ["", "payoff ✗"] },
+    ]);
+    // What the grid writes, the tabs read back whole.
+    const written = parseSnapshot(snapshotNote(grid, { name: "Novel", scope: "Novel/", targetWords: 0, deadline: null, dailyWords: 0, notePath: "Novel/N.md", ignoredNames: [] }, "2026-09-13"));
+    expect(written.columns).toEqual(grid.columns.map((c) => c.heading.name));
+    expect(written.rows.map((r) => r.scene)).toEqual(grid.rows.map((r) => r.scene.title));
+  });
+});

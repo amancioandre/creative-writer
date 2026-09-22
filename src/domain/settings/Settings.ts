@@ -284,15 +284,22 @@ export interface PlotGridSettings {
   readonly unmoved: boolean;
   /** Side-column section → open or folded, as the writer last left it. */
   readonly sections: Readonly<Record<string, boolean>>;
+  /** Project scope → the heading of the last column that stays put while the threads scroll; absent, Scene and Plot alone. */
+  readonly frozen: Readonly<Record<string, string>>;
+  /** Vault-relative folder of the writer's own grid templates. */
+  readonly templatesFolder: string;
 }
 
-export const DEFAULT_PLOT_GRID: PlotGridSettings = { panelOpen: true, castExpanded: false, folded: { arc: false, theme: false, subplot: false, free: false }, hidden: {}, unmoved: true, sections: {} };
+export const DEFAULT_PLOT_GRID: PlotGridSettings = { panelOpen: true, castExpanded: false, folded: { arc: false, theme: false, subplot: false, free: false }, hidden: {}, unmoved: true, sections: {}, frozen: {}, templatesFolder: "Creative Writer/Templates" };
 
 export function normalizePlotGrid(raw: unknown): PlotGridSettings {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const hidden: Record<string, string[]> = {};
   const h = (r.hidden && typeof r.hidden === "object" ? r.hidden : {}) as Record<string, unknown>;
   for (const [scope, list] of Object.entries(h)) if (Array.isArray(list)) { const names = list.filter((x): x is string => typeof x === "string" && !!x.trim()); if (names.length) hidden[scope] = names; }
+  const frozen: Record<string, string> = {};
+  const fz = (r.frozen && typeof r.frozen === "object" ? r.frozen : {}) as Record<string, unknown>;
+  for (const [scope, heading] of Object.entries(fz)) if (typeof heading === "string" && heading.trim()) frozen[scope] = heading.trim();
   return {
     panelOpen: typeof r.panelOpen === "boolean" ? r.panelOpen : DEFAULT_PLOT_GRID.panelOpen,
     castExpanded: typeof r.castExpanded === "boolean" ? r.castExpanded : DEFAULT_PLOT_GRID.castExpanded,
@@ -300,6 +307,8 @@ export function normalizePlotGrid(raw: unknown): PlotGridSettings {
     hidden,
     unmoved: typeof r.unmoved === "boolean" ? r.unmoved : DEFAULT_PLOT_GRID.unmoved,
     sections: boolMap(r.sections),
+    frozen,
+    templatesFolder: typeof r.templatesFolder === "string" && r.templatesFolder.trim() ? normalizeFolderPath(r.templatesFolder) : DEFAULT_PLOT_GRID.templatesFolder,
   };
 }
 

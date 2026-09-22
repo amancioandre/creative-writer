@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { addThread, removeThread, appendThreadItems, formatThreadItem, parseStopText, parseStoryThreads, removeThreadItem, renameThread, resolveThreadRef, sameLink, serializeStoryThreadsNote, upsertThreadItem } from "../../../src/domain/threads/StoryThreadsNote";
+import { addThread, removeThread, appendThreadItems, formatThreadItem, parseStopText, parseStoryThreads, relinkThreadItems, removeThreadItem, renameThread, resolveThreadRef, sameLink, serializeStoryThreadsNote, upsertThreadItem } from "../../../src/domain/threads/StoryThreadsNote";
 
 const note = `---
 creative-writer: false
@@ -134,5 +134,15 @@ describe("Story threads note", () => {
     expect(removeThread(three, "Theme: Salt")).toBe("## The letter\n- [[One#Camp]] — x\n\n## Last\n");
     expect(removeThread(three, "The letter")).toBe("## Theme: Salt\n\n## Last\n");
     expect(removeThread(three, "Nobody")).toBe(three);
+  });
+});
+
+describe("relinkThreadItems", () => {
+  it("moves every stop at one scene to another link, keeping role, quote and note", () => {
+    const md = `## Subplot: The trial\n- [[Outline#1 Courtroom]] — plant: "he wins" the file lands\n- [[Outline#4 Bathroom]] — later\n\n## Arc: [[Kevin]]\n- [[Outline#1 Courtroom]] — want: to win\n`;
+    const { markdown, changed } = relinkThreadItems(md, "Outline#1 Courtroom", "The perfect record#1 Gainesville courtroom");
+    expect(changed).toBe(2);
+    expect(markdown).toBe(`## Subplot: The trial\n- [[The perfect record#1 Gainesville courtroom]] — plant: "he wins" the file lands\n- [[Outline#4 Bathroom]] — later\n\n## Arc: [[Kevin]]\n- [[The perfect record#1 Gainesville courtroom]] — want: to win\n`);
+    expect(relinkThreadItems(md, "Outline#Nowhere", "X#Y")).toEqual({ markdown: md, changed: 0 });
   });
 });

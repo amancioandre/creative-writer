@@ -22,6 +22,21 @@ export interface VaultAppLike {
 
 interface BookmarkItem { type?: string; path?: string; subpath?: string; items?: BookmarkItem[] }
 
+/** The front matter's flat keys, from the text, for a note the cache has not indexed yet. Booleans and numbers as such, the rest as written. */
+export function frontMatterOf(text: string): Record<string, unknown> | undefined {
+  if (!text.startsWith("---\n")) return undefined;
+  const end = text.indexOf("\n---", 4);
+  if (end < 0) return undefined;
+  const out: Record<string, unknown> = {};
+  for (const line of text.slice(4, end).split("\n")) {
+    const m = /^([^\s:][^:]*?)\s*:\s*(.*?)\s*$/.exec(line);
+    if (!m) continue;
+    const raw = m[2]!.replace(/^["']|["']$/g, "");
+    out[m[1]!] = raw === "true" ? true : raw === "false" ? false : raw !== "" && Number.isFinite(Number(raw)) ? Number(raw) : raw;
+  }
+  return out;
+}
+
 /** Without a scope from the host: every note but the opted-out ones and the plugin's own data notes. */
 const anyNote = (path: string, frontmatter: Record<string, unknown> | undefined): boolean =>
   isNoteCounted({ enabled: true, scope: { mode: "all", folders: [] }, path, flag: frontmatter?.["creative-writer"] === false ? false : null, frontmatter });
@@ -53,7 +68,9 @@ export class VaultProjectNotes implements ProjectNotes {
     for (const f of this.app.vault.getMarkdownFiles()) {
       if (!inScope(project, f.path)) continue;
       const cache = this.app.metadataCache.getFileCache(f);
-      const fm = cache?.frontmatter;
+      // A note written a moment ago is not in the cache yet: its front matter is read from the text, so the plugin's own
+      // data notes (the outline just started, the threads note just created) are never read as chapters in the meantime.
+      const fm = cache?.frontmatter ?? frontMatterOf(this.liveText(f.path) ?? await this.app.vault.cachedRead(f));
       if (!this.counted(f.path, fm)) continue;
       const links = new Set<string>();
       for (const l of [...(cache?.links ?? []), ...(cache?.embeds ?? []), ...(cache?.frontmatterLinks ?? [])]) {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { VaultProjectNotes, type VaultAppLike } from "../../../src/infrastructure/obsidian/VaultProjectNotes";
+import { VaultProjectNotes, frontMatterOf, type VaultAppLike } from "../../../src/infrastructure/obsidian/VaultProjectNotes";
 
 const files: Record<string, { fm?: Record<string, unknown>; links?: string[]; body: string }> = {
   "Novel/Novel.md": { fm: { "writing-target": 1000 }, body: "# Plan" },
@@ -69,5 +69,25 @@ describe("VaultProjectNotes live text", () => {
     const notes = await source.notes(source.projects()[0]!);
     expect(notes.find((n) => n.path === "Novel/One.md")!.text).toBe("# Camp\nUnsaved.");
     expect(notes.find((n) => n.path === "Novel/Novel.md")!.text).toBe("# Plan");
+  });
+});
+
+describe("VaultProjectNotes before the cache catches up", () => {
+  it("reads a fresh note's front matter from its text, so the outline just started is not a chapter", async () => {
+    const fresh: Record<string, string> = {
+      "Novel/Novel.md": "---\nwriting-target: 1000\n---\n# Plan",
+      "Novel/Outline.md": "---\ncreative-writer: false\ncreative-writer-outline: 1\n---\nThe outline.\n\n## Chapter 1\n### New scene\n",
+      "Novel/Story threads.md": "---\ncreative-writer: false\ncreative-writer-threads: 1\n---\n## Arc: [[Ilse]]\n",
+      "Novel/One.md": "# Camp\nMarta and Ilse.\n",
+    };
+    const uncached: VaultAppLike = {
+      vault: { getMarkdownFiles: () => Object.keys(fresh).map((path) => ({ path })), cachedRead: async (f) => fresh[f.path]! },
+      metadataCache: { getFileCache: () => null, getFirstLinkpathDest: () => null },
+    };
+    const notes = await new VaultProjectNotes(uncached).notes({ name: "Novel", scope: "Novel/", notePath: "Novel/Novel.md", targetWords: 1000, deadline: null, dailyWords: 0, ignoredNames: [] });
+    expect(notes.map((n) => n.path)).toEqual(["Novel/Novel.md", "Novel/One.md"]);
+    expect(frontMatterOf(fresh["Novel/Outline.md"]!)).toEqual({ "creative-writer": false, "creative-writer-outline": 1 });
+    expect(frontMatterOf("no front matter")).toBeUndefined();
+    expect(frontMatterOf("---\nwriting-name: \"The Devil's Advocate\"\nstory: true\n---\n")).toEqual({ "writing-name": "The Devil's Advocate", story: true });
   });
 });

@@ -256,6 +256,18 @@ export function renameThread(markdown: string, from: string, to: string): string
   return lines.join("\n");
 }
 
+/** Points every stop at `from` to `to` instead, keeping its role, quote and note: a scene renamed or moved into a chapter note. Returns how many lines changed with the text. */
+export function relinkThreadItems(markdown: string, from: string, to: string): { markdown: string; changed: number } {
+  const lines = markdown.split("\n");
+  let changed = 0;
+  for (const thread of parseStoryThreads(markdown)) for (const item of thread.items) {
+    if (!sameLink(item.link, from)) continue;
+    lines[item.line] = formatThreadItem(to, item.note, { role: item.role, quote: item.quote });
+    changed++;
+  }
+  return { markdown: changed ? lines.join("\n") : markdown, changed };
+}
+
 /** The line after the section's last item — where a new one goes. */
 function sectionEnd(lines: readonly string[], heading: number): number {
   let end = heading + 1;

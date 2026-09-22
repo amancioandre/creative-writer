@@ -10,6 +10,13 @@ import { EMPTY_STORY_MAP_FILE, putGridReading, putReading, type GridReading, typ
 import { textHash } from "../../../src/domain/story/StoryGraph";
 import type { ProjectSpec } from "../../../src/domain/progress/Project";
 import { DEFAULT_PLOT_GRID, DEFAULT_STORY_MAP, type PlotGridSettings } from "../../../src/domain/settings/Settings";
+import { parseOutline, serializeOutlineNote } from "../../../src/domain/plot/Outline";
+import { relinkThreadItems } from "../../../src/domain/threads/StoryThreadsNote";
+import { planScaffold } from "../../../src/domain/plot/Scaffold";
+import { BUILT_IN_TEMPLATES } from "../../../src/domain/plot/BuiltInTemplates";
+import { planApply, serializeTemplate } from "../../../src/domain/plot/Templates";
+import { appendOutline } from "../../../src/domain/plot/Outline";
+import { parseSnapshot, snapshotNote } from "../../../src/domain/plot/Snapshot";
 
 const novel: ProjectSpec = { name: "Novel", scope: "Novel/", targetWords: 1, deadline: null, dailyWords: 0, notePath: "Novel/Project.md", ignoredNames: [] };
 const one = `# Camp\nMarta woke before Ilse at the gate of Lisbon.\n\n# Creek\nIlse found the creek alone.\n\n# Later\n`;
@@ -33,17 +40,48 @@ function grid(threads = threadsNote) {
   return buildPlotGrid(graph, model);
 }
 
-function open(overrides: Partial<PlotGridSource> = {}, threads = threadsNote) {
+function open(overrides: Partial<PlotGridSource> = {}, threads = threadsNote, setup: { notes?: ProjectNote[]; outline?: string; snapshots?: { path: string; day: string; label: string }[]; snapshotText?: Record<string, string> } = {}) {
   const calls = { opened: [] as string[], revealed: [] as string[], jumps: [] as string[], writes: [] as string[] };
-  // The threads note as a string the writes edit, so the grid reads back what it wrote.
+  // The threads note as a string the writes edit, so the grid reads back what it wrote; the outline note the same.
   let md = threads;
+  let outline = setup.outline ?? "";
+  const snaps = setup.snapshots ?? [];
+  const snapshotText = setup.snapshotText ?? {};
+  const notes = setup.notes ?? allNotes;
   let prefs: PlotGridSettings = DEFAULT_PLOT_GRID;
   let spec: ProjectSpec = novel;
   let map: StoryMapFile = file;
   const hashes = new Map(notes.flatMap((n) => n.scenes.map((s) => [`${n.path}#${s.title}`, textHash(s.prose)] as const)));
   const src: PlotGridSource = {
     projects: () => [spec], activeProject: () => spec,
-    build: async () => buildPlotGrid(buildStoryGraph("Novel", notes, map), buildThreads(buildStoryGraph("Novel", notes, map), map, parseStoryThreads(md), new Set(), undefined, (p) => notes.find((n) => n.path === p)?.text), { pov: spec.plotPov, time: spec.plotTime, theme: spec.plotTheme }, { readings: map.grid, hashes }),
+    build: async () => buildPlotGrid(buildStoryGraph("Novel", notes, map), buildThreads(buildStoryGraph("Novel", notes, map), map, parseStoryThreads(md), new Set(), undefined, (p) => notes.find((n) => n.path === p)?.text), { pov: spec.plotPov, time: spec.plotTime, theme: spec.plotTheme, beats: spec.plotBeats, order: spec.plotOrder }, { readings: map.grid, hashes }, outline ? { path: "Novel/Outline.md", outline: parseOutline(outline) } : null),
+    outlinePath: () => "Novel/Outline.md",
+    updateOutline: async (_p, change) => { const before = outline; outline = change(before.trim() ? before : serializeOutlineNote("Novel")); calls.writes.push(`outline ${outline === before ? "unchanged" : "written"}`); return { before, after: outline }; },
+    relinkStops: async (_p, from, to) => { calls.writes.push(`relink ${from} → ${to}`); const r = relinkThreadItems(md, from, to); md = r.markdown; return r.changed; },
+    snapshots: async () => snaps,
+    readSnapshot: async (path) => { calls.writes.push(`read ${path}`); return parseSnapshot(snapshotText[path] ?? ""); },
+    templates: async () => BUILT_IN_TEMPLATES,
+    templatesFolder: () => "Creative Writer/Templates",
+    planTemplate: async (_p, template, choices, cast) => planApply(template, choices, { existing: parseStoryThreads(md).map((t) => t.name), cast }),
+    applyTemplate: async (_p, plan) => {
+      const before = { md, outline, spec };
+      const added: string[] = [];
+      for (const h of plan.headings) { const next = addThread(md, h); if (next !== md) added.push(h); md = next; }
+      if (plan.structure) outline = appendOutline(outline.trim() ? outline : serializeOutlineNote("Novel"), plan.structure);
+      spec = { ...spec, ...(plan.jobs.time ? { plotTime: plan.jobs.time } : {}), ...(plan.jobs.pov ? { plotPov: plan.jobs.pov } : {}), ...(plan.jobs.theme ? { plotTheme: plan.jobs.theme } : {}), ...(plan.jobs.beats ? { plotBeats: plan.jobs.beats } : {}) };
+      calls.writes.push(`apply: ${added.join(" | ")}${plan.structure ? " +rows" : ""} jobs=${Object.keys(plan.jobs).join(",")}`);
+      return { plan, added, beatStops: plan.structure && plan.jobs.beats ? plan.scenes : 0, undo: async () => { calls.writes.push("unapply"); md = before.md; outline = before.outline; spec = before.spec; } };
+    },
+    saveTemplate: async (_p, name, parts) => { calls.writes.push(`save ${name} ${parts.columns ? "columns" : ""} ${parts.rows ? "rows" : ""}`.trim()); return `Creative Writer/Templates/${name}.md`; },
+    scaffoldPreview: async (_p, shape) => (outline ? planScaffold(parseOutline(outline), { folder: "Novel/", shape, outlineName: "Outline", existing: () => null }) : null),
+    scaffold: async (_p, shape) => {
+      const plan = planScaffold(parseOutline(outline), { folder: "Novel/", shape, outlineName: "Outline", existing: () => null });
+      calls.writes.push(`build ${shape}: ${plan.files.map((f) => f.path).join(", ")}`);
+      const before = { md, outline };
+      for (const r of plan.relinks) md = relinkThreadItems(md, r.from, r.to).markdown;
+      outline = `---\ncreative-writer-outline-built: 2026-09-22\n---\n${outline.replace(/^---[\s\S]*?---\n/, "")}`;
+      return { plan, relinked: plan.relinks.length, day: "2026-09-22", undo: async () => { calls.writes.push("unbuild"); md = before.md; outline = before.outline; } };
+    },
     readColumn: async (_p, column, signal, onProgress) => {
       calls.writes.push(`read ${column.heading.name}`);
       const targets = column.cells.map((c, i) => [c, i] as const).filter(([c]) => !c.stop);
@@ -62,10 +100,10 @@ function open(overrides: Partial<PlotGridSource> = {}, threads = threadsNote) {
     dismissReading: async (_p, scene, column) => { calls.writes.push(`dismiss ${column} at ${scene.title}`); map = { ...map, grid: map.grid.map((r) => (r.scene.title === scene.title && r.column === column ? { ...r, state: "dismissed" } : r)) }; },
     dismissColumnReadings: async () => undefined,
     modelLabel: () => "Ollama · test",
-    proposeColumns: async () => { calls.writes.push("propose"); return calls.writes.includes("readProject") || !overrides.readProject ? { scenesRead: 3, proposals: [{ kind: "arc", name: "Marta Kovács", why: "The elder sister.", scenes: ["Camp", "Return"], heading: "Arc: [[Marta Kovács]]", existing: false }, { kind: "subplot", name: "The gate", why: "", scenes: ["Camp"], heading: "Subplot: The gate", existing: true }, { kind: "theme", name: "Salt", why: "Pressure.", scenes: ["Creek"], heading: "Theme: Salt", existing: false }] } : { needsReading: true }; },
+    proposeColumns: async () => { calls.writes.push("propose"); return calls.writes.includes("readProject") || !overrides.readProject ? { scenesRead: 3, proposals: [{ kind: "arc", name: "Marta Kovács", why: "The elder sister.", scenes: ["Camp", "Return"], heading: "Arc: [[Marta Kovács]]", existing: false }, { kind: "subplot", name: "The gate", why: "", scenes: ["Camp"], heading: "Subplot: The gate", existing: true }, { kind: "theme", name: "Salt", why: "Pressure.", scenes: ["Creek"], heading: "Theme: Salt", existing: false }] } : { needsReading: true, canRead: true }; },
     readProject: async () => { calls.writes.push("readProject"); return 3; },
     renameThread: async (_p, from, to) => { calls.writes.push(`rename ${from} → ${to}`); md = renameThread(md, from, to); },
-    setProjectKey: async (_p, key, value) => { calls.writes.push(`${key}=${value ?? ""}`); const k = key === "plot-pov" ? "plotPov" : key === "plot-time" ? "plotTime" : "plotTheme"; spec = { ...spec, [k]: value ?? undefined }; },
+    setProjectKey: async (_p, key, value) => { calls.writes.push(`${key}=${value ?? ""}`); if (key === "plot-order") { spec = { ...spec, plotOrder: value ? value.split(",").map((x) => x.trim()) : undefined }; return; } const k = key === "plot-pov" ? "plotPov" : key === "plot-time" ? "plotTime" : key === "plot-beats" ? "plotBeats" : "plotTheme"; spec = { ...spec, [k]: value ?? undefined }; },
     gridSettings: () => prefs,
     updateGridSettings: (next) => { prefs = next; },
     sentences: async (_p, scene) => { calls.writes.push(`sentences ${scene.title}`); return scene.title === "Camp" ? ["Marta woke before Ilse at the gate of Lisbon."] : scene.title === "Return" ? ["Marta came back to Lisbon.", "The gate of Lisbon was shut."] : []; },
@@ -80,8 +118,10 @@ function open(overrides: Partial<PlotGridSource> = {}, threads = threadsNote) {
     removeThread: async (_p, name) => { calls.writes.push(`delete ${name}`); md = removeThread(md, name); },
     ...overrides,
   };
-  return { v: new PlotGridView(new WorkspaceLeaf(), src), calls, note: () => md, prefs: () => prefs };
+  return { v: new PlotGridView(new WorkspaceLeaf(), src), calls, note: () => md, prefs: () => prefs, outline: () => outline };
 }
+const allNotes = notes;
+const tick = () => new Promise((r) => setTimeout(r, 20));
 
 /** The search field redraws once typing pauses. */
 const settle = () => new Promise((r) => setTimeout(r, 150));
@@ -142,8 +182,14 @@ describe("PlotGridView", () => {
     await v.onOpen();
     const el = v.contentEl;
     expect(el.querySelectorAll(".czm-shell-key-item")).toHaveLength(4);
-    (el.querySelector(".czm-pg-cast-toggle") as HTMLElement).click();
-    expect([...el.querySelectorAll(".czm-pg-cast-name span")].map((s) => s.textContent)).toEqual(["Ilse", "Marta Kovács", "Lisbon"]);
+    const castHead = el.querySelector(".czm-pg-group-cast .czm-pg-cast-toggle") as HTMLElement;
+    expect(castHead.querySelector(".czm-pg-group-caret")?.getAttribute("data-icon")).toBe("chevron-right");
+    castHead.click();
+    expect(el.querySelector(".czm-pg-group-cast .czm-pg-group-caret")?.getAttribute("data-icon")).toBe("chevron-down");
+    expect(el.querySelector(".czm-pg-group-cast")?.textContent).toBe("Cast3");
+    expect(el.querySelector("thead th.czm-pg-fold-cast")).toBeNull();
+    expect(el.querySelector(".czm-pg-group-cast")?.getAttribute("colspan")).toBe("3");
+    expect([...el.querySelectorAll("thead .czm-pg-cast-name span")].map((s) => s.textContent)).toEqual(["Ilse", "Marta Kovács", "Lisbon"]);
     expect(el.querySelectorAll(".czm-pg-scene")[0]!.querySelectorAll(".czm-pg-cast-dot.is-on")).toHaveLength(3);
     expect(el.querySelectorAll(".czm-shell-key-item")).toHaveLength(6);
     (el.querySelector(".czm-pg-cast-name .is-link") as HTMLElement).click();
@@ -278,15 +324,26 @@ describe("PlotGridView", () => {
     expect(note()).toContain("## Arc: [[Ilse]]\n- [[One#Camp]] — want: \"woke before Ilse\" to be first");
   });
 
-  it("folds a group from its pill, hides and shows a column, and remembers both in the settings", async () => {
+  it("folds a group from its header caret into one narrow column with a line down the rows, hides and shows a column, and remembers both in the settings", async () => {
     const { v, prefs } = open();
     await v.onOpen();
     const el = v.contentEl;
-    expect([...el.querySelectorAll(".czm-pg-pill")].map((p) => p.textContent)).toEqual(["Arcs1", "Subplots1", "Cast3 folded"]);
-    (el.querySelector(".czm-pg-pill") as HTMLElement).click();
+    expect([...el.querySelectorAll(".czm-pg-groups .czm-pg-group")].map((g) => [g.className.replace(/\s*is-folded/, "").split(" ")[1], g.getAttribute("colspan"), g.textContent])).toEqual([["czm-pg-group-arc", "1", "Arcs1"], ["czm-pg-group-subplot", "1", "Subplots1"], ["czm-pg-group-cast", "1", ""]]);
+    expect(el.querySelector("thead th.czm-pg-fold-cast .czm-pg-fold-name")?.textContent).toBe("Cast · 3");
+    expect(el.querySelector(".czm-pg-pill")).toBeNull();
+    const arcs = el.querySelector(".czm-pg-group-arc .czm-pg-group-toggle") as HTMLElement;
+    expect(arcs.getAttribute("aria-expanded")).toBe("true");
+    expect(arcs.querySelector(".czm-pg-group-caret")?.getAttribute("data-icon")).toBe("chevron-down");
+    arcs.click();
     expect(prefs().folded.arc).toBe(true);
     expect([...el.querySelectorAll(".czm-pg-col-thread .czm-pg-col-title")].map((s) => s.textContent)).toEqual(["The gate"]);
-    expect(el.querySelector(".czm-pg-pill")?.textContent).toBe("Arcs1 folded");
+    const foldedHead = el.querySelector(".czm-pg-group-arc.is-folded .czm-pg-group-toggle")!;
+    expect(foldedHead.querySelector(".czm-pg-group-caret")?.getAttribute("data-icon")).toBe("chevron-right");
+    expect(el.querySelector("thead th.czm-pg-fold.czm-pg-kind-arc .czm-pg-fold-name")?.textContent).toBe("Arcs · 1");
+    expect(el.querySelectorAll("tbody .czm-pg-scene .czm-pg-fold-td.czm-pg-kind-arc")).toHaveLength(4);
+    expect([...el.querySelectorAll(".czm-pg-groups .czm-pg-group")].map((g) => g.textContent)).toEqual(["", "Subplots1", ""]);
+    expect(el.querySelector(".czm-pg-group-arc.is-folded .czm-pg-group-toggle")?.getAttribute("aria-label")).toBe("Arcs: 1, folded, click to show");
+    expect(el.querySelector(".czm-shell-state-text")?.textContent).toContain("1 column · 1 in 1 folded group");
     v.run("fold-arcs");
     expect(prefs().folded.arc).toBe(false);
     el.querySelector<HTMLElement>('.czm-pg-cell[data-col="1"][data-row="0"]')!.click();
@@ -310,7 +367,7 @@ describe("PlotGridView", () => {
     // The header's ⋯ opens the column menu; a job row writes the key and the rebuild reads it back.
     const eyes = [...el.querySelectorAll(".czm-pg-col-thread")].find((th) => th.querySelector(".czm-pg-col-title")?.textContent === "Eyes")!;
     (eyes.querySelector(".czm-pg-col-more") as HTMLElement).click();
-    expect(Menu.last!.items.map((i) => i.title.replace(/Plot grid:.*$/, ""))).toEqual(["Rename…", "Kind: arc", "Kind: theme", "Kind: subplot", "Kind: free thread", "Use as POV", "Use as Time", "Use as Main theme", "Read this column with the model…", "Check this column against the draft…", "Dismiss all readings", "Hide column", "Delete column…"]);
+    expect(Menu.last!.items.map((i) => i.title.replace(/Plot grid:.*$/, ""))).toEqual(["Rename…", "Move the threads left", "Move the threads right", "Kind: arc", "Kind: theme", "Kind: subplot", "Kind: free thread", "Use as POV", "Use as Time", "Use as Plot point", "Use as Main theme", "Read this column with the model…", "Check this column against the draft…", "Dismiss all readings", "Freeze up to here", "Hide column", "Delete column…"]);
     Menu.last!.items.find((i) => i.title === "Use as POV")!.cb();
     await new Promise((r) => setTimeout(r, 400));
     expect(calls.writes).toContain("plot-pov=Eyes");
@@ -329,7 +386,7 @@ describe("PlotGridView", () => {
     input.value = "Theme: Debt";
     input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     await new Promise((r) => setTimeout(r, 20));
-    (el.querySelector(".czm-pg-job[aria-pressed]") as HTMLElement).parentElement!.querySelectorAll<HTMLElement>(".czm-pg-job")[2]!.click();
+    (el.querySelector(".czm-pg-job[aria-pressed]") as HTMLElement).parentElement!.querySelectorAll<HTMLElement>(".czm-pg-job")[3]!.click();
     await new Promise((r) => setTimeout(r, 400));
     expect(calls.writes).toContain("plot-theme=Theme: Debt");
     expect(el.querySelector(".czm-pg-theme-name")?.textContent).toBe("Debt");
@@ -540,5 +597,373 @@ describe("PlotGridView", () => {
     expect(actOf("Novel/Part one/One.md", "Novel/")).toBe("Part one");
     expect(actOf("Novel/One.md", "Novel/")).toBe("");
     expect(actOf("Elsewhere/A/B/c.md", "Novel/")).toBe("Elsewhere · A · B");
+  });
+
+  describe("the outline: rows before the chapters exist", () => {
+    const cast = notes.slice(0, 3);
+    const planned = `# Act I\n## The perfect record\n### 1 Gainesville courtroom\n<!-- Kevin wins a case he knows he should lose -->\n### 4 The recess bathroom\n## The offer\n### 12 The New York invitation\n`;
+
+    it("starts the outline from the empty state: New scene writes Outline.md and opens the row's name for typing", async () => {
+      const { v, calls, outline } = open({}, "## Subplot: The Cullen trial\n", { notes: cast });
+      await v.onOpen();
+      const el = v.contentEl;
+      expect(el.textContent).toContain("No scenes yet");
+      expect(el.textContent).toContain("No outline yet");
+      (el.querySelector(".czm-pg-fix-scene") as HTMLElement).click();
+      await tick();
+      expect(outline()).toMatch(/^---\ncreative-writer: false\ncreative-writer-outline: 1\n---\n/);
+      expect(outline()).toMatch(/## Chapter 1\n### New scene\n$/);
+      expect(el.querySelector(".czm-pg-note.is-outline .czm-pg-group-name")?.textContent).toBe("Chapter 1");
+      expect(el.querySelector(".czm-pg-note.is-outline .czm-pg-note-total")?.textContent).toBe("1 scene · outline · no note yet");
+      expect(el.querySelector(".czm-map-status")?.textContent).toContain("New scene written to Outline.md");
+      // The new row opens for its name; Enter saves it, and the threads note is relinked so a stop would follow.
+      const field = el.querySelector(".czm-pg-row-rename") as HTMLInputElement;
+      expect(field?.value).toBe("New scene");
+      field.value = "1 Gainesville courtroom";
+      field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await tick();
+      expect(outline()).toContain("### 1 Gainesville courtroom");
+      expect(calls.writes).toContain("relink Outline#New scene → Outline#1 Gainesville courtroom");
+      expect(el.querySelector(".czm-pg-scene.is-outline .czm-map-row-name")?.textContent).toBe("1 Gainesville courtroom");
+      expect(el.querySelector(".czm-map-section-pg-rows .czm-map-section-value")?.textContent).toContain("1 planned scene");
+    });
+
+    it("groups planned rows under their chapter and act, shows the logline in the Plot column, and a stop typed there links the outline", async () => {
+      const { v, note } = open({}, "## Subplot: The Cullen trial\n", { notes: cast, outline: planned });
+      await v.onOpen();
+      const el = v.contentEl;
+      expect([...el.querySelectorAll(".czm-pg-act th")].map((th) => th.textContent)).toEqual(["Act Ioutline · no folder yet"]);
+      expect([...el.querySelectorAll(".czm-pg-note .czm-pg-group-name")].map((x) => x.textContent)).toEqual(["The perfect record", "The offer"]);
+      expect([...el.querySelectorAll(".czm-pg-scene .czm-map-row-name")].map((x) => x.textContent)).toEqual(["1 Gainesville courtroom", "4 The recess bathroom", "12 The New York invitation"]);
+      expect(el.querySelector(".czm-pg-plot.is-logline")?.textContent).toBe("Kevin wins a case he knows he should lose");
+      const cell = el.querySelector<HTMLElement>('.czm-pg-cell[data-col="0"][data-row="1"]')!;
+      cell.click(); cell.click();
+      const f = el.querySelector(".czm-pg-editor") as HTMLTextAreaElement;
+      f.value = "the file lands on his desk";
+      f.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await tick();
+      expect(note()).toContain("- [[Outline#4 The recess bathroom]] — the file lands on his desk");
+      expect(el.querySelector('.czm-pg-cell[data-col="0"][data-row="1"]')?.classList.contains("is-plan")).toBe(true);
+    });
+
+    it("the row menu adds a scene below, moves, deletes, and every write has an undo that puts the note back whole", async () => {
+      const { v, outline } = open({}, "", { notes: cast, outline: planned });
+      await v.onOpen();
+      const el = v.contentEl;
+      const titles = () => Menu.last!.items.map((m) => m.title.replace(/Plot grid:.*$/, ""));
+      const pick = (title: string) => Menu.last!.items.find((m) => m.title.startsWith(title))!.cb();
+      const rowMenu = (i: number) => { (el.querySelector(`.czm-pg-scene[data-row="${i}"] .czm-pg-row-more`) as HTMLElement).click(); return titles(); };
+      expect(rowMenu(0)).toEqual(["New scene below", "New chapter below", "New act", "Rename…", "Logline…", "Move up", "Move down", "Delete scene"]);
+      pick("Move down"); await tick();
+      expect(parseOutline(outline()).acts[0]!.chapters[0]!.scenes.map((s) => s.title)).toEqual(["4 The recess bathroom", "1 Gainesville courtroom"]);
+      (el.querySelector(".czm-map-status button") as HTMLElement).click(); await tick();
+      expect(outline()).toBe(planned);
+      rowMenu(2); pick("Delete scene"); await tick();
+      expect(parseOutline(outline()).scenes).toBe(2);
+      expect(el.querySelector(".czm-map-status")?.textContent).toContain("Deleted “12 The New York invitation”");
+      (el.querySelector(".czm-map-status button") as HTMLElement).click(); await tick();
+      expect(outline()).toBe(planned);
+      rowMenu(1); pick("New scene below"); await tick();
+      expect(parseOutline(outline()).acts[0]!.chapters[0]!.scenes.map((s) => s.title)).toEqual(["1 Gainesville courtroom", "4 The recess bathroom", "New scene"]);
+      (el.querySelector(".czm-pg-row-rename") as HTMLInputElement).dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      rowMenu(0); pick("New chapter below"); await tick();
+      expect(parseOutline(outline()).acts[0]!.chapters.map((c) => c.title)).toEqual(["The perfect record", "New chapter", "The offer"]);
+      (el.querySelector(".czm-pg-row-rename") as HTMLInputElement).dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      // A chapter's own menu, from its header row.
+      (el.querySelectorAll(".czm-pg-note .czm-pg-row-more")[1] as HTMLElement).click();
+      expect(titles()).toEqual(["New chapter below", "Rename chapter…", "Move chapter up", "Move chapter down", "Delete chapter and its scenes"]);
+      pick("Delete chapter and its scenes"); await tick();
+      expect(parseOutline(outline()).acts[0]!.chapters.map((c) => c.title)).toEqual(["The perfect record", "The offer"]);
+    });
+
+    it("writes the logline as a comment under the heading and reads it back into the Plot column", async () => {
+      const { v, outline } = open({}, "", { notes: cast, outline: planned });
+      await v.onOpen();
+      const el = v.contentEl;
+      const plot = el.querySelectorAll<HTMLElement>(".czm-pg-plot.is-logline")[1]!;
+      plot.click();
+      const f = el.querySelector(".czm-pg-logline-field") as HTMLTextAreaElement;
+      f.value = "Kevin sees the truth on Gettys' face -- and goes on";
+      f.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await tick();
+      expect(outline()).toContain("### 4 The recess bathroom\n<!-- Kevin sees the truth on Gettys' face – and goes on -->");
+      expect(el.querySelectorAll(".czm-pg-plot.is-logline")[1]!.textContent).toBe("Kevin sees the truth on Gettys' face – and goes on");
+    });
+
+    it("the build sheet previews the tree, offers the shape, builds with undo, and reports what it wrote", async () => {
+      const { v, calls, note, outline } = open({}, "## Subplot: The Cullen trial\n- [[Outline#1 Gainesville courtroom]] — the file lands\n", { notes: cast, outline: planned });
+      await v.onOpen();
+      const el = v.contentEl;
+      (el.querySelector(".czm-pg-outline-build") as HTMLElement).click();
+      await tick();
+      const sheet = el.querySelector(".czm-map-section-pg-build")!;
+      expect(sheet.querySelector(".czm-pg-build-tree")?.textContent).toBe("Act I/\n  The perfect record.md  story-order 1\n    ## 1 Gainesville courtroom\n    ## 4 The recess bathroom\n  The offer.md  story-order 2\n    ## 12 The New York invitation");
+      expect(sheet.textContent).toContain("create 2 notes in 1 folder");
+      const choose = (value: string) => { const r = el.querySelector(`.czm-map-section-pg-build input[value="${value}"]`) as HTMLInputElement; r.checked = true; r.dispatchEvent(new Event("change")); };
+      choose("one-note");
+      await tick();
+      expect(el.querySelector(".czm-map-section-pg-build .czm-pg-build-tree")?.textContent).toContain("Draft.md  story-order 1");
+      choose("chapters");
+      await tick();
+      (el.querySelector(".czm-pg-build-go") as HTMLButtonElement).click();
+      await tick();
+      expect(calls.writes.at(-1)).toBe("build chapters: Novel/Act I/The perfect record.md, Novel/Act I/The offer.md");
+      expect(note()).toContain("- [[The perfect record#1 Gainesville courtroom]] — the file lands");
+      expect(el.querySelector(".czm-map-status")?.textContent).toContain("Built 2 notes in 1 folder, 3 scenes, 3 stops relinked");
+      expect(el.querySelector(".czm-map-section-pg-build")).toBeNull();
+      expect(el.querySelector(".czm-pg-outline")?.textContent).toContain("Built on 2026-09-22");
+      (el.querySelector(".czm-map-status button") as HTMLElement).click();
+      await tick();
+      expect(calls.writes.at(-1)).toBe("unbuild");
+      expect(outline()).toBe(planned);
+      expect(el.querySelectorAll(".czm-pg-scene")).toHaveLength(3);
+    });
+
+    it("a built outline draws no rows and the Rows section says so", async () => {
+      const { v } = open({}, "", { notes: cast, outline: `---\ncreative-writer-outline-built: 2026-09-22\n---\n${planned}` });
+      await v.onOpen();
+      expect(v.contentEl.querySelectorAll(".czm-pg-scene")).toHaveLength(0);
+      expect(v.contentEl.textContent).toContain("The outline was built on 2026-09-22");
+      expect(v.contentEl.querySelector(".czm-pg-outline")?.textContent).toContain("Built on 2026-09-22, Outline.md kept");
+    });
+  });
+});
+
+describe("the frozen block", () => {
+  it("puts the word count under the scene name, freezes Scene and Plot, and freezes further from a column's menu, remembered per project", async () => {
+    const { v, prefs } = open();
+    await v.onOpen();
+    const el = v.contentEl;
+    expect(el.querySelector(".czm-pg-col-words")).toBeNull();
+    expect(el.querySelector('.czm-pg-scene[data-row="0"] .czm-pg-scene-words')?.textContent).toBe("9 words");
+    expect(el.querySelector('.czm-pg-scene[data-row="2"] .czm-pg-scene-words')).toBeNull(); // an outline row has no count
+    expect([...el.querySelectorAll("thead tr:not(.czm-pg-groups) th.is-frozen")].map((t) => t.getAttribute("data-fcol"))).toEqual(["0", "1"]);
+    expect(el.querySelector("thead th.czm-pg-col-plot")?.classList.contains("is-frozen-edge")).toBe(true);
+    expect(el.querySelector('.czm-pg-scene[data-row="0"] .czm-pg-plot')?.classList.contains("is-frozen")).toBe(true);
+    (el.querySelector(".czm-pg-col-thread .czm-pg-col-more") as HTMLElement).click();
+    Menu.last!.items.find((i) => i.title.startsWith("Freeze up to here"))!.cb();
+    expect(prefs().frozen).toEqual({ "Novel/": "Arc: [[Ilse]]" });
+    expect([...el.querySelectorAll("thead tr:not(.czm-pg-groups) th.is-frozen")].map((t) => t.getAttribute("data-fcol"))).toEqual(["0", "1", "2"]);
+    expect(el.querySelector('.czm-pg-scene[data-row="0"] .czm-pg-cell-td.is-frozen')?.getAttribute("data-fcol")).toBe("2");
+    expect(el.querySelector(".czm-map-status")?.textContent).toContain("Frozen up to “Ilse”");
+    (el.querySelector(".czm-pg-col-thread .czm-pg-col-more") as HTMLElement).click();
+    const item = Menu.last!.items.find((i) => i.title.startsWith("Freeze up to here"))!;
+    expect(item.checked).toBe(true);
+    item.cb();
+    expect(prefs().frozen).toEqual({});
+    expect([...el.querySelectorAll("thead tr:not(.czm-pg-groups) th.is-frozen")]).toHaveLength(2);
+  });
+
+  describe("templates", () => {
+    const cast = notes.slice(0, 3);
+    const settle = () => new Promise((r) => setTimeout(r, 40));
+
+    it("offers a template from the empty state, previews Story analysis columns only with arcs bound, applies with jobs, and undoes", async () => {
+      const { v, calls, note, outline } = open({}, "", { notes: cast });
+      await v.onOpen();
+      const el = v.contentEl;
+      (el.querySelector(".czm-pg-fix-template") as HTMLElement).click();
+      await settle();
+      const sheet = el.querySelector(".czm-map-section-pg-template")!;
+      expect([...sheet.querySelectorAll(".czm-pg-template-name")].map((x) => x.textContent)).toEqual(["Three acts", "Save the Cat", "Hero's journey", "An arc per character", "Story analysis"]);
+      const pick = (i: number) => { const r = sheet.querySelectorAll<HTMLInputElement>('input[name="czm-pg-template"]')[i]!; r.checked = true; r.dispatchEvent(new Event("change")); };
+      pick(4);
+      await settle();
+      const analysis = el.querySelector(".czm-map-section-pg-template")!;
+      const parts = [...analysis.querySelectorAll<HTMLInputElement>(".czm-pg-template-part input")];
+      expect(parts.map((p) => [p.disabled, p.checked])).toEqual([[true, false], [false, true]]);
+      const binds = analysis.querySelectorAll<HTMLSelectElement>(".czm-pg-template-bind");
+      expect(binds).toHaveLength(2);
+      expect([...binds[0]!.options].map((o) => o.text)).toEqual(["Character A (as written)", "Ilse", "Marta Kovács"]);
+      binds[0]!.value = "Marta Kovács"; binds[0]!.dispatchEvent(new Event("change"));
+      await settle();
+      const rename = el.querySelector<HTMLInputElement>('.czm-pg-template-rename[aria-label="Theme: Major theme: name"]')!;
+      rename.value = "Vanity"; rename.dispatchEvent(new Event("change"));
+      await settle();
+      const tree = el.querySelector(".czm-map-section-pg-template .czm-pg-build-tree")!.textContent!;
+      expect(tree).toContain("## Arc: [[Marta Kovács]]");
+      expect(tree).toContain("## Theme: Vanity");
+      expect(tree).toContain("## Arc: Character B");
+      expect(tree).toContain("Project note · time: Time · POV: POV · main theme: Theme: Vanity · plot point: Plot point");
+      (el.querySelector(".czm-pg-template-go") as HTMLButtonElement).click();
+      await new Promise((r) => setTimeout(r, 400));
+      expect(calls.writes.at(-1)).toBe("apply: Chapter number | Time | POV | Plot point | Main plot | Theme: Vanity | Subplot: Subplot 1 | Subplot: Subplot 2 | Arc: [[Marta Kovács]] | Arc: Character B jobs=time,pov,theme,beats");
+      expect(note()).toContain("## Theme: Vanity");
+      expect(outline()).toBe("");
+      expect(el.querySelector(".czm-map-status")?.textContent).toContain("Applied Story analysis: 10 columns, 4 jobs set");
+      expect([...el.querySelectorAll(".czm-map-section-pg-columns .czm-pg-side-job")].map((x) => x.textContent)).toEqual(["time", "pov", "plot point", "main theme"]);
+      expect(el.querySelector(".czm-map-section-pg-template")).toBeNull();
+      (el.querySelector(".czm-map-status button") as HTMLElement).click();
+      await new Promise((r) => setTimeout(r, 400));
+      expect(calls.writes.at(-1)).toBe("unapply");
+      expect(note()).toBe("");
+    });
+
+    it("applies Save the Cat's rows and columns to an empty project, then saves the grid as a template", async () => {
+      const { v, calls, outline, note } = open({}, "", { notes: cast });
+      await v.onOpen();
+      const el = v.contentEl;
+      v.run("start-template");
+      await settle();
+      const sheet = el.querySelector(".czm-map-section-pg-template")!;
+      const r = sheet.querySelectorAll<HTMLInputElement>('input[name="czm-pg-template"]')[1]!; r.checked = true; r.dispatchEvent(new Event("change"));
+      await settle();
+      expect(el.querySelector(".czm-map-section-pg-template .czm-pg-build-tree")!.textContent).toContain("Outline.md · 15 scenes");
+      (el.querySelector(".czm-pg-template-go") as HTMLButtonElement).click();
+      await new Promise((r) => setTimeout(r, 400));
+      expect(parseOutline(outline()).scenes).toBe(15);
+      expect(note()).toContain("## Subplot: B story");
+      expect(el.querySelectorAll(".czm-pg-scene")).toHaveLength(15);
+      expect([...el.querySelectorAll(".czm-pg-act th .czm-pg-group-name")].map((x) => x.textContent)).toEqual(["Act I", "Act II", "Act III"]);
+      expect(el.querySelector(".czm-map-status")?.textContent).toContain("Applied Save the Cat: 15 scenes in 3 acts, 3 columns, 2 jobs set, 15 plot points filled");
+      v.run("save-template");
+      await settle();
+      const field = el.querySelector(".czm-pg-save-name") as HTMLInputElement;
+      field.value = "Noir in five moves"; field.dispatchEvent(new Event("input"));
+      (el.querySelector(".czm-pg-save-go") as HTMLButtonElement).click();
+      await settle();
+      expect(calls.writes.at(-1)).toBe("save Noir in five moves columns rows");
+      expect(el.querySelector(".czm-map-status")?.textContent).toContain("Saved Creative Writer/Templates/Noir in five moves.md");
+    });
+  });
+});
+
+describe("gaps", () => {
+  it("counts findings into the state line and a side section, and Show selects the first cell of the finding", async () => {
+    const ten = Array.from({ length: 10 }, (_, i) => `# S${i + 1}\nMarta walked in.\n`).join("\n");
+    const long = [note("Novel/Characters/Marta Kovács.md", ""), note("Novel/Characters/Ilse.md", ""), note("Novel/Part one/Long.md", ten)];
+    const { v } = open({}, "## Arc: [[Marta Kovács]]\n- [[Long#S1]] — want: \"walked\" in\n\n## Theme: Salt\n- [[Long#S1]] — a\n", { notes: long });
+    await v.onOpen();
+    const el = v.contentEl;
+    expect(el.querySelector(".czm-shell-state-text")?.textContent).toContain("3 gaps");
+    const texts = [...el.querySelectorAll(".czm-pg-gap-text")].map((x) => x.textContent);
+    expect(texts).toEqual(["Marta Kovács has a stop in 1 of 10 written scenes.", "Marta Kovács is on the page in 9 scenes in a row, S2 to S10, and the arc has no stop there.", "Salt has a stop in 1 of 10 written scenes."]);
+    (el.querySelectorAll(".czm-pg-gap-show")[1] as HTMLElement).click();
+    expect(el.querySelector(".czm-pg-cell.is-selected")?.getAttribute("data-row")).toBe("1");
+    expect(el.querySelector(".czm-pg-cell.is-selected")?.getAttribute("data-col")).toBe("0");
+  });
+});
+
+describe("actions that put something in a folded section", () => {
+  it("New column unfolds the Columns section and remembers it open", async () => {
+    const { v, prefs } = open({ gridSettings: () => ({ ...DEFAULT_PLOT_GRID, sections: { "pg-column": false, "pg-columns": false } }) });
+    let saved: PlotGridSettings | null = null;
+    const src = (v as unknown as { source: PlotGridSource }).source;
+    src.updateGridSettings = (next) => { saved = next; };
+    await v.onOpen();
+    const el = v.contentEl;
+    v.run("new-column");
+    expect(el.querySelector<HTMLDetailsElement>("details.czm-map-section-pg-columns")!.open).toBe(true);
+    void prefs;
+  });
+});
+
+describe("renaming a column in place", () => {
+  it("Rename… puts the heading in a field in the column's own header; Enter writes it, Escape puts it back; a double click does the same", async () => {
+    const { v, calls } = open();
+    await v.onOpen();
+    const el = v.contentEl;
+    (el.querySelector(".czm-pg-col-thread .czm-pg-col-more") as HTMLElement).click();
+    Menu.last!.items.find((i) => i.title === "Rename…")!.cb();
+    const field = el.querySelector("thead th.czm-pg-col-thread .czm-pg-row-rename") as HTMLInputElement;
+    expect(field?.value).toBe("Arc: [[Ilse]]");
+    field.value = "Arc: [[Ilse]] · the sister";
+    field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(calls.writes).toContain("rename Arc: [[Ilse]] → Arc: [[Ilse]] · the sister");
+    expect(el.querySelector(".czm-map-status")?.textContent).toContain("is now “Arc: [[Ilse]] · the sister”");
+    const name = el.querySelectorAll<HTMLElement>("thead th.czm-pg-col-thread .czm-pg-col-name")[1]!;
+    name.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    const again = el.querySelector("thead th.czm-pg-col-thread .czm-pg-row-rename") as HTMLInputElement;
+    expect(again?.value).toBe("Subplot: The gate");
+    again.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(el.querySelector(".czm-pg-row-rename")).toBeNull();
+    expect(calls.writes.filter((w) => w.startsWith("rename"))).toHaveLength(1);
+  });
+});
+
+describe("a column from a template", () => {
+  it("lists the templates' columns grouped by template, leaves out what the grid has, spells arcs per character, and adds one with its job", async () => {
+    const { v, calls, note } = open();
+    await v.onOpen();
+    await new Promise((r) => setTimeout(r, 30));
+    const el = v.contentEl;
+    const select = el.querySelector(".czm-pg-pick-column") as HTMLSelectElement;
+    expect(select.options[0]!.text).toBe("From a template…");
+    const groups: [string, string[]][] = [...select.querySelectorAll("optgroup")].map((g) => [g.label, [...g.querySelectorAll("option")].map((o) => o.text)]);
+    expect(groups.find((g) => g[0] === "Story analysis")![1]).toEqual(["Chapter number", "Time · time", "POV · POV", "Plot point · plot point", "Main plot", "Theme: Major theme · main theme", "Subplot: Subplot 1", "Subplot: Subplot 2", "Arc: [[Marta Kovács]]"]);
+    expect(groups.find((g) => g[0] === "An arc per character")![1]).toEqual(["Arc: [[Marta Kovács]]", "Theme: Main theme · main theme"]);
+    // Ilse's arc already exists, so no template offers it; the gate subplot is there too.
+    expect(groups.flatMap((g) => g[1]).some((o) => o.includes("Ilse"))).toBe(false);
+    select.value = "Story analysis\u0000Time";
+    select.dispatchEvent(new Event("change"));
+    await new Promise((r) => setTimeout(r, 400));
+    expect(note()).toContain("## Time");
+    expect(calls.writes).toContain("thread Time");
+    expect(calls.writes).toContain("plot-time=Time");
+    expect(el.querySelector(".czm-map-status")?.textContent).toContain("it is the Time column");
+    const after = el.querySelector(".czm-pg-pick-column") as HTMLSelectElement;
+    expect([...after.querySelectorAll("option")].some((o) => o.text.startsWith("Time"))).toBe(false);
+  });
+});
+
+describe("dragging blocks", () => {
+  it("drops a single column with a job past a group, writes plot-order to the project note with Undo, and Move right nudges a group", async () => {
+    const { v, calls } = open({}, "## When\n- [[One#Camp]] — Day 1\n\n## Arc: [[Ilse]]\n- [[One#Camp]] — x\n\n## Subplot: The gate\n- [[One#Camp]] — y\n");
+    await v.onOpen();
+    const el = v.contentEl;
+    // Give When the Time job, so it stands alone as a block.
+    (el.querySelectorAll(".czm-pg-col-thread .czm-pg-col-more")[2] as HTMLElement).click();
+    Menu.last!.items.find((i) => i.title === "Use as Time")!.cb();
+    await new Promise((r) => setTimeout(r, 400));
+    const titles = () => [...el.querySelectorAll(".czm-pg-col-thread .czm-pg-col-title")].map((s) => s.textContent);
+    expect(titles()).toEqual(["When", "Ilse", "The gate"]);
+    const heads = () => [...el.querySelectorAll<HTMLElement>("thead th.czm-pg-col-thread")];
+    expect(heads().map((h) => h.dataset.block)).toEqual(["When", "arcs", "subplots"]);
+    heads()[0]!.dispatchEvent(new Event("dragstart", { bubbles: true }));
+    heads()[2]!.dispatchEvent(new MouseEvent("dragover", { bubbles: true, clientX: 10 }));
+    expect(heads()[2]!.classList.contains("is-drop-after")).toBe(true);
+    heads()[2]!.dispatchEvent(new MouseEvent("drop", { bubbles: true, clientX: 10 }));
+    await new Promise((r) => setTimeout(r, 400));
+    expect(calls.writes.at(-1)).toBe("plot-order=arcs, themes, subplots, When, threads");
+    expect(titles()).toEqual(["Ilse", "The gate", "When"]);
+    expect(el.querySelector(".czm-map-status")?.textContent).toContain("Moved “When” after the subplots");
+    (el.querySelector(".czm-map-status button") as HTMLElement).click();
+    await new Promise((r) => setTimeout(r, 400));
+    expect(calls.writes.at(-1)).toBe("plot-order=");
+    expect(titles()).toEqual(["When", "Ilse", "The gate"]);
+    (el.querySelectorAll(".czm-pg-col-thread .czm-pg-col-more")[1] as HTMLElement).click();
+    Menu.last!.items.find((i) => i.title === "Move the arcs right")!.cb();
+    await new Promise((r) => setTimeout(r, 400));
+    expect(titles()).toEqual(["When", "The gate", "Ilse"]);
+    expect(calls.writes.at(-1)).toBe("plot-order=When, themes, subplots, arcs, threads");
+  });
+});
+
+describe("snapshot tabs", () => {
+  it("lists the snapshots as tabs by day and label, opens one read only as a table, and comes back to the grid", async () => {
+    const snapshotNoteText = snapshotNote(grid(), novel, "2026-09-13");
+    const { v, calls } = open({}, threadsNote, { snapshots: [{ path: "Novel/Plot grid · 2026-09-20 · after the cut.md", day: "2026-09-20", label: "after the cut" }, { path: "Novel/Plot grid · 2026-09-13.md", day: "2026-09-13", label: "" }], snapshotText: { "Novel/Plot grid · 2026-09-13.md": snapshotNoteText, "Novel/Plot grid · 2026-09-20 · after the cut.md": "no table here" } });
+    await v.onOpen();
+    const el = v.contentEl;
+    const tabs = () => [...el.querySelectorAll(".czm-pg-tab")].map((t) => [t.textContent, t.getAttribute("aria-selected")]);
+    expect(tabs()).toEqual([["Now", "true"], ["20 Sept · after the cut", "false"], ["13 Sept", "false"]]);
+    (el.querySelectorAll(".czm-pg-tab")[2] as HTMLElement).click();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(calls.writes).toContain("read Novel/Plot grid · 2026-09-13.md");
+    expect(el.querySelector(".czm-shell-state-text")?.textContent).toContain("Snapshot · 13 Sept · read only · 4 scenes · 2 columns");
+    expect(el.querySelector(".czm-pg-table.is-snapshot")).not.toBeNull();
+    expect([...el.querySelectorAll(".is-snapshot .czm-pg-note th")].map((x) => x.textContent)).toEqual(["One", "Two"]);
+    expect([...el.querySelectorAll(".is-snapshot .czm-pg-scene .czm-map-row-name")].map((x) => x.textContent)).toEqual(["Camp", "Creek", "Later", "Return"]);
+    expect(el.querySelector('.is-snapshot .czm-pg-scene .czm-pg-cell.is-verified')?.textContent).toBe("want: to be first");
+    expect(el.querySelector(".is-snapshot .czm-pg-cell.is-editing")).toBeNull();
+    (el.querySelector(".czm-shell-reset") as HTMLElement).click();
+    expect(calls.opened).toContain("Novel/Plot grid · 2026-09-13.md");
+    (el.querySelectorAll(".czm-pg-tab")[1] as HTMLElement).click();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(el.textContent).toContain("This snapshot has no table the grid can read.");
+    (el.querySelector(".czm-pg-tab") as HTMLElement).click();
+    expect(tabs()[0]).toEqual(["Now", "true"]);
+    expect(el.querySelector(".czm-pg-table:not(.is-snapshot)")).not.toBeNull();
   });
 });

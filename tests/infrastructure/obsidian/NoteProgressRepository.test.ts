@@ -9,11 +9,16 @@ function fakeVault() {
   const files = new Map<string, string>();
   const folders = new Set<string>();
   const vault: VaultLike = {
-    getAbstractFileByPath: (p) => (files.has(p) ? { path: p } : folders.has(p) ? { path: p, children: [] } : null),
+    getAbstractFileByPath: (p) => (files.has(p) ? { path: p } : folders.has(p) ? { path: p, children: [...files.keys()].filter((f) => f.startsWith(`${p}/`)) } : null),
     cachedRead: async (f) => files.get((f as { path: string }).path)!,
     modify: async (f, c) => { files.set((f as { path: string }).path, c); },
     create: async (p, c) => { files.set(p, c); },
     createFolder: async (p) => { folders.add(p); },
+    delete: async (f) => { const path = (f as { path: string }).path; files.delete(path); folders.delete(path); },
+    adapter: {
+      list: async (p) => ({ files: [...files.keys()].filter((f) => f.startsWith(`${p}/`)), folders: [...folders].filter((f) => f.startsWith(`${p}/`)) }),
+      rmdir: async (p) => { folders.delete(p); },
+    },
   };
   return { vault, files, folders };
 }
@@ -67,5 +72,21 @@ describe("NoteProgressRepository", () => {
     path = "B.md";
     await repo.save(log);
     expect([...files.keys()]).toEqual(["A.md", "B.md"]);
+  });
+});
+
+describe("vaultNoteIO removals", () => {
+  it("removes a note by path, and a folder only when it is empty", async () => {
+    const { vault, files, folders } = fakeVault();
+    const io = vaultNoteIO(vault);
+    await io.write("Act I/One.md", "x");
+    expect(folders.has("Act I")).toBe(true);
+    expect(await io.removeFolderIfEmpty("Act I")).toBe(false);
+    await io.remove("Act I/One.md");
+    expect(files.has("Act I/One.md")).toBe(false);
+    await io.remove("Act I/One.md"); // gone already: nothing to do
+    folders.delete("Act I"); folders.add("Act I");
+    expect(await io.removeFolderIfEmpty("Act I")).toBe(true);
+    expect(await io.removeFolderIfEmpty("Nowhere")).toBe(false);
   });
 });

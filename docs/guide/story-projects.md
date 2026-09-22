@@ -39,12 +39,15 @@ A short story or a novella does not need the folders:
 
 ```
 The Bear Hunt/
-├── The Bear Hunt.md      ← writing-target (+ story-ignore: [LOW, POV]) + the whole draft, one # heading per scene
+├── The Bear Hunt.md      ← writing-target (+ story-ignore: [LOW, POV])
+├── Draft.md              ← the whole draft, one # heading per scene
 ├── Vitaliy.md            ← type: character
 ├── Lee.md                ← type: character
 ├── Tikka T3x.md          ← type: item, aliases: [Tikka, the rifle]
 └── memos/                ← creative-writer: false in each
 ```
+
+The draft sits beside the project note rather than in it because the plot grid never reads the project note's own headings as rows; the map and the manuscript page read them either way. With no draft at all yet, the grid's **New scene** starts an `Outline.md` and **Build the manuscript** writes the notes from it: see [the outline](/guide/plot-grid#before-there-are-chapters-the-outline).
 
 ## What the map cannot do for you
 

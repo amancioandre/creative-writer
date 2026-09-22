@@ -503,9 +503,14 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-pg-table th, .czm-pg-table td { padding: 2px 4px; text-align: left; font-weight: normal; vertical-align: top; }
 .czm-pg-table thead th { position: sticky; top: 0; background: var(--background-primary); z-index: 2; vertical-align: bottom; border-bottom: 1px solid var(--background-modifier-border); }
 .czm-pg-table thead th.czm-pg-corner { left: 0; z-index: 3; }
+.czm-pg-corner-hint { display: block; font-family: var(--font-monospace); font-size: 10px; font-weight: normal; color: var(--text-faint); }
 .czm-pg-col { min-width: 140px; max-width: 220px; }
-.czm-pg-col-words { min-width: 56px; max-width: 64px; text-align: right; }
 .czm-pg-col-plot { min-width: 180px; max-width: 240px; }
+/* Frozen columns: Scene and Plot always, more when the writer asks; each is offset by the widths before it, measured after the draw. */
+.czm-pg-table .is-frozen { position: sticky; left: 0; background: var(--background-primary); z-index: 1; }
+.czm-pg-table thead th.is-frozen { z-index: 3; }
+.czm-pg-table .is-frozen-edge { box-shadow: inset -1px 0 0 var(--background-modifier-border); }
+.czm-pg-scene:hover td.is-frozen { background: var(--background-modifier-hover); }
 .czm-pg-col-cast { min-width: 120px; }
 .czm-pg-col-name { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-normal); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* A stripe on the header says what kind of column it is: accent for the writer's threads, faint for what the code fills. */
@@ -516,13 +521,7 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-pg-col-thread.is-group-start { border-left: 1px solid var(--background-modifier-border); }
 .czm-pg-col-count { font-family: var(--font-monospace); font-size: 11px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
 .czm-pg-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--czm-kind, var(--text-muted)); flex: 0 0 auto; }
-.czm-pg-cast-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; box-shadow: none; height: auto; font-weight: 600; font-size: inherit; color: var(--text-normal); cursor: pointer; }
-.czm-pg-cast-toggle:hover { color: var(--text-accent); }
-.czm-pg-cast-toggle:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
-.czm-pg-chevron { display: inline-flex; color: var(--text-faint); }
-.czm-pg-chevron svg { width: 12px; height: 12px; }
 .czm-pg-filler { width: 100%; padding: 0; }
-.czm-pg-cast-row th { position: sticky; top: 0; background: var(--background-primary); z-index: 2; }
 .czm-pg-cast-name { vertical-align: bottom; min-width: 64px; max-width: 100px; }
 .czm-pg-cast-name span { display: block; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--czm-kind, var(--text-muted)); font-weight: 600; }
 .czm-pg-note th { position: sticky; left: 0; background: var(--background-secondary); font-weight: 600; padding-top: 8px; padding-bottom: 3px; }
@@ -535,9 +534,93 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-pg-scene-head:focus-visible { background: var(--background-modifier-hover); outline: 2px solid var(--text-accent); outline-offset: -2px; }
 .czm-pg-scene-head .czm-map-row-meta { margin-left: 8px; }
 .czm-pg-scene.is-outline .czm-pg-scene-head { color: var(--text-muted); font-style: italic; }
+/* The outline: planned rows share one note, so their chapter and act rows say so, and every planned row carries a menu. */
+.czm-pg-note.is-outline th, .czm-pg-act.is-outline th { font-style: italic; }
+.czm-pg-row-more { display: inline-flex; width: 18px; height: 18px; margin-left: 6px; opacity: 0; color: var(--text-faint); vertical-align: middle; }
+.czm-pg-scene-head:hover .czm-pg-row-more, .czm-pg-scene-head:focus-within .czm-pg-row-more, .czm-pg-note th:hover .czm-pg-row-more, .czm-pg-act th:hover .czm-pg-row-more, .czm-pg-note th:focus-within .czm-pg-row-more, .czm-pg-act th:focus-within .czm-pg-row-more { opacity: 1; }
+.czm-pg-row-rename { width: 100%; min-width: 160px; font: inherit; font-style: normal; padding: 1px 4px; }
+.czm-pg-scene-head.is-renaming { padding-top: 2px; padding-bottom: 2px; }
+.czm-pg-plot.is-logline { cursor: text; font-style: italic; }
+.czm-pg-plot.is-logline:empty::after { content: "logline"; color: var(--text-faint); opacity: 0; }
+.czm-pg-scene:hover .czm-pg-plot.is-logline:empty::after { opacity: 1; }
+.czm-pg-plot.is-editing { padding: 0 2px; }
+.czm-pg-outline { margin: 4px 8px 8px; padding: 8px 10px; border: 1px solid var(--background-modifier-border); border-radius: 6px; }
+.czm-pg-outline-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.czm-pg-outline .czm-map-absent { margin: 4px 0 6px; }
+.czm-pg-outline-actions { flex-wrap: wrap; gap: 4px; }
+.czm-pg-outline-actions button { font-size: var(--font-ui-smaller); padding: 3px 8px; height: auto; }
+.czm-pg-outline-open { font-size: var(--font-ui-smaller); color: var(--text-accent); }
+/* The build sheet: the plan as a tree, the shape as two radios, then Build. Deterministic, so it looks like a file operation. */
+.czm-pg-build-tree { margin: 4px 8px; padding: 8px 10px; font-size: 11px; line-height: 1.5; white-space: pre; overflow-x: auto; background: var(--background-secondary); border-radius: 6px; }
+.czm-pg-build-shapes { display: flex; flex-direction: column; gap: 4px; margin: 4px 8px; }
+.czm-pg-build-shape { display: flex; gap: 8px; align-items: flex-start; padding: 6px 8px; border: 1px solid var(--background-modifier-border); border-radius: 6px; cursor: pointer; }
+.czm-pg-build-shape.is-on { border-color: var(--interactive-accent); }
+.czm-pg-build-shape input { margin-top: 3px; }
+.czm-pg-build-shape-name { font-size: var(--font-ui-small); }
+/* The template sheet: a list to pick from, the parts to apply, one row per column to tick, name or bind, then the preview. */
+.czm-pg-template-list { margin: 0 8px 4px; }
+.czm-pg-template-row { display: flex; align-items: center; gap: 8px; padding: 3px 6px; border-radius: 4px; cursor: pointer; }
+.czm-pg-template-row.is-on { background: var(--background-modifier-hover); }
+.czm-pg-template-name { flex: 1; min-width: 0; font-size: var(--font-ui-small); }
+.czm-pg-template-parts { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 2px 8px 4px; }
+.czm-pg-template-part { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-ui-smaller); cursor: pointer; }
+.czm-pg-template-part.is-off { color: var(--text-faint); }
+.czm-pg-template-col { display: flex; align-items: center; gap: 6px; margin: 2px 8px; font-size: var(--font-ui-smaller); }
+.czm-pg-template-col-name { color: var(--text-muted); font-family: var(--font-monospace); white-space: nowrap; }
+.czm-pg-template-rename, .czm-pg-template-bind { flex: 1; min-width: 0; font-size: var(--font-ui-smaller); }
+.czm-pg-save-name { width: calc(100% - 16px); margin: 2px 8px; }
+/* Groups: a row over the columns, one cell per block, colour coded; a caret says open or folded. A folded group is one narrow column
+   with its name written down it and a line the body carries to the last scene, in the group's colour. */
+.czm-pg-groups th { position: sticky; top: 0; z-index: 2; background: var(--background-primary); border-bottom: 0; padding: 0 4px 2px; vertical-align: bottom; }
+.czm-pg-groups th.czm-pg-group-corner { z-index: 3; left: 0; }
+.czm-pg-group { --czm-group: var(--text-faint); }
+.czm-pg-group-arc, .czm-pg-kind-arc.czm-pg-fold, .czm-pg-fold-td.czm-pg-kind-arc { --czm-group: var(--color-purple); }
+.czm-pg-group-theme, .czm-pg-kind-theme.czm-pg-fold, .czm-pg-fold-td.czm-pg-kind-theme { --czm-group: var(--color-orange); }
+.czm-pg-group-subplot, .czm-pg-kind-subplot.czm-pg-fold, .czm-pg-fold-td.czm-pg-kind-subplot { --czm-group: var(--color-blue); }
+.czm-pg-group-free, .czm-pg-kind-free.czm-pg-fold, .czm-pg-fold-td.czm-pg-kind-free { --czm-group: var(--color-green); }
+.czm-pg-group-single { --czm-group: var(--text-muted); }
+.czm-pg-group-cast { --czm-group: var(--color-cyan); }
+.czm-pg-group .czm-pg-group-title, .czm-pg-group-single .czm-pg-group-title { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--czm-group); }
+.czm-pg-group-single .czm-pg-group-title { padding-left: 2px; }
+.czm-pg-group-toggle { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 4px 0 2px; border: 0; border-bottom: 2px solid var(--czm-group); border-radius: 0; background: transparent; box-shadow: none; cursor: pointer; }
+.czm-pg-group-toggle:hover { background: var(--background-modifier-hover); }
+.czm-pg-group-toggle:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.czm-pg-group-caret { display: inline-flex; color: var(--czm-group); }
+.czm-pg-group-caret svg { width: 12px; height: 12px; }
+.czm-pg-group-count { font-family: var(--font-monospace); font-size: 10px; color: var(--text-faint); }
+.czm-pg-group.is-folded { width: 22px; min-width: 22px; max-width: 22px; padding: 0 0 2px !important; text-align: center; }
+.czm-pg-group.is-folded .czm-pg-group-toggle { width: 22px; padding: 0; justify-content: center; border-bottom-width: 3px; }
+/* The folded cast is drawn like every folded group, the name down the column; the column itself keeps the width its dots need. */
+.czm-pg-group.czm-pg-group-cast.is-folded { width: auto; min-width: 22px; max-width: none; text-align: left; }
+.czm-pg-group.czm-pg-group-cast.is-folded .czm-pg-group-toggle { margin: 0; }
+.czm-pg-fold.czm-pg-fold-cast { --czm-group: var(--color-cyan); width: auto; min-width: 22px; max-width: none; text-align: left; }
+.czm-pg-fold.czm-pg-fold-cast .czm-pg-fold-name { margin: 0; }
+.czm-pg-fold { width: 22px; min-width: 22px; max-width: 22px; padding: 4px 2px !important; vertical-align: top; }
+.czm-pg-fold-name { display: block; writing-mode: vertical-rl; max-height: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--czm-group); }
+.czm-pg-fold-td { width: 22px; min-width: 22px; max-width: 22px; padding: 0 !important; background: linear-gradient(to right, transparent calc(50% - 2px), var(--czm-group) calc(50% - 2px), var(--czm-group) calc(50% + 2px), transparent calc(50% + 2px)); opacity: 0.55; }
+.czm-pg-scene:hover .czm-pg-fold-td { background-color: transparent; }
+/* Snapshots as tabs over the table; the open one is read only. */
+.czm-pg-tabs { display: flex; gap: 2px; padding: 0 4px; border-bottom: 1px solid var(--background-modifier-border); overflow-x: auto; }
+.czm-pg-tab { height: 26px; padding: 0 10px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; box-shadow: none; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; cursor: pointer; }
+.czm-pg-tab:hover { color: var(--text-normal); background: var(--background-modifier-hover); }
+.czm-pg-tab.is-active { color: var(--text-normal); border-bottom-color: var(--interactive-accent); }
+.czm-pg-tab:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -2px; }
+.czm-pg-table.is-snapshot .czm-pg-cell { cursor: default; }
+/* Dragging a header moves its block; the drop side shows as a bar on the target block's edge. */
+.czm-pg-col-thread[draggable="true"] { cursor: grab; }
+.czm-pg-col-thread.is-dragging { opacity: 0.45; }
+.czm-pg-col-thread.is-drop-before { box-shadow: inset 3px 0 0 var(--interactive-accent); }
+.czm-pg-col-thread.is-drop-after { box-shadow: inset -3px 0 0 var(--interactive-accent); }
+.czm-pg-pick-row { margin-top: 0; }
+.czm-pg-pick-column { flex: 1; min-width: 0; font-size: var(--font-ui-smaller); }
+/* Gaps: what the grid counted, one box per finding, followed to its cells with Show. */
+.czm-pg-gap { margin: 4px 8px; padding: 6px 8px; border-left: 3px solid var(--text-faint); background: var(--background-secondary); border-radius: 0 6px 6px 0; }
+.czm-pg-gap.is-unmoved-stretch { border-left-color: var(--color-orange); }
+.czm-pg-gap-text { font-size: var(--font-ui-smaller); }
+.czm-pg-gap .czm-map-panel-actions { margin-top: 4px; }
 .czm-pg-scene td, .czm-pg-scene th { border-bottom: 1px solid color-mix(in srgb, var(--background-modifier-border) 60%, transparent); }
 .czm-pg-scene:hover td { background: var(--background-modifier-hover); }
-.czm-pg-words { text-align: right; font-family: var(--font-monospace); font-variant-numeric: tabular-nums; color: var(--text-muted); white-space: nowrap; }
+.czm-pg-scene-words { font-family: var(--font-monospace); font-variant-numeric: tabular-nums; font-size: 10px; color: var(--text-faint); line-height: 1.2; }
 .czm-pg-plot { color: var(--text-muted); font-size: 11.5px; max-width: 240px; }
 /* A cell: a stop at a scene. Its edge says what its anchor says: nothing for a plan, a tick's colour for verified, a warning for broken. */
 .czm-pg-cell { min-height: 22px; padding: 2px 5px; border-radius: 4px; border: 1px solid transparent; line-height: 1.35; cursor: pointer; }
@@ -583,12 +666,6 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-pg-theme { display: flex; align-items: baseline; gap: 8px; min-width: 0; flex: 1 1 auto; }
 .czm-pg-theme-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); white-space: nowrap; }
 .czm-pg-theme-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.czm-pg-pills { display: inline-flex; gap: 4px; flex-wrap: wrap; }
-.czm-pg-pill { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border: 1px solid var(--background-modifier-border); border-radius: 11px; background: var(--background-primary); font-size: var(--font-ui-smaller); box-shadow: none; }
-.czm-pg-pill:hover { background: var(--background-modifier-hover); }
-.czm-pg-pill.is-folded { color: var(--text-muted); border-style: dashed; }
-.czm-pg-pill-count { font-family: var(--font-monospace); font-size: 11px; color: var(--text-faint); }
-.czm-pg-pill:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 /* A column header: the name, the count, and a ⋯ that appears when the header is hovered or holds the focus. */
 .czm-pg-col-sub { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
 .czm-pg-col-more { width: 18px; height: 18px; opacity: 0; color: var(--text-faint); }

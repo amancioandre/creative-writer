@@ -72,6 +72,10 @@ These commands are live only while their panel is the active tab, so they can be
 | **Plot grid: read every column with the model** / **read this column with the model** / **check this column against the draft** | The model leaves [readings](/guide/plot-grid#reading-with-the-model); you answer them. Ollama or Claude. |
 | **Plot grid: dismiss the reading** | With a cell that has a reading selected. |
 | **Plot grid: propose columns with the model** | One call over the events the map holds; the proposals wait in the side column for a tick. |
+| **Plot grid: new scene in the outline** / **new chapter in the outline** / **new act in the outline** | A row written to `Outline.md` before the chapters exist; the new scene opens for its name. See [the outline](/guide/plot-grid#before-there-are-chapters-the-outline). |
+| **Plot grid: build the manuscript from the outline** | The sheet that turns `Outline.md` into folders, chapter notes and scene headings, with Undo. |
+| **Plot grid: open Outline.md** | The plan, as a note. |
+| **Plot grid: start from a template** / **save as template** | The [template](/guide/plot-grid#templates-a-starting-shape) sheets in the side column: a starting shape applied as headings, or the grid as it stands written to a template note. |
 
 ## Ribbon
 

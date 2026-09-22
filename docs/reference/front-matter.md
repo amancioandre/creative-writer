@@ -23,7 +23,8 @@ The note whose front matter declares a [project](/guide/projects). Any note in t
 | `writing-name` | text | Display name instead of the folder name. |
 | `writing-scope` | `note` | Count only this note, not the folder. |
 | `story-ignore` | list or comma string | Capitalised words the story map must not turn into candidates. Written by the map's *Not a name*; edit freely. |
-| `plot-pov`, `plot-time`, `plot-theme` | a heading from `Story threads.md`, e.g. `Theme: What we owe the dead` | Which thread the [plot grid](/guide/plot-grid) draws as its POV, Time and main theme columns. Written by a column's *Use as…*; edit freely. |
+| `plot-order` | list or comma string, e.g. `Time, POV, arcs, Plot point, themes, subplots, threads` | The grid's blocks left to right: a job column's heading, or a kind group's word. Written by a drag or Move left / right; blocks it leaves out follow in the default order. |
+| `plot-pov`, `plot-time`, `plot-theme`, `plot-beats` | a heading from `Story threads.md`, e.g. `Theme: What we owe the dead` | Which thread the [plot grid](/guide/plot-grid) draws as its POV, Time, main theme and plot point columns. Written by a column's *Use as…* or a template's apply; edit freely. |
 | `%% Name %%` right before a sentence of speech | a cast name, or `not speech` | Not front matter but the same kind of thing: the [speaker box](/guide/lenses#the-speaker-box)'s pin, a hidden comment naming who speaks the sentence after it. Written by the box; edit or delete it freely. |
 | `bad-words` | `[[Bad words]]` or a path | The project's own word list for the [words lens](/guide/lenses#words): notes inside the project use it instead of the vault-wide note. |
 | `dialogue` | `double`, `single`, `dash`, `none` | How speech is written in this project, for the [dialogue lens](/guide/lenses#dialogue); `quotes` and `travessão` are read too. Absent, the vault-wide setting. |
@@ -78,6 +79,25 @@ followed by a short explanation and one ```` ```json ```` block: relation readin
 ## Manuscript export note
 
 `<Name> (manuscript).md` in the project folder is written by **Export** on the manuscript page and carries `creative-writer: false` and `creative-writer-manuscript: 1`, so it is never counted or read as a chapter. A snapshot; export again to refresh it.
+
+## Outline note
+
+`Outline.md` in the project folder is the [plot grid's plan](/guide/plot-grid#before-there-are-chapters-the-outline) before the chapters exist, created on the first **New scene** with
+
+```yaml
+---
+creative-writer: false
+creative-writer-outline: 1
+---
+```
+
+and written as `#` act, `##` chapter, `###` scene, with an HTML comment under a scene as its logline. The flag keeps it out of the map, the threads and the manuscript page; the grid reads it for rows. **Build the manuscript** adds `creative-writer-outline-built: YYYY-MM-DD`, after which the grid reads it no more and the rows come from the chapter notes. Edit freely; delete it and the plan is gone, the built notes stay.
+
+A comment, `<!-- … -->` or `%% … %%`, on one line or several, is never prose anywhere in the plugin: not a word counted, not a sentence read, not a heading if a heading is inside it.
+
+## Template note
+
+A note carrying `creative-writer-template: 1` in the templates folder (Settings → Stories and goals) is a [grid template](/guide/plot-grid#templates-a-starting-shape): `##` headings under `# Columns` are columns, the rest is the outline's grammar, and `plot-time`, `plot-pov`, `plot-theme` and `plot-beats` name the columns that get a job when it is applied; with `plot-beats`, the template's `beat:` tags fill that column with one stop per scene. `writing-name` gives it a display name. Written by **Save as template…**; edit freely.
 
 ## Story threads note
 
