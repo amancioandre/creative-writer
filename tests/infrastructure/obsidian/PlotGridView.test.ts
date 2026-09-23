@@ -1333,4 +1333,20 @@ describe("a column's summary", () => {
     expect(note()).not.toContain("<!--");
     expect(el.querySelector(".czm-map-status")?.textContent).toContain("Summary removed from “Ilse”");
   });
+
+  it("Time, POV and the plot point carry no summary: no prompt in the header, no menu row, no field in the Column section", async () => {
+    const { v } = open({}, "## Time\n- [[One#Camp]] — day 1\n\n## Subplot: The gate\n- [[One#Camp]] — planted\n");
+    await v.onOpen();
+    const el = v.contentEl;
+    const timeHead = [...el.querySelectorAll<HTMLElement>(".czm-pg-col-thread")].find((h) => h.querySelector(".czm-pg-col-title")?.textContent === "Time")!;
+    (timeHead.querySelector(".czm-pg-col-more") as HTMLElement).click();
+    Menu.last!.items.find((i) => i.title === "Use as Time")!.cb();
+    await new Promise((r) => setTimeout(r, 400));
+    const time = el.querySelector(".czm-pg-special-time")!;
+    expect(time.querySelector(".czm-pg-col-summary")).toBeNull();
+    expect(el.querySelector(".czm-pg-kind-subplot .czm-pg-col-summary")).not.toBeNull();
+    (time.querySelector(".czm-pg-col-more") as HTMLElement).click();
+    expect(Menu.last!.items.some((i) => i.title.includes("summary"))).toBe(false);
+    expect(el.querySelector(".czm-map-section-pg-column .czm-pg-summary-field")).toBeNull();
+  });
 });

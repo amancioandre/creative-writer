@@ -751,11 +751,13 @@ export class PlotGridView extends ItemView {
       name.createSpan({ text: c.heading.name, cls: "czm-pg-col-title" });
       onActivate(name, () => this.pickColumn(col));
       name.addEventListener("dblclick", (ev) => { ev.preventDefault(); this.renameColumnInPlace(c); });
-      // The summary sits under the name in the same box: a double click writes it where it is read, and an empty one shows a faint prompt on hover.
-      const summary = th.createDiv({ text: c.summary ?? "summary…", cls: `czm-pg-col-summary${c.summary ? "" : " is-empty"}`, attr: { "data-heading": c.heading.heading, title: c.summary ? c.summary : "Double-click to write what this column is", role: "button", tabindex: "-1", "aria-label": c.summary ? `Summary: ${c.summary}. Double-click to edit` : "No summary yet. Double-click to write one" } });
-      if (c.summary) th.title = c.summary;
-      summary.addEventListener("dblclick", (ev) => { ev.preventDefault(); ev.stopPropagation(); this.editSummaryInPlace(c, summary); });
-      summary.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !inField(ev)) { ev.preventDefault(); ev.stopPropagation(); this.editSummaryInPlace(c, summary); } });
+      // The summary sits under the name in the same box: a double click writes it where it is read, and an empty one shows a faint prompt on hover. Time, POV and the plot point are jobs, not threads with a shape, and carry none.
+      const summary = DERIVED.includes(c.special) ? null : th.createDiv({ text: c.summary ?? "summary…", cls: `czm-pg-col-summary${c.summary ? "" : " is-empty"}`, attr: { "data-heading": c.heading.heading, title: c.summary ? c.summary : "Double-click to write what this column is", role: "button", tabindex: "-1", "aria-label": c.summary ? `Summary: ${c.summary}. Double-click to edit` : "No summary yet. Double-click to write one" } });
+      if (summary) {
+        if (c.summary) th.title = c.summary;
+        summary.addEventListener("dblclick", (ev) => { ev.preventDefault(); ev.stopPropagation(); this.editSummaryInPlace(c, summary); });
+        summary.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !inField(ev)) { ev.preventDefault(); ev.stopPropagation(); this.editSummaryInPlace(c, summary); } });
+      }
       const sub = th.createDiv({ cls: "czm-pg-col-sub" });
       const audit = this.audit ? ` · ${c.verified} ${STATE_GLYPH.verified}${c.broken ? ` · ${c.broken} ${STATE_GLYPH.broken}` : ""}` : "";
       sub.createSpan({ text: `${c.special ? `${SPECIAL_LABEL[c.special].toLowerCase()} · ` : ""}${c.filled} of ${rows.length}${audit}`, cls: "czm-pg-col-count" });
@@ -1361,7 +1363,7 @@ export class PlotGridView extends ItemView {
     const jobRows: MenuEntry[] = (["pov", "time", "beats", "main-theme"] as SpecialColumn[]).map((job) => ({ label: c.special === job ? `Stop using as ${SPECIAL_LABEL[job]}` : `Use as ${SPECIAL_LABEL[job]}`, checked: c.special === job, onClick: () => void this.setSpecial(c, job) }));
     return [
       { label: "Rename…", icon: "pencil", onClick: () => this.renameColumnInPlace(c) },
-      { label: c.summary ? "Summary…" : "Add a summary…", icon: "text", onClick: () => { const host = this.body?.querySelector<HTMLElement>(`.czm-pg-col-thread[data-block] .czm-pg-col-summary[data-heading="${attrValue(c.heading.heading)}"]`); if (host) this.editSummaryInPlace(c, host); else this.openSide("pg-column", ".czm-pg-summary-field"); } },
+      ...(DERIVED.includes(c.special) ? [] : [{ label: c.summary ? "Summary…" : "Add a summary…", icon: "text", onClick: () => { const host = this.body?.querySelector<HTMLElement>(`.czm-pg-col-thread[data-block] .czm-pg-col-summary[data-heading="${attrValue(c.heading.heading)}"]`); if (host) this.editSummaryInPlace(c, host); else this.openSide("pg-column", ".czm-pg-summary-field"); } }]),
       { label: DERIVED.includes(c.special) ? "Move left" : `Move the ${KIND_GROUP[c.heading.kind].toLowerCase()} left`, icon: "arrow-left", onClick: () => void this.nudgeBlock(c, -1) },
       { label: DERIVED.includes(c.special) ? "Move right" : `Move the ${KIND_GROUP[c.heading.kind].toLowerCase()} right`, icon: "arrow-right", onClick: () => void this.nudgeBlock(c, 1) },
       "-",
@@ -1735,6 +1737,7 @@ export class PlotGridView extends ItemView {
       const b = jobRow.createEl("button", { text: SPECIAL_LABEL[job], cls: `czm-pg-job${c.special === job ? " is-on" : ""}`, attr: { "aria-pressed": String(c.special === job), title: c.special === job ? `Stop using as ${SPECIAL_LABEL[job]}` : `Use as ${SPECIAL_LABEL[job]}: writes ${SPECIAL_KEY[job]} to the project note` } });
       b.addEventListener("click", () => void this.setSpecial(c, job));
     }
+    if (DERIVED.includes(c.special)) { section.createDiv({ text: `${c.filled} of ${this.rows.length} scenes`, cls: "czm-map-absent" }); return; }
     const summary = section.createDiv({ cls: "czm-pg-field" });
     summary.createDiv({ text: "Summary · what the column is", cls: "czm-pg-field-label" });
     const field = summary.createEl("textarea", { cls: "czm-pg-summary-field", attr: { rows: "3", placeholder: c.heading.kind === "arc" ? "A self-sacrifice arc: he realises he has been vain and chose himself over the love of this life" : c.heading.kind === "theme" ? "What the story argues, and the answers it turns through" : "What this line of events is, from its plant to its payoff", "aria-label": "Summary" } });
