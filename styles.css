@@ -528,9 +528,12 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 /* The hover tint is translucent; a frozen cell paints it over an opaque base, or the cells scrolled under it show through. */
 .czm-pg-scene:hover td.is-frozen, .czm-pg-scene:hover th.is-frozen, .czm-pg-scene:hover .czm-pg-gauge-td { background-color: var(--background-primary); background-image: linear-gradient(var(--background-modifier-hover), var(--background-modifier-hover)); }
 .czm-pg-col-cast { min-width: 120px; }
-.czm-pg-col-name { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-normal); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* A column's name and its line under it wrap and take the height they need: a theme is a question, and the header grows to hold it. */
+.czm-pg-col-name { display: flex; align-items: flex-start; gap: 6px; font-weight: 600; color: var(--text-normal); white-space: normal; overflow: visible; line-height: 1.25; }
+.czm-pg-col-name > .czm-pg-dot { margin-top: 3px; }
+.czm-pg-col-title { white-space: normal; overflow-wrap: anywhere; }
 /* A stripe on the header says what kind of column it is: accent for the writer's threads, faint for what the code fills. */
-.czm-pg-col-thread .czm-pg-col-name::before { content: ""; width: 3px; height: 12px; border-radius: 2px; background: var(--interactive-accent); flex: 0 0 auto; }
+.czm-pg-col-thread .czm-pg-col-name::before { content: ""; width: 3px; height: 12px; margin-top: 2px; border-radius: 2px; background: var(--interactive-accent); flex: 0 0 auto; }
 .czm-pg-kind-theme .czm-pg-col-name::before { background: var(--color-purple); }
 .czm-pg-kind-subplot .czm-pg-col-name::before { background: var(--text-accent); }
 .czm-pg-kind-free .czm-pg-col-name::before { background: var(--text-muted); }
@@ -685,7 +688,8 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-pg-theme-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); white-space: nowrap; }
 .czm-pg-theme-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* A column header: the name, the count, and a ⋯ that appears when the header is hovered or holds the focus. */
-.czm-pg-col-sub { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+.czm-pg-col-sub { display: flex; align-items: flex-start; justify-content: space-between; gap: 4px; }
+.czm-pg-col-sub .czm-pg-col-count { white-space: normal; overflow-wrap: anywhere; }
 .czm-pg-col-more { width: 18px; height: 18px; opacity: 0; color: var(--text-faint); }
 .czm-pg-col-thread:hover .czm-pg-col-more, .czm-pg-col-thread:focus-within .czm-pg-col-more, .czm-pg-col-thread.is-current .czm-pg-col-more { opacity: 1; }
 .czm-pg-col-thread.is-current .czm-pg-col-title { color: var(--text-accent); }
@@ -716,8 +720,6 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-pg-table .czm-pg-gauge-td + .czm-pg-gauge-td, .czm-pg-table .czm-pg-gauge-head + .czm-pg-gauge-head { box-shadow: inset 1px 0 0 var(--background-modifier-border-hover); }
 .czm-pg-table .czm-pg-group-gauge { position: sticky; right: 0; z-index: 3; color: var(--text-muted); background: var(--background-primary); }
 /* The lane's name wraps under the group's "Gauge", and the header grows with it: a theme is a question, not a word. */
-.czm-pg-gauge-head .czm-pg-col-name { white-space: normal; align-items: flex-start; }
-.czm-pg-gauge-head .czm-pg-col-title { white-space: normal; overflow: visible; line-height: 1.25; }
 .czm-pg-gauge-head .czm-pg-col-name::before { display: none; }
 .czm-pg-gauge-modes { grid-template-columns: 1fr 1fr; }
 /* A group the freeze cuts through: the label rides the frozen cell, the rest of the group keeps its line without one. */
