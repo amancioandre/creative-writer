@@ -4,7 +4,7 @@ import { PLOT_GRID_VIEW_TYPE, PlotGridView, ROW_CHUNK, actOf, type PlotGridSourc
 import { buildStoryGraph, type ProjectNote } from "../../../src/domain/story/BuildGraph";
 import { buildPlotGrid } from "../../../src/domain/plot/PlotGrid";
 import { buildThreads } from "../../../src/domain/threads/BuildThreads";
-import { addThread, appendThreadItems, parseStoryThreads, removeThread, removeThreadItem, renameThread } from "../../../src/domain/threads/StoryThreadsNote";
+import { addThread, appendThreadItems, parseStoryThreads, removeThread, removeThreadItem, renameScaleWord, renameThread, setThreadScale } from "../../../src/domain/threads/StoryThreadsNote";
 import { splitScenes } from "../../../src/domain/text/Scenes";
 import { EMPTY_STORY_MAP_FILE, putGridReading, putReading, type GridReading, type StoryMapFile } from "../../../src/domain/story/StoryMapFile";
 import { textHash } from "../../../src/domain/story/StoryGraph";
@@ -103,6 +103,8 @@ function open(overrides: Partial<PlotGridSource> = {}, threads = threadsNote, se
     proposeColumns: async () => { calls.writes.push("propose"); return calls.writes.includes("readProject") || !overrides.readProject ? { scenesRead: 3, proposals: [{ kind: "arc", name: "Marta Kovács", why: "The elder sister.", scenes: ["Camp", "Return"], heading: "Arc: [[Marta Kovács]]", existing: false }, { kind: "subplot", name: "The gate", why: "", scenes: ["Camp"], heading: "Subplot: The gate", existing: true }, { kind: "theme", name: "Salt", why: "Pressure.", scenes: ["Creek"], heading: "Theme: Salt", existing: false }] } : { needsReading: true, canRead: true }; },
     readProject: async () => { calls.writes.push("readProject"); return 3; },
     renameThread: async (_p, from, to) => { calls.writes.push(`rename ${from} → ${to}`); md = renameThread(md, from, to); },
+    setScale: async (_p, thread, words) => { calls.writes.push(`scale ${thread}: ${words ? words.join(", ") : "none"}`); md = setThreadScale(md, thread, words); },
+    renameScaleWord: async (_p, thread, from, to) => { calls.writes.push(`reword ${thread}: ${from} → ${to}`); const r = renameScaleWord(md, thread, from, to); md = r.markdown; return r.changed; },
     setProjectKey: async (_p, key, value) => { calls.writes.push(`${key}=${value ?? ""}`); if (key === "plot-order") { spec = { ...spec, plotOrder: value ? value.split(",").map((x) => x.trim()) : undefined }; return; } const k = key === "plot-pov" ? "plotPov" : key === "plot-time" ? "plotTime" : key === "plot-beats" ? "plotBeats" : "plotTheme"; spec = { ...spec, [k]: value ?? undefined }; },
     gridSettings: () => prefs,
     updateGridSettings: (next) => { prefs = next; },
@@ -367,7 +369,7 @@ describe("PlotGridView", () => {
     // The header's ⋯ opens the column menu; a job row writes the key and the rebuild reads it back.
     const eyes = [...el.querySelectorAll(".czm-pg-col-thread")].find((th) => th.querySelector(".czm-pg-col-title")?.textContent === "Eyes")!;
     (eyes.querySelector(".czm-pg-col-more") as HTMLElement).click();
-    expect(Menu.last!.items.map((i) => i.title.replace(/Plot grid:.*$/, ""))).toEqual(["Rename…", "Move the threads left", "Move the threads right", "Kind: arc", "Kind: theme", "Kind: subplot", "Kind: free thread", "Use as POV", "Use as Time", "Use as Plot point", "Use as Main theme", "Read this column with the model…", "Check this column against the draft…", "Dismiss all readings", "Gauge this column", "Freeze up to here", "Hide column", "Delete column…"]);
+    expect(Menu.last!.items.map((i) => i.title.replace(/Plot grid:.*$/, ""))).toEqual(["Rename…", "Move the threads left", "Move the threads right", "Kind: arc", "Kind: theme", "Kind: subplot", "Kind: free thread", "Use as POV", "Use as Time", "Use as Plot point", "Use as Main theme", "Read this column with the model…", "Check this column against the draft…", "Dismiss all readings", "Set scale…", "Gauge this column", "Freeze up to here", "Hide column", "Delete column…"]);
     Menu.last!.items.find((i) => i.title === "Use as POV")!.cb();
     await new Promise((r) => setTimeout(r, 400));
     expect(calls.writes).toContain("plot-pov=Eyes");
@@ -1081,5 +1083,139 @@ describe("the value gauge", () => {
     v.select({ col: 2, row: 0 });
     v.run("gauge-column");
     expect(el.querySelector(".czm-map-status")?.textContent).toContain("cannot be gauged: a scale needs an odd number of words");
+  });
+});
+
+describe("setting a scale and writing a keyword", () => {
+  const graded = `## Theme: Should jealousy justify violent acts?
+<!-- scale: hate, disgust, indifference, sympathy, love -->
+- [[One#Camp]] — love: warm
+- [[One#Creek]] — reversal: hate: "found the creek" cold
+- [[One#Later]] — disgust: meh
+- [[Two#Return]] — hate: colder
+
+## Subplot: The gate
+- [[One#Camp]] — plant: "gate of Lisbon" planted
+`;
+  const tick = () => new Promise((r) => setTimeout(r, 20));
+  const words = (el: HTMLElement) => [...el.querySelectorAll<HTMLInputElement>(".czm-pg-scale-word")];
+  const type = (input: HTMLInputElement, value: string) => { input.value = value; input.dispatchEvent(new Event("input")); };
+
+  it("Set scale… opens a sheet of five blanks for a column without one, refuses an even count, writes the line with Undo", async () => {
+    const { v, note, calls } = open({}, graded);
+    await v.onOpen();
+    const el = v.contentEl;
+    (el.querySelectorAll(".czm-pg-col-thread .czm-pg-col-more")[1] as HTMLElement).click();
+    Menu.last!.items.find((i) => i.title.startsWith("Set scale…"))!.cb();
+    const sheet = el.querySelector(".czm-map-section-pg-scale")!;
+    expect(sheet.querySelector(".czm-map-section-value")?.textContent).toBe("The gate");
+    expect(words(el)).toHaveLength(5);
+    expect(words(el).map((w) => w.placeholder)).toEqual(["most negative", "", "neutral", "", "most positive"]);
+    expect([...sheet.querySelectorAll(".czm-pg-scale-charge")].map((c) => c.textContent)).toEqual(["−2", "−1", "0", "+1", "+2"]);
+    expect(sheet.querySelector(".czm-pg-scale-neutral")?.textContent).toBe("neutral");
+    const save = sheet.querySelector<HTMLButtonElement>(".czm-pg-scale-save")!;
+    expect(save.disabled).toBe(true);
+    expect(sheet.querySelector(".czm-pg-scale-problem")?.textContent).toContain("odd number of words");
+    ["shut", "ajar", "open"].forEach((w, i) => type(words(el)[i]!, w));
+    // Three words is a scale already: blanks are not counted.
+    expect(sheet.querySelector(".czm-pg-scale-problem")).toBeNull();
+    expect(sheet.querySelector(".czm-pg-scale-line")?.textContent).toBe("<!-- scale: shut, ajar, open -->");
+    type(words(el)[3]!, "wide");
+    expect(sheet.querySelector(".czm-pg-scale-problem")?.textContent).toContain("odd number of words");
+    type(words(el)[4]!, "gone");
+    expect(sheet.querySelector(".czm-pg-scale-problem")).toBeNull();
+    expect(sheet.querySelector(".czm-pg-scale-line")?.textContent).toBe("<!-- scale: shut, ajar, open, wide, gone -->");
+    expect([...sheet.querySelectorAll(".czm-map-absent")].at(-1)?.textContent).toContain("Preview: 0 of 4 cells match");
+    expect(save.disabled).toBe(false);
+    save.click(); await tick();
+    expect(calls.writes.at(-1)).toBe("scale Subplot: The gate: shut, ajar, open, wide, gone");
+    expect(note()).toContain("## Subplot: The gate\n<!-- scale: shut, ajar, open, wide, gone -->\n- [[One#Camp]]");
+    expect(el.querySelector(".czm-map-section-pg-scale")).toBeNull();
+    expect(el.querySelector(".czm-map-status")?.textContent).toContain("Scale written for “The gate”: shut · ajar · open · wide · gone");
+    (el.querySelector(".czm-map-status button") as HTMLElement).click(); await tick();
+    expect(note()).toBe(graded);
+  });
+
+  it("a word changed in place is offered as a rename and written into the cells that used it; Remove scale takes the line out", async () => {
+    const { v, note } = open({}, graded);
+    await v.onOpen();
+    const el = v.contentEl;
+    v.select({ col: 0, row: 0 });
+    v.run("set-scale");
+    const sheet = el.querySelector(".czm-map-section-pg-scale")!;
+    expect(words(el).map((w) => w.value)).toEqual(["hate", "disgust", "indifference", "sympathy", "love"]);
+    type(words(el)[1]!, "revulsion");
+    expect(sheet.querySelector(".czm-pg-scale-rename")?.textContent).toBe("Renames disgust → revulsion in 1 cell");
+    expect([...sheet.querySelectorAll(".czm-map-absent")].at(-1)?.textContent).toContain("Preview: 4 of 4 cells match · 1 inversion at 3 Later");
+    sheet.querySelector<HTMLButtonElement>(".czm-pg-scale-save")!.click(); await tick();
+    expect(note()).toContain("<!-- scale: hate, revulsion, indifference, sympathy, love -->");
+    expect(note()).toContain("- [[One#Later]] — revulsion: meh");
+    expect(el.querySelector(".czm-map-status")?.textContent).toContain("1 cell reworded");
+    (el.querySelector(".czm-map-status button") as HTMLElement).click(); await tick();
+    expect(note()).toBe(graded);
+    v.run("set-scale");
+    // A word dropped from the list orphans the cells that say it; the sheet says so before Save.
+    (el.querySelectorAll(".czm-pg-scale-drop")[1] as HTMLElement).click();
+    expect(el.querySelector(".czm-pg-scale-problem")?.textContent).toContain("odd number");
+    (el.querySelectorAll(".czm-pg-scale-drop")[0] as HTMLElement).click();
+    expect([...el.querySelectorAll(".czm-pg-scale-problem")].map((p) => p.textContent)).toEqual(["2 cells say “hate”, which is no longer on the scale: they will draw nothing until reworded", "1 cell say “disgust”, which is no longer on the scale: they will draw nothing until reworded"]);
+    el.querySelector<HTMLButtonElement>(".czm-pg-scale-remove")!.click(); await tick();
+    expect(note()).not.toContain("<!-- scale:");
+    expect(el.querySelector(".czm-map-status")?.textContent).toContain("Scale removed from");
+  });
+
+  it("the cell editor shows the keyword in front of the note, completes a started word on Tab, offers the scale as chips, and writes what was typed", async () => {
+    const { v, note, calls } = open({}, graded);
+    await v.onOpen();
+    const el = v.contentEl;
+    const cell = el.querySelector<HTMLElement>('.czm-pg-cell[data-col="0"][data-row="2"]')!;
+    cell.click(); cell.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    const field = el.querySelector(".czm-pg-editor") as HTMLTextAreaElement;
+    expect(field.value).toBe("disgust: meh");
+    expect([...el.querySelectorAll(".czm-pg-scale-chip")].map((c) => c.textContent)).toEqual(["hate", "disgust", "indifference", "sympathy", "love"]);
+    field.value = "sym";
+    field.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+    expect(field.value).toBe("sympathy: ");
+    field.value = "sympathy: he waits";
+    field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); await tick();
+    expect(calls.writes.at(-1)).toBe("add Theme: Should jealousy justify violent acts?: One#Later touch  he waits");
+    expect(note()).toContain("- [[One#Later]] — sympathy: he waits");
+    // A chip puts its word in front, replacing the one there; a note with no word keeps the stop's.
+    const again = el.querySelector<HTMLElement>('.czm-pg-cell[data-col="0"][data-row="2"]')!;
+    again.click(); again.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    const f2 = el.querySelector(".czm-pg-editor") as HTMLTextAreaElement;
+    (el.querySelectorAll(".czm-pg-scale-chip")[0] as HTMLElement).click();
+    expect(f2.value).toBe("hate: he waits");
+    f2.value = "he waits longer";
+    f2.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); await tick();
+    expect(note()).toContain("- [[One#Later]] — sympathy: he waits longer");
+    // Tab on a word that is not a start of exactly one scale word finishes the edit as before.
+    const third = el.querySelector<HTMLElement>('.czm-pg-cell[data-col="1"][data-row="1"]')!;
+    third.click(); third.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    const f3 = el.querySelector(".czm-pg-editor") as HTMLTextAreaElement;
+    expect(el.querySelector(".czm-pg-scale-chip")).toBeNull();
+    f3.value = "Ilse washes";
+    f3.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true })); await tick();
+    expect(note()).toContain("- [[One#Creek]] — Ilse washes");
+  });
+
+  it("the Cell section has a keyword to pick, n walks to a turn no line marks, and the section says so", async () => {
+    const { v, note } = open({}, graded);
+    await v.onOpen();
+    const el = v.contentEl;
+    v.run("toggle-gauge");
+    // Camp +2, Creek −2, Later −1: the total flips at Later, where no quote marks it.
+    v.run("next-issue");
+    expect(v.selected?.row.scene.title).toBe("Later");
+    expect(v.selected?.column.heading.name).toBe("Should jealousy justify violent acts?");
+    expect(el.querySelector(".czm-pg-turn-unmarked")?.textContent).toContain("No line marks this turn");
+    const select = el.querySelector(".czm-pg-keyword-select") as HTMLSelectElement;
+    expect([...select.options].map((o) => o.textContent)).toEqual(["none", "−2 hate", "−1 disgust", "0 indifference", "+1 sympathy", "+2 love"]);
+    expect(select.value).toBe("disgust");
+    select.value = "love";
+    (el.querySelector(".czm-pg-save") as HTMLElement).click(); await tick();
+    expect(note()).toContain("- [[One#Later]] — love: meh");
+    v.run("next-issue");
+    expect(el.querySelector(".czm-map-status")?.textContent).toContain("every turn of the gauge has its line");
   });
 });

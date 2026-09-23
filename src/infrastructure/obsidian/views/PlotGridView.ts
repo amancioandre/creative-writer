@@ -8,7 +8,7 @@ import { ARC_ROLES, THREAD_ROLES, type StopRole, type ThreadRef } from "../../..
 import type { StopToAdd } from "../../../application/use-cases/EditStoryThread";
 import { KIND_LABEL } from "./StoryMapView";
 import { PanelShell, showOverflow, type MenuEntry, type PanelId } from "./PanelShell";
-import { COLUMN_KINDS } from "../../../domain/threads/StoryThreadsNote";
+import { COLUMN_KINDS, parseStopText, rolesFor, scaleComment } from "../../../domain/threads/StoryThreadsNote";
 import { rankSentences, type SnapshotTable } from "../../../domain/plot/Snapshot";
 import type { AnalyzeProgress } from "../../../application/use-cases/AnalyzeSceneRelations";
 import type { ProposalsResult } from "../../../application/use-cases/ProposeColumns";
@@ -46,6 +46,10 @@ export interface PlotGridSource {
   removeThread(project: ProjectSpec, name: string): Promise<void>;
   /** The heading rewritten: a rename, or a kind set by its prefix. */
   renameThread(project: ProjectSpec, from: string, to: string): Promise<void>;
+  /** The thread's scale as one comment line under its heading; null takes the line out. */
+  setScale(project: ProjectSpec, thread: string, words: readonly string[] | null): Promise<void>;
+  /** One word of the scale renamed in the line and in every stop that used it; resolves to how many stops changed. */
+  renameScaleWord(project: ProjectSpec, thread: string, from: string, to: string): Promise<number>;
   /** Writes or clears a text key in the project note's front matter: `plot-pov`, `plot-time`, `plot-theme`. */
   setProjectKey(project: ProjectSpec, key: "plot-pov" | "plot-time" | "plot-theme" | "plot-beats" | "plot-order", value: string | null): Promise<void>;
   /** The grid's layout as the writer last left it, and where it is kept. */
@@ -113,7 +117,7 @@ interface Selection { readonly col: number; readonly row: number }
 /** One stretch of the header: a single column with a job, an open group of columns, or a folded group drawn as one narrow cell. */
 interface Segment { readonly kind: ColumnKind; readonly block: string; readonly single: GridColumn | null; readonly columns: GridColumn[]; readonly folded: boolean }
 
-export type PlotGridAction = "clear-search" | "toggle-cast" | "open-note" | "toggle-panel" | "new-column" | "new-scene" | "new-chapter" | "new-act" | "open-outline" | "build-manuscript" | "start-template" | "save-template" | "fold-arcs" | "fold-themes" | "fold-subplots" | "fold-threads" | "hide-column" | "show-hidden" | "focus-search" | "help" | "toggle-unmoved" | "audit" | "snapshot" | "next-issue" | "previous-issue" | "anchor" | "read-column" | "check-column" | "read-all" | "dismiss-reading" | "stop-reading" | "propose-columns" | "export" | "toggle-gauge" | "gauge-column";
+export type PlotGridAction = "clear-search" | "toggle-cast" | "open-note" | "toggle-panel" | "new-column" | "new-scene" | "new-chapter" | "new-act" | "open-outline" | "build-manuscript" | "start-template" | "save-template" | "fold-arcs" | "fold-themes" | "fold-subplots" | "fold-threads" | "hide-column" | "show-hidden" | "focus-search" | "help" | "toggle-unmoved" | "audit" | "snapshot" | "next-issue" | "previous-issue" | "anchor" | "read-column" | "check-column" | "read-all" | "dismiss-reading" | "stop-reading" | "propose-columns" | "export" | "toggle-gauge" | "gauge-column" | "set-scale";
 
 /** Rows are drawn this many at a time; past the first chunk, the next is drawn as the last row comes into view. */
 export const ROW_CHUNK = 60;
@@ -186,6 +190,8 @@ export class PlotGridView extends ItemView {
   private templateSheet: { list: readonly StoryTemplate[]; chosen: number; choices: { rows: boolean; columns: boolean; ticked: Set<string>; names: Record<string, string>; bindings: Record<string, string> }; plan: ApplyPlan | null; loading: boolean } | null = null;
   /** The save sheet: a name for the template and which parts of the grid go into it. */
   private saveSheet: { name: string; columns: boolean; rows: boolean } | null = null;
+  /** Set scale…: the column, the words as the writer is editing them, and the scale the note holds now, so a changed word can be offered as a rename. */
+  private scaleSheet: { heading: string; words: string[]; original: readonly string[] | null } | null = null;
   /** What the grid can count for itself: thin columns and unmoved stretches, over the written scenes. */
   private gaps: readonly Gap[] = [];
   /** The templates, fetched once for the column picker; null until asked for. */
@@ -340,6 +346,7 @@ export class PlotGridView extends ItemView {
       { label: "Present, unmoved", command: "plot-grid-toggle-unmoved", checked: this.settings.unmoved, onClick: () => this.run("toggle-unmoved") },
       { label: "Audit view", icon: "scan-search", command: "plot-grid-audit", checked: this.audit, onClick: () => this.run("audit") },
       { label: "Show gauge", icon: "activity", command: "plot-grid-toggle-gauge", checked: this.gaugePrefs.shown, disabled: !this.project, onClick: () => this.run("toggle-gauge") },
+      { label: "Set the selected column's scale…", command: "plot-grid-set-scale", disabled: this.current() === null, onClick: () => this.run("set-scale") },
       { label: "Next broken anchor", command: "plot-grid-next-issue", disabled: this.grid.broken === 0, onClick: () => this.run("next-issue") },
       { label: "Start from a template…", icon: "layout-template", command: "plot-grid-start-template", disabled: !this.project, onClick: () => this.run("start-template") },
       { label: "Save as template…", command: "plot-grid-save-template", disabled: !this.project || (this.grid.columns.length === 0 && !this.grid.plan), onClick: () => this.run("save-template") },
@@ -411,6 +418,7 @@ export class PlotGridView extends ItemView {
       case "propose-columns": void this.proposeColumns(); break;
       case "toggle-gauge": { const on = !this.gaugePrefs.shown; this.setGauge({ shown: on }); this.renderTable(); this.status?.say(on ? (this.lanes.length ? `Gauge on: ${this.lanes.map((l) => l.column.heading.name).join(", ")}.` : "Gauge on, but no column has a scale yet: Set scale… in a column's menu grades its stops.") : "Gauge off."); break; }
       case "gauge-column": { const c = this.current(); if (c) this.gaugeColumn(c); break; }
+      case "set-scale": { const c = this.current(); if (c) this.openScaleSheet(c); break; }
     }
   }
 
@@ -550,9 +558,9 @@ export class PlotGridView extends ItemView {
       const at = ((start + step * i) % total + total) % total;
       const col = at % cols, row = Math.floor(at / cols);
       const cell = this.shown[col]!.cells[this.rows[row]!.index]!;
-      if (cell.state === "broken" || (cell.reading && !cell.reading.stale)) { this.select({ col, row }); return; }
+      if (cell.state === "broken" || (cell.reading && !cell.reading.stale) || this.unmarkedTurn(this.shown[col]!, row)) { this.select({ col, row }); return; }
     }
-    this.status?.say("No readings awaiting you, and no broken anchors.");
+    this.status?.say(this.lanes.length ? "No readings awaiting you, no broken anchors, and every turn of the gauge has its line." : "No readings awaiting you, and no broken anchors.");
   }
 
   private async snapshot(dated = true): Promise<void> {
@@ -998,6 +1006,120 @@ export class PlotGridView extends ItemView {
     if (this.lanes.length > 1) section.createDiv({ text: this.disagree.size ? `${plural(this.disagree.size, "disagreement")}: opposite signs at ${[...this.disagree].sort((a, b) => a - b).map((p) => p + 1).join(", ")}, marked ≠ on the scene.` : "The lanes never disagree.", cls: "czm-map-absent czm-pg-gauge-summary" });
   }
 
+  /** The gauge flips at this row of the column, and no quote on the stop says where: a turn without its line. */
+  private unmarkedTurn(column: GridColumn, position: number): boolean {
+    const g = this.lanes.find((l) => l.column === column)?.rows[position];
+    return !!g && g.inversion && !g.marked;
+  }
+
+  // ---- Set scale… -------------------------------------------------------------------
+
+  /** Opens the sheet on a column: its words as they stand, or five blanks to fill, most negative first. */
+  private openScaleSheet(c: GridColumn): void {
+    const original = c.scale ? [...c.scale] : null;
+    this.scaleSheet = { heading: c.heading.heading, words: original?.length ? [...original] : ["", "", "", "", ""], original };
+    this.openSide("pg-scale", ".czm-pg-scale-word");
+  }
+
+  /** Words changed in place, by position, when the count is unchanged: the renames Save will write into the cells. */
+  private scaleRenames(sheet: { words: string[]; original: readonly string[] | null }): { from: string; to: string }[] {
+    if (!sheet.original || sheet.original.length !== sheet.words.length) return [];
+    return sheet.words.map((w, i) => ({ from: sheet.original![i]!, to: w.trim() })).filter((r) => r.to && r.from.toLowerCase() !== r.to.toLowerCase());
+  }
+
+  /** The sheet: an ordered word list with the middle marked neutral, the renames and the line it will write, a preview, Save with Undo. */
+  private renderScaleSheet(section: HTMLElement): void {
+    const sheet = this.scaleSheet, project = this.project;
+    const column = this.grid.columns.find((c) => c.heading.heading === sheet?.heading);
+    if (!sheet || !project || !column) return;
+    section.createDiv({ text: "Most negative first, the middle word neutral, every step equal. The words name the nuances the theme pivots through: the gauge is there to show where the story reverses.", cls: "czm-map-absent" });
+    const list = section.createDiv({ cls: "czm-pg-scale-list", attr: { role: "group", "aria-label": "Scale words, most negative first" } });
+    const neutral = (sheet.words.length - 1) / 2;
+    sheet.words.forEach((w, i) => {
+      const row = list.createDiv({ cls: `czm-pg-scale-row${i === neutral ? " is-neutral" : ""}` });
+      row.createSpan({ text: Number.isInteger(neutral) ? signed(i - neutral) : "·", cls: "czm-pg-scale-charge" });
+      const input = row.createEl("input", { cls: "czm-pg-scale-word", attr: { type: "text", "aria-label": `Word ${i + 1} of ${sheet.words.length}`, placeholder: i === 0 ? "most negative" : i === sheet.words.length - 1 ? "most positive" : i === neutral ? "neutral" : "" } });
+      input.value = w;
+      input.addEventListener("input", () => { sheet.words[i] = input.value; this.refreshScaleSheet(section); });
+      input.addEventListener("keydown", (ev) => { ev.stopPropagation(); if (ev.key === "Enter") { ev.preventDefault(); void this.saveScale(); } else if (ev.key === "Escape") { ev.preventDefault(); this.scaleSheet = null; this.renderSide(); } });
+      if (i === neutral) row.createSpan({ text: "neutral", cls: "czm-pg-scale-neutral" });
+      const drop = row.createEl("button", { cls: "clickable-icon czm-pg-scale-drop", attr: { "aria-label": `Remove word ${i + 1}` } });
+      setIcon(drop, "x");
+      drop.addEventListener("click", () => { sheet.words.splice(i, 1); this.renderSide(); this.shell?.reveal("pg-scale"); });
+    });
+    const tools = section.createDiv({ cls: "czm-map-panel-actions czm-pg-scale-tools" });
+    const pair = tools.createEl("button", { text: "Add a pair", cls: "czm-pg-scale-pair", attr: { title: "One word at each end, so the count stays odd" } });
+    pair.disabled = sheet.words.length + 2 > 11;
+    pair.addEventListener("click", () => { sheet.words.unshift(""); sheet.words.push(""); this.renderSide(); this.shell?.reveal("pg-scale"); this.shell?.side.querySelector<HTMLElement>(".czm-pg-scale-word")?.focus(); });
+    tools.createSpan({ text: "3, 5, 7, 9 or 11 words", cls: "czm-map-row-meta" });
+    section.createDiv({ cls: "czm-pg-scale-check" });
+    const foot = section.createDiv({ cls: "czm-pg-proposals-foot czm-pg-scale-foot" });
+    const cancel = foot.createEl("button", { text: "Cancel", cls: "czm-pg-scale-cancel" });
+    cancel.addEventListener("click", () => { this.scaleSheet = null; this.renderSide(); });
+    if (sheet.original) {
+      const remove = foot.createEl("button", { text: "Remove scale", cls: "czm-pg-scale-remove mod-warning", attr: { title: "Takes the scale line out; the words in the cells stay as note text" } });
+      remove.addEventListener("click", () => void this.saveScale(true));
+    }
+    const go = foot.createEl("button", { text: "Save scale", cls: "czm-pg-scale-save mod-cta" });
+    go.addEventListener("click", () => { go.disabled = true; void this.saveScale().finally(() => { go.disabled = false; }); });
+    this.refreshScaleSheet(section);
+  }
+
+  /** The check under the list, redrawn as the words change: the problem or the line to be written, the renames, and what the gauge would count. */
+  private refreshScaleSheet(section: HTMLElement): void {
+    const sheet = this.scaleSheet;
+    const column = this.grid.columns.find((c) => c.heading.heading === sheet?.heading);
+    const box = section.querySelector<HTMLElement>(".czm-pg-scale-check");
+    const save = section.querySelector<HTMLButtonElement>(".czm-pg-scale-save");
+    if (!sheet || !column || !box) return;
+    box.empty();
+    const words = sheet.words.map((w) => w.trim()).filter(Boolean);
+    const problem = checkScale(words);
+    if (save) save.disabled = !!problem;
+    if (problem) { box.createDiv({ text: describeScaleProblem(problem), cls: "czm-pg-scale-problem" }); return; }
+    const renames = this.scaleRenames(sheet);
+    const uses = (word: string) => column.cells.reduce((n, cell) => n + [cell.stop, ...cell.more].filter((s) => s?.keyword && s.keyword.toLowerCase() === word.toLowerCase()).length, 0);
+    for (const r of renames) box.createDiv({ text: `Renames ${r.from} → ${r.to} in ${plural(uses(r.from), "cell")}`, cls: "czm-pg-scale-rename" });
+    const renamed = new Map(renames.map((r) => [r.from.toLowerCase(), r.to]));
+    const orphans = (sheet.original ?? []).filter((w) => !renamed.has(w.toLowerCase()) && !words.some((x) => x.toLowerCase() === w.toLowerCase())).map((w) => ({ w, n: uses(w) })).filter((o) => o.n > 0);
+    for (const o of orphans) box.createDiv({ text: `${plural(o.n, "cell")} say “${o.w}”, which is no longer on the scale: they will draw nothing until reworded`, cls: "czm-pg-scale-problem" });
+    // What the gauge would count with these words: the column read again with its keywords mapped through the renames.
+    const map = (stop: ThreadRef | null) => stop?.keyword && renamed.has(stop.keyword.toLowerCase()) ? { ...stop, keyword: renamed.get(stop.keyword.toLowerCase())! } : stop;
+    const preview = gaugeLane({ ...column, scale: words, cells: column.cells.map((cell) => ({ ...cell, stop: map(cell.stop), more: cell.more.map((m) => map(m)!) })) }, this.rows);
+    if (preview) {
+      const at = preview.inversions.map((p) => `${p + 1} ${this.rows[p]?.scene.title || ""}`.trim()).join(", ");
+      box.createDiv({ text: `Preview: ${preview.charged} of ${this.rows.length} cells match${preview.unread ? ` · ${preview.unread} unread` : ""} · ${preview.inversions.length ? `${plural(preview.inversions.length, "inversion")} at ${at}` : "no inversion"}`, cls: "czm-map-absent" });
+    }
+    box.createDiv({ text: "Writes one line under the heading", cls: "czm-pg-field-label" });
+    box.createEl("code", { text: scaleComment(words), cls: "czm-pg-scale-line" });
+  }
+
+  /** Writes the scale line, then the renames into the cells, with one Undo for the lot; `remove` takes the line out instead. */
+  private async saveScale(remove = false): Promise<void> {
+    const sheet = this.scaleSheet, project = this.project;
+    const column = this.grid.columns.find((c) => c.heading.heading === sheet?.heading);
+    if (!sheet || !project || !column) return;
+    const words = sheet.words.map((w) => w.trim()).filter(Boolean);
+    const problem = remove ? null : checkScale(words);
+    if (problem) { this.status?.fail(`Not saved: ${describeScaleProblem(problem)}.`); return; }
+    const renames = remove ? [] : this.scaleRenames(sheet);
+    const original = sheet.original;
+    let changed = 0;
+    try {
+      // The renames first, while the old words are still the scale the cells are read against; then the line as a whole.
+      for (const r of renames) changed += await this.source.renameScaleWord(project, column.heading.heading, r.from, r.to);
+      await this.source.setScale(project, column.heading.heading, remove ? null : words);
+    } catch (e) { this.status?.fail(couldNot(`write the scale of “${column.heading.name}”`, e)); return; }
+    this.scaleSheet = null;
+    await this.show(project, true);
+    const said = remove ? `Scale removed from “${column.heading.name}”.` : `Scale written for “${column.heading.name}”: ${words.join(" · ")}${changed ? ` · ${plural(changed, "cell")} reworded` : ""}`;
+    this.status?.undoable(said, async () => {
+      for (const r of renames) await this.source.renameScaleWord(project, column.heading.heading, r.to, r.from);
+      await this.source.setScale(project, column.heading.heading, original);
+      await this.show(project, true);
+    });
+  }
+
   private renderCell(tr: HTMLElement, column: GridColumn, cell: GridCell, row: GridRow, at: Selection, frozen = false): void {
     const td = tr.createEl("td", { cls: `czm-pg-cell-td czm-pg-kind-${column.heading.kind}${column.special ? ` czm-pg-special-${column.special}` : ""}${frozen ? " is-frozen" : ""}`, attr: frozen ? { "data-fcol": String(2 + at.col) } : {} });
     const where = `${column.heading.name} at ${row.scene.title || basenameOf(row.scene.path)}`;
@@ -1212,6 +1334,7 @@ export class PlotGridView extends ItemView {
       { label: "Check this column against the draft…", command: "plot-grid-check-column", disabled: !!this.running || c.filled === 0, onClick: () => void this.readColumns([c], "checking") },
       { label: `Dismiss all readings${c.readings ? ` (${c.readings})` : ""}`, disabled: c.readings === 0, onClick: () => { if (this.project) void this.source.dismissColumnReadings(this.project, c.heading.heading).then(() => this.show(this.project, true)); } },
       "-",
+      { label: "Set scale…", icon: "sliders-horizontal", command: "plot-grid-set-scale", disabled: DERIVED.includes(c.special), onClick: () => this.openScaleSheet(c) },
       { label: "Gauge this column", icon: "activity", command: "plot-grid-gauge-column", checked: this.gaugePrefs.shown && this.laneHeadings().includes(c.heading.heading), disabled: !c.scale || DERIVED.includes(c.special), onClick: () => this.gaugeColumn(c) },
       { label: "Freeze up to here", icon: "panel-left", checked: this.frozenHeading === c.heading.heading, onClick: () => { const on = this.frozenHeading === c.heading.heading; this.setFrozen(on ? null : c.heading.heading); this.renderTable(); this.status?.say(on ? "Scene and Plot stay put; the threads scroll." : `Frozen up to “${c.heading.name}”: it stays put with Scene and Plot while the rest scroll.`); } },
       { label: "Hide column", icon: "eye-off", command: "plot-grid-hide-column", onClick: () => this.hideColumn(c) },
@@ -1326,9 +1449,11 @@ export class PlotGridView extends ItemView {
     this.editing = true;
     el.empty();
     el.addClass("is-editing");
-    const hint = sel.cell.reading && !sel.cell.stop ? sel.cell.reading.text : "What the thread does here";
+    const scale = readScale(sel.column.scale);
+    const hint = sel.cell.reading && !sel.cell.stop ? sel.cell.reading.text : scale ? `${scale.words[0]}: what the thread does here` : "What the thread does here";
     const field = el.createEl("textarea", { cls: "czm-pg-editor", attr: { rows: "1", "aria-label": `${sel.column.heading.name} at ${sel.row.scene.title || basenameOf(sel.row.scene.path)}`, placeholder: hint } });
-    field.value = sel.cell.stop?.note ?? "";
+    // The keyword rides in front of the note, as it does in the line, so it can be changed where it is read.
+    field.value = sel.cell.stop ? `${sel.cell.stop.keyword ? `${sel.cell.stop.keyword}: ` : ""}${sel.cell.stop.note}` : "";
     const grow = () => { field.setCssStyles({ height: "auto" }); field.setCssStyles({ height: `${field.scrollHeight}px` }); };
     field.addEventListener("input", grow);
     let done = false;
@@ -1336,16 +1461,46 @@ export class PlotGridView extends ItemView {
       if (done) return;
       done = true;
       this.editing = false;
-      const text = field.value;
-      if (save && text.trim() !== (sel.cell.stop?.note ?? "")) void this.writeCell(sel.column, sel.row, sel.cell.stop, text.trim());
-      else this.renderTable();
+      const text = field.value.trim();
+      const was = sel.cell.stop ? `${sel.cell.stop.keyword ? `${sel.cell.stop.keyword}: ` : ""}${sel.cell.stop.note}` : "";
+      if (save && text !== was) {
+        // A role or a scale word typed at the front is read as such, as the note reads it; what was not typed is kept.
+        const parsed = parseStopText(text, rolesFor(sel.column.heading.heading), scale?.words ?? []);
+        void this.writeCell(sel.column, sel.row, sel.cell.stop, parsed.note, { ...(parsed.role !== "touch" ? { role: parsed.role } : {}), ...(parsed.keyword ? { keyword: parsed.keyword } : {}), ...(parsed.quote ? { quote: parsed.quote } : {}) });
+      } else this.renderTable();
       window.setTimeout(() => this.select(this.selection ?? { col: 0, row: 0 }), 0);
+    };
+    /** Tab finishes a scale word the writer has started, and nothing else: "sym" becomes "sympathy: ". */
+    const complete = (): boolean => {
+      if (!scale) return false;
+      const m = /^([^\s:]+)$/.exec(field.value.trim());
+      if (!m) return false;
+      const hits = scale.words.filter((w) => w.toLowerCase().startsWith(m[1]!.toLowerCase()));
+      if (hits.length !== 1) return false;
+      field.value = `${hits[0]}: `;
+      field.setSelectionRange(field.value.length, field.value.length);
+      return true;
     };
     field.addEventListener("keydown", (ev) => {
       if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); finish(false); }
       else if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); ev.stopPropagation(); finish(true); }
-      else if (ev.key === "Tab") { finish(true); }
+      else if (ev.key === "Tab") { if (complete()) { ev.preventDefault(); ev.stopPropagation(); } else finish(true); }
     });
+    if (scale) {
+      // The scale under the field: a click puts the word in front of the note.
+      const strip = el.createDiv({ cls: "czm-pg-scale-strip", attr: { role: "group", "aria-label": "Scale words" } });
+      scale.words.forEach((w, i) => {
+        const b = strip.createEl("button", { text: w, cls: `czm-pg-scale-chip is-${i < scale.neutral ? "neg" : i > scale.neutral ? "pos" : "neutral"}`, attr: { type: "button", tabindex: "-1", title: `${w}: ${signed(i - scale.neutral)}` } });
+        b.addEventListener("mousedown", (ev) => { ev.preventDefault(); });
+        b.addEventListener("click", () => {
+          const rest = field.value.replace(new RegExp(`^\\s*(${scale.words.map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})\\s*:\\s*`, "i"), "");
+          field.value = `${w}: ${rest}`;
+          field.focus();
+          field.setSelectionRange(field.value.length, field.value.length);
+          grow();
+        });
+      });
+    }
     field.addEventListener("blur", () => finish(true));
     field.focus();
     grow();
@@ -1379,19 +1534,20 @@ export class PlotGridView extends ItemView {
   }
 
   /** Writes the cell: the note replaced, the role and quote kept; an emptied cell is a removed stop. Undo in the status line either way. */
-  private async writeCell(column: GridColumn, row: GridRow, before: ThreadRef | null, note: string, stop: { role?: StopRole; quote?: string | null } = {}): Promise<void> {
+  private async writeCell(column: GridColumn, row: GridRow, before: ThreadRef | null, note: string, stop: { role?: StopRole; quote?: string | null; keyword?: string | null } = {}): Promise<void> {
     const project = this.project;
     if (!project) return;
     const link = sceneLink(row.scene);
     const thread = column.heading.heading;
     const quote = stop.quote === undefined ? before?.quote ?? null : stop.quote;
-    if (!note && !quote) { if (before) await this.removeCell(); return; }
+    const keyword = stop.keyword === undefined ? before?.keyword ?? null : stop.keyword;
+    if (!note && !quote && !keyword) { if (before) await this.removeCell(); return; }
     try {
-      await this.source.addStops(project, thread, [{ link, note, role: stop.role ?? before?.role, quote }]);
+      await this.source.addStops(project, thread, [{ link, note, role: stop.role ?? before?.role, quote, keyword }]);
     } catch (e) { this.status?.fail(couldNot(`write “${column.heading.name}” at ${row.scene.title || basenameOf(row.scene.path)}`, e)); return; }
     await this.show(project, true);
     this.status?.undoable(`${before ? "Changed" : "Written"}: ${column.heading.name} at ${row.scene.title || basenameOf(row.scene.path)}`, async () => {
-      if (before) await this.source.addStops(project, thread, [{ link, note: before.note, role: before.role, quote: before.quote ?? null }]);
+      if (before) await this.source.addStops(project, thread, [{ link, note: before.note, role: before.role, quote: before.quote ?? null, keyword: before.keyword ?? null }]);
       else await this.source.removeFromThread(project, thread, link);
       await this.show(project, true);
     });
@@ -1406,7 +1562,7 @@ export class PlotGridView extends ItemView {
     } catch (e) { this.status?.fail(couldNot("remove the stop", e)); return; }
     await this.show(project, true);
     this.status?.undoable(`${sel.row.scene.title || basenameOf(sel.row.scene.path)} taken out of “${sel.column.heading.name}”`, async () => {
-      await this.source.addStops(project, thread, [{ link, note: before.note, role: before.role, quote: before.quote ?? null }]);
+      await this.source.addStops(project, thread, [{ link, note: before.note, role: before.role, quote: before.quote ?? null, keyword: before.keyword ?? null }]);
       await this.show(project, true);
     });
   }
@@ -1487,6 +1643,7 @@ export class PlotGridView extends ItemView {
     if (this.sheet && this.grid.plan) this.renderBuildSheet(shell.section("Build the manuscript", this.sheet.plan ? `${plural(this.sheet.plan.files.length, "note")}` : "", "pg-build", true));
     if (this.templateSheet) this.renderTemplateSheet(shell.section("Start from a template", this.templateSheet.list[this.templateSheet.chosen]?.name ?? "", "pg-template", true));
     if (this.saveSheet) this.renderSaveSheet(shell.section("Save as template", "", "pg-save-template", true));
+    if (this.scaleSheet) this.renderScaleSheet(shell.section("Set scale", this.grid.columns.find((c) => c.heading.heading === this.scaleSheet!.heading)?.heading.name ?? "", "pg-scale", true));
   }
 
   /** The model's proposals: a tick each, the sentence, the scenes; Add writes the ticked ones as empty headings. */
@@ -1574,6 +1731,17 @@ export class PlotGridView extends ItemView {
       }
       box.createDiv({ text: stop ? "" : "Write the cell in your own words; the reading is the placeholder while you type.", cls: "czm-map-absent" });
     }
+    const position = this.rows.indexOf(row);
+    if (this.unmarkedTurn(column, position)) section.createDiv({ text: "No line marks this turn. The gauge flips here: pick the sentence that carries the value.", cls: "czm-pg-turn-unmarked" });
+    const scale = readScale(column.scale);
+    let keywordSelect: HTMLSelectElement | null = null;
+    if (scale) {
+      const kw = section.createDiv({ cls: "czm-pg-field" });
+      kw.createDiv({ text: "Keyword · what the scene mostly is", cls: "czm-pg-field-label" });
+      keywordSelect = kw.createEl("select", { cls: "dropdown czm-pg-keyword-select", attr: { "aria-label": "Keyword" } });
+      const none = keywordSelect.createEl("option", { text: "none" }); none.value = "";
+      scale.words.forEach((w, i) => { const o = keywordSelect!.createEl("option", { text: `${signed(i - scale.neutral)} ${w}` }); o.value = w; if ((stop?.keyword ?? "").toLowerCase() === w.toLowerCase()) o.selected = true; });
+    }
     const roles = column.heading.kind === "arc" ? [...THREAD_ROLES, ...ARC_ROLES] : THREAD_ROLES;
     const role = section.createDiv({ cls: "czm-pg-field" });
     role.createDiv({ text: "Role", cls: "czm-pg-field-label" });
@@ -1613,7 +1781,7 @@ export class PlotGridView extends ItemView {
     const save = actions.createEl("button", { text: stop ? "Save stop" : "Write stop", cls: "czm-pg-save mod-cta" });
     save.addEventListener("click", () => {
       save.disabled = true;
-      void this.writeCell(column, row, stop, noteInput.value.trim(), { role: roleSelect.value as StopRole, quote: quoteInput.value.trim() || null }).finally(() => { save.disabled = false; });
+      void this.writeCell(column, row, stop, noteInput.value.trim(), { role: roleSelect.value as StopRole, quote: quoteInput.value.trim() || null, ...(keywordSelect ? { keyword: keywordSelect.value || null } : {}) }).finally(() => { save.disabled = false; });
     });
     const open = actions.createEl("button", { text: "Open scene", cls: "czm-pg-open" });
     open.addEventListener("click", () => this.source.reveal(stop?.anchor ? { ...row.scene, line: stop.anchor.line } : row.scene));
@@ -1624,7 +1792,7 @@ export class PlotGridView extends ItemView {
     if (cell.more.length) {
       const more = section.createDiv({ cls: "czm-pg-more-list" });
       more.createDiv({ text: `${cell.more.length} more at this scene`, cls: "czm-pg-field-label" });
-      for (const m of cell.more) more.createDiv({ text: `${m.role && m.role !== "touch" ? `${m.role}: ` : ""}${m.note}`, cls: "czm-map-absent" });
+      for (const m of cell.more) more.createDiv({ text: `${m.role && m.role !== "touch" ? `${m.role}: ` : ""}${m.keyword ? `${m.keyword}: ` : ""}${m.note}`, cls: "czm-map-absent" });
     }
   }
 

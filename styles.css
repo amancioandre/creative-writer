@@ -735,6 +735,25 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-pg-gauge-lane-scale { font-family: var(--font-monospace); font-size: 10px; color: var(--text-faint); }
 .czm-pg-gauge-lane-scale.is-problem { color: var(--text-warning); }
 .czm-pg-gauge-summary { margin: 2px 8px; }
+/* Set scale…: the ordered word list, the middle marked neutral; the scale under the cell editor as chips. */
+.czm-pg-scale-list { display: flex; flex-direction: column; gap: 3px; margin: 4px 8px; }
+.czm-pg-scale-row { display: flex; align-items: center; gap: 6px; }
+.czm-pg-scale-row.is-neutral .czm-pg-scale-word { border-color: var(--background-modifier-border-hover); }
+.czm-pg-scale-charge { width: 22px; text-align: right; font-family: var(--font-monospace); font-size: 10px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.czm-pg-scale-word { flex: 1; min-width: 0; font-size: var(--font-ui-smaller); }
+.czm-pg-scale-neutral { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); }
+.czm-pg-scale-drop { width: 20px; height: 20px; flex: 0 0 auto; color: var(--text-faint); }
+.czm-pg-scale-tools { grid-template-columns: auto 1fr; align-items: center; }
+.czm-pg-scale-check { margin: 4px 8px; }
+.czm-pg-scale-problem { color: var(--text-warning); font-size: var(--font-ui-smaller); margin: 2px 0; }
+.czm-pg-scale-rename { color: var(--text-accent); font-size: var(--font-ui-smaller); margin: 2px 0; }
+.czm-pg-scale-line { display: block; font-size: 11px; padding: 4px 6px; white-space: pre-wrap; word-break: break-word; }
+.czm-pg-scale-foot { grid-template-columns: 1fr auto auto; }
+.czm-pg-turn-unmarked { margin: 4px 8px 8px; padding: 5px 8px; border-left: 2px solid var(--text-warning); font-size: var(--font-ui-small); color: var(--text-muted); }
+.czm-pg-scale-strip { display: flex; flex-wrap: wrap; gap: 3px; padding: 3px 4px 4px; }
+.czm-pg-scale-chip { font-family: var(--font-monospace); font-size: 10px; line-height: 1.4; padding: 0 5px; height: auto; border-radius: 3px; box-shadow: none; background: var(--background-modifier-border); color: var(--text-muted); }
+.czm-pg-scale-chip.is-neg { background: rgba(var(--color-red-rgb), 0.16); color: var(--color-red); }
+.czm-pg-scale-chip.is-pos { background: rgba(var(--color-green-rgb), 0.16); color: var(--color-green); }
 .czm-pg-key-gauge::before { width: 4px; height: 12px; border-radius: 1px; }
 .czm-pg-key-gauge.is-neg::before { background: var(--color-red); }
 .czm-pg-key-gauge.is-pos::before { background: var(--color-green); }
