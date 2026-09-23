@@ -1,6 +1,6 @@
 import { ItemView, setIcon, type WorkspaceLeaf } from "obsidian";
 import type { ProjectSpec } from "../../../domain/progress/Project";
-import { NO_GAUGE, type GaugePrefs, type PlotGridSettings, type StoryMapSettings } from "../../../domain/settings/Settings";
+import { NO_GAUGE, type GaugeLine, type GaugePrefs, type PlotGridSettings, type StoryMapSettings } from "../../../domain/settings/Settings";
 import { EMPTY_PLOT_GRID, GROUP_TOKEN, blockOf, blockOrder, type ColumnKind, type GridCell, type GridColumn, type GridRow, type PlotGrid, type SpecialColumn } from "../../../domain/plot/PlotGrid";
 import type { Entity, SceneRef } from "../../../domain/story/StoryGraph";
 import { basenameOf } from "../../../domain/story/EntityIndex";
@@ -117,7 +117,7 @@ interface Selection { readonly col: number; readonly row: number }
 /** One stretch of the header: a single column with a job, an open group of columns, or a folded group drawn as one narrow cell. */
 interface Segment { readonly kind: ColumnKind; readonly block: string; readonly single: GridColumn | null; readonly columns: GridColumn[]; readonly folded: boolean }
 
-export type PlotGridAction = "clear-search" | "toggle-cast" | "open-note" | "toggle-panel" | "new-column" | "new-scene" | "new-chapter" | "new-act" | "open-outline" | "build-manuscript" | "start-template" | "save-template" | "fold-arcs" | "fold-themes" | "fold-subplots" | "fold-threads" | "hide-column" | "show-hidden" | "focus-search" | "help" | "toggle-unmoved" | "audit" | "snapshot" | "next-issue" | "previous-issue" | "anchor" | "read-column" | "check-column" | "read-all" | "dismiss-reading" | "stop-reading" | "propose-columns" | "export" | "toggle-gauge" | "gauge-column" | "set-scale";
+export type PlotGridAction = "clear-search" | "toggle-cast" | "open-note" | "toggle-panel" | "new-column" | "new-scene" | "new-chapter" | "new-act" | "open-outline" | "build-manuscript" | "start-template" | "save-template" | "fold-arcs" | "fold-themes" | "fold-subplots" | "fold-threads" | "hide-column" | "show-hidden" | "focus-search" | "help" | "toggle-unmoved" | "audit" | "snapshot" | "next-issue" | "previous-issue" | "anchor" | "read-column" | "check-column" | "read-all" | "dismiss-reading" | "stop-reading" | "propose-columns" | "export" | "toggle-gauge" | "gauge-column" | "set-scale" | "gauge-line";
 
 /** Rows are drawn this many at a time; past the first chunk, the next is drawn as the last row comes into view. */
 export const ROW_CHUNK = 60;
@@ -419,6 +419,7 @@ export class PlotGridView extends ItemView {
       case "toggle-gauge": { const on = !this.gaugePrefs.shown; this.setGauge({ shown: on }); this.renderTable(); this.status?.say(on ? (this.lanes.length ? `Gauge on: ${this.lanes.map((l) => l.column.heading.name).join(", ")}.` : "Gauge on, but no column has a scale yet: Set scale… in a column's menu grades its stops.") : "Gauge off."); break; }
       case "gauge-column": { const c = this.current(); if (c) this.gaugeColumn(c); break; }
       case "set-scale": { const c = this.current(); if (c) this.openScaleSheet(c); break; }
+      case "gauge-line": { const line: GaugeLine = this.gaugePrefs.line === "total" ? "charge" : "total"; this.setGauge({ line }); this.renderTable(); this.status?.say(line === "total" ? "The gauge line walks the running total: the macro reversal." : "The gauge line walks each scene's own charge: the scene-to-scene turns."); break; }
     }
   }
 
@@ -455,8 +456,10 @@ export class PlotGridView extends ItemView {
   private gaugeSummary(rows: readonly GridRow[]): string {
     const first = this.lanes[0];
     if (!first) return "";
-    const at = (l: Lane) => l.inversions.map((p) => `${p + 1} ${rows[p]?.scene.title || basenameOf(rows[p]?.scene.path ?? "")}`).join(", ");
-    const parts = [`gauge: ${first.charged} of ${rows.length} charged${first.unread ? ` · ${first.unread} unread` : ""}`, first.inversions.length ? `${plural(first.inversions.length, "inversion")} at ${at(first)}` : "no inversion"];
+    const byCharge = this.gaugePrefs.line === "charge";
+    const flips = (l: Lane) => (byCharge ? l.turns : l.inversions);
+    const at = (l: Lane) => flips(l).map((p) => `${p + 1} ${rows[p]?.scene.title || basenameOf(rows[p]?.scene.path ?? "")}`).join(", ");
+    const parts = [`gauge: ${first.charged} of ${rows.length} charged${first.unread ? ` · ${first.unread} unread` : ""}`, flips(first).length ? `${plural(flips(first).length, byCharge ? "turn" : "inversion")} at ${at(first)}` : byCharge ? "no turn" : "no inversion"];
     if (this.lanes.length > 1) parts.push(`${this.lanes.length} lanes · ${plural(this.disagree.size, "disagreement")}`);
     return parts.join(" · ");
   }
@@ -686,7 +689,12 @@ export class PlotGridView extends ItemView {
     theadEl.prepend(groups);
     groups.createEl("th", { cls: "czm-pg-corner czm-pg-group-corner is-frozen", attr: { colspan: "2", "data-fcol": "0" } });
     for (const seg of segments) {
-      const th = groups.createEl("th", { cls: `czm-pg-group czm-pg-group-${seg.single ? "single" : seg.kind}${seg.folded ? " is-folded" : ""}`, attr: { colspan: String(seg.folded ? 1 : seg.columns.length), scope: "colgroup" } });
+      // A group over frozen columns freezes with them; a group the freeze cuts through is drawn in two cells, the label on the frozen one.
+      const first = seg.folded ? -1 : columns.indexOf(seg.columns[0]!);
+      const frozenIn = seg.folded ? 0 : seg.columns.filter((c) => columns.indexOf(c) <= frozenUpTo).length;
+      const frozenAttrs: Record<string, string> = frozenIn > 0 ? { "data-fcol": String(2 + first) } : {};
+      const th = groups.createEl("th", { cls: `czm-pg-group czm-pg-group-${seg.single ? "single" : seg.kind}${seg.folded ? " is-folded" : ""}${frozenIn > 0 ? " is-frozen" : ""}`, attr: { colspan: String(seg.folded ? 1 : Math.max(1, frozenIn || seg.columns.length)), scope: "colgroup", ...frozenAttrs } });
+      if (frozenIn > 0 && frozenIn < seg.columns.length) groups.createEl("th", { cls: `czm-pg-group czm-pg-group-${seg.kind} is-continued`, attr: { colspan: String(seg.columns.length - frozenIn), "aria-hidden": "true" } });
       if (seg.single) { th.createSpan({ text: SPECIAL_LABEL[seg.single.special!], cls: "czm-pg-group-title" }); continue; }
       const btn = th.createEl("button", { cls: "czm-pg-group-toggle", attr: { "aria-expanded": String(!seg.folded), "aria-label": `${KIND_GROUP[seg.kind]}: ${seg.columns.length}, ${seg.folded ? "folded, click to show" : "shown, click to fold"}`, title: seg.folded ? `${KIND_GROUP[seg.kind]}: ${seg.columns.map((c) => c.heading.name).join(", ")}` : `Fold the ${KIND_GROUP[seg.kind].toLowerCase()}` } });
       const caret = btn.createSpan({ cls: "czm-pg-group-caret" });
@@ -905,23 +913,30 @@ export class PlotGridView extends ItemView {
     const words = lane.scale.words;
     const th = thead.createEl("th", { cls: "czm-pg-col czm-pg-gauge-head", attr: { scope: "col", title: `Gauge · ${lane.column.heading.name}: ${words.join(" → ")}. Pipes are the scene's charge, the line is the running total, a diamond is where it flips.` } });
     const name = th.createDiv({ cls: "czm-pg-col-name" });
-    name.createSpan({ text: "Gauge", cls: "czm-pg-gauge-tag" });
     name.createSpan({ text: lane.column.heading.name, cls: "czm-pg-col-title" });
     const legend = th.createDiv({ cls: "czm-pg-gauge-legend", attr: { "aria-label": `Scale: ${words.join(", ")}` } });
     words.forEach((w, i) => legend.createSpan({ text: w, cls: `czm-pg-gauge-word is-${i < lane.scale.neutral ? "neg" : i > lane.scale.neutral ? "pos" : "neutral"}`, attr: { title: `${w}: ${signed(i - lane.scale.neutral)}` } }));
     const sub = th.createDiv({ cls: "czm-pg-col-sub" });
-    sub.createSpan({ text: `${lane.charged} of ${rowCount} · ${plural(lane.inversions.length, "inversion")}${lane.unread ? ` · ${lane.unread} unread` : ""}${lane.unit > 1 ? ` · line: 1 step = ${lane.unit}` : ""}`, cls: "czm-pg-col-count" });
+    const charge = this.gaugePrefs.line === "charge";
+    sub.createSpan({ text: `${lane.charged} of ${rowCount} · ${charge ? plural(lane.turns.length, "turn") : plural(lane.inversions.length, "inversion")}${lane.unread ? ` · ${lane.unread} unread` : ""}${!charge && lane.unit > 1 ? ` · line: 1 step = ${lane.unit}` : ""}`, cls: "czm-pg-col-count" });
   }
 
   /** The line's x for a total: the centre, then one pipe's pitch per unit of total, so the line shares the pipes' scale until it would leave the lane. */
   private laneX(lane: Lane, total: number): number { return LANE_CX + (total / lane.unit) * LANE_STEP; }
+
+  /** Where the line stands after a row: at the running total, or, scene to scene, at the last charge said so far. */
+  private lineAt(lane: Lane, position: number): number {
+    if (this.gaugePrefs.line === "total") return this.laneX(lane, position < 0 ? 0 : lane.rows[position]!.total);
+    for (let i = position; i >= 0; i--) { const c = lane.rows[i]!.charge; if (c !== null) return LANE_CX + c * LANE_STEP; }
+    return LANE_CX;
+  }
 
   /** A band row carries the line straight through, so the total is continuous from the first scene to the last. */
   private renderGaugePass(tr: HTMLElement, lane: Lane, position: number): void {
     const td = tr.createEl("td", { cls: "czm-pg-gauge-td is-pass", attr: { "aria-hidden": "true" } });
     const svg = svgEl("svg", { class: "czm-pg-gauge-svg", width: String(LANE_W), height: "100%" });
     td.createDiv({ cls: "czm-pg-gauge" }).appendChild(svg);
-    const x = String(this.laneX(lane, position > 0 ? lane.rows[position - 1]!.total : 0));
+    const x = String(this.lineAt(lane, position - 1));
     svg.appendChild(svgEl("line", { class: "czm-pg-gauge-centre", x1: String(LANE_CX), x2: String(LANE_CX), y1: "0%", y2: "100%" }));
     svg.appendChild(svgEl("line", { class: "czm-pg-gauge-line", x1: x, x2: x, y1: "0%", y2: "100%" }));
   }
@@ -929,13 +944,16 @@ export class PlotGridView extends ItemView {
   /** One row of a lane: the pipes for the scene's charge, the running total walking through, the diamond and rule where it flips. */
   private renderGaugeCell(tr: HTMLElement, lane: Lane, position: number, row: GridRow): void {
     const g = lane.rows[position]!;
-    const prev = position > 0 ? lane.rows[position - 1]!.total : 0;
+    const byCharge = this.gaugePrefs.line === "charge";
+    // In total mode the flip is the inversion; scene to scene it is the turn: the move changing direction on either side of neutral.
+    const flip = byCharge ? g.turn : g.inversion;
     const where = row.scene.title || basenameOf(row.scene.path);
     const what = g.conflict ? `two stops disagree (${g.conflict.join(", ")}), unread` : g.charge === null ? "no word" : `${g.keyword} (${signed(g.charge)})`;
-    const td = tr.createEl("td", { cls: `czm-pg-gauge-td${g.inversion ? " is-inversion" : ""}${g.conflict ? " is-unread" : ""}`, attr: { "aria-label": `Gauge, ${lane.column.heading.name} at ${where}: ${what}, total ${signed(g.total)}${g.inversion ? `, inversion${g.marked ? "" : ", no line marks it"}` : ""}` } });
+    const move = byCharge ? (g.delta === null ? "" : `, ${g.delta > 0 ? "rises" : g.delta < 0 ? "falls" : "holds"} ${g.delta ? signed(g.delta) : ""}`.trimEnd()) : `, total ${signed(g.total)}`;
+    const td = tr.createEl("td", { cls: `czm-pg-gauge-td${flip ? " is-inversion" : ""}${g.conflict ? " is-unread" : ""}`, attr: { "aria-label": `Gauge, ${lane.column.heading.name} at ${where}: ${what}${move}${flip ? `, ${byCharge ? "turn" : "inversion"}${g.marked ? "" : ", no line marks it"}` : ""}` } });
     const svg = svgEl("svg", { class: "czm-pg-gauge-svg", width: String(LANE_W), height: "100%", "aria-hidden": "true" });
     td.createDiv({ cls: "czm-pg-gauge" }).appendChild(svg);
-    if (g.inversion) svg.appendChild(svgEl("line", { class: "czm-pg-gauge-rule", x1: "0", x2: String(LANE_W), y1: "50%", y2: "50%" }));
+    if (flip) svg.appendChild(svgEl("line", { class: "czm-pg-gauge-rule", x1: "0", x2: String(LANE_W), y1: "50%", y2: "50%" }));
     svg.appendChild(svgEl("line", { class: "czm-pg-gauge-centre", x1: String(LANE_CX), x2: String(LANE_CX), y1: "0%", y2: "100%" }));
     // The charge: one pipe per step to three, then a block of three and singles; left of the line below neutral, right above it.
     if (g.charge !== null && g.charge !== 0) {
@@ -953,23 +971,23 @@ export class PlotGridView extends ItemView {
       q.textContent = "?";
       svg.appendChild(q);
     }
-    // The running total: from where the row above left it to this row's, then down; dotted where nobody has said.
-    const x0 = String(this.laneX(lane, prev)), x1 = String(this.laneX(lane, g.total));
+    // The line: from where the row above left it to this row's, then down; dotted where nobody has said.
+    const x0 = String(this.lineAt(lane, position - 1)), x1 = String(this.lineAt(lane, position));
     const lineCls = `czm-pg-gauge-line${g.charge === null ? " is-empty" : ""}`;
     svg.appendChild(svgEl("line", { class: lineCls, x1: x0, x2: x1, y1: "0%", y2: "50%" }));
     svg.appendChild(svgEl("line", { class: lineCls, x1: x1, x2: x1, y1: "50%", y2: "100%" }));
-    if (g.inversion) {
-      const d = svgEl("text", { class: `czm-pg-gauge-diamond${g.marked ? "" : " is-hollow"}`, x: x1, y: "50%", "text-anchor": "middle", "dominant-baseline": "central" });
-      d.textContent = g.marked ? "◆" : "◇";
+    if (flip) {
+      const d = svgEl("text", { class: `czm-pg-gauge-diamond${g.marked ? "" : " is-hollow"}${byCharge ? " is-turn" : ""}`, x: x1, y: "50%", "text-anchor": "middle", "dominant-baseline": "central" });
+      d.textContent = byCharge ? (g.marked ? "▲" : "△") : (g.marked ? "◆" : "◇");
       svg.appendChild(d);
       const label = svgEl("text", { class: "czm-pg-gauge-label", x: "3", y: "50%", dy: "-5" });
-      label.textContent = "inversion";
+      label.textContent = byCharge ? "turn" : "inversion";
       svg.appendChild(label);
     } else if (g.charge !== null) {
       svg.appendChild(svgEl("circle", { class: "czm-pg-gauge-dot", cx: x1, cy: "50%", r: "2.5" }));
     }
     const total = svgEl("text", { class: "czm-pg-gauge-total", x: String(LANE_W - 2), y: "50%", "text-anchor": "end", "dominant-baseline": "central" });
-    total.textContent = signed(g.total);
+    total.textContent = byCharge ? (g.delta === null ? "" : g.delta > 0 ? `↑${g.delta}` : g.delta < 0 ? `↓${-g.delta}` : "=") : signed(g.total);
     svg.appendChild(total);
   }
 
@@ -982,6 +1000,13 @@ export class PlotGridView extends ItemView {
     showInfo.createDiv({ text: "A thermometer per scene at the right edge: pipes for the scene's charge, a line for the running total, a diamond where it flips", cls: "setting-item-description" });
     const showToggle = showRow.createDiv({ cls: "setting-item-control" }).createEl("button", { cls: `czm-pg-toggle czm-pg-gauge-toggle${prefs.shown ? " is-on" : ""}`, attr: { role: "switch", "aria-checked": String(prefs.shown), "aria-label": "Show gauge" } });
     showToggle.addEventListener("click", () => this.run("toggle-gauge"));
+    const modeRow = section.createDiv({ cls: "czm-pg-field" });
+    modeRow.createDiv({ text: "The line", cls: "czm-pg-field-label" });
+    const modes = modeRow.createDiv({ cls: "czm-map-panel-actions czm-pg-jobs czm-pg-gauge-modes" });
+    for (const [line, label, hint] of [["total", "Running total", "The story's cumulative balance: where it inverts, and which answer it ends on"], ["charge", "Scene to scene", "Each scene's own charge: where the move turns the other way, on either side of neutral"]] as const) {
+      const b = modes.createEl("button", { text: label, cls: `czm-pg-job czm-pg-gauge-mode${prefs.line === line ? " is-on" : ""}`, attr: { "aria-pressed": String(prefs.line === line), title: hint } });
+      b.addEventListener("click", () => { if (prefs.line !== line) this.run("gauge-line"); });
+    }
     const graded = this.grid.columns.filter((c) => c.scale !== null);
     if (!graded.length) { section.createDiv({ text: "No column has a scale yet. Set scale… in a column's menu writes one line under its heading, hate to love, and the gauge reads the word each stop opens with.", cls: "czm-map-absent" }); return; }
     const ticked = this.laneHeadings();
@@ -1001,9 +1026,10 @@ export class PlotGridView extends ItemView {
     if (ticked.length >= MAX_LANES && graded.length > MAX_LANES) list.createDiv({ text: `${MAX_LANES} lanes at most: untick one to pick another.`, cls: "czm-map-absent" });
     for (const lane of this.lanes) {
       const at = lane.inversions.map((p) => `${p + 1} ${this.rows[p]?.scene.title || ""}`.trim()).join(", ");
+      const turnsAt = lane.turns.map((p) => `${p + 1} ${this.rows[p]?.scene.title || ""}`.trim()).join(", ");
       const end = lane.rows.at(-1)?.total ?? 0;
       const leans = end > 0 ? `leans to ${lane.scale.words.at(-1)}` : end < 0 ? `leans to ${lane.scale.words[0]}` : "ends level";
-      section.createDiv({ text: `${lane.column.heading.name}: ${lane.charged} of ${this.rows.length} charged${lane.unread ? `, ${lane.unread} unread` : ""}, total ends at ${signed(end)}, ${leans}${lane.inversions.length ? `, ${plural(lane.inversions.length, "inversion")} at ${at}` : ", no inversion"}${lane.unit > 1 ? ` · line: 1 step = ${lane.unit}` : ""}`, cls: "czm-map-absent czm-pg-gauge-summary" });
+      section.createDiv({ text: `${lane.column.heading.name}: ${lane.charged} of ${this.rows.length} charged${lane.unread ? `, ${lane.unread} unread` : ""}, total ends at ${signed(end)}, ${leans}${lane.inversions.length ? `, ${plural(lane.inversions.length, "inversion")} at ${at}` : ", no inversion"}${lane.turns.length ? `, ${plural(lane.turns.length, "turn")} at ${turnsAt}` : ", no turn"}${lane.unit > 1 ? ` · line: 1 step = ${lane.unit}` : ""}`, cls: "czm-map-absent czm-pg-gauge-summary" });
     }
     if (this.lanes.length > 1) section.createDiv({ text: this.disagree.size ? `${plural(this.disagree.size, "disagreement")}: opposite signs at ${[...this.disagree].sort((a, b) => a - b).map((p) => p + 1).join(", ")}, marked ≠ on the scene.` : "The lanes never disagree.", cls: "czm-map-absent czm-pg-gauge-summary" });
   }
@@ -1011,7 +1037,7 @@ export class PlotGridView extends ItemView {
   /** The gauge flips at this row of the column, and no quote on the stop says where: a turn without its line. */
   private unmarkedTurn(column: GridColumn, position: number): boolean {
     const g = this.lanes.find((l) => l.column === column)?.rows[position];
-    return !!g && g.inversion && !g.marked;
+    return !!g && (this.gaugePrefs.line === "charge" ? g.turn : g.inversion) && !g.marked;
   }
 
   // ---- Set scale… -------------------------------------------------------------------

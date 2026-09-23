@@ -1012,7 +1012,7 @@ describe("the value gauge", () => {
     await v.onOpen();
     const el = v.contentEl;
     v.run("toggle-gauge");
-    expect(prefs().gauge).toEqual({ "Novel/": { shown: true, lanes: [] } });
+    expect(prefs().gauge).toEqual({ "Novel/": { shown: true, lanes: [], line: "total" } });
     // The first theme with a readable scale is the lane when none is ticked; the even one cannot be.
     const head = el.querySelector(".czm-pg-gauge-head")!;
     expect(head.querySelector(".czm-pg-col-title")?.textContent).toBe("Should jealousy justify violent acts?");
@@ -1053,6 +1053,43 @@ describe("the value gauge", () => {
     expect(prefs().gauge["Novel/"]!.shown).toBe(false);
   });
 
+  it("the line walks the running total or, scene to scene, each scene's charge, with the turns marked instead of the inversions", async () => {
+    const { v, prefs } = open({}, graded);
+    await v.onOpen();
+    const el = v.contentEl;
+    v.run("toggle-gauge");
+    const modes = () => [...el.querySelectorAll<HTMLButtonElement>(".czm-pg-gauge-mode")].map((b) => [b.textContent, b.getAttribute("aria-pressed")]);
+    expect(modes()).toEqual([["Running total", "true"], ["Scene to scene", "false"]]);
+    (el.querySelectorAll(".czm-pg-gauge-mode")[1] as HTMLElement).click();
+    expect(prefs().gauge["Novel/"]!.line).toBe("charge");
+    expect(modes()).toEqual([["Running total", "false"], ["Scene to scene", "true"]]);
+    const cell = (row: number) => el.querySelector(`.czm-pg-scene[data-row="${row}"] .czm-pg-gauge-td`)!;
+    // Camp +2, Creek −2 (falls 4), Later nobody, Return −2 (holds): the line stands at the charge, and no move turns the other way.
+    expect(cell(0).getAttribute("aria-label")).toBe("Gauge, Should jealousy justify violent acts? at Camp: love (+2)");
+    expect(cell(1).getAttribute("aria-label")).toBe("Gauge, Should jealousy justify violent acts? at Creek: hate (−2), falls −4");
+    expect(cell(1).querySelector(".czm-pg-gauge-total")?.textContent).toBe("↓4");
+    expect(cell(3).getAttribute("aria-label")).toBe("Gauge, Should jealousy justify violent acts? at Return: hate (−2), holds");
+    expect(cell(3).classList.contains("is-inversion")).toBe(false);
+    expect(el.querySelector(".czm-pg-gauge-head .czm-pg-col-count")?.textContent).toBe("3 of 4 · 0 turns");
+    expect(el.querySelector(".czm-shell-state")?.textContent).toContain("gauge: 3 of 4 charged · no turn");
+    expect(el.querySelector(".czm-map-status")?.textContent).toContain("scene-to-scene turns");
+    v.run("gauge-line");
+    expect(prefs().gauge["Novel/"]!.line).toBe("total");
+    expect(cell(3).classList.contains("is-inversion")).toBe(true);
+  });
+
+  it("freezes a group's header with its columns, and splits a group the freeze cuts through, the label on the frozen part", async () => {
+    const { v } = open({}, graded);
+    await v.onOpen();
+    const el = v.contentEl;
+    const groups = () => [...el.querySelectorAll(".czm-pg-groups th")].map((t) => [t.textContent, t.getAttribute("colspan"), t.classList.contains("is-frozen") ? t.getAttribute("data-fcol") : null, t.classList.contains("is-continued")]);
+    expect(groups()).toEqual([["", "2", "0", false], ["Arcs1", "1", null, false], ["Themes2", "2", null, false], ["Subplots1", "1", null, false], ["", "1", null, false], ["", null, null, false]]);
+    // Freeze up to the first theme: the arcs group freezes whole, the themes group splits, the label staying with the frozen column.
+    (el.querySelectorAll(".czm-pg-col-thread .czm-pg-col-more")[1] as HTMLElement).click();
+    Menu.last!.items.find((i) => i.title.startsWith("Freeze up to here"))!.cb();
+    expect(groups()).toEqual([["", "2", "0", false], ["Arcs1", "1", "2", false], ["Themes2", "1", "3", false], ["", "1", null, true], ["Subplots1", "1", null, false], ["", "1", null, false], ["", null, null, false]]);
+  });
+
   it("ticks a second lane from the Gauge section or the column's menu, marks the rows where the lanes disagree, and refuses an even scale", async () => {
     const { v, prefs } = open({}, graded);
     await v.onOpen();
@@ -1068,8 +1105,8 @@ describe("the value gauge", () => {
     expect([...el.querySelectorAll(".czm-pg-scene-head .czm-pg-disagree")].map((d) => d.closest(".czm-pg-scene")?.getAttribute("data-row"))).toEqual(["0", "3"]);
     expect(el.querySelector(".czm-shell-state")?.textContent).toContain("2 lanes · 2 disagreements");
     expect([...el.querySelectorAll(".czm-pg-gauge-summary")].map((d) => d.textContent)).toEqual([
-      "Ilse: 2 of 4 charged, total ends at +1, leans to love, 1 inversion at 4 Return",
-      "Should jealousy justify violent acts?: 3 of 4 charged, total ends at −2, leans to hate, 1 inversion at 4 Return",
+      "Ilse: 2 of 4 charged, total ends at +1, leans to love, 1 inversion at 4 Return, no turn",
+      "Should jealousy justify violent acts?: 3 of 4 charged, total ends at −2, leans to hate, 1 inversion at 4 Return, no turn",
       "2 disagreements: opposite signs at 1, 4, marked ≠ on the scene.",
     ]);
     // The column's own menu row unticks it again.

@@ -615,7 +615,7 @@ export default class CreativeZenModePlugin extends Plugin {
       ["plot-grid-hide-column", "hide-column"], ["plot-grid-show-hidden", "show-hidden"], ["plot-grid-toggle-unmoved", "toggle-unmoved"], ["plot-grid-focus-search", "focus-search"], ["plot-grid-help", "help"],
       ["plot-grid-audit", "audit"], ["plot-grid-snapshot", "snapshot"], ["plot-grid-next-issue", "next-issue"], ["plot-grid-previous-issue", "previous-issue"], ["plot-grid-anchor", "anchor"],
       ["plot-grid-read-all", "read-all"], ["plot-grid-read-column", "read-column"], ["plot-grid-check-column", "check-column"], ["plot-grid-dismiss-reading", "dismiss-reading"], ["plot-grid-propose-columns", "propose-columns"], ["plot-grid-export", "export"],
-      ["plot-grid-toggle-gauge", "toggle-gauge"], ["plot-grid-gauge-column", "gauge-column"], ["plot-grid-set-scale", "set-scale"],
+      ["plot-grid-toggle-gauge", "toggle-gauge"], ["plot-grid-gauge-column", "gauge-column"], ["plot-grid-set-scale", "set-scale"], ["plot-grid-gauge-line", "gauge-line"],
     ]);
     this.registerView(STORY_THREADS_VIEW_TYPE, (leaf: WorkspaceLeaf) => new StoryThreadsView(leaf, {
       projects: storySource.projects,

@@ -302,9 +302,13 @@ export interface PlotGridSettings {
 export interface GaugePrefs {
   readonly shown: boolean;
   readonly lanes: readonly string[];
+  /** What the line walks: the running total (the macro reversal) or the scene's own charge (the scene-to-scene turns). */
+  readonly line: GaugeLine;
 }
 
-export const NO_GAUGE: GaugePrefs = { shown: false, lanes: [] };
+export type GaugeLine = "total" | "charge";
+
+export const NO_GAUGE: GaugePrefs = { shown: false, lanes: [], line: "total" };
 
 export const DEFAULT_PLOT_GRID: PlotGridSettings = { panelOpen: true, castExpanded: false, folded: { arc: false, theme: false, subplot: false, free: false }, hidden: {}, unmoved: true, sections: {}, frozen: {}, templatesFolder: "Creative Writer/Templates", gauge: {} };
 
@@ -322,7 +326,8 @@ export function normalizePlotGrid(raw: unknown): PlotGridSettings {
     const g = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
     const lanes = Array.isArray(g.lanes) ? g.lanes.filter((x): x is string => typeof x === "string" && !!x.trim()) : [];
     const shown = g.shown === true;
-    if (shown || lanes.length) gauge[scope] = { shown, lanes };
+    const line: GaugeLine = g.line === "charge" ? "charge" : "total";
+    if (shown || lanes.length || line !== "total") gauge[scope] = { shown, lanes, line };
   }
   return {
     panelOpen: typeof r.panelOpen === "boolean" ? r.panelOpen : DEFAULT_PLOT_GRID.panelOpen,

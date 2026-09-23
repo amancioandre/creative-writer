@@ -711,9 +711,14 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-pg-table .czm-pg-gauge-head, .czm-pg-table .czm-pg-gauge-td { position: sticky; right: 0; background: var(--background-primary); z-index: 1; min-width: 140px; max-width: 140px; width: 140px; padding: 0; box-shadow: inset 1px 0 0 var(--background-modifier-border); }
 .czm-pg-table thead th.czm-pg-gauge-head { z-index: 3; padding: 2px 4px; }
 .czm-pg-table .czm-pg-gauge-td + .czm-pg-gauge-td, .czm-pg-table .czm-pg-gauge-head + .czm-pg-gauge-head { box-shadow: inset 1px 0 0 var(--background-modifier-border-hover); }
-.czm-pg-group-gauge { color: var(--text-muted); }
-.czm-pg-gauge-tag { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); font-weight: 600; }
+.czm-pg-table .czm-pg-group-gauge { position: sticky; right: 0; z-index: 3; color: var(--text-muted); background: var(--background-primary); }
+/* The lane's name wraps under the group's "Gauge", and the header grows with it: a theme is a question, not a word. */
+.czm-pg-gauge-head .czm-pg-col-name { white-space: normal; align-items: flex-start; }
+.czm-pg-gauge-head .czm-pg-col-title { white-space: normal; overflow: visible; line-height: 1.25; }
 .czm-pg-gauge-head .czm-pg-col-name::before { display: none; }
+.czm-pg-gauge-modes { grid-template-columns: 1fr 1fr; }
+/* A group the freeze cuts through: the label rides the frozen cell, the rest of the group keeps its line without one. */
+.czm-pg-group.is-continued { padding-left: 0; }
 .czm-pg-gauge-legend { display: flex; gap: 2px; margin: 3px 0; }
 .czm-pg-gauge-word { flex: 1 1 0; min-width: 0; height: 4px; border-radius: 2px; font-size: 0; color: transparent; overflow: hidden; }
 .czm-pg-gauge-word.is-neg { background: var(--color-red); opacity: 0.85; }
@@ -733,6 +738,7 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-pg-gauge-dot { fill: var(--text-normal); }
 .czm-pg-gauge-diamond { fill: var(--text-normal); font-size: 11px; }
 .czm-pg-gauge-diamond.is-hollow { fill: var(--text-muted); }
+.czm-pg-gauge-diamond.is-turn { font-size: 9px; }
 .czm-pg-gauge-label, .czm-pg-gauge-total, .czm-pg-gauge-unread { fill: var(--text-faint); font-family: var(--font-monospace); font-size: 9px; }
 .czm-pg-gauge-unread { fill: var(--text-warning); font-size: 11px; }
 .czm-pg-gauge-td.is-inversion .czm-pg-gauge-total { fill: var(--text-normal); }

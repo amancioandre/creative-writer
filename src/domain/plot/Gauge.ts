@@ -84,6 +84,10 @@ export interface GaugeRow {
   readonly inversion: boolean;
   /** The stop that gave the charge carries a quote: the line that marks the value. */
   readonly marked: boolean;
+  /** The move from the last charged scene to this one; null on the first charged scene and on rows with no charge. */
+  readonly delta: number | null;
+  /** The move changed direction: the story was sinking and now rises, or the reverse, whichever side of neutral it is on. */
+  readonly turn: boolean;
 }
 
 /** What a row's stops say for the gauge: each stop's word, and whether a quote marks it. */
@@ -103,6 +107,8 @@ export interface GaugeSeries {
   readonly unread: number;
   /** Row positions of the inversions. */
   readonly inversions: readonly number[];
+  /** Row positions of the turns: where the scene-to-scene move changes direction. */
+  readonly turns: readonly number[];
   /** The largest total reached, absolute, so the line can be scaled to the lane. */
   readonly maxTotal: number;
   /** Steps of total per step of lane width: 1 while the line fits the pipes' unit, more when it would leave the lane. */
@@ -128,7 +134,9 @@ export interface ThreadLane extends GaugeSeries {
 export function gaugeSeries(scale: Scale, rows: readonly (readonly StopWord[])[]): GaugeSeries {
   const out: GaugeRow[] = [];
   let total = 0, lastSign = 0, charged = 0, unread = 0, maxTotal = 0;
+  let lastCharge: number | null = null, lastDir = 0;
   const inversions: number[] = [];
+  const turns: number[] = [];
   rows.forEach((stops, position) => {
     const words = stops.map((s) => s.keyword).filter((w): w is string => !!w);
     const distinct = words.filter((w, i) => words.findIndex((x) => x.toLowerCase() === w.toLowerCase()) === i);
@@ -142,10 +150,17 @@ export function gaugeSeries(scale: Scale, rows: readonly (readonly StopWord[])[]
     if (sign !== 0) lastSign = sign;
     if (inversion) inversions.push(position);
     maxTotal = Math.max(maxTotal, Math.abs(total));
+    // The micro movement: the step from the last charged scene, and whether it turned the other way.
+    const delta = charge !== null && lastCharge !== null ? charge - lastCharge : null;
+    const dir = delta === null ? 0 : Math.sign(delta);
+    const turn = dir !== 0 && lastDir !== 0 && dir !== lastDir;
+    if (dir !== 0) lastDir = dir;
+    if (charge !== null) lastCharge = charge;
+    if (turn) turns.push(position);
     const giver = keyword ? stops.find((s) => s.keyword && s.keyword.toLowerCase() === keyword.toLowerCase()) ?? null : null;
-    out.push({ charge, keyword: charge === null ? null : keyword, conflict, total, inversion, marked: !!giver?.marked });
+    out.push({ charge, keyword: charge === null ? null : keyword, conflict, total, inversion, marked: !!giver?.marked, delta, turn });
   });
-  return { scale, rows: out, charged, unread, inversions, maxTotal, unit: Math.max(1, Math.ceil(maxTotal / scale.steps)) };
+  return { scale, rows: out, charged, unread, inversions, turns, maxTotal, unit: Math.max(1, Math.ceil(maxTotal / scale.steps)) };
 }
 
 const stopWord = (s: ThreadRef | null | undefined): StopWord | null => (s ? { keyword: s.keyword ?? null, marked: !!s.quote } : null);

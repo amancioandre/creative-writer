@@ -72,6 +72,7 @@ These commands are live only while their panel is the active tab, so they can be
 | **Plot grid: show or hide the gauge** | The value gauge at the grid's right edge: pipes for each scene's charge on a graded column, the running total, where it flips. Remembered per project. |
 | **Plot grid: gauge the selected column** | Ticks or unticks the selected graded column as a lane of the gauge; three at most. |
 | **Plot grid: set the selected column's scale** | Opens Set scale… for the selected column: the words most negative first, the middle neutral, written as one comment line under its heading. |
+| **Plot grid: gauge line, running total or scene to scene** | Switches what the gauge's line walks: the running total (the macro inversion) or each scene's own charge (the scene-to-scene turns). Remembered per project. |
 | **Plot grid: read every column with the model** / **read this column with the model** / **check this column against the draft** | The model leaves [readings](/guide/plot-grid#reading-with-the-model); you answer them. Ollama or Claude. |
 | **Plot grid: dismiss the reading** | With a cell that has a reading selected. |
 | **Plot grid: propose columns with the model** | One call over the events the map holds; the proposals wait in the side column for a tick. |

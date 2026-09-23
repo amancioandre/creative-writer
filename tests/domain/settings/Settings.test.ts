@@ -143,7 +143,7 @@ describe("writer settings", () => {
     expect(normalizePlotGrid(undefined)).toEqual(DEFAULT_PLOT_GRID);
     expect(normalizePlotGrid({ panelOpen: false, castExpanded: true, folded: { arc: true, bogus: true }, hidden: { "Novel/": ["Time", 3, " "], "Other/": [] }, unmoved: false, sections: { "pg-cell": false, x: "no" } }))
       .toEqual({ panelOpen: false, castExpanded: true, folded: { arc: true, theme: false, subplot: false, free: false }, hidden: { "Novel/": ["Time"] }, unmoved: false, sections: { "pg-cell": false }, frozen: {}, templatesFolder: "Creative Writer/Templates", gauge: {} });
-    expect(normalizePlotGrid({ gauge: { "Novel/": { shown: true, lanes: ["Theme: T", 3, ""] }, "Other/": { shown: false, lanes: [] }, "Third/": "x" } })).toMatchObject({ gauge: { "Novel/": { shown: true, lanes: ["Theme: T"] } } });
+    expect(normalizePlotGrid({ gauge: { "Novel/": { shown: true, lanes: ["Theme: T", 3, ""], line: "bogus" }, "Other/": { shown: false, lanes: [], line: "charge" }, "Third/": "x" } })).toMatchObject({ gauge: { "Novel/": { shown: true, lanes: ["Theme: T"], line: "total" }, "Other/": { shown: false, lanes: [], line: "charge" } } });
     expect(normalizePlotGrid({ frozen: { "Novel/": " POV ", "Other/": 3 }, templatesFolder: "/My templates/" })).toMatchObject({ frozen: { "Novel/": "POV" }, templatesFolder: "My templates" });
   });
 });

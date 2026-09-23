@@ -65,6 +65,7 @@ export const COMMANDS = {
   "plot-grid-toggle-gauge": "Plot grid: show or hide the gauge",
   "plot-grid-gauge-column": "Plot grid: gauge the selected column",
   "plot-grid-set-scale": "Plot grid: set the selected column's scale",
+  "plot-grid-gauge-line": "Plot grid: gauge line, running total or scene to scene",
   "show-release-note": "Show release note",
   "open-writer": "Open writer",
   "writer-next-lane": "Writer: next lane",

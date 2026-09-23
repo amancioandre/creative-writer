@@ -104,6 +104,10 @@ describe("a lane", () => {
     expect(lane.unread).toBe(0);
     expect(lane.maxTotal).toBe(3);
     expect(lane.unit).toBe(2);
+    // Scene to scene: the move from the last charged scene, and the rows where it changes direction on either side of neutral.
+    expect(lane.rows.map((r) => r.delta)).toEqual([null, 1, -3, 0, -1, 2, null, -1, 2, 1, -1, -2]);
+    expect(lane.turns).toEqual([2, 5, 7, 8, 10]);
+    expect(lane.rows[3]!.turn).toBe(false);
   });
 
   it("zero holds the sign: a total that lands on zero is not an inversion, the next non-zero total decides", () => {
