@@ -2,6 +2,10 @@
 
 Release notes for every version are on the [releases page](https://github.com/amancioandre/creative-writer/releases). This file carries the same text for the versions since it was started.
 
+## 0.14.1 — Headers that wrap
+
+- **Column names wrap.** A column's name and the line under it wrap in the header and take the height they need, instead of cutting off with an ellipsis; a theme asked as a question now reads whole.
+
 ## 0.14.0 — The value gauge
 
 - **The value gauge.** Every scene turns on a value. Give a column a scale, one comment line under its heading, `<!-- scale: hate, disgust, indifference, sympathy, love -->`, most negative first, odd, equal steps, and start each stop with the word the scene mostly appears to be: `disgust: she wipes his kiss off`, before or after its role. **Show gauge** draws a lane at the grid's right edge, pinned like Scene and Plot: pipes either side of a centreline for the scene's charge, red below neutral and green above, a continuous line for the running total, dotted where nobody has said, and a diamond, a rule and the word *inversion* where the total changes sign; zero keeps the sign. The main theme is the lane by default; the *Gauge* section ticks up to three, and rows where two lanes disagree get ≠. A flip at a stop with no quote draws hollow, the Cell section says *No line marks this turn*, and `n` walks to it. The line has two modes, *Running total* and *Scene to scene*: the second walks each scene's own charge and marks where the move changes direction, on either side of neutral, so a fall that softens reads as the rise it is.
