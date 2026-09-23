@@ -27,10 +27,10 @@ export const WELCOME: NoteCopy = {
 };
 
 export const UPDATE: NoteCopy = {
-  headline: "The plot grid starts before the chapters exist",
+  headline: "The value gauge: every scene turns on a value",
   bullets: [
-    "New scene writes the plan to Outline.md; Build the manuscript turns it into folders and chapter notes, with Undo",
-    "Start from a template: Three acts, Save the Cat, Hero's journey, Story analysis, or a note of your own",
-    "Snapshots as tabs, groups with a caret, blocks you can drag, and a plot point column with a job",
+    "Give a theme a scale, hate to love, in one line under its heading; start each stop with the word the scene mostly is",
+    "Show gauge draws the charge as pipes and the running total as a line, with a diamond where the story flips",
+    "The same lanes under the threads chart and in the manuscript gutter; the model may offer a word, never write one",
   ],
 };
