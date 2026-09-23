@@ -525,7 +525,8 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-pg-table .is-frozen { position: sticky; left: 0; background: var(--background-primary); z-index: 1; }
 .czm-pg-table thead th.is-frozen { z-index: 3; }
 .czm-pg-table .is-frozen-edge { box-shadow: inset -1px 0 0 var(--background-modifier-border); }
-.czm-pg-scene:hover td.is-frozen { background: var(--background-modifier-hover); }
+/* The hover tint is translucent; a frozen cell paints it over an opaque base, or the cells scrolled under it show through. */
+.czm-pg-scene:hover td.is-frozen, .czm-pg-scene:hover th.is-frozen, .czm-pg-scene:hover .czm-pg-gauge-td { background-color: var(--background-primary); background-image: linear-gradient(var(--background-modifier-hover), var(--background-modifier-hover)); }
 .czm-pg-col-cast { min-width: 120px; }
 .czm-pg-col-name { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-normal); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* A stripe on the header says what kind of column it is: accent for the writer's threads, faint for what the code fills. */
