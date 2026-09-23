@@ -8,6 +8,8 @@ export interface ColumnBrief {
   readonly examples: readonly string[];
   /** For an arc: the character the column follows. */
   readonly character?: string;
+  /** For a graded column: its scale, most negative first, so the reading can name the one word the scene mostly appears to be. */
+  readonly scale?: readonly string[];
 }
 
 /**

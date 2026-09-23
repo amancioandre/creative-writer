@@ -1450,7 +1450,7 @@ export class PlotGridView extends ItemView {
     el.empty();
     el.addClass("is-editing");
     const scale = readScale(sel.column.scale);
-    const hint = sel.cell.reading && !sel.cell.stop ? sel.cell.reading.text : scale ? `${scale.words[0]}: what the thread does here` : "What the thread does here";
+    const hint = sel.cell.reading && !sel.cell.stop ? `${sel.cell.reading.keyword ? `${sel.cell.reading.keyword}: ` : ""}${sel.cell.reading.text}` : scale ? `${scale.words[0]}: what the thread does here` : "What the thread does here";
     const field = el.createEl("textarea", { cls: "czm-pg-editor", attr: { rows: "1", "aria-label": `${sel.column.heading.name} at ${sel.row.scene.title || basenameOf(sel.row.scene.path)}`, placeholder: hint } });
     // The keyword rides in front of the note, as it does in the line, so it can be changed where it is read.
     field.value = sel.cell.stop ? `${sel.cell.stop.keyword ? `${sel.cell.stop.keyword}: ` : ""}${sel.cell.stop.note}` : "";
@@ -1716,7 +1716,7 @@ export class PlotGridView extends ItemView {
       const head = box.createDiv({ cls: "czm-pg-reading-head" });
       head.createSpan({ text: r.kind === "check" ? (r.evidence ? "Checked: on the page" : "Checked: not on the page") : "A reading", cls: "czm-pg-reading-label" });
       head.createSpan({ text: "Story map.md", cls: "czm-map-row-meta" });
-      if (r.kind !== "check" || !r.evidence) box.createDiv({ text: r.text, cls: "czm-pg-reading-text" });
+      if (r.kind !== "check" || !r.evidence) box.createDiv({ text: `${r.keyword ? `${r.keyword}: ` : ""}${r.text}`, cls: "czm-pg-reading-text" });
       if (r.evidence) box.createDiv({ text: `“${r.evidence}”`, cls: "czm-pg-reading-quote" });
       box.createDiv({ text: `${r.model}${r.role ? ` · ${r.role}` : ""}${r.stale ? " · the scene changed since" : ""}`, cls: "czm-map-row-meta" });
       const acts = box.createDiv({ cls: "czm-map-panel-actions czm-pg-reading-actions" });
@@ -1776,6 +1776,7 @@ export class PlotGridView extends ItemView {
     const note = section.createDiv({ cls: "czm-pg-field" });
     note.createDiv({ text: "Note", cls: "czm-pg-field-label" });
     const noteInput = note.createEl("textarea", { cls: "czm-pg-note-field", attr: { rows: "2", placeholder: cell.reading && !stop ? cell.reading.text : "What the thread does here", "aria-label": "Note" } });
+    if (keywordSelect && cell.reading?.keyword && !stop) keywordSelect.title = `The model offered ${cell.reading.keyword}; nothing is written until Write stop`;
     noteInput.value = stop?.note ?? "";
     const actions = section.createDiv({ cls: "czm-map-panel-actions czm-pg-cell-actions" });
     const save = actions.createEl("button", { text: stop ? "Save stop" : "Write stop", cls: "czm-pg-save mod-cta" });

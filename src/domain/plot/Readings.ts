@@ -10,11 +10,13 @@ const MAX_QUOTE = 300;
 export interface ValidReading {
   readonly text: string;
   readonly role: StopRole | null;
+  /** The scale word the model said the scene mostly appears to be, as the scale spells it; null off the scale or without one. */
+  readonly keyword: string | null;
   readonly evidence: string;
 }
 
 /** `{reading: null}` is the model saying the scene does nothing for the thread; that is a valid answer and yields null. */
-export function validateGridReading(raw: unknown, prose: string, kind: ColumnKind): ValidReading | null {
+export function validateGridReading(raw: unknown, prose: string, kind: ColumnKind, scale: readonly string[] = []): ValidReading | null {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const o = (r.reading && typeof r.reading === "object" ? r.reading : null) as Record<string, unknown> | null;
   if (!o) return null;
@@ -26,7 +28,9 @@ export function validateGridReading(raw: unknown, prose: string, kind: ColumnKin
   if ((ALL_ROLES as readonly string[]).includes(text.toLowerCase().replace(/[.:]$/, ""))) return null;
   const word = typeof o.role === "string" ? o.role.trim().toLowerCase() : "";
   const role = roles.find((x) => x === word) ?? null;
-  return { text, role: role === "touch" ? null : role, evidence };
+  const said = typeof o.keyword === "string" ? o.keyword.trim().toLowerCase() : "";
+  const keyword = said ? scale.find((w) => w.toLowerCase() === said) ?? null : null;
+  return { text, role: role === "touch" ? null : role, keyword, evidence };
 }
 
 /** A check's verdict: found with a quote that is on the page, or not found. A "found" with no locatable quote is not found. */

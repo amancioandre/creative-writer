@@ -24,6 +24,8 @@ export type CellState = "empty" | "plan" | "verified" | "broken";
 export interface CellReading {
   readonly text: string;
   readonly role: ThreadRef["role"] | null;
+  /** The scale word the model offered, for the placeholder; never a charge. */
+  readonly keyword: string | null;
   readonly evidence: string;
   readonly model: string;
   readonly kind: GridReading["kind"];
@@ -254,7 +256,7 @@ function column(thread: Thread, heading: ColumnHeading, special: SpecialColumn |
     // A reading belongs to an empty cell; a check's verdict to a plan. A cell that gained a stop has answered its reading.
     const r = byScene.get(sceneKey(row.scene));
     const applies = r && r.state === "open" && r.text && (r.kind === "reading" ? !stop : !!stop && state === "plan");
-    const reading: CellReading | null = applies ? { text: r.text, role: r.role, evidence: r.evidence, model: r.model, kind: r.kind, stale: read.hashes.get(sceneKey(row.scene)) !== undefined && read.hashes.get(sceneKey(row.scene)) !== r.hash } : null;
+    const reading: CellReading | null = applies ? { text: r.text, role: r.role, keyword: r.keyword, evidence: r.evidence, model: r.model, kind: r.kind, stale: read.hashes.get(sceneKey(row.scene)) !== undefined && read.hashes.get(sceneKey(row.scene)) !== r.hash } : null;
     if (reading && !reading.stale) readings++;
     return { state, stop, more: stops.slice(1), presentUnmoved, reading };
   });

@@ -23,10 +23,14 @@ describe("column analysers", () => {
     expect(msgs[0]!.content).toBe(GRID_RULEBOOK);
     expect(msgs[1]!.content).toContain("Column: The letter (subplot)");
     expect(msgs[1]!.content).toContain("“pockets it”");
+    expect(msgs[1]!.content).not.toContain("Scale, most negative first");
     expect((calls[0]!.body.format as { required: string[] }).required).toEqual(["reading"]);
+    await a.read("She pocketed it.", ["Anna"], { ...brief, scale: ["hate", "calm", "love"] }, new AbortController().signal);
+    expect((calls[1]!.body.messages as { content: string }[])[1]!.content).toContain("Scale, most negative first: hate, calm, love");
+    expect(GRID_RULEBOOK).toContain('"keyword"');
     await a.check("She pocketed it.", { note: "pockets it", role: "plant" }, brief, new AbortController().signal);
-    expect((calls[1]!.body.messages as { content: string }[])[0]!.content).toBe(CHECK_RULEBOOK);
-    expect((calls[1]!.body.messages as { content: string }[])[1]!.content).toContain("The outline says this scene: plant: pockets it");
+    expect((calls[2]!.body.messages as { content: string }[])[0]!.content).toBe(CHECK_RULEBOOK);
+    expect((calls[2]!.body.messages as { content: string }[])[1]!.content).toContain("The outline says this scene: plant: pockets it");
   });
 
   it("Ollama: an error status or a non-JSON answer is an error", async () => {

@@ -12,10 +12,19 @@ const prose = "She pocketed the letter without reading it, and the porter said n
 
 describe("validateGridReading", () => {
   it("keeps a reading whose quote is on the page and whose role the column allows", () => {
-    expect(validateGridReading({ reading: { text: "  keeps it unread ", role: "Plant", evidence: "pocketed the letter" } }, prose, "subplot")).toEqual({ text: "keeps it unread", role: "plant", evidence: "pocketed the letter" });
+    expect(validateGridReading({ reading: { text: "  keeps it unread ", role: "Plant", evidence: "pocketed the letter" } }, prose, "subplot")).toEqual({ text: "keeps it unread", role: "plant", keyword: null, evidence: "pocketed the letter" });
     expect(validateGridReading({ reading: { text: "wants to be nobody's", role: "want", evidence: "without reading it" } }, prose, "arc")).toMatchObject({ role: "want" });
     expect(validateGridReading({ reading: { text: "x", role: "want", evidence: "without reading it" } }, prose, "subplot")).toMatchObject({ role: null });
     expect(validateGridReading({ reading: { text: "x", role: "touch", evidence: "the porter" } }, prose, "free")).toMatchObject({ role: null });
+  });
+
+  it("keeps the model's keyword only when it is a word of the column's scale, spelt as the scale spells it", () => {
+    const scale = ["hate", "Disgust", "indifference", "sympathy", "love"];
+    expect(validateGridReading({ reading: { text: "reads her letters", role: "", keyword: "disgust", evidence: "the porter" } }, prose, "theme", scale)).toMatchObject({ keyword: "Disgust" });
+    expect(validateGridReading({ reading: { text: "x", role: "", keyword: "rage", evidence: "the porter" } }, prose, "theme", scale)).toMatchObject({ keyword: null });
+    expect(validateGridReading({ reading: { text: "x", role: "", keyword: "", evidence: "the porter" } }, prose, "theme", scale)).toMatchObject({ keyword: null });
+    // Without a scale a keyword means nothing, and an old answer without the key still reads.
+    expect(validateGridReading({ reading: { text: "x", role: "", keyword: "hate", evidence: "the porter" } }, prose, "theme")).toMatchObject({ keyword: null });
   });
 
   it("drops a reading with no quote on the page, and reads null as the model's no", () => {
@@ -37,7 +46,7 @@ describe("validateGridReading", () => {
 
 describe("grid readings in Story map.md", () => {
   const scene = { path: "Novel/One.md", title: "The station", line: 0 };
-  const reading: GridReading = { scene, hash: "h", column: "Subplot: The letter", model: "m", rulebook: "r", kind: "reading", text: "keeps it", role: "plant", evidence: "pocketed", state: "open" };
+  const reading: GridReading = { scene, hash: "h", column: "Subplot: The letter", model: "m", rulebook: "r", kind: "reading", text: "keeps it", role: "plant", keyword: null, evidence: "pocketed", state: "open" };
 
   it("keeps one reading per cell, normalises what it reads back, and is version 4", () => {
     const file = putGridReading(putGridReading(EMPTY_STORY_MAP_FILE, reading), { ...reading, text: "newer" });

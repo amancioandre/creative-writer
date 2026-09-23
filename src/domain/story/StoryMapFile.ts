@@ -123,6 +123,8 @@ export interface GridReading {
   readonly kind: "reading" | "check";
   readonly text: string;
   readonly role: StopRole | null;
+  /** For a graded column: the scale word the model said the scene mostly appears to be; offered as the cell's placeholder, never summed. */
+  readonly keyword: string | null;
   readonly evidence: string;
   readonly state: "open" | "dismissed" | "none";
 }
@@ -190,7 +192,7 @@ export function normalizeStoryMapFile(raw: unknown): StoryMapFile {
     seenCell.add(cellKey);
     const role = typeof o.role === "string" && (STOP_ROLES as readonly string[]).includes(o.role) ? (o.role as StopRole) : null;
     const state = o.state === "dismissed" || o.state === "none" ? o.state : "open";
-    grid.push({ scene, hash: o.hash, column, model: str(o.model), rulebook: str(o.rulebook), kind: o.kind === "check" ? "check" : "reading", text: str(o.text), role, evidence: str(o.evidence), state });
+    grid.push({ scene, hash: o.hash, column, model: str(o.model), rulebook: str(o.rulebook), kind: o.kind === "check" ? "check" : "reading", text: str(o.text), role, keyword: typeof o.keyword === "string" && o.keyword.trim() ? o.keyword.trim() : null, evidence: str(o.evidence), state });
   }
   return { version: STORY_MAP_VERSION, readings, facts, dismissed, layout, intents, echoes, grid };
 }

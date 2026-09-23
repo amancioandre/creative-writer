@@ -44,6 +44,17 @@ describe("ReadColumn", () => {
     expect(progress.at(-1)).toBe("1/1 skip");
   });
 
+  it("a graded column sends its scale in the brief and keeps the word the model answers with", async () => {
+    const graded = parseStoryThreads("## Theme: Jealousy\n<!-- scale: hate, disgust, indifference, sympathy, love -->\n- [[One#The station]] — disgust: pockets it\n");
+    const briefs: string[] = [];
+    const analyser: ColumnAnalyser = { name: "fake", rulebook: "v1", read: async (_t, _p, column) => { briefs.push(`${(column.scale ?? []).join(",")}|${column.examples.join(";")}`); return { reading: { text: "lies about the bill", role: "", keyword: "Sympathy", evidence: "said it was a bill" } }; }, check: async () => ({}), propose: async () => ({}) };
+    const r = repo();
+    const grid = buildPlotGrid(graph, buildThreads(graph, EMPTY_STORY_MAP_FILE, graded, new Set(), undefined, () => one));
+    expect(await new ReadColumn({ projects: () => [novel], notes: async () => notes }, r, analyser).execute(novel, grid.columns[0]!, graph, new AbortController().signal)).toBe(1);
+    expect(briefs).toEqual(["hate,disgust,indifference,sympathy,love|disgust: pockets it"]);
+    expect(r.file().grid[0]).toMatchObject({ scene: { title: "Dinner" }, keyword: "sympathy", text: "lies about the bill", state: "open" });
+  });
+
   it("a reading the model returns without a locatable quote is kept as a no, so the scene is not asked again; stopping keeps what landed", async () => {
     const analyser: ColumnAnalyser = { name: "fake", rulebook: "v1", read: async () => ({ reading: { text: "x", role: "", evidence: "nowhere" } }), check: async () => ({}), propose: async () => ({}) };
     const r = repo();

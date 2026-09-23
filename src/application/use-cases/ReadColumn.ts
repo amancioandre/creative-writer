@@ -4,6 +4,7 @@ import { sceneKey, textHash, type SceneRef, type StoryGraph } from "../../domain
 import { putGridReading, type GridReading } from "../../domain/story/StoryMapFile";
 import { validateCheck, validateGridReading } from "../../domain/plot/Readings";
 import type { GridColumn } from "../../domain/plot/PlotGrid";
+import { readScale } from "../../domain/plot/Gauge";
 import type { ColumnAnalyser, ColumnBrief } from "../ports/ColumnAnalyser";
 import type { ProjectNotes } from "../ports/ProjectNotes";
 import type { StoryMapRepository } from "../ports/StoryMapRepository";
@@ -47,8 +48,8 @@ export class ReadColumn {
       if (signal.aborted) break;
       const names = presentNames(graph, ref, prose, index);
       const raw = await this.analyser.read(prose, names, brief, signal);
-      const valid = validateGridReading(raw, prose, column.heading.kind);
-      const reading: GridReading = { scene: ref, hash, column: column.heading.heading, model: this.analyser.name, rulebook: this.analyser.rulebook, kind: "reading", text: valid?.text ?? "", role: valid?.role ?? null, evidence: valid?.evidence ?? "", state: valid ? "open" : "none" };
+      const valid = validateGridReading(raw, prose, column.heading.kind, brief.scale ?? []);
+      const reading: GridReading = { scene: ref, hash, column: column.heading.heading, model: this.analyser.name, rulebook: this.analyser.rulebook, kind: "reading", text: valid?.text ?? "", role: valid?.role ?? null, keyword: valid?.keyword ?? null, evidence: valid?.evidence ?? "", state: valid ? "open" : "none" };
       file = await this.repo.update(project, (latest) => putGridReading(latest, reading));
       read++;
       onProgress?.({ done: i + 1, total: targets.length, scene: ref, skipped: false });
@@ -67,7 +68,7 @@ export class ReadColumn {
       const stop = cell.stop!;
       const raw = await this.analyser.check(prose, { note: stop.note, role: stop.role && stop.role !== "touch" ? stop.role : null }, brief, signal);
       const verdict = validateCheck(raw, prose);
-      const reading: GridReading = { scene: ref, hash, column: column.heading.heading, model: this.analyser.name, rulebook: this.analyser.rulebook, kind: "check", text: verdict.found ? stop.note : "not on the page", role: null, evidence: verdict.evidence, state: "open" };
+      const reading: GridReading = { scene: ref, hash, column: column.heading.heading, model: this.analyser.name, rulebook: this.analyser.rulebook, kind: "check", text: verdict.found ? stop.note : "not on the page", role: null, keyword: null, evidence: verdict.evidence, state: "open" };
       await this.repo.update(project, (latest) => putGridReading(latest, reading));
       checked++;
       onProgress?.({ done: i + 1, total: targets.length, scene: ref, skipped: false });
@@ -93,6 +94,7 @@ export class ReadColumn {
 }
 
 function briefOf(column: GridColumn): ColumnBrief {
-  const examples = column.thread.refs.map((r) => r.note).filter((n) => n.trim()).slice(0, 6);
-  return { name: column.heading.name, kind: column.heading.kind, examples, ...(column.entity ? { character: column.entity.name } : {}) };
+  const examples = column.thread.refs.map((r) => `${r.keyword ? `${r.keyword}: ` : ""}${r.note}`).filter((n) => n.trim()).slice(0, 6);
+  const scale = readScale(column.scale);
+  return { name: column.heading.name, kind: column.heading.kind, examples, ...(column.entity ? { character: column.entity.name } : {}), ...(scale ? { scale: scale.words } : {}) };
 }

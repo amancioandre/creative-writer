@@ -90,7 +90,7 @@ function open(overrides: Partial<PlotGridSource> = {}, threads = threadsNote, se
         if (signal.aborted) break;
         const scene = column.cells.length ? grid(md).rows[i]!.scene : { path: "", title: "", line: 0 };
         onProgress({ done: ++n, total: targets.length, scene, skipped: false });
-        const reading: GridReading = { scene, hash: hashes.get(`${scene.path}#${scene.title}`) ?? "", column: column.heading.heading, model: "test", rulebook: "t", kind: "reading", text: `the model read ${scene.title}`, role: null, evidence: "Lisbon", state: "open" };
+        const reading: GridReading = { scene, hash: hashes.get(`${scene.path}#${scene.title}`) ?? "", column: column.heading.heading, model: "test", rulebook: "t", kind: "reading", text: `the model read ${scene.title}`, role: null, keyword: column.scale ? column.scale[column.scale.length - 1]! : null, evidence: "Lisbon", state: "open" };
         map = putGridReading(map, reading);
         await new Promise((r) => setTimeout(r, 5));
       }
@@ -1197,6 +1197,28 @@ describe("setting a scale and writing a keyword", () => {
     f3.value = "Ilse washes";
     f3.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true })); await tick();
     expect(note()).toContain("- [[One#Creek]] — Ilse washes");
+  });
+
+  it("a reading on a graded column offers its word as the placeholder, in the Cell section and in the editor, and never writes it", async () => {
+    const { v, note } = open({}, graded.replace("- [[Two#Return]] — hate: colder\n", ""));
+    await v.onOpen();
+    const el = v.contentEl;
+    // The theme's one empty cell is Return: read the column, the model says love.
+    v.select({ col: 0, row: 0 });
+    v.run("read-column");
+    await tick(); await tick(); await tick();
+    const empty = [...el.querySelectorAll<HTMLElement>('.czm-pg-cell[data-col="0"]')].find((c) => c.classList.contains("has-reading"));
+    expect(empty).toBeDefined();
+    empty!.click();
+    expect(el.querySelector(".czm-pg-reading-text")?.textContent).toMatch(/^love: the model read/);
+    expect((el.querySelector(".czm-pg-keyword-select") as HTMLSelectElement).value).toBe("");
+    expect((el.querySelector(".czm-pg-keyword-select") as HTMLSelectElement).title).toContain("The model offered love");
+    empty!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    const field = el.querySelector(".czm-pg-editor") as HTMLTextAreaElement;
+    expect(field.value).toBe("");
+    expect(field.placeholder).toMatch(/^love: the model read/);
+    field.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); await tick();
+    expect(note()).not.toContain("the model read");
   });
 
   it("the Cell section has a keyword to pick, n walks to a turn no line marks, and the section says so", async () => {

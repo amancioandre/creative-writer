@@ -1,7 +1,7 @@
 import type { ColumnBrief } from "../../../application/ports/ColumnAnalyser";
 import type { ProposalBrief } from "../../../domain/plot/Proposals";
 
-export const GRID_RULEBOOK_VERSION = "2026-09-13.2";
+export const GRID_RULEBOOK_VERSION = "2026-09-22.1";
 
 /**
  * The reader's prompt for one column of the plot grid. It asks the one
@@ -15,9 +15,11 @@ export const GRID_RULEBOOK_VERSION = "2026-09-13.2";
 export const GRID_RULEBOOK = `You are a careful reader helping a novelist fill one column of their plot grid. The grid has a row per scene and a column per thread of the book: a character's arc, a theme, a subplot. You are given one scene, the names known to be in it, the column, and the notes the writer has already made in that column for other scenes, which show their voice. You say what this thread is doing in this scene, in that voice: one short note, and the verbatim quote that made you think so.
 
 Return JSON only, an object with one key:
-- "reading": null, or {"role", "text", "evidence"}. "role" is one of the words allowed for this column, or "" when none fits; it is a label, never the note. "text" is the note itself: what the thread does here, at most twenty words, in the writer's voice, present tense, the thread's name not repeated. "evidence" is a short verbatim quote from the scene.
+- "reading": null, or {"role", "keyword", "text", "evidence"}. "role" is one of the words allowed for this column, or "" when none fits; it is a label, never the note. "keyword" is, when the column comes with a scale, the one word of that scale the scene mostly appears to be, or "" when none fits; without a scale it is "". "text" is the note itself: what the thread does here, at most twenty words, in the writer's voice, present tense, the thread's name not repeated. "evidence" is a short verbatim quote from the scene.
 
-For example, for a subplot column called "The letter" and a scene where a character puts a letter away unread, a good answer is {"reading": {"role": "plant", "text": "pockets it unread and says nothing", "evidence": "put it in her coat without reading it"}}. A bad answer puts the role word in "text".
+For example, for a subplot column called "The letter" and a scene where a character puts a letter away unread, a good answer is {"reading": {"role": "plant", "keyword": "", "text": "pockets it unread and says nothing", "evidence": "put it in her coat without reading it"}}. For a theme column with the scale hate, disgust, indifference, sympathy, love and a scene where a man reads a woman's letters behind her back, a good answer has "keyword": "disgust". A bad answer puts the role word or the keyword in "text".
+
+A scale, when given, runs from the most negative word to the most positive, and the scene as a whole is one word of it: not a tally of moments, the impression it mostly leaves. The quote in "evidence" should be the sentence that carries that impression.
 
 The kinds of column, and the question each asks:
 - arc: what does this scene do to the character's want — set it up, act on the lie, turn it, or arrive at the truth? Roles: want, lie, turn, truth.
@@ -38,7 +40,7 @@ export const GRID_SCHEMA = {
     reading: {
       anyOf: [
         { type: "null" },
-        { type: "object", properties: { role: { type: "string" }, text: { type: "string" }, evidence: { type: "string" } }, required: ["role", "text", "evidence"], additionalProperties: false },
+        { type: "object", properties: { role: { type: "string" }, keyword: { type: "string" }, text: { type: "string" }, evidence: { type: "string" } }, required: ["role", "keyword", "text", "evidence"], additionalProperties: false },
       ],
     },
   },
@@ -49,6 +51,7 @@ export const GRID_SCHEMA = {
 export const gridUserMessage = (text: string, present: readonly string[], column: ColumnBrief): string =>
   [
     `Column: ${column.name} (${column.kind}${column.character ? `, the arc of ${column.character}` : ""})`,
+    ...(column.scale?.length ? [`Scale, most negative first: ${column.scale.join(", ")}`] : []),
     `Known names in this scene: ${present.length ? present.join("; ") : "(none)"}`,
     `The writer's notes in this column so far: ${column.examples.length ? column.examples.map((e) => `“${e}”`).join("; ") : "(none yet)"}`,
     "",
