@@ -103,7 +103,7 @@ import { BuildManuscript } from "./application/use-cases/BuildManuscript";
 import { ExportManuscript } from "./application/use-cases/ExportManuscript";
 import { MANUSCRIPT_VIEW_TYPE, ManuscriptView } from "./infrastructure/obsidian/views/ManuscriptView";
 import type { PanelId } from "./infrastructure/obsidian/views/PanelShell";
-import { castFromGraph, conflictMarks, echoMarks, threadMarks, type SectionFacts } from "./domain/manuscript/StoryFacts";
+import { castFromGraph, conflictMarks, echoMarks, threadMarks, type SectionFacts, gaugeMarks } from "./domain/manuscript/StoryFacts";
 import { toggleResolved } from "./domain/manuscript/Comments";
 import { COMMANDS, type CommandId } from "./infrastructure/obsidian/commands";
 import { OllamaFactAnalyser } from "./infrastructure/llm/OllamaFactAnalyser";
@@ -657,7 +657,7 @@ export default class CreativeZenModePlugin extends Plugin {
       jumpTo: (to, project) => this.jumpTo(to, project),
     }));
     this.addCommand({ id: "open-story-threads", name: COMMANDS["open-story-threads"], callback: () => void this.openStoryThreads(null) });
-    this.viewCommands(StoryThreadsView, [["story-threads-zoom-in", "zoom-in"], ["story-threads-zoom-out", "zoom-out"], ["story-threads-fit", "fit"], ["story-threads-open-note", "open-note"], ["story-threads-read-project", "read-project"]]);
+    this.viewCommands(StoryThreadsView, [["story-threads-zoom-in", "zoom-in"], ["story-threads-zoom-out", "zoom-out"], ["story-threads-fit", "fit"], ["story-threads-open-note", "open-note"], ["story-threads-read-project", "read-project"], ["story-threads-gauge", "gauge"]]);
     this.addRibbonIcon("spline", "Open story threads", () => void this.openStoryThreads(null));
     this.addCommand({
       id: "read-note-for-story-threads",
@@ -701,7 +701,7 @@ export default class CreativeZenModePlugin extends Plugin {
       voices: (project) => ({ roster: this.projectRosters()[project.scope] ?? [], conventions: resolveConventions(this.current.dialogue, this.projectConventions()[project.scope]), dimNarration: this.current.dialogue.dimNarration }),
       replaceLines: (path, from, to, text) => this.editNote(path, (all) => { const lines = all.split("\n"); lines.splice(from, to - from + 1, ...text.split("\n")); return lines.join("\n"); }),
       // Readability from the same profiler as the desk, today's words from the log, cast and contradictions from the map and threads.
-      facts: async (project, paths, story, echoes = false) => {
+      facts: async (project, paths, story, echoes = false, gauge = false) => {
         const texts = new Map((await projectNotes.notes(project)).map((n) => [n.path, n.text ?? ""]));
         const log = countedLog();
         const today = log.days[toDay(new Date())];
@@ -713,16 +713,16 @@ export default class CreativeZenModePlugin extends Plugin {
           const c = cast.get(path);
           sections.set(path, { readability: ease ? { label: ease.band.label, score: ease.score } : null, today: { added: delta?.added ?? 0, removed: delta?.removed ?? 0 }, cast: c?.cast ?? [], scenes: c?.scenes ?? [] });
         }
-        const threads = story || echoes ? await buildThreads.execute(project) : null;
+        const threads = story || echoes || gauge ? await buildThreads.execute(project) : null;
         const marks = threads ? [...(story ? [...conflictMarks(threads.contradictions), ...threadMarks(threads.threads)] : []), ...(echoes ? echoMarks(threads.threads) : [])] : [];
-        return { sections, marks };
+        return { sections, marks, gauge: threads && gauge ? gaugeMarks(threads) : [] };
       },
       storyColors: () => this.current.storyMap.colors,
       promote: (project, name, kind) => this.createEntityNote(project.scope, name, kind),
       ignore: (project, name) => this.editList(project.notePath, "story-ignore", (list) => [...list.filter((n) => n !== name), name]),
     }));
     this.addCommand({ id: "open-manuscript", name: COMMANDS["open-manuscript"], callback: () => void this.openManuscript(null) });
-    this.viewCommands(ManuscriptView, [["manuscript-prose-only", "prose-only"], ["manuscript-comments", "comments"], ["manuscript-ruler", "ruler"], ["manuscript-story", "story"], ["manuscript-echoes", "echoes"], ["manuscript-voices", "voices"]]);
+    this.viewCommands(ManuscriptView, [["manuscript-prose-only", "prose-only"], ["manuscript-comments", "comments"], ["manuscript-ruler", "ruler"], ["manuscript-story", "story"], ["manuscript-echoes", "echoes"], ["manuscript-voices", "voices"], ["manuscript-gauge", "gauge"]]);
     this.addCommand({
       id: "return-to-manuscript",
       name: "Return to manuscript",

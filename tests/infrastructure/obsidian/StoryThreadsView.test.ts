@@ -437,3 +437,47 @@ describe("StoryThreadsView keyboard", () => {
     expect(el.querySelector(".czm-map-row.is-broken")!.getAttribute("role")).toBeNull();
   });
 });
+
+describe("the value gauge under the chart", () => {
+  const jealousy: Thread = { id: "writer:jealousy", kind: "writer", source: "writer", label: "Theme: Jealousy", scale: ["hate", "calm", "love"], refs: [stop(0, "warm", { keyword: "love", quote: "woke" }), stop(2, "cold", { keyword: "hate" }), stop(3, "colder", { keyword: "hate" })], stale: false, directed: false, dangling: [] };
+
+  it("is off until asked, then draws one band per graded thread with pipes, the running total and the inversion, remembered per project", async () => {
+    const { el, v, settings } = await open({}, model({ threads: [ilse, eyes, letter, jealousy] }));
+    expect(el.querySelector(".czm-th-gauge-lane")).toBeNull();
+    const h0 = Number(el.querySelector("svg")!.getAttribute("height"));
+    v.run("gauge");
+    await new Promise((r) => setTimeout(r, 450));
+    expect(settings().gauge).toEqual({ "Novel/": true });
+    expect(Number(el.querySelector("svg")!.getAttribute("height"))).toBeGreaterThan(h0);
+    const lane = el.querySelector(".czm-th-gauge-lane")!;
+    expect(lane.getAttribute("data-thread")).toBe("writer:jealousy");
+    expect(lane.querySelector(".czm-th-strip-label")?.textContent).toBe("Gauge · Theme: Jealousy · hate → calm → love · 3 of 4 · 1 inversion at Night");
+    // Camp: love, one pipe up; Creek: nobody has said, the line is dotted; Return: hate brings the total to zero; Night: hate flips it.
+    expect(lane.querySelectorAll(".czm-th-gauge-pipe.is-pos")).toHaveLength(1);
+    expect(lane.querySelectorAll(".czm-th-gauge-pipe.is-neg")).toHaveLength(2);
+    expect(lane.querySelectorAll(".czm-th-gauge-line.is-empty")).toHaveLength(1);
+    expect(lane.querySelector(".czm-th-gauge-diamond")?.textContent).toBe("◇");
+    expect(lane.querySelectorAll(".czm-th-gauge-rule")).toHaveLength(1);
+    expect([...lane.querySelectorAll("title")].map((t) => t.textContent)).toEqual([
+      "Theme: Jealousy — Camp: love (+1) · total +1",
+      "Theme: Jealousy — Creek: no word · total +1",
+      "Theme: Jealousy — Return: hate (−1) · total 0",
+      "Theme: Jealousy — Night: hate (−1) · total −1 · inversion",
+    ]);
+    // The panel is drawn again with the gauge on: the latest toggle is the live one.
+    const latest = () => [...Setting.created].reverse().find((x) => x.settingEl.classList.contains("czm-set-gauge"))!;
+    expect(latest().toggle!.value).toBe(true);
+    expect(el.querySelector(".czm-map-status")?.textContent).toContain("Gauge on: Theme: Jealousy.");
+    latest().toggle!.onChangeCb(false);
+    expect(el.querySelector(".czm-th-gauge-lane")).toBeNull();
+    await new Promise((r) => setTimeout(r, 450));
+    expect(settings().gauge).toEqual({ "Novel/": false });
+  });
+
+  it("says when no thread has a scale yet", async () => {
+    const { el, v } = await open();
+    v.run("gauge");
+    expect(el.querySelector(".czm-th-gauge-lane")).toBeNull();
+    expect(el.querySelector(".czm-map-status")?.textContent).toContain("no thread has a scale yet");
+  });
+});

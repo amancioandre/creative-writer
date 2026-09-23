@@ -1,5 +1,5 @@
 import { STOP_ROLES } from "../threads/Thread";
-import type { ThreadRef } from "../threads/Thread";
+import type { Thread, ThreadModel, ThreadRef } from "../threads/Thread";
 import type { GridColumn, GridRow } from "./PlotGrid";
 
 /**
@@ -86,10 +86,16 @@ export interface GaugeRow {
   readonly marked: boolean;
 }
 
-export interface Lane {
-  readonly column: GridColumn;
+/** What a row's stops say for the gauge: each stop's word, and whether a quote marks it. */
+export interface StopWord {
+  readonly keyword: string | null;
+  readonly marked: boolean;
+}
+
+/** A column or a thread read down its rows: the charges, the running total, the flips. */
+export interface GaugeSeries {
   readonly scale: Scale;
-  /** One per row of the grid, in the order given. */
+  /** One per row, in the order given. */
   readonly rows: readonly GaugeRow[];
   /** Rows with a charge. */
   readonly charged: number;
@@ -103,27 +109,28 @@ export interface Lane {
   readonly unit: number;
 }
 
-/** The keywords of a scene's stops: the first stop and the further ones at the same scene. */
-function keywordsAt(stop: ThreadRef | null, more: readonly ThreadRef[]): readonly string[] {
-  return [stop, ...more].filter((s): s is ThreadRef => !!s?.keyword).map((s) => s.keyword!);
+export interface Lane extends GaugeSeries {
+  readonly column: GridColumn;
+}
+
+/** A hand-drawn thread as a lane: the same series, read along the threads chart's axis. */
+export interface ThreadLane extends GaugeSeries {
+  readonly thread: Thread;
 }
 
 /**
- * One column read down the rows: the charge per row, the running total
- * in the rows' order, and the rows where the total changes sign. Zero
- * holds the sign: a total that lands on zero is not yet an inversion.
- * Empty rows and neutral rows both hold the total; two stops that
- * disagree give no charge and count as unread.
+ * The series: the charge per row, the running total in the rows' order,
+ * and the rows where the total changes sign. Zero holds the sign: a
+ * total that lands on zero is not yet an inversion. Empty rows and
+ * neutral rows both hold the total; two stops that disagree give no
+ * charge and count as unread.
  */
-export function gaugeLane(column: GridColumn, rows: readonly GridRow[]): Lane | null {
-  const scale = readScale(column.scale);
-  if (!scale) return null;
+export function gaugeSeries(scale: Scale, rows: readonly (readonly StopWord[])[]): GaugeSeries {
   const out: GaugeRow[] = [];
   let total = 0, lastSign = 0, charged = 0, unread = 0, maxTotal = 0;
   const inversions: number[] = [];
-  rows.forEach((row, position) => {
-    const cell = column.cells[row.index];
-    const words = cell ? keywordsAt(cell.stop, cell.more) : [];
+  rows.forEach((stops, position) => {
+    const words = stops.map((s) => s.keyword).filter((w): w is string => !!w);
     const distinct = words.filter((w, i) => words.findIndex((x) => x.toLowerCase() === w.toLowerCase()) === i);
     const conflict = distinct.length > 1 ? distinct : null;
     const keyword = distinct.length === 1 ? distinct[0]! : null;
@@ -135,10 +142,34 @@ export function gaugeLane(column: GridColumn, rows: readonly GridRow[]): Lane | 
     if (sign !== 0) lastSign = sign;
     if (inversion) inversions.push(position);
     maxTotal = Math.max(maxTotal, Math.abs(total));
-    const giver = cell ? [cell.stop, ...cell.more].find((s) => s?.keyword && keyword && s.keyword.toLowerCase() === keyword.toLowerCase()) ?? null : null;
-    out.push({ charge, keyword: charge === null ? null : keyword, conflict, total, inversion, marked: !!giver?.quote });
+    const giver = keyword ? stops.find((s) => s.keyword && s.keyword.toLowerCase() === keyword.toLowerCase()) ?? null : null;
+    out.push({ charge, keyword: charge === null ? null : keyword, conflict, total, inversion, marked: !!giver?.marked });
   });
-  return { column, scale, rows: out, charged, unread, inversions, maxTotal, unit: Math.max(1, Math.ceil(maxTotal / scale.steps)) };
+  return { scale, rows: out, charged, unread, inversions, maxTotal, unit: Math.max(1, Math.ceil(maxTotal / scale.steps)) };
+}
+
+const stopWord = (s: ThreadRef | null | undefined): StopWord | null => (s ? { keyword: s.keyword ?? null, marked: !!s.quote } : null);
+
+/** One column read down the grid's rows, in the order given. Null when the column has no readable scale. */
+export function gaugeLane(column: GridColumn, rows: readonly GridRow[]): Lane | null {
+  const scale = readScale(column.scale);
+  if (!scale) return null;
+  const series = gaugeSeries(scale, rows.map((row) => { const cell = column.cells[row.index]; return cell ? [stopWord(cell.stop), ...cell.more.map(stopWord)].filter((s): s is StopWord => s !== null) : []; }));
+  return { column, ...series };
+}
+
+/** Every hand-drawn thread with a readable scale, read along the model's scenes: the lanes the threads chart and the manuscript draw. */
+export function threadLanes(model: ThreadModel): ThreadLane[] {
+  const out: ThreadLane[] = [];
+  for (const thread of model.threads) {
+    if (thread.kind !== "writer") continue;
+    const scale = readScale(thread.scale);
+    if (!scale) continue;
+    const rows: StopWord[][] = model.scenes.map(() => []);
+    for (const ref of thread.refs) if (ref.index >= 0 && ref.index < rows.length) rows[ref.index]!.push({ keyword: ref.keyword ?? null, marked: !!ref.quote });
+    out.push({ thread, ...gaugeSeries(scale, rows) });
+  }
+  return out;
 }
 
 /** Row positions where two lanes carry opposite signs: the audience loves what the character hates. Signs only, since scales of different lengths do not compare in size. */

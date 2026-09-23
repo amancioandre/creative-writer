@@ -130,6 +130,8 @@ export interface ThreadsSettings {
   readonly echoSensitivity: EchoSensitivity;
   /** Strip id → shown; strips not listed are shown. */
   readonly strips: Readonly<Record<string, boolean>>;
+  /** Project scope → the value gauge drawn under the chart, one lane per graded thread. */
+  readonly gauge: Readonly<Record<string, boolean>>;
   readonly showDismissed: boolean;
   readonly contradictionsOnly: boolean;
   readonly panelOpen: boolean;
@@ -142,6 +144,7 @@ export const DEFAULT_THREADS: ThreadsSettings = {
   kinds: { entity: false, fact: true, writer: true, echo: false },
   echoSensitivity: "medium",
   strips: {},
+  gauge: {},
   showDismissed: false,
   contradictionsOnly: false,
   panelOpen: true,
@@ -168,16 +171,18 @@ export interface ManuscriptSettings extends ManuscriptOptions {
   readonly showEchoes: boolean;
   /** Who speaks each paragraph, as a stripe in the speaker's colour; grey when nobody is sure. The hover box pins. */
   readonly showVoices: boolean;
+  /** The value gauge in the gutter at each scene's heading: the scene's word on its thread's scale, the running total, where it flips. Costs a threads build. */
+  readonly showGauge: boolean;
 }
 
 export const DEFAULT_MANUSCRIPT: ManuscriptSettings = {
   folderDepth: 2, noteTitles: true, stripPrefix: DEFAULT_STRIP_PREFIX, demoteHeadings: true, proseOnly: false,
-  showComments: true, tintTags: true, tags: DEFAULT_TAGS, showRuler: true, showStory: false, readingSpeed: DEFAULT_READING_SPEED, showEchoes: false, showVoices: false,
+  showComments: true, tintTags: true, tags: DEFAULT_TAGS, showRuler: true, showStory: false, readingSpeed: DEFAULT_READING_SPEED, showEchoes: false, showVoices: false, showGauge: false,
 };
 
 export function normalizeManuscript(raw: unknown): ManuscriptSettings {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  const bool = (key: "noteTitles" | "demoteHeadings" | "proseOnly" | "showComments" | "tintTags" | "showRuler" | "showStory" | "showEchoes" | "showVoices") => (typeof r[key] === "boolean" ? r[key] : DEFAULT_MANUSCRIPT[key]);
+  const bool = (key: "noteTitles" | "demoteHeadings" | "proseOnly" | "showComments" | "tintTags" | "showRuler" | "showStory" | "showEchoes" | "showVoices" | "showGauge") => (typeof r[key] === "boolean" ? r[key] : DEFAULT_MANUSCRIPT[key]);
   return {
     folderDepth: typeof r.folderDepth === "number" && Number.isFinite(r.folderDepth) ? clampInt(r.folderDepth, 0, 6) : DEFAULT_MANUSCRIPT.folderDepth,
     noteTitles: bool("noteTitles"),
@@ -191,6 +196,7 @@ export function normalizeManuscript(raw: unknown): ManuscriptSettings {
     showStory: bool("showStory"),
     showEchoes: bool("showEchoes"),
     showVoices: bool("showVoices"),
+    showGauge: bool("showGauge"),
     readingSpeed: typeof r.readingSpeed === "number" && Number.isFinite(r.readingSpeed) ? clampInt(r.readingSpeed, MIN_READING_SPEED, MAX_READING_SPEED) : DEFAULT_MANUSCRIPT.readingSpeed,
   };
 }
@@ -513,6 +519,7 @@ export function normalizeThreads(raw: unknown): ThreadsSettings {
     kinds: flags(r.kinds, THREAD_KINDS, DEFAULT_THREADS.kinds),
     echoSensitivity: ECHO_SENSITIVITIES.includes(r.echoSensitivity as EchoSensitivity) ? (r.echoSensitivity as EchoSensitivity) : DEFAULT_THREADS.echoSensitivity,
     strips,
+    gauge: boolMap(r.gauge),
     showDismissed: typeof r.showDismissed === "boolean" ? r.showDismissed : DEFAULT_THREADS.showDismissed,
     contradictionsOnly: typeof r.contradictionsOnly === "boolean" ? r.contradictionsOnly : DEFAULT_THREADS.contradictionsOnly,
     panelOpen: typeof r.panelOpen === "boolean" ? r.panelOpen : DEFAULT_THREADS.panelOpen,

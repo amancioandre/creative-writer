@@ -1,5 +1,6 @@
 import type { EntityKind, StoryGraph } from "../story/StoryGraph";
-import { isLiveContradiction, type Contradiction, type StopRole, type Thread } from "../threads/Thread";
+import { isLiveContradiction, type Contradiction, type StopRole, type Thread, type ThreadModel } from "../threads/Thread";
+import { MAX_LANES, threadLanes } from "../plot/Gauge";
 
 /**
  * What the rest of the plugin knows about each section of the manuscript,
@@ -50,12 +51,46 @@ export interface GutterMark {
 /** @deprecated Use `GutterMark`; kept for the name's readers. */
 export type ConflictMark = GutterMark;
 
+/**
+ * The value gauge at a scene's heading: the word the scene mostly is on
+ * one graded thread, its charge, the running total there, and whether
+ * the total flips. Drawn in the gutter beside the heading; never written.
+ */
+export interface GaugeMark {
+  readonly path: string;
+  /** 0-based line of the scene's heading. */
+  readonly line: number;
+  /** The thread's label: which lane this is. */
+  readonly lane: string;
+  readonly keyword: string | null;
+  readonly charge: number | null;
+  readonly total: number;
+  readonly inversion: boolean;
+  /** A quote on the stop marks the value; an inversion without one is a turn no line marks. */
+  readonly marked: boolean;
+}
+
 export interface StoryFacts {
   readonly sections: ReadonlyMap<string, SectionFacts>;
   readonly marks: readonly GutterMark[];
+  /** The gauge at each charged or flipping scene, for every graded thread up to the lane cap. */
+  readonly gauge: readonly GaugeMark[];
 }
 
-export const EMPTY_FACTS: StoryFacts = { sections: new Map(), marks: [] };
+export const EMPTY_FACTS: StoryFacts = { sections: new Map(), marks: [], gauge: [] };
+
+/** One mark per scene that carries a word or a flip, for each graded hand-drawn thread, in the manuscript's order. */
+export function gaugeMarks(model: ThreadModel): GaugeMark[] {
+  const out: GaugeMark[] = [];
+  for (const lane of threadLanes(model).slice(0, MAX_LANES)) {
+    lane.rows.forEach((g, i) => {
+      if (g.charge === null && !g.inversion && !g.conflict) return;
+      const scene = model.scenes[i]!.ref;
+      out.push({ path: scene.path, line: scene.line, lane: lane.thread.label, keyword: g.keyword, charge: g.charge, total: g.total, inversion: g.inversion, marked: g.marked });
+    });
+  }
+  return out;
+}
 export const NO_SECTION: SectionFacts = { readability: null, today: { added: 0, removed: 0 }, cast: [], scenes: [] };
 
 const CAST_KINDS: ReadonlySet<EntityKind> = new Set<EntityKind>(["character", "location", "item", "faction", "event", "candidate"]);

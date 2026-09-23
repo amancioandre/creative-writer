@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { castFromGraph, conflictMarks, easeLevel, echoMarks, threadMarks } from "../../../src/domain/manuscript/StoryFacts";
+import { castFromGraph, conflictMarks, easeLevel, echoMarks, gaugeMarks, threadMarks } from "../../../src/domain/manuscript/StoryFacts";
+import { EMPTY_THREAD_MODEL } from "../../../src/domain/threads/Thread";
 import type { Thread } from "../../../src/domain/threads/Thread";
 import type { StoryGraph } from "../../../src/domain/story/StoryGraph";
 import type { Contradiction } from "../../../src/domain/threads/Thread";
@@ -79,5 +80,19 @@ describe("easeLevel", () => {
     expect(easeLevel("Very dense")).toBe(7);
     expect(easeLevel(null)).toBe(0);
     expect(easeLevel("Nonsense")).toBe(0);
+  });
+});
+
+describe("gaugeMarks", () => {
+  it("marks every scene that carries a word or a flip on a graded thread, at the scene's heading", () => {
+    const scenes = [0, 1, 2].map((i) => ({ ref: { path: i < 2 ? "One.md" : "Two.md", title: ["Camp", "Creek", "Return"][i]!, line: i * 10 }, index: i, words: 100, start: i * 100, note: i < 2 ? "One.md" : "Two.md", bookmarked: false }));
+    const at = (i: number, keyword: string | null, quote?: string) => ({ scene: scenes[i]!.ref, index: i, note: "", ...(keyword ? { keyword } : {}), ...(quote ? { quote } : {}) });
+    const graded: Thread = { id: "writer:t", kind: "writer", source: "writer", label: "Theme: T", scale: ["hate", "calm", "love"], refs: [at(0, "love", "a line"), at(2, "hate"), at(2, "hate")], stale: false, directed: false, dangling: [] };
+    const plain: Thread = { ...graded, id: "writer:p", label: "Plain", scale: undefined };
+    expect(gaugeMarks({ ...EMPTY_THREAD_MODEL, scenes, threads: [plain, graded] })).toEqual([
+      { path: "One.md", line: 0, lane: "Theme: T", keyword: "love", charge: 1, total: 1, inversion: false, marked: true },
+      { path: "Two.md", line: 20, lane: "Theme: T", keyword: "hate", charge: -1, total: 0, inversion: false, marked: false },
+    ]);
+    expect(gaugeMarks(EMPTY_THREAD_MODEL)).toEqual([]);
   });
 });

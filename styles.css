@@ -464,6 +464,21 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-th-strip-bar.czm-th-strip-open-writer-threads { fill: var(--text-accent); }
 .czm-th-strip-bar.is-bad { fill: var(--color-red); }
 .czm-th-strip-bar:hover { opacity: 1; }
+/* The gauge under the strips: a band per graded thread, pipes up or down from a centreline, the running total as a line. */
+.czm-th-gauge-centre { stroke: var(--background-modifier-border); stroke-width: 1; }
+.czm-th-gauge-pipe.is-neg { fill: var(--color-red); }
+.czm-th-gauge-pipe.is-pos { fill: var(--color-green); }
+.czm-th-gauge-tick { stroke: var(--text-faint); stroke-width: 2; }
+.czm-th-gauge-line { stroke: var(--text-muted); stroke-width: 1.5; fill: none; }
+.czm-th-gauge-line.is-empty { stroke-dasharray: 2 3; }
+.czm-th-gauge-dot { fill: var(--text-normal); }
+.czm-th-gauge-rule { stroke: var(--background-modifier-border-hover); stroke-width: 1; }
+.czm-th-gauge-diamond { fill: var(--text-normal); font-size: 11px; }
+.czm-th-gauge-diamond.is-hollow { fill: var(--text-muted); }
+.czm-th-gauge-label, .czm-th-gauge-unread { fill: var(--text-faint); font-family: var(--font-monospace); font-size: 9px; pointer-events: none; }
+.czm-th-gauge-unread { fill: var(--text-warning); font-size: 11px; }
+.czm-th-gauge-hit { fill: transparent; }
+.czm-th-gauge-hit:hover { fill: var(--background-modifier-hover); }
 .czm-th-badge { position: absolute; left: 10px; top: 8px; z-index: 2; display: none; padding: 3px 10px; border-radius: 12px; cursor: pointer;
   background: var(--background-secondary); border: 1px solid var(--background-modifier-border); font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .czm-th-badge.is-open { display: block; }
@@ -905,6 +920,18 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-ms-mark.is-plant { border-left: 7px solid var(--text-accent); }
 .czm-ms-mark.is-payoff, .czm-ms-mark.is-reversal { border-right: 7px solid var(--text-accent); }
 .czm-ms-mark.is-echo { background: var(--text-muted); }
+/* The gauge in the gutter at a scene's heading: pipes, the word, and "inversion" where the total flips. */
+.czm-ms-gauge { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; font-family: var(--font-monospace); font-size: 9px; line-height: 1.2; color: var(--text-faint); cursor: default; }
+.czm-ms-gauge-pipes { display: flex; gap: 2px; align-items: center; height: 10px; }
+.czm-ms-gauge-pipe { width: 3px; height: 10px; border-radius: 1px; background: var(--text-muted); }
+.czm-ms-gauge.is-neg .czm-ms-gauge-pipe { background: var(--color-red); }
+.czm-ms-gauge.is-pos .czm-ms-gauge-pipe { background: var(--color-green); }
+.czm-ms-gauge-tick { width: 8px; height: 2px; background: var(--text-faint); }
+.czm-ms-gauge.is-neg .czm-ms-gauge-word { color: var(--color-red); }
+.czm-ms-gauge.is-pos .czm-ms-gauge-word { color: var(--color-green); }
+.czm-ms-gauge.is-unread .czm-ms-gauge-word { color: var(--text-warning); }
+.czm-ms-gauge-turn { color: var(--text-normal); }
+.czm-ms-gauge.is-hollow .czm-ms-gauge-turn { color: var(--text-muted); font-style: italic; }
 .czm-ms-cm-badge.is-echo { background: color-mix(in srgb, var(--text-muted) 20%, transparent); color: var(--text-muted); }
 .czm-ms-cm-badge.is-plant { background: color-mix(in srgb, var(--text-accent) 20%, transparent); color: var(--text-accent); }
 .czm-ms-cm-badge.is-payoff, .czm-ms-cm-badge.is-reversal { background: var(--interactive-accent); color: var(--text-on-accent); }

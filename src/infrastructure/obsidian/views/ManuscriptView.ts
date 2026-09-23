@@ -1,7 +1,7 @@
 import { ItemView, Menu, Notice, setIcon, type WorkspaceLeaf } from "obsidian";
 import { overflowButton, renderJumps, type MenuEntry, type PanelId } from "./PanelShell";
 
-export type ManuscriptAction = "prose-only" | "comments" | "ruler" | "story" | "echoes" | "voices" | "export";
+export type ManuscriptAction = "prose-only" | "comments" | "ruler" | "story" | "echoes" | "voices" | "gauge" | "export";
 import { onActivate } from "./keys";
 import type { ProjectSpec } from "../../../domain/progress/Project";
 import { EMPTY_MANUSCRIPT, type Manuscript, type ManuscriptBlock, type NoteItem } from "../../../domain/manuscript/Manuscript";
@@ -43,8 +43,8 @@ export interface ManuscriptSource {
   appendComment(path: string, line: number, comment: string): Promise<void>;
   /** Resolves the comment opening at (line, ch), or reopens it: a trailing check mark inside the comment. */
   toggleResolved(path: string, line: number, ch: number): Promise<void>;
-  /** Readability, today's words, and — with `story` — cast and contradictions for these notes. */
-  facts(project: ProjectSpec, paths: readonly string[], story: boolean, echoes?: boolean): Promise<StoryFacts>;
+  /** Readability, today's words, and — with `story` — cast and contradictions for these notes; with `gauge`, the value gauge at each scene. */
+  facts(project: ProjectSpec, paths: readonly string[], story: boolean, echoes?: boolean, gauge?: boolean): Promise<StoryFacts>;
   storyColors(): Readonly<Record<EntityKind, string>>;
   /** A candidate becomes a typed note in the project's folder for that kind; resolves to its path. */
   promote(project: ProjectSpec, name: string, kind: EntityKind): Promise<string>;
@@ -155,7 +155,7 @@ export class ManuscriptView extends ItemView {
     if (generation !== this.generation) return;
     const s = this.source.settings();
     const paths = manuscript.items.filter((i): i is NoteItem => i.kind === "note").map((i) => i.path);
-    const facts = s.showRuler || s.showStory || s.showEchoes ? await this.source.facts(project, paths, s.showStory, s.showEchoes) : EMPTY_FACTS;
+    const facts = s.showRuler || s.showStory || s.showEchoes || s.showGauge ? await this.source.facts(project, paths, s.showStory, s.showEchoes, s.showGauge) : EMPTY_FACTS;
     if (generation !== this.generation) return;
     this.manuscript = manuscript;
     this.facts = facts;
@@ -256,6 +256,7 @@ export class ManuscriptView extends ItemView {
     toggle("users", "Story: who is in each section and scene, and the model's contradictions in the gutter", settings.showStory, "story");
     toggle("repeat", "Echoes: repeated phrases marked in the gutter, each naming another place the words occur", settings.showEchoes, "echoes");
     toggle("quote", "Voices: speech tinted by who is speaking, grey when nobody is sure. Hover a sentence, or press v, to pin", settings.showVoices, "voices");
+    toggle("activity", "Gauge marks: at each scene's heading, its word on a graded thread's scale, the running total, and where it flips", settings.showGauge, "gauge");
     const exportBtn = tools.createEl("button", { cls: "clickable-icon czm-ms-tool czm-ms-export", attr: { "aria-label": "Export as one note beside the project (comments left out)" } });
     setIcon(exportBtn, "file-output");
     exportBtn.addEventListener("click", () => this.run("export"));
@@ -273,6 +274,7 @@ export class ManuscriptView extends ItemView {
       case "story": set({ ...s, showStory: !s.showStory }); break;
       case "echoes": set({ ...s, showEchoes: !s.showEchoes }); break;
       case "voices": set({ ...s, showVoices: !s.showVoices }); break;
+      case "gauge": set({ ...s, showGauge: !s.showGauge }); break;
       case "export": this.export(); break;
     }
   }
@@ -298,6 +300,7 @@ export class ManuscriptView extends ItemView {
       { label: "Story marks", icon: "users", command: "manuscript-story", checked: s.showStory, onClick: () => this.run("story") },
       { label: "Echoes", icon: "repeat", command: "manuscript-echoes", checked: s.showEchoes, onClick: () => this.run("echoes") },
       { label: "Voices", icon: "quote", command: "manuscript-voices", checked: s.showVoices, onClick: () => this.run("voices") },
+      { label: "Gauge marks", icon: "activity", command: "manuscript-gauge", checked: s.showGauge, onClick: () => this.run("gauge") },
       "-",
       { label: "Export as one note", icon: "file-output", command: "export-manuscript", disabled: !this.project, onClick: () => this.run("export") },
     ];
@@ -350,8 +353,9 @@ export class ManuscriptView extends ItemView {
   private decorate(settings: ManuscriptSettings): void {
     const page = this.page;
     if (!page) return;
-    for (const old of page.querySelectorAll(".czm-ms-cast, .czm-ms-mark.is-story")) old.remove();
+    for (const old of page.querySelectorAll(".czm-ms-cast, .czm-ms-mark.is-story, .czm-ms-gauge")) old.remove();
     this.decorateVoices(settings);
+    if (settings.showGauge) this.decorateGauge();
     if (!settings.showStory && !settings.showEchoes) return;
     for (const noteEl of page.querySelectorAll<HTMLElement>(".czm-ms-note")) {
       if (!settings.showStory) break;
@@ -368,6 +372,29 @@ export class ManuscriptView extends ItemView {
       const mark = marks.createSpan({ cls: `czm-ms-mark is-story is-${c.kind}`, attr: { "aria-label": c.text, role: "button", tabindex: "0" } });
       // The mark is the way to the other end: a click or Enter takes the page there, the editor following.
       onActivate(mark, (ev) => { ev.stopPropagation(); this.goTo(c.otherPath, c.otherLine); });
+    }
+  }
+
+  /**
+   * The value gauge at a scene's heading: pipes for the scene's word on its
+   * thread's scale, the word itself, the running total, and "inversion"
+   * where the total flips. Read from the same lines as the grid; never
+   * written.
+   */
+  private decorateGauge(): void {
+    const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : "0");
+    for (const m of this.facts.gauge) {
+      const el = this.blockAt(m.path, m.line);
+      if (!el) continue;
+      const marks = el.querySelector<HTMLElement>(".czm-ms-marks") ?? el.createSpan({ cls: "czm-ms-marks" });
+      const side = m.charge === null ? "unread" : m.charge < 0 ? "neg" : m.charge > 0 ? "pos" : "neutral";
+      const label = `Gauge, ${m.lane}: ${m.keyword ? `${m.keyword} (${signed(m.charge ?? 0)})` : "two stops disagree"}, total ${signed(m.total)}${m.inversion ? `, inversion${m.marked ? "" : ", no line marks it"}` : ""}`;
+      const mark = marks.createSpan({ cls: `czm-ms-gauge is-${side}${m.inversion ? " is-inversion" : ""}${m.inversion && !m.marked ? " is-hollow" : ""}`, attr: { "aria-label": label, title: label } });
+      const pipes = mark.createSpan({ cls: "czm-ms-gauge-pipes", attr: { "aria-hidden": "true" } });
+      for (let i = 0; i < Math.min(5, Math.abs(m.charge ?? 0)); i++) pipes.createSpan({ cls: "czm-ms-gauge-pipe" });
+      if (m.charge === 0) pipes.createSpan({ cls: "czm-ms-gauge-tick" });
+      mark.createSpan({ text: m.keyword ?? "?", cls: "czm-ms-gauge-word" });
+      if (m.inversion) mark.createSpan({ text: "inversion", cls: "czm-ms-gauge-turn" });
     }
   }
 

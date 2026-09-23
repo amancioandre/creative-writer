@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { checkScale, chargeOf, describeScaleProblem, disagreements, gaugeLane, gaugeLanes, pipesOf, readScale } from "../../../src/domain/plot/Gauge";
+import { checkScale, chargeOf, describeScaleProblem, disagreements, gaugeLane, gaugeLanes, pipesOf, readScale, threadLanes } from "../../../src/domain/plot/Gauge";
 import { buildPlotGrid, type GridRow } from "../../../src/domain/plot/PlotGrid";
 import { buildThreads } from "../../../src/domain/threads/BuildThreads";
 import { buildStoryGraph, type ProjectNote } from "../../../src/domain/story/BuildGraph";
@@ -138,5 +138,17 @@ describe("a lane", () => {
     const lane = gaugeLane(theme, reversed)!;
     expect(lane.rows[0]).toMatchObject({ charge: -1, total: -1 });
     expect(lane.inversions).not.toEqual([4, 9]);
+  });
+});
+
+describe("thread lanes", () => {
+  it("reads every graded hand-drawn thread along the model's scenes, the same series the grid draws", () => {
+    const model = buildThreads(graph, EMPTY_STORY_MAP_FILE, parseStoryThreads(threadsNote), new Set(), undefined, (p) => notes.find((n) => n.path === p)?.text);
+    const lanes = threadLanes(model);
+    expect(lanes.map((l) => l.thread.label)).toEqual(["Theme: Should jealousy justify violent acts?", "Arc: [[Anna]]", "Theme: Two words at Dinner"]);
+    expect(lanes[0]!.inversions).toEqual([4, 9]);
+    expect(lanes[0]!.rows.map((r) => r.total)).toEqual([1, 3, 2, 1, -1, -1, -1, -2, -1, 1, 2, 1]);
+    expect(lanes[0]!.rows[4]).toMatchObject({ keyword: "hate", marked: true });
+    expect(lanes[1]!.inversions).toEqual([9]);
   });
 });

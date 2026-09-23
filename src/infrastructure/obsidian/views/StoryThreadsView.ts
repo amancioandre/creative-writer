@@ -2,7 +2,7 @@ import { ItemView, Setting, setIcon, type WorkspaceLeaf } from "obsidian";
 import { couldNot, StatusLine } from "./StatusLine";
 import { PanelShell, type Fix, type MenuEntry, type PanelId } from "./PanelShell";
 
-export type StoryThreadsAction = "zoom-in" | "zoom-out" | "fit" | "open-note" | "read-project" | "read-intent" | "read-echoes";
+export type StoryThreadsAction = "zoom-in" | "zoom-out" | "fit" | "open-note" | "read-project" | "read-intent" | "read-echoes" | "gauge";
 import { inField, onActivate } from "./keys";
 import type { ProjectSpec } from "../../../domain/progress/Project";
 import { DEFAULT_THREADS, THREAD_KINDS, type StoryEntityKind, type ThreadKind, type ThreadsSettings } from "../../../domain/settings/Settings";
@@ -15,6 +15,7 @@ import { intentLine } from "../../../domain/threads/Intent";
 import type { AnalyzeProgress } from "../../../application/use-cases/AnalyzeSceneRelations";
 import type { StopToAdd } from "../../../application/use-cases/EditStoryThread";
 import { KIND_LABEL } from "./StoryMapView";
+import { MAX_LANES, pipesOf, threadLanes, type ThreadLane } from "../../../domain/plot/Gauge";
 
 export const STORY_THREADS_VIEW_TYPE = "creative-writer-story-threads";
 
@@ -62,6 +63,10 @@ const CHAR_W = 6.2;
 /** A search redraws the chart once the typing pauses. */
 const SEARCH_DEBOUNCE_MS = 120;
 const BOTTOM_PAD = 8;
+/** The gauge under the strips: one band per graded thread, the label above it, pipes and the running total either side of a centreline. */
+const GAUGE_LANE_H = 76, GAUGE_LABEL_H = 14, GAUGE_STEP = 5, GAUGE_PIPE_W = 4;
+/** A total as the gauge labels it: a sign on every non-zero number, the minus a real minus. */
+const signed = (n: number): string => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : "0");
 
 type Selection = { kind: "arc"; arc: ArcPath } | { kind: "scene"; index: number } | null;
 
@@ -96,6 +101,7 @@ export class StoryThreadsView extends ItemView {
   private arcsG!: SVGGElement;
   private axisG!: SVGGElement;
   private stripsG!: SVGGElement;
+  private gaugeG!: SVGGElement;
   private arcEls = new Map<ArcPath, SVGPathElement>();
   private panel!: HTMLElement;
   private card!: HTMLElement;
@@ -182,7 +188,8 @@ export class StoryThreadsView extends ItemView {
     this.axisG = document.createElementNS(SVG, "g"); this.axisG.setAttribute("class", "czm-th-axis");
     this.arcsG = document.createElementNS(SVG, "g"); this.arcsG.setAttribute("class", "czm-th-arcs");
     this.stripsG = document.createElementNS(SVG, "g"); this.stripsG.setAttribute("class", "czm-th-strips");
-    this.svg.appendChild(this.axisG); this.svg.appendChild(this.arcsG); this.svg.appendChild(this.stripsG);
+    this.gaugeG = document.createElementNS(SVG, "g"); this.gaugeG.setAttribute("class", "czm-th-gauge");
+    this.svg.appendChild(this.axisG); this.svg.appendChild(this.arcsG); this.svg.appendChild(this.stripsG); this.svg.appendChild(this.gaugeG);
     this.svg.addEventListener("click", (ev) => { if (!(ev.target as Element | null)?.closest?.(".czm-arc, .czm-th-bar")) this.select(null); });
     this.scroller.addEventListener("wheel", (ev) => {
       if (!ev.ctrlKey && !ev.metaKey) return;
@@ -266,7 +273,9 @@ export class StoryThreadsView extends ItemView {
     const strips = this.model.strips.filter((s) => this.settings.strips[s.id] !== false);
     const stripTop = baseY + o.barMax + AXIS_GAP + AXIS_LABEL_HEIGHT;
     const { rows, bars, height } = layoutStrips(strips, slots, stripTop, o);
-    const total = stripTop + height + BOTTOM_PAD;
+    const lanes = this.gaugeOn ? threadLanes(this.model).slice(0, MAX_LANES) : [];
+    const gaugeTop = stripTop + height;
+    const total = gaugeTop + lanes.length * GAUGE_LANE_H + BOTTOM_PAD;
     this.svg.setAttribute("width", f(contentWidth));
     this.svg.setAttribute("height", f(total));
     this.svg.setAttribute("viewBox", `0 0 ${f(contentWidth)} ${f(total)}`);
@@ -402,10 +411,74 @@ export class StoryThreadsView extends ItemView {
       this.stripsG.appendChild(rect);
     }
 
+    this.renderGauge(lanes, slots, gaugeTop, contentWidth);
+
     this.emptyEl?.remove();
     this.emptyEl = null;
     if (this.model.scenes.length === 0 || this.arcs.length === 0) this.emptyEl = this.renderEmpty();
     this.applySelectionClasses();
+  }
+
+  /** The gauge as the writer left it for this project. */
+  private get gaugeOn(): boolean { return !!this.project && this.settings.gauge[this.project.scope] === true; }
+
+  /**
+   * The value gauge under the strips, on the same axis: one band per graded
+   * thread. At each scene, pipes rise above the centreline for a charge above
+   * neutral and hang below it for one below; the running total walks the band
+   * as a line, dotted where nobody has said, and a diamond with a rule marks
+   * where it flips, hollow when no quote marks the turn.
+   */
+  private renderGauge(lanes: readonly ThreadLane[], slots: readonly SlotBox[], top: number, width: number): void {
+    this.gaugeG.replaceChildren();
+    const el = <K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string>, text?: string): SVGElementTagNameMap[K] => {
+      const e = document.createElementNS(SVG, tag);
+      for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+      if (text !== undefined) e.textContent = text;
+      return e;
+    };
+    lanes.forEach((lane, n) => {
+      const y0 = top + n * GAUGE_LANE_H;
+      const mid = y0 + GAUGE_LABEL_H + (GAUGE_LANE_H - GAUGE_LABEL_H) / 2;
+      const g = el("g", { class: "czm-th-gauge-lane", "data-thread": lane.thread.id });
+      const at = lane.inversions.map((p) => this.model.scenes[p]?.ref.title || basenameOf(this.model.scenes[p]?.ref.path ?? "")).join(", ");
+      g.appendChild(el("text", { class: "czm-th-strip-label", x: "4", y: f(y0 + GAUGE_LABEL_H - 3) }, `Gauge · ${lane.thread.label} · ${lane.scale.words.join(" → ")} · ${lane.charged} of ${slots.length} · ${lane.inversions.length ? `${lane.inversions.length} inversion${lane.inversions.length === 1 ? "" : "s"} at ${at}` : "no inversion"}${lane.unit > 1 ? ` · line: 1 step = ${lane.unit}` : ""}`));
+      g.appendChild(el("line", { class: "czm-th-gauge-centre", x1: "0", x2: f(width), y1: f(mid), y2: f(mid) }));
+      const yOf = (total: number) => mid - (total / lane.unit) * GAUGE_STEP;
+      let prev: { x: number; y: number } | null = null;
+      for (const s of slots) {
+        const row = lane.rows[s.index]!;
+        const cx = s.cx;
+        if (row.charge !== null && row.charge !== 0) {
+          const { block, singles } = pipesOf(row.charge);
+          const up = row.charge > 0;
+          const pipe = (i: number, h: number) => g.appendChild(el("rect", { class: `czm-th-gauge-pipe is-${up ? "pos" : "neg"}`, x: f(cx - GAUGE_PIPE_W / 2), y: f(up ? mid - 2 - i * GAUGE_STEP - h : mid + 2 + i * GAUGE_STEP), width: f(GAUGE_PIPE_W), height: f(h) }));
+          if (block) pipe(0, 2 * GAUGE_STEP + (GAUGE_STEP - 1));
+          for (let i = block ? 3 : 0; i < (block ? 3 : 0) + singles; i++) pipe(i, GAUGE_STEP - 1);
+        } else if (row.charge === 0) {
+          g.appendChild(el("line", { class: "czm-th-gauge-tick", x1: f(cx - 3), x2: f(cx + 3), y1: f(mid), y2: f(mid) }));
+        } else if (row.conflict) {
+          g.appendChild(el("text", { class: "czm-th-gauge-unread", x: f(cx), y: f(mid - 4), "text-anchor": "middle" }, "?"));
+        }
+        const here = { x: cx, y: yOf(row.total) };
+        const from = prev ?? { x: s.x0, y: yOf(0) };
+        g.appendChild(el("line", { class: `czm-th-gauge-line${row.charge === null ? " is-empty" : ""}`, x1: f(from.x), y1: f(from.y), x2: f(here.x), y2: f(here.y) }));
+        if (row.inversion) {
+          g.appendChild(el("line", { class: "czm-th-gauge-rule", x1: f(cx), x2: f(cx), y1: f(y0 + GAUGE_LABEL_H), y2: f(y0 + GAUGE_LANE_H) }));
+          g.appendChild(el("text", { class: `czm-th-gauge-diamond${row.marked ? "" : " is-hollow"}`, x: f(here.x), y: f(here.y), "text-anchor": "middle", "dominant-baseline": "central" }, row.marked ? "◆" : "◇"));
+          g.appendChild(el("text", { class: "czm-th-gauge-label", x: f(cx + 4), y: f(y0 + GAUGE_LABEL_H + 9) }, "inversion"));
+        } else if (row.charge !== null) {
+          g.appendChild(el("circle", { class: "czm-th-gauge-dot", cx: f(here.x), cy: f(here.y), r: "2" }));
+        }
+        const scene = this.model.scenes[s.index]!;
+        const title = el("title", {}, `${lane.thread.label} — ${scene.ref.title || basenameOf(scene.ref.path)}: ${row.conflict ? `two stops disagree (${row.conflict.join(", ")})` : row.charge === null ? "no word" : `${row.keyword} (${signed(row.charge)})`} · total ${signed(row.total)}${row.inversion ? " · inversion" : ""}`);
+        const hit = el("rect", { class: "czm-th-gauge-hit", x: f(s.x0), y: f(y0 + GAUGE_LABEL_H), width: f(Math.max(1, s.x1 - s.x0)), height: f(GAUGE_LANE_H - GAUGE_LABEL_H) });
+        hit.appendChild(title);
+        g.appendChild(hit);
+        prev = here;
+      }
+      this.gaugeG.appendChild(g);
+    });
   }
 
   /** Nothing to draw: say why, and offer the click that changes it. */
@@ -525,6 +598,7 @@ export class StoryThreadsView extends ItemView {
       case "read-project": if (this.project) void this.toggleRead(null); break;
       case "read-intent": if (this.project) void this.toggleIntent(); break;
       case "read-echoes": if (this.project) void this.toggleEchoes(); break;
+      case "gauge": { if (!this.project) break; const on = !this.gaugeOn; this.saveSettings({ ...this.settings, gauge: { ...this.settings.gauge, [this.project.scope]: on } }); this.renderChart(); this.renderPanel(); this.status.say(on ? (threadLanes(this.model).length ? `Gauge on: ${threadLanes(this.model).slice(0, MAX_LANES).map((l) => l.thread.label).join(", ")}.` : "Gauge on, but no thread has a scale yet: Set scale… in the plot grid grades one.") : "Gauge off."); break; }
     }
   }
 
@@ -535,6 +609,7 @@ export class StoryThreadsView extends ItemView {
       { label: "Zoom out", icon: "zoom-out", command: "story-threads-zoom-out", onClick: () => this.run("zoom-out") },
       { label: "Fit the manuscript", icon: "maximize", command: "story-threads-fit", onClick: () => this.run("fit") },
       { label: "Open Story threads.md", icon: "file-text", command: "story-threads-open-note", disabled: !this.project, onClick: () => this.run("open-note") },
+      { label: "Show gauge", icon: "activity", command: "story-threads-gauge", checked: this.gaugeOn, disabled: !this.project, onClick: () => this.run("gauge") },
       "-",
       { label: stop ?? "Read project for facts", icon: "sparkles", command: "story-threads-read-project", disabled: !this.project, onClick: () => this.run("read-project") },
       { label: stop ?? "Read contradictions for intent", icon: "sparkles", command: "read-contradictions-for-intent", disabled: !this.project, onClick: () => this.run("read-intent") },
@@ -612,6 +687,8 @@ export class StoryThreadsView extends ItemView {
     for (const strip of this.model.strips) {
       new Setting(strips).setName(strip.label).setClass(`czm-set-strip-${strip.id}`).addToggle((t) => t.setValue(s.strips[strip.id] !== false).onChange((v) => { this.saveSettings({ ...this.settings, strips: { ...this.settings.strips, [strip.id]: v } }); this.renderChart(); }));
     }
+    const graded = threadLanes(this.model);
+    new Setting(strips).setName("Gauge").setDesc(graded.length ? `${graded.slice(0, MAX_LANES).map((l) => l.thread.label).join(", ")}${graded.length > MAX_LANES ? ` and ${graded.length - MAX_LANES} more` : ""}: the scene's word on the scale as pipes, the running total as a line, a diamond where it flips` : "No thread has a scale yet. Set scale… in the plot grid grades one.").setClass("czm-set-gauge").addToggle((t) => t.setValue(this.gaugeOn).onChange(() => this.run("gauge")));
   }
 
   private renderBadge(): void {

@@ -26,6 +26,7 @@ export const COMMANDS = {
   "story-threads-fit": "Story threads: fit the manuscript",
   "story-threads-open-note": "Story threads: open Story threads.md",
   "story-threads-read-project": "Story threads: read project for facts",
+  "story-threads-gauge": "Story threads: show or hide the gauge",
   "read-contradictions-for-intent": "Read contradictions for intent (story threads)",
   "read-project-for-echoes": "Read project for echoes (story threads)",
   "open-story-timeline": "Open plot grid",
@@ -83,6 +84,7 @@ export const COMMANDS = {
   "manuscript-story": "Manuscript: toggle story marks",
   "manuscript-echoes": "Manuscript: toggle echoes",
   "manuscript-voices": "Manuscript: toggle voices",
+  "manuscript-gauge": "Manuscript: toggle gauge marks",
   "export-manuscript": "Export manuscript to a note",
 } as const;
 

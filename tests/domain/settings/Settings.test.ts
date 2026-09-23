@@ -91,7 +91,7 @@ describe("normalizeSettings — story map", () => {
     expect(normalizeSettings({}).storyMap).toEqual(DEFAULT_SETTINGS.storyMap);
     expect(normalizeSettings({}).threads).toEqual(DEFAULT_SETTINGS.threads);
     const t = normalizeSettings({ threads: { kinds: { entity: true, bogus: 1 }, strips: { cast: false, "": true, x: "no" }, showDismissed: true, contradictionsOnly: "yes", panelOpen: false } }).threads;
-    expect(t).toEqual({ kinds: { entity: true, fact: true, writer: true, echo: false }, echoSensitivity: "medium", strips: { cast: false }, showDismissed: true, contradictionsOnly: false, panelOpen: false, sections: {} });
+    expect(t).toEqual({ kinds: { entity: true, fact: true, writer: true, echo: false }, echoSensitivity: "medium", gauge: {}, strips: { cast: false }, showDismissed: true, contradictionsOnly: false, panelOpen: false, sections: {} });
     expect(normalizeSettings({ threads: { sections: { filters: false, strips: true, "": true, x: "no" } } }).threads.sections).toEqual({ filters: false, strips: true });
     expect(normalizeSettings({ threads: { echoSensitivity: "high" } }).threads.echoSensitivity).toBe("high");
     expect(normalizeSettings({ threads: { echoSensitivity: "loud" } }).threads.echoSensitivity).toBe("medium");

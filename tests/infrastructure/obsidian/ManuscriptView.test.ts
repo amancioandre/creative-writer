@@ -74,7 +74,7 @@ describe("ManuscriptView", () => {
     expect([...one.querySelectorAll(".czm-ms-block")].map((b) => b.getAttribute("data-line"))).toEqual(["0", "1", "3", "4"]);
     expect(one.querySelector(".czm-ms-heading p")?.textContent).toBe("Chapter One");
     expect(el.querySelectorAll(".czm-ms-note")[1]!.querySelector(".czm-ms-title")?.textContent).toBe("Chapter Two1 words · under a minute");
-    expect([...el.querySelectorAll(".czm-ms-tool")].map((b) => b.getAttribute("aria-pressed"))).toEqual(["false", "true", "true", "false", "false", "false", null]);
+    expect([...el.querySelectorAll(".czm-ms-tool")].map((b) => b.getAttribute("aria-pressed"))).toEqual(["false", "true", "true", "false", "false", "false", "false", null]);
   });
 
   it("selects on click without taking the editor's focus, and edits on double click at the sentence", async () => {
@@ -288,7 +288,7 @@ describe("ManuscriptView", () => {
   });
 
   it("draws the ruler from the sections and goes there on click", async () => {
-    const facts: StoryFacts = { sections: new Map([["Novel/Part One/01 Chapter One.md", { readability: { label: "Easy", score: 82 }, today: { added: 40, removed: 3 }, cast: [], scenes: [] }]]), marks: [] };
+    const facts: StoryFacts = { sections: new Map([["Novel/Part One/01 Chapter One.md", { readability: { label: "Easy", score: 82 }, today: { added: 40, removed: 3 }, cast: [], scenes: [] }]]), marks: [], gauge: [] };
     const { v, calls } = open(notes(), { facts: async () => facts });
     await v.onOpen();
     const segs = v.contentEl.querySelectorAll<HTMLElement>(".czm-ms-ruler-seg");
@@ -316,6 +316,7 @@ describe("ManuscriptView", () => {
         { kind: "conflict", path: "Novel/Part One/01 Chapter One.md", line: 3, text: "Ilse · age: nine vs twelve", otherPath: "Novel/Part One/02 Chapter Two.md", otherLine: 0 },
         { kind: "plant", path: "Novel/Part One/02 Chapter Two.md", line: 0, text: "The letter · plant, paid off in Creek", otherPath: "Novel/Part One/01 Chapter One.md", otherLine: 3 },
       ],
+      gauge: [],
     };
     let asked: [string[], boolean] | null = null;
     const { v, calls } = open(notes(), { facts: async (_p, paths, story) => { asked = [[...paths], story]; return facts; } });
@@ -357,7 +358,7 @@ describe("ManuscriptView", () => {
 
   it("marks echoes in the gutter on their own toggle, without the story", async () => {
     let asked: [boolean, boolean | undefined] | null = null;
-    const facts: StoryFacts = { sections: new Map(), marks: [{ kind: "echo", path: "Novel/Part One/01 Chapter One.md", line: 3, text: "“salt on the wind” · also in Chapter Two", otherPath: "Novel/Part One/02 Chapter Two.md", otherLine: 0 }] };
+    const facts: StoryFacts = { sections: new Map(), marks: [{ kind: "echo", path: "Novel/Part One/01 Chapter One.md", line: 3, text: "“salt on the wind” · also in Chapter Two", otherPath: "Novel/Part One/02 Chapter Two.md", otherLine: 0 }], gauge: [] };
     const { v, calls } = open(notes(), { facts: async (_p, _paths, story, echoes) => { asked = [story, echoes]; return facts; } });
     await v.onOpen();
     expect(v.contentEl.querySelector(".czm-ms-mark.is-echo")).toBeNull();
@@ -371,9 +372,37 @@ describe("ManuscriptView", () => {
     expect(calls.revealed.at(-1)).toEqual(["Novel/Part One/02 Chapter Two.md", 0, 0, false]);
   });
 
+  it("draws the gauge at a scene's heading on its own toggle: pipes, the word, the total, and where it flips", async () => {
+    let asked: [boolean, boolean | undefined, boolean | undefined] | null = null;
+    const facts: StoryFacts = { sections: new Map(), marks: [], gauge: [
+      { path: "Novel/Part One/01 Chapter One.md", line: 0, lane: "Should jealousy justify violent acts?", keyword: "love", charge: 2, total: 2, inversion: false, marked: true },
+      { path: "Novel/Part One/01 Chapter One.md", line: 3, lane: "Should jealousy justify violent acts?", keyword: "hate", charge: -2, total: -1, inversion: true, marked: false },
+    ] };
+    const { v } = open(notes(), { facts: async (_p, _paths, story, echoes, gauge) => { asked = [story, echoes, gauge]; return facts; } });
+    await v.onOpen();
+    expect(v.contentEl.querySelector(".czm-ms-gauge")).toBeNull();
+    click(v.contentEl.querySelectorAll<HTMLElement>(".czm-ms-tool")[6]!);
+    await tick();
+    expect(asked).toEqual([false, false, true]);
+    const marks = [...v.contentEl.querySelectorAll<HTMLElement>(".czm-ms-gauge")];
+    expect(marks.map((m) => m.getAttribute("aria-label"))).toEqual([
+      "Gauge, Should jealousy justify violent acts?: love (+2), total +2",
+      "Gauge, Should jealousy justify violent acts?: hate (−2), total −1, inversion, no line marks it",
+    ]);
+    expect(marks[0]!.querySelectorAll(".czm-ms-gauge-pipe")).toHaveLength(2);
+    expect(marks[0]!.classList.contains("is-pos")).toBe(true);
+    expect(marks[1]!.classList.contains("is-inversion")).toBe(true);
+    expect(marks[1]!.classList.contains("is-hollow")).toBe(true);
+    expect(marks[1]!.querySelector(".czm-ms-gauge-turn")?.textContent).toBe("inversion");
+    expect(v.contentEl.querySelectorAll<HTMLElement>(".czm-ms-tool")[6]!.classList.contains("is-active")).toBe(true);
+    click(v.contentEl.querySelectorAll<HTMLElement>(".czm-ms-tool")[6]!);
+    await tick();
+    expect(v.contentEl.querySelector(".czm-ms-gauge")).toBeNull();
+  });
+
   it("offers to make a candidate a note, or to dismiss it, from the cast line", async () => {
     const zsofi = { name: "Zsófi", kind: "candidate" as const, path: null, mentions: 4 };
-    const facts: StoryFacts = { sections: new Map([["Novel/Part One/01 Chapter One.md", { readability: null, today: { added: 0, removed: 0 }, cast: [zsofi], scenes: [] }]]), marks: [] };
+    const facts: StoryFacts = { sections: new Map([["Novel/Part One/01 Chapter One.md", { readability: null, today: { added: 0, removed: 0 }, cast: [zsofi], scenes: [] }]]), marks: [], gauge: [] };
     const { v, calls } = open(notes(), { facts: async () => facts });
     await v.onOpen();
     click(v.contentEl.querySelectorAll<HTMLElement>(".czm-ms-tool")[3]!);

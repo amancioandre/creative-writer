@@ -146,6 +146,7 @@ export class CreativeZenSettingsTab extends PluginSettingTab {
         { name: "Echoes on the page", desc: "Repeated phrases as marks in the gutter. Builds the story threads.", control: toggle("manuscript.showEchoes") },
         { name: "Echo sensitivity", desc: "How close two passages must be to count, here and in the story threads.", control: dropdown("threads.echoSensitivity", ECHO_OPTIONS) },
         { name: "Voices on the page", desc: "Who speaks each paragraph, a stripe in the speaker's colour; grey when nobody is sure. The hover box pins.", control: toggle("manuscript.showVoices") },
+        { name: "Gauge marks on the page", desc: "At each scene's heading, its word on a graded thread's scale, the running total, and where it flips. Builds the story threads.", control: toggle("manuscript.showGauge") },
         { name: "Reading speed", desc: "Words per minute behind the reading times. Adults read prose at about 250.", control: slider("manuscript.readingSpeed", MIN_READING_SPEED, MAX_READING_SPEED, 10) },
       ]),
       group("Stories and goals", [
