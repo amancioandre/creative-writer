@@ -61,6 +61,8 @@ export const COMMANDS = {
   "plot-grid-dismiss-reading": "Plot grid: dismiss the reading",
   "plot-grid-propose-columns": "Plot grid: propose columns with the model",
   "plot-grid-export": "Plot grid: export the grid to a note",
+  "plot-grid-toggle-gauge": "Plot grid: show or hide the gauge",
+  "plot-grid-gauge-column": "Plot grid: gauge the selected column",
   "show-release-note": "Show release note",
   "open-writer": "Open writer",
   "writer-next-lane": "Writer: next lane",

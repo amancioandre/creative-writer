@@ -288,9 +288,19 @@ export interface PlotGridSettings {
   readonly frozen: Readonly<Record<string, string>>;
   /** Vault-relative folder of the writer's own grid templates. */
   readonly templatesFolder: string;
+  /** Project scope → the value gauge as the writer left it there: shown or not, and which graded columns are its lanes. */
+  readonly gauge: Readonly<Record<string, GaugePrefs>>;
 }
 
-export const DEFAULT_PLOT_GRID: PlotGridSettings = { panelOpen: true, castExpanded: false, folded: { arc: false, theme: false, subplot: false, free: false }, hidden: {}, unmoved: true, sections: {}, frozen: {}, templatesFolder: "Creative Writer/Templates" };
+/** The gauge column's state for one project. Lanes are column headings; none ticked means the main theme, or the first graded column. */
+export interface GaugePrefs {
+  readonly shown: boolean;
+  readonly lanes: readonly string[];
+}
+
+export const NO_GAUGE: GaugePrefs = { shown: false, lanes: [] };
+
+export const DEFAULT_PLOT_GRID: PlotGridSettings = { panelOpen: true, castExpanded: false, folded: { arc: false, theme: false, subplot: false, free: false }, hidden: {}, unmoved: true, sections: {}, frozen: {}, templatesFolder: "Creative Writer/Templates", gauge: {} };
 
 export function normalizePlotGrid(raw: unknown): PlotGridSettings {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
@@ -300,6 +310,14 @@ export function normalizePlotGrid(raw: unknown): PlotGridSettings {
   const frozen: Record<string, string> = {};
   const fz = (r.frozen && typeof r.frozen === "object" ? r.frozen : {}) as Record<string, unknown>;
   for (const [scope, heading] of Object.entries(fz)) if (typeof heading === "string" && heading.trim()) frozen[scope] = heading.trim();
+  const gauge: Record<string, GaugePrefs> = {};
+  const gz = (r.gauge && typeof r.gauge === "object" ? r.gauge : {}) as Record<string, unknown>;
+  for (const [scope, raw] of Object.entries(gz)) {
+    const g = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+    const lanes = Array.isArray(g.lanes) ? g.lanes.filter((x): x is string => typeof x === "string" && !!x.trim()) : [];
+    const shown = g.shown === true;
+    if (shown || lanes.length) gauge[scope] = { shown, lanes };
+  }
   return {
     panelOpen: typeof r.panelOpen === "boolean" ? r.panelOpen : DEFAULT_PLOT_GRID.panelOpen,
     castExpanded: typeof r.castExpanded === "boolean" ? r.castExpanded : DEFAULT_PLOT_GRID.castExpanded,
@@ -309,6 +327,7 @@ export function normalizePlotGrid(raw: unknown): PlotGridSettings {
     sections: boolMap(r.sections),
     frozen,
     templatesFolder: typeof r.templatesFolder === "string" && r.templatesFolder.trim() ? normalizeFolderPath(r.templatesFolder) : DEFAULT_PLOT_GRID.templatesFolder,
+    gauge,
   };
 }
 

@@ -692,6 +692,53 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-pg-toggle.is-on::after { left: 16px; }
 .czm-pg-toggle:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .czm-pg-help { width: 380px; }
+/* The value gauge: one lane per graded column at the right edge, pinned like Scene and Plot at the left. A row draws its charge as pipes either side of a centreline and the running total as a line through the row; a band row carries the line straight through. */
+.czm-pg-table .czm-pg-gauge-head, .czm-pg-table .czm-pg-gauge-td { position: sticky; right: 0; background: var(--background-primary); z-index: 1; min-width: 140px; max-width: 140px; width: 140px; padding: 0; box-shadow: inset 1px 0 0 var(--background-modifier-border); }
+.czm-pg-table thead th.czm-pg-gauge-head { z-index: 3; padding: 2px 4px; }
+.czm-pg-table .czm-pg-gauge-td + .czm-pg-gauge-td, .czm-pg-table .czm-pg-gauge-head + .czm-pg-gauge-head { box-shadow: inset 1px 0 0 var(--background-modifier-border-hover); }
+.czm-pg-group-gauge { color: var(--text-muted); }
+.czm-pg-gauge-tag { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); font-weight: 600; }
+.czm-pg-gauge-head .czm-pg-col-name::before { display: none; }
+.czm-pg-gauge-legend { display: flex; gap: 2px; margin: 3px 0; }
+.czm-pg-gauge-word { flex: 1 1 0; min-width: 0; height: 4px; border-radius: 2px; font-size: 0; color: transparent; overflow: hidden; }
+.czm-pg-gauge-word.is-neg { background: var(--color-red); opacity: 0.85; }
+.czm-pg-gauge-word.is-pos { background: var(--color-green); opacity: 0.85; }
+.czm-pg-gauge-word.is-neutral { background: var(--background-modifier-border-hover); }
+.czm-pg-gauge { height: 100%; min-height: 24px; }
+.czm-pg-scene .czm-pg-gauge-td { vertical-align: top; }
+.czm-pg-gauge-svg { display: block; width: 140px; height: 100%; min-height: 24px; overflow: visible; }
+.czm-pg-gauge-centre { stroke: var(--background-modifier-border); stroke-width: 1; }
+.czm-pg-gauge-rule { stroke: var(--background-modifier-border-hover); stroke-width: 1; }
+.czm-pg-gauge-pipe.is-neg { fill: var(--color-red); }
+.czm-pg-gauge-pipe.is-pos { fill: var(--color-green); }
+.czm-pg-gauge-tick { stroke: var(--text-faint); stroke-width: 2; }
+.czm-pg-gauge-line { stroke: var(--text-muted); stroke-width: 1.5; fill: none; }
+.czm-pg-gauge-line.is-empty { stroke-dasharray: 2 3; }
+.czm-pg-gauge-dot { fill: var(--text-normal); }
+.czm-pg-gauge-diamond { fill: var(--text-normal); font-size: 11px; }
+.czm-pg-gauge-diamond.is-hollow { fill: var(--text-muted); }
+.czm-pg-gauge-label, .czm-pg-gauge-total, .czm-pg-gauge-unread { fill: var(--text-faint); font-family: var(--font-monospace); font-size: 9px; }
+.czm-pg-gauge-unread { fill: var(--text-warning); font-size: 11px; }
+.czm-pg-gauge-td.is-inversion .czm-pg-gauge-total { fill: var(--text-normal); }
+.czm-pg-disagree { color: var(--text-warning); font-family: var(--font-monospace); font-size: 11px; margin-left: 4px; }
+.czm-pg-keyword { display: inline-block; font-family: var(--font-monospace); font-size: 10px; line-height: 1.3; padding: 0 4px; margin-right: 4px; border-radius: 3px; vertical-align: 1px; background: var(--background-modifier-border); color: var(--text-muted); }
+.czm-pg-keyword.is-neg { background: rgba(var(--color-red-rgb), 0.16); color: var(--color-red); }
+.czm-pg-keyword.is-pos { background: rgba(var(--color-green-rgb), 0.16); color: var(--color-green); }
+.czm-pg-keyword.is-neutral { background: var(--background-modifier-border); color: var(--text-muted); }
+.czm-pg-keyword.is-plain { border: 1px dashed var(--background-modifier-border-hover); background: none; }
+.czm-pg-gauge-lanes { margin: 4px 8px; display: flex; flex-direction: column; gap: 4px; }
+.czm-pg-gauge-lane { display: flex; gap: 8px; align-items: flex-start; padding: 4px 6px; border-radius: var(--radius-s); border: 1px solid var(--background-modifier-border); cursor: pointer; }
+.czm-pg-gauge-lane.is-on { border-color: var(--interactive-accent); }
+.czm-pg-gauge-lane.is-problem { border-style: dashed; cursor: default; }
+.czm-pg-gauge-lane-text { min-width: 0; }
+.czm-pg-gauge-lane-name { font-size: var(--font-ui-small); }
+.czm-pg-gauge-lane-scale { font-family: var(--font-monospace); font-size: 10px; color: var(--text-faint); }
+.czm-pg-gauge-lane-scale.is-problem { color: var(--text-warning); }
+.czm-pg-gauge-summary { margin: 2px 8px; }
+.czm-pg-key-gauge::before { width: 4px; height: 12px; border-radius: 1px; }
+.czm-pg-key-gauge.is-neg::before { background: var(--color-red); }
+.czm-pg-key-gauge.is-pos::before { background: var(--color-green); }
+.czm-pg-key-gauge.is-line::before { width: auto; height: auto; border-radius: 0; background: none; content: "●◆"; font-size: 9px; color: var(--text-muted); letter-spacing: 1px; }
 /* Audit view: one shape per state, filled as certainty grows; the header counts follow. */
 .czm-pg-state-glyph { font-size: 10px; margin-right: 4px; vertical-align: 1px; }
 .czm-pg-state-glyph.is-plan { color: var(--text-faint); }

@@ -1,6 +1,6 @@
 import { ItemView, setIcon, type WorkspaceLeaf } from "obsidian";
 import type { ProjectSpec } from "../../../domain/progress/Project";
-import type { PlotGridSettings, StoryMapSettings } from "../../../domain/settings/Settings";
+import { NO_GAUGE, type GaugePrefs, type PlotGridSettings, type StoryMapSettings } from "../../../domain/settings/Settings";
 import { EMPTY_PLOT_GRID, GROUP_TOKEN, blockOf, blockOrder, type ColumnKind, type GridCell, type GridColumn, type GridRow, type PlotGrid, type SpecialColumn } from "../../../domain/plot/PlotGrid";
 import type { Entity, SceneRef } from "../../../domain/story/StoryGraph";
 import { basenameOf } from "../../../domain/story/EntityIndex";
@@ -21,6 +21,7 @@ import type { ScaffoldResult } from "../../../application/use-cases/ScaffoldManu
 import type { ApplyResult } from "../../../application/use-cases/ApplyTemplate";
 import type { ApplyChoices, ApplyPlan, StoryTemplate } from "../../../domain/plot/Templates";
 import { findGaps, type Gap } from "../../../domain/plot/Gaps";
+import { MAX_LANES, chargeOf, describeScaleProblem, disagreements, checkScale, gaugeLane, pipesOf, readScale, type Lane } from "../../../domain/plot/Gauge";
 
 /** The timeline's type string, kept so leaves open across the update come back as the grid. */
 export const PLOT_GRID_VIEW_TYPE = "creative-writer-story-timeline";
@@ -112,7 +113,7 @@ interface Selection { readonly col: number; readonly row: number }
 /** One stretch of the header: a single column with a job, an open group of columns, or a folded group drawn as one narrow cell. */
 interface Segment { readonly kind: ColumnKind; readonly block: string; readonly single: GridColumn | null; readonly columns: GridColumn[]; readonly folded: boolean }
 
-export type PlotGridAction = "clear-search" | "toggle-cast" | "open-note" | "toggle-panel" | "new-column" | "new-scene" | "new-chapter" | "new-act" | "open-outline" | "build-manuscript" | "start-template" | "save-template" | "fold-arcs" | "fold-themes" | "fold-subplots" | "fold-threads" | "hide-column" | "show-hidden" | "focus-search" | "help" | "toggle-unmoved" | "audit" | "snapshot" | "next-issue" | "previous-issue" | "anchor" | "read-column" | "check-column" | "read-all" | "dismiss-reading" | "stop-reading" | "propose-columns" | "export";
+export type PlotGridAction = "clear-search" | "toggle-cast" | "open-note" | "toggle-panel" | "new-column" | "new-scene" | "new-chapter" | "new-act" | "open-outline" | "build-manuscript" | "start-template" | "save-template" | "fold-arcs" | "fold-themes" | "fold-subplots" | "fold-threads" | "hide-column" | "show-hidden" | "focus-search" | "help" | "toggle-unmoved" | "audit" | "snapshot" | "next-issue" | "previous-issue" | "anchor" | "read-column" | "check-column" | "read-all" | "dismiss-reading" | "stop-reading" | "propose-columns" | "export" | "toggle-gauge" | "gauge-column";
 
 /** Rows are drawn this many at a time; past the first chunk, the next is drawn as the last row comes into view. */
 export const ROW_CHUNK = 60;
@@ -140,6 +141,20 @@ const SPECIAL_LABEL: Record<SpecialColumn, string> = { pov: "POV", time: "Time",
 const SPECIAL_KEY: Record<SpecialColumn, "plot-pov" | "plot-time" | "plot-theme" | "plot-beats"> = { pov: "plot-pov", time: "plot-time", "main-theme": "plot-theme", beats: "plot-beats" };
 /** The jobs drawn in the derived block after Plot, rather than among the kinds. */
 const DERIVED: readonly (SpecialColumn | null)[] = ["time", "pov", "beats"];
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+/** A gauge lane's width, its centreline, and the pitch of its pipes: one step of the scale is one pipe, and the line shares the unit. */
+export const LANE_W = 140, LANE_CX = 70, LANE_STEP = 8, PIPE_W = 4, PIPE_H = 14;
+
+/** An SVG element with its attributes, since the gauge is drawn in the row rather than laid over it. */
+function svgEl<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string>): SVGElementTagNameMap[K] {
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+
+/** A total as the gauge labels it: a sign on every non-zero number, the minus a real minus. */
+export function signed(n: number): string { return n > 0 ? `+${n}` : n < 0 ? `−${-n}` : "0"; }
 
 /**
  * The plot grid: every scene of the project in reading order down the
@@ -195,6 +210,10 @@ export class PlotGridView extends ItemView {
   /** The columns as drawn, after the search: what the selection indexes. */
   private shown: readonly GridColumn[] = [];
   private rows: readonly GridRow[] = [];
+  /** The gauge's lanes as drawn at the right edge, in the grid's order; empty while the gauge is off. */
+  private lanes: readonly Lane[] = [];
+  /** Row positions where the first lane and another carry opposite signs. */
+  private disagree: ReadonlySet<number> = new Set();
 
   constructor(leaf: WorkspaceLeaf, private readonly source: PlotGridSource) {
     super(leaf);
@@ -214,6 +233,13 @@ export class PlotGridView extends ItemView {
     const frozen = { ...this.settings.frozen };
     if (heading) frozen[this.project.scope] = heading; else delete frozen[this.project.scope];
     this.save({ frozen });
+  }
+
+  /** The gauge as the writer left it in this project. */
+  private get gaugePrefs(): GaugePrefs { return this.project ? this.settings.gauge[this.project.scope] ?? NO_GAUGE : NO_GAUGE; }
+  private setGauge(next: Partial<GaugePrefs>): void {
+    if (!this.project) return;
+    this.save({ gauge: { ...this.settings.gauge, [this.project.scope]: { ...this.gaugePrefs, ...next } } });
   }
 
   getViewType(): string { return PLOT_GRID_VIEW_TYPE; }
@@ -313,6 +339,7 @@ export class PlotGridView extends ItemView {
       { label: `Show hidden columns${this.hidden.length ? ` (${this.hidden.length})` : ""}`, icon: "eye", command: "plot-grid-show-hidden", disabled: this.hidden.length === 0, onClick: () => this.run("show-hidden") },
       { label: "Present, unmoved", command: "plot-grid-toggle-unmoved", checked: this.settings.unmoved, onClick: () => this.run("toggle-unmoved") },
       { label: "Audit view", icon: "scan-search", command: "plot-grid-audit", checked: this.audit, onClick: () => this.run("audit") },
+      { label: "Show gauge", icon: "activity", command: "plot-grid-toggle-gauge", checked: this.gaugePrefs.shown, disabled: !this.project, onClick: () => this.run("toggle-gauge") },
       { label: "Next broken anchor", command: "plot-grid-next-issue", disabled: this.grid.broken === 0, onClick: () => this.run("next-issue") },
       { label: "Start from a template…", icon: "layout-template", command: "plot-grid-start-template", disabled: !this.project, onClick: () => this.run("start-template") },
       { label: "Save as template…", command: "plot-grid-save-template", disabled: !this.project || (this.grid.columns.length === 0 && !this.grid.plan), onClick: () => this.run("save-template") },
@@ -382,7 +409,48 @@ export class PlotGridView extends ItemView {
       case "dismiss-reading": void this.dismissReading(); break;
       case "stop-reading": this.running?.controller.abort(); break;
       case "propose-columns": void this.proposeColumns(); break;
+      case "toggle-gauge": { const on = !this.gaugePrefs.shown; this.setGauge({ shown: on }); this.renderTable(); this.status?.say(on ? (this.lanes.length ? `Gauge on: ${this.lanes.map((l) => l.column.heading.name).join(", ")}.` : "Gauge on, but no column has a scale yet: Set scale… in a column's menu grades its stops.") : "Gauge off."); break; }
+      case "gauge-column": { const c = this.current(); if (c) this.gaugeColumn(c); break; }
     }
+  }
+
+  /** Ticks or unticks a graded column as a lane of the gauge, turning the gauge on with the first tick. */
+  private gaugeColumn(c: GridColumn): void {
+    if (!c.scale) { this.status?.fail(`“${c.heading.name}” has no scale yet: Set scale… in its menu grades its stops.`); return; }
+    const problem = checkScale(c.scale);
+    if (problem) { this.status?.fail(`“${c.heading.name}” cannot be gauged: ${describeScaleProblem(problem)}. Edit the scale line under its heading.`); return; }
+    const on = this.laneHeadings().includes(c.heading.heading);
+    const lanes = on ? this.laneHeadings().filter((h) => h !== c.heading.heading) : [...this.laneHeadings(), c.heading.heading];
+    if (!on && lanes.length > MAX_LANES) { this.status?.fail(`The gauge draws ${MAX_LANES} lanes at most: untick one in the Gauge section first.`); return; }
+    this.setGauge({ lanes, shown: true });
+    this.renderTable();
+    this.status?.say(on ? `“${c.heading.name}” taken off the gauge.` : `“${c.heading.name}” gauged.`);
+  }
+
+  /** The columns ticked as lanes: what the settings say, or the main theme (else the first graded column) when nothing is ticked. */
+  private laneHeadings(): string[] {
+    const graded = this.grid.columns.filter((c) => c.scale && !checkScale(c.scale));
+    const ticked = this.gaugePrefs.lanes.filter((h) => graded.some((c) => c.heading.heading === h));
+    if (ticked.length) return ticked;
+    const first = graded.find((c) => c.special === "main-theme") ?? graded.find((c) => c.heading.kind === "theme") ?? graded[0];
+    return first ? [first.heading.heading] : [];
+  }
+
+  /** The lanes drawn: the ticked columns in the grid's order, at most three, each read down the rows as shown. */
+  private lanesFor(rows: readonly GridRow[]): Lane[] {
+    if (!this.gaugePrefs.shown) return [];
+    const headings = this.laneHeadings();
+    return this.grid.columns.filter((c) => headings.includes(c.heading.heading)).slice(0, MAX_LANES).map((c) => gaugeLane(c, rows)).filter((l): l is Lane => l !== null);
+  }
+
+  /** The state line's word on the gauge: how much is charged, where the total flips, and where two lanes disagree. */
+  private gaugeSummary(rows: readonly GridRow[]): string {
+    const first = this.lanes[0];
+    if (!first) return "";
+    const at = (l: Lane) => l.inversions.map((p) => `${p + 1} ${rows[p]?.scene.title || basenameOf(rows[p]?.scene.path ?? "")}`).join(", ");
+    const parts = [`gauge: ${first.charged} of ${rows.length} charged${first.unread ? ` · ${first.unread} unread` : ""}`, first.inversions.length ? `${plural(first.inversions.length, "inversion")} at ${at(first)}` : "no inversion"];
+    if (this.lanes.length > 1) parts.push(`${this.lanes.length} lanes · ${plural(this.disagree.size, "disagreement")}`);
+    return parts.join(" · ");
   }
 
   /** One call over the outline: the proposals land in the side column with a tick each; nothing is written until Add. */
@@ -538,12 +606,15 @@ export class PlotGridView extends ItemView {
     shell.main.querySelector(".czm-shell-empty")?.remove();
     if (!this.project) { shell.setState("No project"); shell.empty("No project yet — put story: true (or writing-target: 50000) in a note's front matter and its folder becomes one."); this.renderSide(); return; }
     const grid = this.grid;
+    this.lanes = []; this.disagree = new Set();
     this.renderTabs(root);
     if (this.tab) { this.renderSnapshot(root); return; }
     // The project note is the container, not a scene of the story.
     const notePath = this.project.notePath;
     const rows = grid.rows.filter((r) => r.scene.path !== notePath);
     this.rows = rows;
+    this.lanes = this.lanesFor(rows);
+    this.disagree = new Set(this.lanes.slice(1).flatMap((l) => disagreements(this.lanes[0]!, l)));
     const q = this.query.trim().toLowerCase();
     const settings = this.source.settings();
     const hidden = new Set(this.hidden.map((h) => h.toLowerCase()));
@@ -572,11 +643,12 @@ export class PlotGridView extends ItemView {
     const awaiting = grid.readings ? ` · ${plural(grid.readings, "reading")} awaiting you` : "";
     this.gaps = findGaps(grid);
     const gapsLine = this.gaps.length ? ` · ${plural(this.gaps.length, "gap")}` : "";
+    const gaugeLine = this.lanes.length ? ` · ${this.gaugeSummary(rows)}` : "";
     root.classList.toggle("is-audit", this.audit);
     const foldedGroups = segments.filter((sg) => sg.folded);
     const foldedLine = foldedGroups.length ? ` · ${foldedGroups.reduce((n, sg) => n + sg.columns.length, 0)} in ${plural(foldedGroups.length, "folded group")}` : "";
     const auditLine = this.audit ? `${plural(grid.cells, "cell")} · ${grid.filled} filled · ${grid.verified} verified · ${grid.broken} broken` : `${rows.length} scene${rows.length === 1 ? "" : "s"} · ${plural(columns.length, "column")}${foldedLine} · ${cast.length} in the cast`;
-    shell.setState(`${auditLine}${awaiting}${gapsLine}${hid}${q ? ` · “${this.query.trim()}”` : ""}${unknown}`, q ? { label: "Clear", cls: "czm-pg-clear", onClick: () => { this.clearSearch(); } } : this.hidden.length ? { label: "Show hidden", cls: "czm-pg-show-hidden", onClick: () => this.run("show-hidden") } : null);
+    shell.setState(`${auditLine}${awaiting}${gapsLine}${gaugeLine}${hid}${q ? ` · “${this.query.trim()}”` : ""}${unknown}`, q ? { label: "Clear", cls: "czm-pg-clear", onClick: () => { this.clearSearch(); } } : this.hidden.length ? { label: "Show hidden", cls: "czm-pg-show-hidden", onClick: () => this.run("show-hidden") } : null);
     this.renderSide();
     if (rows.length === 0) {
       const plan = grid.plan;
@@ -629,6 +701,7 @@ export class PlotGridView extends ItemView {
     }
     castToggle.addEventListener("click", () => this.run("toggle-cast"));
     groups.createEl("th", { cls: "czm-pg-filler" });
+    if (this.lanes.length) groups.createEl("th", { cls: "czm-pg-group czm-pg-group-gauge", attr: { colspan: String(this.lanes.length), scope: "colgroup" } }).createSpan({ text: "Gauge", cls: "czm-pg-group-title" });
     const corner = thead.createEl("th", { cls: `czm-pg-corner is-frozen${frozenCount === 1 ? " is-frozen-edge" : ""}`, attr: { scope: "col", "data-fcol": "0" } });
     corner.createSpan({ text: "Scene" });
     corner.createSpan({ text: "words under the name", cls: "czm-pg-corner-hint" });
@@ -682,6 +755,7 @@ export class PlotGridView extends ItemView {
     }
     // A filler column takes the slack, so the columns stay close together however wide the pane.
     thead.createEl("th", { cls: "czm-pg-filler" });
+    for (const lane of this.lanes) this.renderGaugeHead(thead, lane, rows.length);
     const tbody = table.createEl("tbody");
     const span = 2 + columns.length + segments.filter((sg) => sg.folded).length + (this.castExpanded ? Math.max(1, cast.length) : 1) + 1;
     const scope = this.project.scope;
@@ -698,9 +772,11 @@ export class PlotGridView extends ItemView {
         if (act !== lastAct) {
           lastAct = act;
           if (act) {
-            const th = tbody.createEl("tr", { cls: `czm-pg-act${group ? " is-outline" : ""}` }).createEl("th", { attr: { colspan: String(span), scope: "rowgroup" } });
+            const actTr = tbody.createEl("tr", { cls: `czm-pg-act${group ? " is-outline" : ""}` });
+            const th = actTr.createEl("th", { attr: { colspan: String(span), scope: "rowgroup" } });
             th.createSpan({ text: group ? group.act : act, cls: group ? "is-link czm-pg-group-name" : "" });
             if (group) { th.createSpan({ text: "outline · no folder yet", cls: "czm-pg-note-total" }); this.groupControls(th, row, "act"); }
+            for (const lane of this.lanes) this.renderGaugePass(actTr, lane, i);
           }
         }
         const chapterKey = group ? `${row.scene.path}#chapter${group.chapterLine}` : row.scene.path;
@@ -716,6 +792,7 @@ export class PlotGridView extends ItemView {
           const names = new Set(chapter.flatMap((r) => r.present).filter((id) => cast.some((c) => c.id === id))).size;
           th.createSpan({ text: group ? `${plural(chapter.length, "scene")} · outline · no note yet` : `${plural(chapter.length, "scene")} · ${words.toLocaleString()} words · ${names} of the cast`, cls: "czm-pg-note-total" });
           if (group) this.groupControls(th, row, "chapter");
+          for (const lane of this.lanes) this.renderGaugePass(tr, lane, i);
         }
         this.renderRow(tbody, row, columns, cast, settings, frozenUpTo, segments);
         this.drawn = i + 1;
@@ -770,6 +847,7 @@ export class PlotGridView extends ItemView {
     // A 3px chip in the POV character's colour rides the sticky column, so the eye's owner survives sideways scrolling.
     if (row.pov) { th.setCssProps({ "--czm-pov": row.pov.entity ? settings.colors[row.pov.entity.kind] : "var(--text-faint)" }); th.title = `POV: ${row.pov.name}`; }
     th.createSpan({ text: `${row.bookmarked ? "★ " : ""}${row.scene.title || "(opening)"}`, cls: "czm-map-row-name" });
+    if (this.disagree.has(rowIndex)) th.createSpan({ text: "≠", cls: "czm-pg-disagree", attr: { title: `The lanes disagree here: ${this.lanes.map((l) => `${l.column.heading.name} ${signed(l.rows[rowIndex]?.charge ?? 0)}`).join(", ")}` } });
     if (row.outline) th.createSpan({ text: "outline", cls: "czm-map-row-meta", attr: { title: row.group ? "A scene planned in Outline.md, not written: build the manuscript to make it a heading in a chapter note" : "A heading with no prose yet: a scene planned, not written" } });
     onActivate(th, () => this.source.reveal(row.scene));
     if (row.group) {
@@ -809,6 +887,115 @@ export class PlotGridView extends ItemView {
       }
     }
     tr.createEl("td", { cls: "czm-pg-filler" });
+    for (const lane of this.lanes) this.renderGaugeCell(tr, lane, rowIndex, row);
+  }
+
+  // ---- the gauge -------------------------------------------------------------------
+
+  /** Over a lane: the column it reads, its scale as a legend from red to green, and what the lane counts. */
+  private renderGaugeHead(thead: HTMLElement, lane: Lane, rowCount: number): void {
+    const words = lane.scale.words;
+    const th = thead.createEl("th", { cls: "czm-pg-col czm-pg-gauge-head", attr: { scope: "col", title: `Gauge · ${lane.column.heading.name}: ${words.join(" → ")}. Pipes are the scene's charge, the line is the running total, a diamond is where it flips.` } });
+    const name = th.createDiv({ cls: "czm-pg-col-name" });
+    name.createSpan({ text: "Gauge", cls: "czm-pg-gauge-tag" });
+    name.createSpan({ text: lane.column.heading.name, cls: "czm-pg-col-title" });
+    const legend = th.createDiv({ cls: "czm-pg-gauge-legend", attr: { "aria-label": `Scale: ${words.join(", ")}` } });
+    words.forEach((w, i) => legend.createSpan({ text: w, cls: `czm-pg-gauge-word is-${i < lane.scale.neutral ? "neg" : i > lane.scale.neutral ? "pos" : "neutral"}`, attr: { title: `${w}: ${signed(i - lane.scale.neutral)}` } }));
+    const sub = th.createDiv({ cls: "czm-pg-col-sub" });
+    sub.createSpan({ text: `${lane.charged} of ${rowCount} · ${plural(lane.inversions.length, "inversion")}${lane.unread ? ` · ${lane.unread} unread` : ""}${lane.unit > 1 ? ` · line: 1 step = ${lane.unit}` : ""}`, cls: "czm-pg-col-count" });
+  }
+
+  /** The line's x for a total: the centre, then one pipe's pitch per unit of total, so the line shares the pipes' scale until it would leave the lane. */
+  private laneX(lane: Lane, total: number): number { return LANE_CX + (total / lane.unit) * LANE_STEP; }
+
+  /** A band row carries the line straight through, so the total is continuous from the first scene to the last. */
+  private renderGaugePass(tr: HTMLElement, lane: Lane, position: number): void {
+    const td = tr.createEl("td", { cls: "czm-pg-gauge-td is-pass", attr: { "aria-hidden": "true" } });
+    const svg = svgEl("svg", { class: "czm-pg-gauge-svg", width: String(LANE_W), height: "100%" });
+    td.createDiv({ cls: "czm-pg-gauge" }).appendChild(svg);
+    const x = String(this.laneX(lane, position > 0 ? lane.rows[position - 1]!.total : 0));
+    svg.appendChild(svgEl("line", { class: "czm-pg-gauge-centre", x1: String(LANE_CX), x2: String(LANE_CX), y1: "0%", y2: "100%" }));
+    svg.appendChild(svgEl("line", { class: "czm-pg-gauge-line", x1: x, x2: x, y1: "0%", y2: "100%" }));
+  }
+
+  /** One row of a lane: the pipes for the scene's charge, the running total walking through, the diamond and rule where it flips. */
+  private renderGaugeCell(tr: HTMLElement, lane: Lane, position: number, row: GridRow): void {
+    const g = lane.rows[position]!;
+    const prev = position > 0 ? lane.rows[position - 1]!.total : 0;
+    const where = row.scene.title || basenameOf(row.scene.path);
+    const what = g.conflict ? `two stops disagree (${g.conflict.join(", ")}), unread` : g.charge === null ? "no word" : `${g.keyword} (${signed(g.charge)})`;
+    const td = tr.createEl("td", { cls: `czm-pg-gauge-td${g.inversion ? " is-inversion" : ""}${g.conflict ? " is-unread" : ""}`, attr: { "aria-label": `Gauge, ${lane.column.heading.name} at ${where}: ${what}, total ${signed(g.total)}${g.inversion ? `, inversion${g.marked ? "" : ", no line marks it"}` : ""}` } });
+    const svg = svgEl("svg", { class: "czm-pg-gauge-svg", width: String(LANE_W), height: "100%", "aria-hidden": "true" });
+    td.createDiv({ cls: "czm-pg-gauge" }).appendChild(svg);
+    if (g.inversion) svg.appendChild(svgEl("line", { class: "czm-pg-gauge-rule", x1: "0", x2: String(LANE_W), y1: "50%", y2: "50%" }));
+    svg.appendChild(svgEl("line", { class: "czm-pg-gauge-centre", x1: String(LANE_CX), x2: String(LANE_CX), y1: "0%", y2: "100%" }));
+    // The charge: one pipe per step to three, then a block of three and singles; left of the line below neutral, right above it.
+    if (g.charge !== null && g.charge !== 0) {
+      const { block, singles } = pipesOf(g.charge);
+      const side = g.charge < 0 ? "neg" : "pos";
+      const slotX = (i: number, w: number) => (g.charge! < 0 ? LANE_CX - 2 - i * LANE_STEP - w : LANE_CX + 2 + i * LANE_STEP);
+      const pipe = (x: number, w: number) => svg.appendChild(svgEl("rect", { class: `czm-pg-gauge-pipe is-${side}`, x: String(x), width: String(w), y: "50%", height: String(PIPE_H), transform: `translate(0,${-PIPE_H / 2})` }));
+      const blockW = 2 * LANE_STEP + PIPE_W;
+      if (block) pipe(g.charge < 0 ? LANE_CX - 2 - blockW : LANE_CX + 2, blockW);
+      for (let i = block ? 3 : 0; i < (block ? 3 : 0) + singles; i++) pipe(slotX(i, PIPE_W), PIPE_W);
+    } else if (g.charge === 0) {
+      svg.appendChild(svgEl("line", { class: "czm-pg-gauge-tick", x1: String(LANE_CX - 5), x2: String(LANE_CX + 5), y1: "50%", y2: "50%" }));
+    } else if (g.conflict) {
+      const q = svgEl("text", { class: "czm-pg-gauge-unread", x: String(LANE_CX + 4), y: "50%", "dominant-baseline": "central" });
+      q.textContent = "?";
+      svg.appendChild(q);
+    }
+    // The running total: from where the row above left it to this row's, then down; dotted where nobody has said.
+    const x0 = String(this.laneX(lane, prev)), x1 = String(this.laneX(lane, g.total));
+    const lineCls = `czm-pg-gauge-line${g.charge === null ? " is-empty" : ""}`;
+    svg.appendChild(svgEl("line", { class: lineCls, x1: x0, x2: x1, y1: "0%", y2: "50%" }));
+    svg.appendChild(svgEl("line", { class: lineCls, x1: x1, x2: x1, y1: "50%", y2: "100%" }));
+    if (g.inversion) {
+      const d = svgEl("text", { class: `czm-pg-gauge-diamond${g.marked ? "" : " is-hollow"}`, x: x1, y: "50%", "text-anchor": "middle", "dominant-baseline": "central" });
+      d.textContent = g.marked ? "◆" : "◇";
+      svg.appendChild(d);
+      const label = svgEl("text", { class: "czm-pg-gauge-label", x: "3", y: "50%", dy: "-5" });
+      label.textContent = "inversion";
+      svg.appendChild(label);
+    } else if (g.charge !== null) {
+      svg.appendChild(svgEl("circle", { class: "czm-pg-gauge-dot", cx: x1, cy: "50%", r: "2.5" }));
+    }
+    const total = svgEl("text", { class: "czm-pg-gauge-total", x: String(LANE_W - 2), y: "50%", "text-anchor": "end", "dominant-baseline": "central" });
+    total.textContent = signed(g.total);
+    svg.appendChild(total);
+  }
+
+  /** The Gauge section: the switch, one tick per graded column, and what each lane counts. */
+  private renderGaugeSection(section: HTMLElement): void {
+    const prefs = this.gaugePrefs;
+    const showRow = section.createDiv({ cls: "setting-item mod-toggle" });
+    const showInfo = showRow.createDiv({ cls: "setting-item-info" });
+    showInfo.createDiv({ text: "Show gauge", cls: "setting-item-name" });
+    showInfo.createDiv({ text: "A thermometer per scene at the right edge: pipes for the scene's charge, a line for the running total, a diamond where it flips", cls: "setting-item-description" });
+    const showToggle = showRow.createDiv({ cls: "setting-item-control" }).createEl("button", { cls: `czm-pg-toggle czm-pg-gauge-toggle${prefs.shown ? " is-on" : ""}`, attr: { role: "switch", "aria-checked": String(prefs.shown), "aria-label": "Show gauge" } });
+    showToggle.addEventListener("click", () => this.run("toggle-gauge"));
+    const graded = this.grid.columns.filter((c) => c.scale !== null);
+    if (!graded.length) { section.createDiv({ text: "No column has a scale yet. Set scale… in a column's menu writes one line under its heading, hate to love, and the gauge reads the word each stop opens with.", cls: "czm-map-absent" }); return; }
+    const ticked = this.laneHeadings();
+    const list = section.createDiv({ cls: "czm-pg-gauge-lanes", attr: { role: "group", "aria-label": "Lanes" } });
+    for (const c of graded) {
+      const problem = c.scale ? checkScale(c.scale) : null;
+      const on = ticked.includes(c.heading.heading);
+      const row = list.createEl("label", { cls: `czm-pg-gauge-lane${on ? " is-on" : ""}${problem ? " is-problem" : ""}` });
+      const box = row.createEl("input", { cls: "czm-pg-gauge-tick", attr: { type: "checkbox", "aria-label": `Lane: ${c.heading.name}` } });
+      box.checked = on;
+      box.disabled = !!problem || (!on && ticked.length >= MAX_LANES);
+      box.addEventListener("change", () => this.gaugeColumn(c));
+      const text = row.createDiv({ cls: "czm-pg-gauge-lane-text" });
+      text.createDiv({ text: c.heading.name, cls: "czm-pg-gauge-lane-name" });
+      text.createDiv({ text: problem ? describeScaleProblem(problem) : (c.scale ?? []).join(" · "), cls: `czm-pg-gauge-lane-scale${problem ? " is-problem" : ""}` });
+    }
+    if (ticked.length >= MAX_LANES && graded.length > MAX_LANES) list.createDiv({ text: `${MAX_LANES} lanes at most: untick one to pick another.`, cls: "czm-map-absent" });
+    for (const lane of this.lanes) {
+      const at = lane.inversions.map((p) => `${p + 1} ${this.rows[p]?.scene.title || ""}`.trim()).join(", ");
+      section.createDiv({ text: `${lane.column.heading.name}: ${lane.charged} of ${this.rows.length} charged${lane.unread ? `, ${lane.unread} unread` : ""}, total ends at ${signed(lane.rows.at(-1)?.total ?? 0)}${lane.inversions.length ? `, ${plural(lane.inversions.length, "inversion")} at ${at}` : ", no inversion"}${lane.unit > 1 ? ` · line: 1 step = ${lane.unit}` : ""}`, cls: "czm-map-absent czm-pg-gauge-summary" });
+    }
+    if (this.lanes.length > 1) section.createDiv({ text: this.disagree.size ? `${plural(this.disagree.size, "disagreement")}: opposite signs at ${[...this.disagree].sort((a, b) => a - b).map((p) => p + 1).join(", ")}, marked ≠ on the scene.` : "The lanes never disagree.", cls: "czm-map-absent czm-pg-gauge-summary" });
   }
 
   private renderCell(tr: HTMLElement, column: GridColumn, cell: GridCell, row: GridRow, at: Selection, frozen = false): void {
@@ -820,7 +1007,7 @@ export class PlotGridView extends ItemView {
     const reading = cell.reading;
     const el = td.createDiv({
       cls: `czm-pg-cell is-${stop ? cell.state : "empty"}${unmoved ? " is-unmoved" : ""}${reading ? ` has-reading${reading.stale ? " is-stale" : ""}` : ""}${selected ? " is-selected" : ""}`,
-      attr: { role: "button", tabindex: selected || (!this.selection && at.col === 0 && at.row === 0) ? "0" : "-1", "data-col": String(at.col), "data-row": String(at.row), "aria-selected": String(selected), "aria-label": stop ? `${where}: ${stop.role && stop.role !== "touch" ? `${stop.role}, ` : ""}${stop.note || stop.quote || ""}` : unmoved ? `${where}: ${column.entity?.name ?? "the character"} is on the page, unmoved` : `${where}: empty` },
+      attr: { role: "button", tabindex: selected || (!this.selection && at.col === 0 && at.row === 0) ? "0" : "-1", "data-col": String(at.col), "data-row": String(at.row), "aria-selected": String(selected), "aria-label": stop ? `${where}: ${stop.role && stop.role !== "touch" ? `${stop.role}, ` : ""}${stop.keyword ? `${stop.keyword}, ` : ""}${stop.note || stop.quote || ""}` : unmoved ? `${where}: ${column.entity?.name ?? "the character"} is on the page, unmoved` : `${where}: empty` },
     });
     if (stop && column.special === "pov") {
       const dot = el.createSpan({ cls: "czm-pg-dot czm-pg-pov-dot" });
@@ -830,6 +1017,11 @@ export class PlotGridView extends ItemView {
       if (this.audit) el.createSpan({ text: STATE_GLYPH[cell.state as "plan" | "verified" | "broken"], cls: `czm-pg-state-glyph is-${cell.state}`, attr: { title: cell.state } });
       const glyph = stop.role ? ROLE_GLYPH[stop.role] : "";
       if (glyph && stop.role) el.createSpan({ text: glyph, cls: `czm-pg-role is-${stop.role}`, attr: { title: stop.role } });
+      if (stop.keyword) {
+        const scale = readScale(column.scale);
+        const charge = scale ? chargeOf(stop.keyword, scale) : null;
+        el.createSpan({ text: charge === null ? stop.keyword : `${signed(charge)} ${stop.keyword}`, cls: `czm-pg-keyword is-${charge === null ? "plain" : charge < 0 ? "neg" : charge > 0 ? "pos" : "neutral"}`, attr: { title: charge === null ? `${stop.keyword}: not on the column's scale` : `${stop.keyword}: ${signed(charge)} on the scale` } });
+      }
       el.createSpan({ text: stop.note || (stop.quote ? `“${stop.quote}”` : ""), cls: "czm-pg-cell-text" });
       if (cell.more.length) el.createSpan({ text: `+${cell.more.length}`, cls: "czm-pg-more", attr: { title: cell.more.map((m) => m.note).join("\n") } });
       if (cell.state === "broken") el.title = `“${stop.quote}” is no longer in the scene`;
@@ -1020,6 +1212,7 @@ export class PlotGridView extends ItemView {
       { label: "Check this column against the draft…", command: "plot-grid-check-column", disabled: !!this.running || c.filled === 0, onClick: () => void this.readColumns([c], "checking") },
       { label: `Dismiss all readings${c.readings ? ` (${c.readings})` : ""}`, disabled: c.readings === 0, onClick: () => { if (this.project) void this.source.dismissColumnReadings(this.project, c.heading.heading).then(() => this.show(this.project, true)); } },
       "-",
+      { label: "Gauge this column", icon: "activity", command: "plot-grid-gauge-column", checked: this.gaugePrefs.shown && this.laneHeadings().includes(c.heading.heading), disabled: !c.scale || DERIVED.includes(c.special), onClick: () => this.gaugeColumn(c) },
       { label: "Freeze up to here", icon: "panel-left", checked: this.frozenHeading === c.heading.heading, onClick: () => { const on = this.frozenHeading === c.heading.heading; this.setFrozen(on ? null : c.heading.heading); this.renderTable(); this.status?.say(on ? "Scene and Plot stay put; the threads scroll." : `Frozen up to “${c.heading.name}”: it stays put with Scene and Plot while the rest scroll.`); } },
       { label: "Hide column", icon: "eye-off", command: "plot-grid-hide-column", onClick: () => this.hideColumn(c) },
       { label: "Delete column…", icon: "x", onClick: () => { this.openSide("pg-columns"); const del = this.shell?.side.querySelector<HTMLButtonElement>(`.czm-pg-col-delete[data-heading="${attrValue(c.heading.heading)}"]`); del?.click(); del?.focus(); } },
@@ -1086,6 +1279,11 @@ export class PlotGridView extends ItemView {
       { label: "payoff", color: "", cls: "czm-pg-key-role is-payoff" },
       { label: "reversal · turn", color: "", cls: "czm-pg-key-role is-reversal" },
       { label: "want · lie · truth", color: "", cls: "czm-pg-key-role is-arc" },
+      ...(this.lanes.length ? [
+        { label: "below neutral", color: "", cls: "czm-pg-key-gauge is-neg" },
+        { label: "above neutral", color: "", cls: "czm-pg-key-gauge is-pos" },
+        { label: "running total · inversion", color: "", cls: "czm-pg-key-gauge is-line" },
+      ] : []),
       ...kinds,
     ]);
   }
@@ -1234,6 +1432,7 @@ export class PlotGridView extends ItemView {
     else this.renderColumnSection(colOne, picked);
     const columns = this.grid.columns;
     const colSection = shell.section("Columns", `${columns.length}${this.hidden.length ? ` · ${this.hidden.length} hidden` : ""}${this.grid.unknownPrefixes.length ? ` · ${this.grid.unknownPrefixes.length} unread` : ""}`, "pg-columns", true);
+    this.renderGaugeSection(shell.section("Gauge", this.gaugePrefs.shown ? (this.lanes.length ? plural(this.lanes.length, "lane") : "on · no scale") : "off", "pg-gauge", false));
     if (this.gaps.length) this.renderGaps(shell.section("Gaps", plural(this.gaps.length, "finding"), "pg-gaps", true));
     const modelSection = shell.section("Model", this.source.modelLabel() || "off", "pg-model", false);
     modelSection.createDiv({ text: this.source.modelLabel() ? `${this.source.modelLabel()}. Read… asks what each thread does in each scene and leaves a reading in the empty cells; you write the cell in your own words, or dismiss it. The model never writes a cell, and never a chapter.` : "No model. Set Model to Local (Ollama) or Claude in Creative Writer settings to read columns.", cls: "czm-map-absent" });
