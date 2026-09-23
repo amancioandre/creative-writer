@@ -1503,9 +1503,9 @@ export class PlotGridView extends ItemView {
       const text = field.value.trim();
       const was = sel.cell.stop ? `${sel.cell.stop.keyword ? `${sel.cell.stop.keyword}: ` : ""}${sel.cell.stop.note}` : "";
       if (save && text !== was) {
-        // A role or a scale word typed at the front is read as such, as the note reads it; what was not typed is kept.
+        // A role or a scale word typed at the front is read as such, as the note reads it. The role and the quote are not shown in the field, so they are kept unless typed; the keyword is shown, so deleting it takes it off the stop.
         const parsed = parseStopText(text, rolesFor(sel.column.heading.heading), scale?.words ?? []);
-        void this.writeCell(sel.column, sel.row, sel.cell.stop, parsed.note, { ...(parsed.role !== "touch" ? { role: parsed.role } : {}), ...(parsed.keyword ? { keyword: parsed.keyword } : {}), ...(parsed.quote ? { quote: parsed.quote } : {}) });
+        void this.writeCell(sel.column, sel.row, sel.cell.stop, parsed.note, { ...(parsed.role !== "touch" ? { role: parsed.role } : {}), keyword: parsed.keyword, ...(parsed.quote ? { quote: parsed.quote } : {}) });
       } else this.renderTable();
       window.setTimeout(() => this.select(this.selection ?? { col: 0, row: 0 }), 0);
     };

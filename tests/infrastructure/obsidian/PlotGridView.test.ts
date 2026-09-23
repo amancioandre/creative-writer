@@ -1218,7 +1218,7 @@ describe("setting a scale and writing a keyword", () => {
     field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); await tick();
     expect(calls.writes.at(-1)).toBe("add Theme: Should jealousy justify violent acts?: One#Later touch  he waits");
     expect(note()).toContain("- [[One#Later]] — sympathy: he waits");
-    // A chip puts its word in front, replacing the one there; a note with no word keeps the stop's.
+    // A chip puts its word in front, replacing the one there; a note typed with no word takes the stop's word off.
     const again = el.querySelector<HTMLElement>('.czm-pg-cell[data-col="0"][data-row="2"]')!;
     again.click(); again.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     const f2 = el.querySelector(".czm-pg-editor") as HTMLTextAreaElement;
@@ -1226,7 +1226,10 @@ describe("setting a scale and writing a keyword", () => {
     expect(f2.value).toBe("hate: he waits");
     f2.value = "he waits longer";
     f2.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); await tick();
-    expect(note()).toContain("- [[One#Later]] — sympathy: he waits longer");
+    // The word was shown in the field and is gone from it: the stop loses it. The line keeps its note.
+    expect(note()).toContain("- [[One#Later]] — he waits longer");
+    expect(note()).not.toContain("sympathy: he waits longer");
+    expect(el.querySelector('.czm-pg-cell[data-col="0"][data-row="2"] .czm-pg-keyword')).toBeNull();
     // Tab on a word that is not a start of exactly one scale word finishes the edit as before.
     const third = el.querySelector<HTMLElement>('.czm-pg-cell[data-col="1"][data-row="1"]')!;
     third.click(); third.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));

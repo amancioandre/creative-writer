@@ -4,6 +4,7 @@ Release notes for every version are on the [releases page](https://github.com/am
 
 ## Unreleased
 
+- **A keyword deleted in the cell is gone from the stop.** The cell editor shows the scale word in front of the note; clearing it there now takes it off the line, where before the last word stayed.
 - **A summary under the column's name.** A comment line under a heading in `Story threads.md` is the column's summary, what the arc is or what the theme argues, shown under the name in three lines at most and whole on hover; a double click on it, or on the faint *summary…* under a name without one, edits it where it is read, with Undo; **Summary…** in the column's menu and the Column section reach the same line.
 
 ## 0.14.1 — Headers that wrap
