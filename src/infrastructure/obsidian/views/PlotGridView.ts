@@ -1001,7 +1001,9 @@ export class PlotGridView extends ItemView {
     if (ticked.length >= MAX_LANES && graded.length > MAX_LANES) list.createDiv({ text: `${MAX_LANES} lanes at most: untick one to pick another.`, cls: "czm-map-absent" });
     for (const lane of this.lanes) {
       const at = lane.inversions.map((p) => `${p + 1} ${this.rows[p]?.scene.title || ""}`.trim()).join(", ");
-      section.createDiv({ text: `${lane.column.heading.name}: ${lane.charged} of ${this.rows.length} charged${lane.unread ? `, ${lane.unread} unread` : ""}, total ends at ${signed(lane.rows.at(-1)?.total ?? 0)}${lane.inversions.length ? `, ${plural(lane.inversions.length, "inversion")} at ${at}` : ", no inversion"}${lane.unit > 1 ? ` · line: 1 step = ${lane.unit}` : ""}`, cls: "czm-map-absent czm-pg-gauge-summary" });
+      const end = lane.rows.at(-1)?.total ?? 0;
+      const leans = end > 0 ? `leans to ${lane.scale.words.at(-1)}` : end < 0 ? `leans to ${lane.scale.words[0]}` : "ends level";
+      section.createDiv({ text: `${lane.column.heading.name}: ${lane.charged} of ${this.rows.length} charged${lane.unread ? `, ${lane.unread} unread` : ""}, total ends at ${signed(end)}, ${leans}${lane.inversions.length ? `, ${plural(lane.inversions.length, "inversion")} at ${at}` : ", no inversion"}${lane.unit > 1 ? ` · line: 1 step = ${lane.unit}` : ""}`, cls: "czm-map-absent czm-pg-gauge-summary" });
     }
     if (this.lanes.length > 1) section.createDiv({ text: this.disagree.size ? `${plural(this.disagree.size, "disagreement")}: opposite signs at ${[...this.disagree].sort((a, b) => a - b).map((p) => p + 1).join(", ")}, marked ≠ on the scene.` : "The lanes never disagree.", cls: "czm-map-absent czm-pg-gauge-summary" });
   }
@@ -1032,7 +1034,7 @@ export class PlotGridView extends ItemView {
     const sheet = this.scaleSheet, project = this.project;
     const column = this.grid.columns.find((c) => c.heading.heading === sheet?.heading);
     if (!sheet || !project || !column) return;
-    section.createDiv({ text: "Most negative first, the middle word neutral, every step equal. The words name the nuances the theme pivots through: the gauge is there to show where the story reverses.", cls: "czm-map-absent" });
+    section.createDiv({ text: "Most negative first, the middle word neutral, every step equal. For a theme asked as a question, the two ends are its two answers, and the words between are the nuances the story pivots through. The gauge shows where the story reverses, where it pays off, and which answer it ends on.", cls: "czm-map-absent" });
     const list = section.createDiv({ cls: "czm-pg-scale-list", attr: { role: "group", "aria-label": "Scale words, most negative first" } });
     const neutral = (sheet.words.length - 1) / 2;
     sheet.words.forEach((w, i) => {

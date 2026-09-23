@@ -1068,8 +1068,8 @@ describe("the value gauge", () => {
     expect([...el.querySelectorAll(".czm-pg-scene-head .czm-pg-disagree")].map((d) => d.closest(".czm-pg-scene")?.getAttribute("data-row"))).toEqual(["0", "3"]);
     expect(el.querySelector(".czm-shell-state")?.textContent).toContain("2 lanes · 2 disagreements");
     expect([...el.querySelectorAll(".czm-pg-gauge-summary")].map((d) => d.textContent)).toEqual([
-      "Ilse: 2 of 4 charged, total ends at +1, 1 inversion at 4 Return",
-      "Should jealousy justify violent acts?: 3 of 4 charged, total ends at −2, 1 inversion at 4 Return",
+      "Ilse: 2 of 4 charged, total ends at +1, leans to love, 1 inversion at 4 Return",
+      "Should jealousy justify violent acts?: 3 of 4 charged, total ends at −2, leans to hate, 1 inversion at 4 Return",
       "2 disagreements: opposite signs at 1, 4, marked ≠ on the scene.",
     ]);
     // The column's own menu row unticks it again.

@@ -121,7 +121,7 @@ The model reads; you write. A pass over a column shows the model each scene that
 
 ## The value gauge
 
-Every scene turns on a value, and the story's shape is where that value reverses. Give a column a **scale**, an odd list of words from the most negative to the most positive, and start each of its stops with the word the scene mostly appears to be; the gauge draws the rest and stores nothing.
+Every scene turns on a value, and the story's shape is where that value reverses, where it pays off, and which answer to its question it leans into. Told from a villain's side, the reader's scale and the character's part ways, and the gauge shows where. Give a column a **scale**, an odd list of words from the most negative to the most positive, and start each of its stops with the word the scene mostly appears to be; the gauge draws the rest and stores nothing.
 
 ```markdown
 ## Theme: Should jealousy justify violent acts?

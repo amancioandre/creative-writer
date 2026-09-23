@@ -12,7 +12,7 @@ It is a feature of storytelling, not of the grid. It first appears as a column t
 
 | Term | Meaning |
 |---|---|
-| **Scale** | An ordered, odd-length list of words for one column, from the most negative to the most positive, written as one comment line under the column's heading. The middle word is neutral. Five words is the norm; eleven is the cap. The words name the nuances the theme pivots through, because the point of the scale is the reversal. |
+| **Scale** | An ordered, odd-length list of words for one column, from the most negative to the most positive, written as one comment line under the column's heading. The middle word is neutral. Five words is the norm; eleven is the cap. For a theme asked as a question the two ends are its two answers, and the words between are the nuances the story pivots through; the gauge shows where the story reverses, where it pays off, and which answer it ends on. From a villain's side the audience's scale and the character's diverge, which is what two lanes show. |
 | **Keyword** | The scale word the scene mostly appears to be on this column, written at the front of its stop as `word:`. One per scene per column. Its position on the scale is the scene's **charge**: −2 to +2 on a five-word scale, −5 to +5 on eleven. Independent of the stop's role. |
 | **Gauged column** | A column whose heading carries a scale. Themes by default; an arc may carry one too, for what the character feels rather than what the audience should. Any column with a scale line can be gauged. |
 | **Lane** | One gauged column drawn as a thermometer. The gauge column shows the main theme's lane by default; the side column's Gauge section ticks more, and lanes beyond three fold into a picker so the view does not clutter. |
