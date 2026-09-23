@@ -543,6 +543,8 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 .czm-pg-note th { position: sticky; left: 0; background: var(--background-secondary); font-weight: 600; padding-top: 8px; padding-bottom: 3px; }
 .czm-pg-note-total { margin-left: 10px; font-weight: normal; color: var(--text-muted); font-family: var(--font-monospace); font-variant-numeric: tabular-nums; }
 .czm-pg-act th { position: sticky; left: 0; background: var(--background-primary); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); padding-top: 12px; }
+/* A band's cell is as wide as the row and cannot stick; its label can, so the act and the chapter stay put while the threads scroll. */
+.czm-pg-band { display: inline-flex; align-items: baseline; gap: 8px; position: sticky; left: 4px; max-width: calc(100% - 8px); }
 .is-link { cursor: pointer; }
 .is-link:hover { text-decoration: underline; }
 .czm-pg-scene-head { position: sticky; left: 0; background: var(--background-primary); cursor: pointer; white-space: nowrap; min-width: 180px; z-index: 1; }

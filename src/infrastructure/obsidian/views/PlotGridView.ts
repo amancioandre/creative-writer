@@ -790,8 +790,10 @@ export class PlotGridView extends ItemView {
           if (act) {
             const actTr = tbody.createEl("tr", { cls: `czm-pg-act${group ? " is-outline" : ""}` });
             const th = actTr.createEl("th", { attr: { colspan: String(span), scope: "rowgroup" } });
-            th.createSpan({ text: group ? group.act : act, cls: group ? "is-link czm-pg-group-name" : "" });
-            if (group) { th.createSpan({ text: "outline · no folder yet", cls: "czm-pg-note-total" }); this.groupControls(th, row, "act"); }
+            // The band spans the row, so its label sticks on its own: the cell cannot, being as wide as what scrolls.
+            const band = th.createDiv({ cls: "czm-pg-band" });
+            band.createSpan({ text: group ? group.act : act, cls: group ? "is-link czm-pg-group-name" : "" });
+            if (group) { band.createSpan({ text: "outline · no folder yet", cls: "czm-pg-note-total" }); this.groupControls(band, row, "act"); }
             for (const lane of this.lanes) this.renderGaugePass(actTr, lane, i);
           }
         }
@@ -800,14 +802,15 @@ export class PlotGridView extends ItemView {
           lastChapter = chapterKey;
           const tr = tbody.createEl("tr", { cls: `czm-pg-note${group ? " is-outline" : ""}` });
           const th = tr.createEl("th", { attr: { colspan: String(span), scope: "rowgroup" } });
-          const link = th.createSpan({ text: group ? group.chapter || "(no chapter)" : basenameOf(row.scene.path), cls: "is-link czm-pg-group-name" });
+          const band = th.createDiv({ cls: "czm-pg-band" });
+          const link = band.createSpan({ text: group ? group.chapter || "(no chapter)" : basenameOf(row.scene.path), cls: "is-link czm-pg-group-name" });
           onActivate(link, () => { if (group) this.source.reveal({ path: row.scene.path, title: group.chapter, line: Math.max(0, group.chapterLine) }); else this.source.openNote(row.scene.path); });
           // The one structural question the row can answer: how much of the book, and how much of the cast, this chapter holds.
           const chapter = rows.filter((r) => (r.group ? `${r.scene.path}#chapter${r.group.chapterLine}` : r.scene.path) === chapterKey);
           const words = chapter.reduce((n, r) => n + r.words, 0);
           const names = new Set(chapter.flatMap((r) => r.present).filter((id) => cast.some((c) => c.id === id))).size;
-          th.createSpan({ text: group ? `${plural(chapter.length, "scene")} · outline · no note yet` : `${plural(chapter.length, "scene")} · ${words.toLocaleString()} words · ${names} of the cast`, cls: "czm-pg-note-total" });
-          if (group) this.groupControls(th, row, "chapter");
+          band.createSpan({ text: group ? `${plural(chapter.length, "scene")} · outline · no note yet` : `${plural(chapter.length, "scene")} · ${words.toLocaleString()} words · ${names} of the cast`, cls: "czm-pg-note-total" });
+          if (group) this.groupControls(band, row, "chapter");
           for (const lane of this.lanes) this.renderGaugePass(tr, lane, i);
         }
         this.renderRow(tbody, row, columns, cast, settings, frozenUpTo, segments);
