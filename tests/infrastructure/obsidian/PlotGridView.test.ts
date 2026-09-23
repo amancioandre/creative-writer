@@ -1298,27 +1298,35 @@ describe("a column's summary", () => {
     expect(heads[0]!.querySelector(".czm-pg-col-summary")?.textContent).toBe("A self-sacrifice arc: she realises she has been vain and chose herself over the love of this life");
     expect(heads[0]!.querySelector(".czm-pg-col-summary")?.getAttribute("title")).toContain("self-sacrifice");
     expect(heads[0]!.querySelector(".czm-pg-col-title")?.textContent).toBe("Ilse");
-    expect(heads[1]!.querySelector(".czm-pg-col-summary")).toBeNull();
-    // The gate has none: its menu offers to add one, and the Column section writes it.
-    (heads[1]!.querySelector(".czm-pg-col-more") as HTMLElement).click();
-    const row = Menu.last!.items.find((i) => i.title.startsWith("Add a summary…"))!;
-    row.cb();
-    const field = el.querySelector(".czm-map-section-pg-column .czm-pg-summary-field") as HTMLTextAreaElement;
+    // The gate has none: a faint prompt sits under its name, and a double click on it opens a field there.
+    const prompt = heads[1]!.querySelector(".czm-pg-col-summary") as HTMLElement;
+    expect(prompt.classList.contains("is-empty")).toBe(true);
+    expect(prompt.textContent).toBe("summary…");
+    prompt.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    const field = heads[1]!.querySelector(".czm-pg-summary-inline") as HTMLTextAreaElement;
     expect(field.value).toBe("");
     field.value = "  The letter nobody collects,\n and who finally does  ";
-    (el.querySelector(".czm-pg-summary-save") as HTMLElement).click(); await tick();
+    field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); await tick();
     expect(calls.writes.at(-1)).toBe("summary Subplot: The gate: The letter nobody collects, and who finally does");
     expect(note()).toContain("## Subplot: The gate\n<!-- The letter nobody collects, and who finally does -->\n- [[One#Camp]]");
-    expect([...el.querySelectorAll(".czm-pg-col-thread .czm-pg-col-summary")].map((d) => d.textContent)).toHaveLength(2);
+    expect([...el.querySelectorAll(".czm-pg-col-thread .czm-pg-col-summary:not(.is-empty)")].map((d) => d.textContent)).toHaveLength(2);
     expect(el.querySelector(".czm-map-status")?.textContent).toContain("Summary written for “The gate”");
     (el.querySelector(".czm-map-status button") as HTMLElement).click(); await tick();
     expect(note()).toBe(withSummary);
-    // Emptying the field takes the line out.
-    v.select({ col: 0, row: 0 });
-    const f2 = el.querySelector(".czm-map-section-pg-column .czm-pg-summary-field") as HTMLTextAreaElement;
+    // Escape puts the line back; the menu row opens the same field; emptying it takes the line out.
+    const ilse = () => el.querySelector(".czm-pg-col-thread .czm-pg-col-summary") as HTMLElement;
+    ilse().dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    const f1 = el.querySelector(".czm-pg-summary-inline") as HTMLTextAreaElement;
+    expect(f1.value).toContain("self-sacrifice");
+    f1.value = "changed";
+    f1.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); await tick();
+    expect(note()).toBe(withSummary);
+    (el.querySelector(".czm-pg-col-thread .czm-pg-col-more") as HTMLElement).click();
+    Menu.last!.items.find((i) => i.title.startsWith("Summary…"))!.cb();
+    const f2 = el.querySelector(".czm-pg-summary-inline") as HTMLTextAreaElement;
     expect(f2.value).toContain("self-sacrifice");
     f2.value = "";
-    (el.querySelector(".czm-pg-summary-save") as HTMLElement).click(); await tick();
+    f2.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); await tick();
     expect(note()).not.toContain("<!--");
     expect(el.querySelector(".czm-map-status")?.textContent).toContain("Summary removed from “Ilse”");
   });

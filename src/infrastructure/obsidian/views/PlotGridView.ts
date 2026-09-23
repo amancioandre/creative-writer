@@ -751,7 +751,11 @@ export class PlotGridView extends ItemView {
       name.createSpan({ text: c.heading.name, cls: "czm-pg-col-title" });
       onActivate(name, () => this.pickColumn(col));
       name.addEventListener("dblclick", (ev) => { ev.preventDefault(); this.renameColumnInPlace(c); });
-      if (c.summary) { th.createDiv({ text: c.summary, cls: "czm-pg-col-summary", attr: { title: c.summary } }); th.title = c.summary; }
+      // The summary sits under the name in the same box: a double click writes it where it is read, and an empty one shows a faint prompt on hover.
+      const summary = th.createDiv({ text: c.summary ?? "summary…", cls: `czm-pg-col-summary${c.summary ? "" : " is-empty"}`, attr: { "data-heading": c.heading.heading, title: c.summary ? c.summary : "Double-click to write what this column is", role: "button", tabindex: "-1", "aria-label": c.summary ? `Summary: ${c.summary}. Double-click to edit` : "No summary yet. Double-click to write one" } });
+      if (c.summary) th.title = c.summary;
+      summary.addEventListener("dblclick", (ev) => { ev.preventDefault(); ev.stopPropagation(); this.editSummaryInPlace(c, summary); });
+      summary.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !inField(ev)) { ev.preventDefault(); ev.stopPropagation(); this.editSummaryInPlace(c, summary); } });
       const sub = th.createDiv({ cls: "czm-pg-col-sub" });
       const audit = this.audit ? ` · ${c.verified} ${STATE_GLYPH.verified}${c.broken ? ` · ${c.broken} ${STATE_GLYPH.broken}` : ""}` : "";
       sub.createSpan({ text: `${c.special ? `${SPECIAL_LABEL[c.special].toLowerCase()} · ` : ""}${c.filled} of ${rows.length}${audit}`, cls: "czm-pg-col-count" });
@@ -1357,7 +1361,7 @@ export class PlotGridView extends ItemView {
     const jobRows: MenuEntry[] = (["pov", "time", "beats", "main-theme"] as SpecialColumn[]).map((job) => ({ label: c.special === job ? `Stop using as ${SPECIAL_LABEL[job]}` : `Use as ${SPECIAL_LABEL[job]}`, checked: c.special === job, onClick: () => void this.setSpecial(c, job) }));
     return [
       { label: "Rename…", icon: "pencil", onClick: () => this.renameColumnInPlace(c) },
-      { label: c.summary ? "Summary…" : "Add a summary…", icon: "text", onClick: () => this.openSide("pg-column", ".czm-pg-summary-field") },
+      { label: c.summary ? "Summary…" : "Add a summary…", icon: "text", onClick: () => { const host = this.body?.querySelector<HTMLElement>(`.czm-pg-col-thread[data-block] .czm-pg-col-summary[data-heading="${attrValue(c.heading.heading)}"]`); if (host) this.editSummaryInPlace(c, host); else this.openSide("pg-column", ".czm-pg-summary-field"); } },
       { label: DERIVED.includes(c.special) ? "Move left" : `Move the ${KIND_GROUP[c.heading.kind].toLowerCase()} left`, icon: "arrow-left", onClick: () => void this.nudgeBlock(c, -1) },
       { label: DERIVED.includes(c.special) ? "Move right" : `Move the ${KIND_GROUP[c.heading.kind].toLowerCase()} right`, icon: "arrow-right", onClick: () => void this.nudgeBlock(c, 1) },
       "-",
@@ -1741,6 +1745,30 @@ export class PlotGridView extends ItemView {
     save.addEventListener("click", () => { save.disabled = true; void this.writeSummary(c, field.value).finally(() => { save.disabled = false; }); });
     summary.createDiv({ text: "Kept as a comment under the heading in Story threads.md; shown under the column's name, whole on hover.", cls: "czm-map-absent" });
     section.createDiv({ text: `${c.filled} of ${this.rows.length} scenes · ${c.verified} verified · ${c.broken} broken${c.entity ? ` · bound to ${c.entity.name}` : c.heading.kind === "arc" ? " · no character of that name on the map" : ""}`, cls: "czm-map-absent" });
+  }
+
+  /** The summary as a field in the header itself, where it is read: Enter writes it, Shift+Enter a new line, Escape puts it back. */
+  private editSummaryInPlace(c: GridColumn, host: HTMLElement): void {
+    if (this.editing) return;
+    this.editing = true;
+    host.empty();
+    host.addClass("is-editing");
+    const field = host.createEl("textarea", { cls: "czm-pg-summary-inline", attr: { rows: "3", "aria-label": `Summary of ${c.heading.name}`, placeholder: "What this column is: the shape of the arc, what the theme argues" } });
+    field.value = c.summary ?? "";
+    let done = false;
+    const finish = (ok: boolean) => {
+      if (done) return;
+      done = true;
+      this.editing = false;
+      if (ok) void this.writeSummary(c, field.value).then(() => { if ((field.value.replace(/\s+/g, " ").trim() || null) === (c.summary ?? null)) this.renderTable(); });
+      else this.renderTable();
+    };
+    field.addEventListener("keydown", (ev) => { ev.stopPropagation(); if (ev.key === "Escape") { ev.preventDefault(); finish(false); } else if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); finish(true); } });
+    field.addEventListener("click", (ev) => ev.stopPropagation());
+    field.addEventListener("dblclick", (ev) => ev.stopPropagation());
+    field.addEventListener("blur", () => finish(true));
+    field.focus();
+    field.setSelectionRange(field.value.length, field.value.length);
   }
 
   /** Writes the column's summary as the comment under its heading, with Undo; an emptied field takes the line out. */
