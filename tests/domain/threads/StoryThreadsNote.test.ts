@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { addThread, removeThread, appendThreadItems, formatThreadItem, parseStopText, parseStoryThreads, relinkThreadItems, removeThreadItem, renameThread, resolveThreadRef, sameLink, serializeStoryThreadsNote, upsertThreadItem } from "../../../src/domain/threads/StoryThreadsNote";
+import { addThread, removeThread, appendThreadItems, formatThreadItem, parseStopText, parseStoryThreads, relinkThreadItems, removeThreadItem, renameScaleWord, renameThread, resolveThreadRef, sameLink, scaleComment, serializeStoryThreadsNote, setThreadScale, upsertThreadItem } from "../../../src/domain/threads/StoryThreadsNote";
 
 const note = `---
 creative-writer: false
@@ -27,10 +27,10 @@ describe("Story threads note", () => {
     const threads = parseStoryThreads(note);
     expect(threads.map((t) => t.name)).toEqual(["The letter", "Empty"]);
     expect(threads[0]!.items).toEqual([
-      { link: "Chapter 3#The station", note: "Anna pockets it", line: 9, role: "touch", quote: null },
-      { link: "Chapter 12#Dinner", note: "first mentioned aloud", line: 10, role: "touch", quote: null },
-      { link: "Chapter 41#The reading", note: "payoff", line: 11, role: "touch", quote: null },
-      { link: "Chapter 50", note: "", line: 12, role: "touch", quote: null },
+      { link: "Chapter 3#The station", note: "Anna pockets it", line: 9, role: "touch", quote: null, keyword: null },
+      { link: "Chapter 12#Dinner", note: "first mentioned aloud", line: 10, role: "touch", quote: null, keyword: null },
+      { link: "Chapter 41#The reading", note: "payoff", line: 11, role: "touch", quote: null, keyword: null },
+      { link: "Chapter 50", note: "", line: 12, role: "touch", quote: null, keyword: null },
     ]);
     expect(threads[1]!.items).toEqual([]);
   });
@@ -50,7 +50,7 @@ describe("Story threads note", () => {
       ["touch", "salt on the wind", ""],
       ["reversal", null, ""],
     ]);
-    expect(parseStopText("payoff is not a role here")).toEqual({ role: "touch", quote: null, note: "payoff is not a role here" });
+    expect(parseStopText("payoff is not a role here")).toEqual({ role: "touch", quote: null, keyword: null, note: "payoff is not a role here" });
   });
 
   it("writes a stop line in a fixed order and reads it back the same", () => {
@@ -108,9 +108,9 @@ describe("Story threads note", () => {
       { scene: { path: "Novel/Chapter 3.md", title: "Platform", line: 40 }, index: 3 },
       { scene: { path: "Novel/Chapter 12.md", title: "Dinner", line: 0 }, index: 7 },
     ];
-    expect(resolveThreadRef({ link: "Chapter 3#the STATION", note: "n", line: 1, role: "touch", quote: null }, scenes)).toEqual({ scene: scenes[0]!.scene, index: 2, note: "n", line: 1, role: "touch" });
-    expect(resolveThreadRef({ link: "Chapter 3", note: "", line: 2, role: "plant", quote: "q" }, scenes)).toMatchObject({ index: 2, role: "plant", quote: "q" });
-    const broken = resolveThreadRef({ link: "Chapter 99#Nowhere", note: "?", line: 3, role: "touch", quote: null }, scenes);
+    expect(resolveThreadRef({ link: "Chapter 3#the STATION", note: "n", line: 1, role: "touch", quote: null, keyword: null }, scenes)).toEqual({ scene: scenes[0]!.scene, index: 2, note: "n", line: 1, role: "touch" });
+    expect(resolveThreadRef({ link: "Chapter 3", note: "", line: 2, role: "plant", quote: "q", keyword: null }, scenes)).toMatchObject({ index: 2, role: "plant", quote: "q" });
+    const broken = resolveThreadRef({ link: "Chapter 99#Nowhere", note: "?", line: 3, role: "touch", quote: null, keyword: null }, scenes);
     expect(broken.index).toBe(-1);
     expect(broken.unresolved).toBe("Chapter 99#Nowhere");
     expect(broken.scene).toEqual({ path: "Chapter 99", title: "Nowhere", line: 0 });
@@ -144,5 +144,67 @@ describe("relinkThreadItems", () => {
     expect(changed).toBe(2);
     expect(markdown).toBe(`## Subplot: The trial\n- [[The perfect record#1 Gainesville courtroom]] — plant: "he wins" the file lands\n- [[Outline#4 Bathroom]] — later\n\n## Arc: [[Kevin]]\n- [[The perfect record#1 Gainesville courtroom]] — want: to win\n`);
     expect(relinkThreadItems(md, "Outline#Nowhere", "X#Y")).toEqual({ markdown: md, changed: 0 });
+  });
+});
+
+describe("a thread's scale and a stop's keyword", () => {
+  const graded = `## Theme: Should jealousy justify violent acts?
+<!-- scale: hate, disgust, indifference, sympathy, love -->
+- [[Chapter 1#The customs house]] — sympathy: Tomas carries her trunk up from the quay
+- [[Chapter 3#The station]] — Disgust: she wipes his kiss off
+- [[Chapter 4#Dinner]] — reversal: hate: "his hand found her wrist" he breaks Ilse's wrist
+- [[Chapter 5#The quarry]] — love: payoff: two words, the role second
+- [[Chapter 6#The flood]] — note: a word with a colon that is on no scale
+- [[Chapter 7#The hearing]] — plant: "a quote" no keyword at all
+
+## Arc: [[Anna]]
+- [[Chapter 4#Dinner]] — fear: says nothing about the wrist
+`;
+
+  it("reads the scale line under the heading and the keyword at the front of a stop, before or after the role", () => {
+    const [theme, arc] = parseStoryThreads(graded);
+    expect(theme!.scale).toEqual(["hate", "disgust", "indifference", "sympathy", "love"]);
+    expect(theme!.scaleLine).toBe(1);
+    expect(theme!.items.map((i) => [i.role, i.keyword, i.quote, i.note])).toEqual([
+      ["touch", "sympathy", null, "Tomas carries her trunk up from the quay"],
+      ["touch", "disgust", null, "she wipes his kiss off"],
+      ["reversal", "hate", "his hand found her wrist", "he breaks Ilse's wrist"],
+      ["payoff", "love", null, "two words, the role second"],
+      ["touch", null, null, "note: a word with a colon that is on no scale"],
+      ["plant", null, "a quote", "no keyword at all"],
+    ]);
+    // No scale under the arc: "fear:" is note text, as every note written before scales still is.
+    expect(arc!.scale).toBeNull();
+    expect(arc!.items[0]).toMatchObject({ keyword: null, note: "fear: says nothing about the wrist" });
+  });
+
+  it("writes role, keyword, quote, note in that order and reads it back", () => {
+    const line = formatThreadItem("Chapter 4#Dinner", "he breaks it", { role: "reversal", keyword: "hate", quote: "her wrist" });
+    expect(line).toBe('- [[Chapter 4#Dinner]] — reversal: hate: "her wrist" he breaks it');
+    expect(parseStoryThreads(`## T\n<!-- scale: hate, calm, love -->\n${line}\n`)[0]!.items[0]).toMatchObject({ role: "reversal", keyword: "hate", quote: "her wrist", note: "he breaks it" });
+    // Upsert keeps the keyword when the edit does not mention it, and clears it on null.
+    const md = `## T\n<!-- scale: hate, calm, love -->\n- [[One#Quay]] — love: warm\n`;
+    expect(upsertThreadItem(md, "T", "One#Quay", "warmer")).toContain("- [[One#Quay]] — love: warmer");
+    expect(upsertThreadItem(md, "T", "One#Quay", "cold", { keyword: "hate" })).toContain("- [[One#Quay]] — hate: cold");
+    expect(upsertThreadItem(md, "T", "One#Quay", "plain", { keyword: null })).toContain("- [[One#Quay]] — plain");
+  });
+
+  it("sets, replaces and removes the scale line, right under the heading", () => {
+    const md = `## T\n- [[One#Quay]] — warm\n\n## U\n- [[One#Quay]]\n`;
+    const withScale = setThreadScale(md, "T", ["hate", "calm", "love"]);
+    expect(withScale).toBe(`## T\n<!-- scale: hate, calm, love -->\n- [[One#Quay]] — warm\n\n## U\n- [[One#Quay]]\n`);
+    expect(setThreadScale(withScale, "T", ["cold", "mild", "hot"])).toContain("<!-- scale: cold, mild, hot -->");
+    expect(setThreadScale(withScale, "T", null)).toBe(md);
+    expect(setThreadScale(md, "Nope", ["a", "b", "c"])).toBe(md);
+    expect(scaleComment([" a ", "", "b"])).toBe("<!-- scale: a, b -->");
+  });
+
+  it("renames a word of the scale and every stop that used it", () => {
+    const md = `## T\n<!-- scale: hate, calm, love -->\n- [[One#Quay]] — hate: cold\n- [[One#Creek]] — plant: hate: "salt" colder\n- [[Two#Return]] — love: warm\n`;
+    const r = renameScaleWord(md, "T", "hate", "loathing");
+    expect(r.changed).toBe(2);
+    expect(r.markdown).toBe(`## T\n<!-- scale: loathing, calm, love -->\n- [[One#Quay]] — loathing: cold\n- [[One#Creek]] — plant: loathing: "salt" colder\n- [[Two#Return]] — love: warm\n`);
+    expect(renameScaleWord(md, "T", "hate", "hate")).toEqual({ markdown: md, changed: 0 });
+    expect(renameScaleWord(md, "U", "hate", "x")).toEqual({ markdown: md, changed: 0 });
   });
 });

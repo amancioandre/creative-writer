@@ -1,5 +1,5 @@
 import type { ProjectSpec } from "../../domain/progress/Project";
-import { addThread, appendThreadItems, removeThread, removeThreadItem, renameThread, setStopRole, upsertThreadItem } from "../../domain/threads/StoryThreadsNote";
+import { addThread, appendThreadItems, removeThread, removeThreadItem, renameScaleWord, renameThread, setStopRole, setThreadScale, upsertThreadItem } from "../../domain/threads/StoryThreadsNote";
 import type { StopRole } from "../../domain/threads/Thread";
 
 /** A stop to write: where, what it is, the sentence it hangs on, a word about it. */
@@ -8,6 +8,8 @@ export interface StopToAdd {
   readonly note: string;
   readonly role?: StopRole;
   readonly quote?: string | null;
+  /** A word of the thread's scale: what the scene mostly appears to be. Undefined keeps what the line has; null clears it. */
+  readonly keyword?: string | null;
 }
 import type { StoryThreadsRepository } from "../ports/StoryThreadsRepository";
 
@@ -53,5 +55,17 @@ export class EditStoryThread {
   /** The heading and every stop under it. */
   async removeThread(project: ProjectSpec, name: string): Promise<void> {
     await this.repo.update(project, (md) => removeThread(md, name));
+  }
+
+  /** The thread's scale as one comment line under its heading; null takes the line out. */
+  async setScale(project: ProjectSpec, thread: string, words: readonly string[] | null): Promise<void> {
+    await this.repo.update(project, (md) => setThreadScale(md, thread, words));
+  }
+
+  /** One word of the scale renamed, in the scale line and in every stop that used it. Resolves to how many stops changed. */
+  async renameScaleWord(project: ProjectSpec, thread: string, from: string, to: string): Promise<number> {
+    let changed = 0;
+    await this.repo.update(project, (md) => { const r = renameScaleWord(md, thread, from, to); changed = r.changed; return r.markdown; });
+    return changed;
   }
 }

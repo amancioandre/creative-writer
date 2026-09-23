@@ -66,6 +66,8 @@ export interface ThreadRef {
   readonly quote?: string;
   /** Where the quote was found in the note; null when it was written but no longer matches — a broken anchor. */
   readonly anchor?: Anchor | null;
+  /** The scale word a hand-drawn stop opens with: what the scene mostly appears to be on its thread's scale. */
+  readonly keyword?: string;
 }
 
 export interface Thread {
@@ -77,6 +79,8 @@ export interface Thread {
   readonly entityKind?: EntityKind;
   /** In manuscript order; unresolved refs last. */
   readonly refs: readonly ThreadRef[];
+  /** A hand-drawn thread's scale, the words of its `<!-- scale: … -->` line, most negative first. */
+  readonly scale?: readonly string[];
   /** Some scene changed since the model read it. */
   readonly stale: boolean;
   /** A hand-drawn thread with at least one plant: its plant → payoff arcs carry a direction. */

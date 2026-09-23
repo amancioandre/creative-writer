@@ -79,6 +79,8 @@ export interface GridColumn {
   readonly readings: number;
   /** Scene key → row index, so a pass over the column can find its cell for a scene. */
   readonly rowIndex: ReadonlyMap<string, number>;
+  /** The thread's scale, most negative first, when its heading carries a `<!-- scale: … -->` line; what the gauge reads. */
+  readonly scale: readonly string[] | null;
 }
 
 /** Where an outline row sits in the plan: the chapter and act it was written under, by heading, since every outline row shares one note. */
@@ -234,7 +236,7 @@ function column(thread: Thread, heading: ColumnHeading, special: SpecialColumn |
   const unresolved: ThreadRef[] = [];
   for (const raw of thread.refs) {
     // The threads model resolves stops against prose scenes; a stop on an outline heading is planned, not lost.
-    const ref = raw.unresolved ? resolveThreadRef({ link: raw.unresolved, note: raw.note, line: raw.line ?? 0, role: raw.role ?? "touch", quote: raw.quote ?? null }, rows) : raw;
+    const ref = raw.unresolved ? resolveThreadRef({ link: raw.unresolved, note: raw.note, line: raw.line ?? 0, role: raw.role ?? "touch", quote: raw.quote ?? null, keyword: raw.keyword ?? null }, rows) : raw;
     const i = ref.index < 0 ? undefined : rowIndex.get(sceneKey(ref.scene));
     if (i === undefined) { unresolved.push(ref); continue; }
     const list = at.get(i);
@@ -256,7 +258,7 @@ function column(thread: Thread, heading: ColumnHeading, special: SpecialColumn |
     if (reading && !reading.stale) readings++;
     return { state, stop, more: stops.slice(1), presentUnmoved, reading };
   });
-  return { id: thread.id, special, heading, thread, entity, cells, filled, verified, broken, armed: verified > 0, unresolved, readings, rowIndex };
+  return { id: thread.id, special, heading, thread, entity, cells, filled, verified, broken, armed: verified > 0, unresolved, readings, rowIndex, scale: thread.scale ?? null };
 }
 
 /** What a stop's anchor says: no quote is a plan, a found quote is verified, a lost one is broken. */

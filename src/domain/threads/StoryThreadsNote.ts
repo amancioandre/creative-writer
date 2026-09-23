@@ -13,9 +13,13 @@ import { STOP_ROLES, THREAD_ROLES, type StopRole, type ThreadRef } from "./Threa
  *     - [[Chapter 41#The reading]] — payoff: "addressed to her mother"
  *
  * After the link and a separator, a line may name the stop's role
- * (`plant:`, `touch:`, `payoff:`, `reversal:`; none means touch) and
- * anchor it to a sentence with one quoted string; whatever is left is
- * the note. Markdown, not JSON, so it reads as an outline, can be edited by hand,
+ * (`plant:`, `touch:`, `payoff:`, `reversal:`; none means touch), then
+ * a keyword from the thread's scale (`disgust:`), then anchor it to a
+ * sentence with one quoted string; whatever is left is the note. A
+ * thread's scale is one comment line under its heading,
+ * `<!-- scale: hate, disgust, indifference, sympathy, love -->`, most
+ * negative first, and the keyword says what the scene mostly appears to
+ * be on it. Markdown, not JSON, so it reads as an outline, can be edited by hand,
  * syncs everywhere, and Obsidian keeps the links current on rename. The
  * view writes lines here; it never owns them.
  */
@@ -33,12 +37,15 @@ export interface WriterThreadItem {
   readonly role: StopRole;
   /** The quoted anchor, without its quotes; null when the line has none. */
   readonly quote: string | null;
+  /** The scale word the stop opens with, as the scale spells it; null when it has none or the heading has no scale. */
+  readonly keyword: string | null;
 }
 
 /** What a stop line says besides its link. */
 export interface StopText {
   readonly role?: StopRole;
   readonly quote?: string | null;
+  readonly keyword?: string | null;
 }
 
 export interface WriterThread {
@@ -46,6 +53,10 @@ export interface WriterThread {
   /** 0-based line of the heading. */
   readonly line: number;
   readonly items: readonly WriterThreadItem[];
+  /** The words of the `<!-- scale: … -->` line under the heading, most negative first; null when there is none. */
+  readonly scale: readonly string[] | null;
+  /** 0-based line of that comment, so it can be rewritten in place. */
+  readonly scaleLine: number | null;
 }
 
 const THREAD_HEADING = /^##\s+(.+?)\s*#*\s*$/;
@@ -54,7 +65,10 @@ const ITEM = /^\s*[-*+]\s+(.+?)\s*$/;
 const LINK = /^\[\[([^\]|]+?)(?:\|[^\]]*)?\]\]\s*(.*)$/;
 const MD_LINK = /^\[[^\]]*\]\(([^)]+?)\)\s*(.*)$/;
 const SEP = /^(?:[—–:-]|--)\s*/;
-const ROLE = new RegExp(`^(${STOP_ROLES.join("|")})\\s*:\\s*`, "i");
+/** A word and a colon at the front of a stop's text: a role, a scale word, or neither. */
+const WORD_PREFIX = /^([^\s:"“”]+)\s*:\s*/;
+/** The one comment line that grades a thread: `<!-- scale: hate, disgust, indifference, sympathy, love -->`. */
+const SCALE_LINE = /^\s*<!--\s*scale\s*:\s*(.*?)\s*-->\s*$/i;
 const COLUMN_PREFIX = /^(arc|theme|subplot)\s*:\s*(.+)$/i;
 const UNKNOWN_PREFIX = /^([a-z][a-z-]{1,15})\s*:\s*\S/i;
 
@@ -100,23 +114,41 @@ const QUOTE = /"([^"]+)"|“([^”]+)”/;
 
 export function parseStoryThreads(markdown: string): WriterThread[] {
   const lines = markdown.split("\n");
-  const out: WriterThread[] = [];
-  let current: { name: string; line: number; items: WriterThreadItem[] } | null = null;
+  const sections: { name: string; line: number; scale: readonly string[] | null; scaleLine: number | null; raw: { text: string; line: number }[] }[] = [];
+  let current: (typeof sections)[number] | null = null;
   let inFence = false;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
     if (/^\s*(```|~~~)/.test(line)) { inFence = !inFence; continue; }
     if (inFence) continue;
     const h = THREAD_HEADING.exec(line);
-    if (h) { current = { name: h[1]!.trim(), line: i, items: [] }; out.push(current); continue; }
+    if (h) { current = { name: h[1]!.trim(), line: i, scale: null, scaleLine: null, raw: [] }; sections.push(current); continue; }
     if (ANY_HEADING.test(line)) { current = null; continue; }
     if (!current) continue;
+    // The scale is read before the stops, wherever it sits in the section, because a stop's keyword is only a keyword on the scale.
+    const sc = SCALE_LINE.exec(line);
+    if (sc && current.scaleLine === null) { current.scale = parseScaleWords(sc[1]!); current.scaleLine = i; continue; }
     const item = ITEM.exec(line);
-    if (!item) continue;
-    const parsed = parseItem(item[1]!);
-    if (parsed) current.items.push({ ...parsed, ...parseStopText(parsed.note, rolesFor(current.name)), line: i });
+    if (item) current.raw.push({ text: item[1]!, line: i });
   }
-  return out;
+  return sections.map((sec) => {
+    const items: WriterThreadItem[] = [];
+    for (const r of sec.raw) {
+      const parsed = parseItem(r.text);
+      if (parsed) items.push({ ...parsed, ...parseStopText(parsed.note, rolesFor(sec.name), sec.scale ?? []), line: r.line });
+    }
+    return { name: sec.name, line: sec.line, items, scale: sec.scale, scaleLine: sec.scaleLine };
+  });
+}
+
+/** "hate, disgust, indifference, sympathy, love" → the words, trimmed, empties dropped, duplicates kept for the check to name. */
+export function parseScaleWords(text: string): string[] {
+  return text.split(/[,·;]/).map((w) => w.trim()).filter(Boolean);
+}
+
+/** The line that grades a thread, as Set scale writes it. */
+export function scaleComment(words: readonly string[]): string {
+  return `<!-- scale: ${words.map((w) => w.trim()).filter(Boolean).join(", ")} -->`;
 }
 
 /** "[[One#Quay]] — planted" → link "One#Quay", note "planted". Markdown links and bare "One#Quay — planted" also work. */
@@ -130,23 +162,37 @@ function parseItem(text: string): { link: string; note: string } | null {
   return text.trim() ? { link: text.trim(), note: "" } : null;
 }
 
-/** "plant: \"she pocketed it\" Anna" → role plant, quote "she pocketed it", note "Anna". No role means touch. */
-export function parseStopText(text: string, roles: readonly StopRole[] = STOP_ROLES): { role: StopRole; quote: string | null; note: string } {
+/**
+ * "plant: \"she pocketed it\" Anna" → role plant, quote "she pocketed it", note "Anna". No role means touch.
+ * Under a graded heading the front of the line may also carry one scale word, before or after the role:
+ * "reversal: hate: \"his hand found her wrist\" he breaks it". A word and a colon that is neither stays in the note.
+ */
+export function parseStopText(text: string, roles: readonly StopRole[] = STOP_ROLES, scale: readonly string[] = []): { role: StopRole; quote: string | null; keyword: string | null; note: string } {
   let rest = text.trim();
   let role: StopRole = "touch";
-  const r = ROLE.exec(rest);
-  if (r && roles.includes(r[1]!.toLowerCase() as StopRole)) { role = r[1]!.toLowerCase() as StopRole; rest = rest.slice(r[0].length); }
+  let roleSaid = false;
+  let keyword: string | null = null;
+  for (let n = 0; n < 2; n++) {
+    const m = WORD_PREFIX.exec(rest);
+    if (!m) break;
+    const word = m[1]!.toLowerCase();
+    if (!roleSaid && (roles as readonly string[]).includes(word)) { role = word as StopRole; roleSaid = true; rest = rest.slice(m[0].length); continue; }
+    const hit: string | undefined = keyword === null ? scale.find((w) => w.toLowerCase() === word) : undefined;
+    if (hit) { keyword = hit; rest = rest.slice(m[0].length); continue; }
+    break;
+  }
   let quote: string | null = null;
   const q = QUOTE.exec(rest);
   if (q) { quote = (q[1] ?? q[2] ?? "").trim() || null; rest = (rest.slice(0, q.index) + " " + rest.slice(q.index + q[0].length)); }
-  return { role, quote, note: rest.replace(/\s+/g, " ").trim() };
+  return { role, quote, keyword, note: rest.replace(/\s+/g, " ").trim() };
 }
 
-/** The line for a stop: link, then the role when it is not the default, the quote, the note. */
+/** The line for a stop: link, then the role when it is not the default, the keyword, the quote, the note. */
 export function formatThreadItem(link: string, note: string, stop: StopText = {}): string {
   const target = link.startsWith("[[") || link.startsWith("[") ? link : `[[${link}]]`;
   const parts: string[] = [];
   if (stop.role && stop.role !== "touch") parts.push(`${stop.role}:`);
+  if (stop.keyword?.trim()) parts.push(`${stop.keyword.trim()}:`);
   if (stop.quote) parts.push(`"${stop.quote.replace(/"/g, "'").trim()}"`);
   if (note.trim()) parts.push(note.trim());
   return parts.length ? `- ${target} — ${parts.join(" ")}` : `- ${target}`;
@@ -186,7 +232,7 @@ export function upsertThreadItem(markdown: string, thread: string, link: string,
   if (existing) {
     const hit = existing.items.find((i) => sameLink(i.link, link));
     // The line already points at that scene: keep the link as the writer wrote it, change only what was given.
-    if (hit) { lines[hit.line] = formatThreadItem(hit.link, note, { role: stop.role ?? hit.role, quote: stop.quote === undefined ? hit.quote : stop.quote }); return lines.join("\n"); }
+    if (hit) { lines[hit.line] = formatThreadItem(hit.link, note, { role: stop.role ?? hit.role, quote: stop.quote === undefined ? hit.quote : stop.quote, keyword: stop.keyword === undefined ? hit.keyword : stop.keyword }); return lines.join("\n"); }
     const end = sectionEnd(lines, existing.line);
     lines.splice(end, 0, formatThreadItem(link, note, stop));
     return lines.join("\n");
@@ -201,13 +247,42 @@ export function setStopRole(markdown: string, thread: string, link: string, role
   const existing = parseStoryThreads(markdown).find((t) => sameName(t.name, thread));
   const hit = existing?.items.find((i) => sameLink(i.link, link));
   if (!hit) return markdown;
-  lines[hit.line] = formatThreadItem(hit.link, hit.note, { role, quote: hit.quote });
+  lines[hit.line] = formatThreadItem(hit.link, hit.note, { role, quote: hit.quote, keyword: hit.keyword });
   return lines.join("\n");
 }
 
+/** Writes, replaces or (with null) removes the scale line under a thread's heading; nothing happens when the thread is not there. */
+export function setThreadScale(markdown: string, thread: string, words: readonly string[] | null): string {
+  const lines = markdown.split("\n");
+  const existing = parseStoryThreads(markdown).find((t) => sameName(t.name, thread));
+  if (!existing) return markdown;
+  if (existing.scaleLine !== null) {
+    if (words) lines[existing.scaleLine] = scaleComment(words); else lines.splice(existing.scaleLine, 1);
+  } else if (words) {
+    lines.splice(existing.line + 1, 0, scaleComment(words));
+  }
+  return lines.join("\n");
+}
+
+/** Renames one word of a thread's scale and every stop that opens with it, so no cell is left off the scale. Returns how many stops changed. */
+export function renameScaleWord(markdown: string, thread: string, from: string, to: string): { markdown: string; changed: number } {
+  const existing = parseStoryThreads(markdown).find((t) => sameName(t.name, thread));
+  const word = to.trim();
+  if (!existing || !existing.scale || existing.scaleLine === null || !word || sameName(from, word)) return { markdown, changed: 0 };
+  const lines = markdown.split("\n");
+  lines[existing.scaleLine] = scaleComment(existing.scale.map((w) => (sameName(w, from) ? word : w)));
+  let changed = 0;
+  for (const item of existing.items) {
+    if (!item.keyword || !sameName(item.keyword, from)) continue;
+    lines[item.line] = formatThreadItem(item.link, item.note, { role: item.role, quote: item.quote, keyword: word });
+    changed++;
+  }
+  return { markdown: lines.join("\n"), changed };
+}
+
 /** Appends several stops to one thread in one pass — a motif's occurrences, or a plant and its reversal. */
-export function appendThreadItems(markdown: string, thread: string, stops: readonly { link: string; note: string; role?: StopRole; quote?: string | null }[]): string {
-  return stops.reduce((md, s) => upsertThreadItem(md, thread, s.link, s.note, { role: s.role, quote: s.quote }), markdown);
+export function appendThreadItems(markdown: string, thread: string, stops: readonly { link: string; note: string; role?: StopRole; quote?: string | null; keyword?: string | null }[]): string {
+  return stops.reduce((md, s) => upsertThreadItem(md, thread, s.link, s.note, { role: s.role, quote: s.quote, keyword: s.keyword }), markdown);
 }
 
 export function removeThreadItem(markdown: string, thread: string, link: string): string {
@@ -262,7 +337,7 @@ export function relinkThreadItems(markdown: string, from: string, to: string): {
   let changed = 0;
   for (const thread of parseStoryThreads(markdown)) for (const item of thread.items) {
     if (!sameLink(item.link, from)) continue;
-    lines[item.line] = formatThreadItem(to, item.note, { role: item.role, quote: item.quote });
+    lines[item.line] = formatThreadItem(to, item.note, { role: item.role, quote: item.quote, keyword: item.keyword });
     changed++;
   }
   return { markdown: changed ? lines.join("\n") : markdown, changed };
@@ -283,7 +358,7 @@ export function serializeStoryThreadsNote(project: string): string {
     "creative-writer: false",
     `${STORY_THREADS_FLAG}: ${STORY_THREADS_VERSION}`,
     "---",
-    `Story threads for **${project}** — clues, motifs and set-ups you are tracking by hand. One \`## heading\` per thread, one \`- [[Note#Scene]] — note\` line per scene it touches; a line may start with \`plant:\`, \`payoff:\` or \`reversal:\` and carry one "quoted sentence" as its anchor. The story threads view draws each as arcs across the manuscript and adds lines here when you ask it to; edit freely.`,
+    `Story threads for **${project}** — clues, motifs and set-ups you are tracking by hand. One \`## heading\` per thread, one \`- [[Note#Scene]] — note\` line per scene it touches; a line may start with \`plant:\`, \`payoff:\` or \`reversal:\`, then a word from the thread's scale, and carry one "quoted sentence" as its anchor; a \`<!-- scale: hate, …, love -->\` line under a heading grades its stops. The story threads view draws each as arcs across the manuscript and adds lines here when you ask it to; edit freely.`,
     "",
   ].join("\n");
 }
@@ -298,7 +373,7 @@ export function resolveThreadRef(item: WriterThreadItem, scenes: readonly { scen
   const { note, heading } = splitLink(item.link);
   const inNote = scenes.filter((s) => sameTarget(s.scene.path, note));
   const hit = heading ? inNote.find((s) => sameHeading(s.scene.title, heading)) : [...inNote].sort((a, b) => a.index - b.index)[0];
-  const stop = { note: item.note, line: item.line, role: item.role, ...(item.quote ? { quote: item.quote } : {}) };
+  const stop = { note: item.note, line: item.line, role: item.role, ...(item.quote ? { quote: item.quote } : {}), ...(item.keyword ? { keyword: item.keyword } : {}) };
   if (hit) return { scene: hit.scene, index: hit.index, ...stop };
   return { scene: { path: note, title: heading, line: 0 }, index: -1, unresolved: item.link, ...stop };
 }
