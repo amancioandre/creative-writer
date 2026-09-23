@@ -27,10 +27,10 @@ export const WELCOME: NoteCopy = {
 };
 
 export const UPDATE: NoteCopy = {
-  headline: "The value gauge: every scene turns on a value",
+  headline: "A summary under every column's name",
   bullets: [
-    "Give a theme a scale, hate to love, in one line under its heading; start each stop with the word the scene mostly is",
-    "Show gauge draws the charge as pipes and the running total as a line, with a diamond where the story flips",
-    "The same lanes under the threads chart and in the manuscript gutter; the model may offer a word, never write one",
+    "Double-click under a column's name and write what the arc is or what the theme argues; it lives as a comment under the heading",
+    "A scale word deleted in the cell now comes off the stop",
+    "The value gauge from 0.14.0: a scale per theme, pipes per scene, a line where the story flips",
   ],
 };
