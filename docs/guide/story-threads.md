@@ -117,6 +117,8 @@ Under the bars, on the same axis, run small bar charts — one value per scene, 
 | Open threads (yours) | Hand-drawn threads that have started and not yet reached their last stop — what the reader is carrying. A plant counts as open until its payoff. |
 | Echoes | Where the echoes land. A summary only; the pair is the finding. |
 
+**The gauge** (⋯ → *Show gauge*, the *Gauge* toggle in the same section, or the command, remembered per project) runs under the strips: one band per thread that carries a `<!-- scale: … -->` line, the [plot grid](/guide/plot-grid#the-value-gauge)'s value gauge on the chart's axis. At each scene, pipes rise above the centreline for a word above neutral and hang below it for one below, the running total walks the band as a line, dotted where nobody has said, and a diamond with a rule marks where the total flips, hollow when no quote marks the turn. Hover a scene for the word, its charge and the total. Three bands at most.
+
 Strips share the slots exactly, so a spike lines up with the scene above it at every zoom. Under the bars the axis names its scenes, a title under every bar wide enough for one (zoom in for the rest), and each chapter at its first bar.
 
 ## The panel

@@ -119,6 +119,26 @@ The model reads; you write. A pass over a column shows the model each scene that
 - **Propose columns…** (⋯ menu, the side column, or the empty grid) asks the model one question over the outline the map already holds, the events read per scene, the loglines of the scenes still only planned, and the cast, rather than every page: which threads run through more than one scene and deserve a column. On the paper grid, before any prose, the loglines are all it has: write a line in the Plot column of a few rows first, or the state line says there is nothing to propose from. The proposals land in the side column with a tick each, a sentence, and the scenes that carry them; one that already exists is greyed; **Add** writes the ticked ones as empty headings, with Undo. With no scene read for its events yet, the grid offers **Read the project** first.
 - The prompt asks in the column's kind: an arc is asked what the scene does to the character's want, a theme how the scene argues it, a subplot what happens to it. A small local model reads subplots well and arcs less well; read an arc with a larger one, or write it yourself.
 
+## The value gauge
+
+Every scene turns on a value, and the story's shape is where that value reverses. Give a column a **scale**, an odd list of words from the most negative to the most positive, and start each of its stops with the word the scene mostly appears to be; the gauge draws the rest and stores nothing.
+
+```markdown
+## Theme: Should jealousy justify violent acts?
+<!-- scale: hate, disgust, indifference, sympathy, love -->
+- [[Chapter 1#The customs house]] — sympathy: Tomas carries her trunk up from the quay
+- [[Chapter 3#The station]] — disgust: she wipes his kiss off
+- [[Chapter 4#Dinner]] — reversal: hate: "his hand found her wrist" he breaks Ilse's wrist
+```
+
+- **The scale** is one comment line under the heading, written by **Set scale…** in the column's menu or by hand. The sheet in the side column lists the words most negative first with the middle one marked *neutral*, keeps the count odd (**Add a pair**), shows the exact line it will write and what the gauge would count, and saves with one Undo. A word changed in place is a rename: the sheet says how many cells use it, and Save rewrites them. An even list, a repeated word, or a role word is refused. The steps are equal: an end that feels heavier gets more words, never a weight.
+- **The keyword** is the first word of a stop followed by a colon, before or after its role; a role says what the stop does to the thread, the keyword what the scene mostly is on this scale, and they never stand in for each other. In the cell editor the word rides in front of the note (`disgust: she wipes his kiss off`), Tab completes a started word, the scale sits under the field as chips, and the side column's **Keyword** picks it. One word per scene per column: two stops in one scene that disagree draw nothing and count as *unread* until you pick.
+- **The gauge column** (**Show gauge** in the ⋯ menu, the side column's *Gauge* section, or the command) sits at the right edge and stays put like Scene and Plot. A row draws the scene's **charge** as pipes either side of a centreline, red to the left below neutral, green to the right above, one per step up to three and a block of three past that; a neutral word is a grey tick; nobody's word draws nothing. A line walks the **running total** down the column, continuous from the first scene to the last, dotted where nobody has said. Where the total changes sign the row carries a diamond, a faint rule and the word *inversion*: a total that lands on zero keeps its sign, so the flip is counted only from strictly positive to strictly negative or back. The line is the story's cumulative balance and is never reset; the turns are in the pipes. The header shows the scale as a legend and says *line: 1 step = 2* when the total outgrows the lane.
+- **Lanes.** The main theme is the lane by default; the *Gauge* section ticks any other graded column, an arc's scale for what the character feels beside a theme's for what the reader should, three lanes at most. Rows where two lanes carry opposite signs get ≠ on the scene; signs only, since scales of different lengths do not compare in size.
+- **The marker.** A quote on a gauged stop is the line that carries the value. On an inversion it matters most: a flip at a stop with no quote draws its diamond hollow, the Cell section says *No line marks this turn*, and `n` walks to it with the readings and the broken anchors. The quote is the anchor the audit already checks, so a rewritten sentence breaks it the same way.
+- **The model** may offer one word. Reading a graded column sends its scale, and a reading answers with the word the scene mostly appears to be, shown as the placeholder and in the Cell section; only typed words enter the sum.
+- The same lines draw a band under the [threads chart](/guide/story-threads#strips) and marks in the [manuscript](/guide/manuscript)'s gutter, each on its own toggle.
+
 ## Keys
 
 Click anywhere on the grid and the keys work; press `?` for the list on the grid itself. Tab is never taken: it moves the focus as it does everywhere in Obsidian, and Ctrl and Cmd stay with Obsidian's own hotkeys. Nothing is bound by default.
@@ -136,7 +156,7 @@ Click anywhere on the grid and the keys work; press `?` for the list on the grid
 | `v` | Audit view. |
 | `?` | The list. |
 
-Folding a group, hiding a column, showing the hidden ones, the search, the panel and *Present, unmoved* are commands, each named in the ⋯ menu, so a key of your own can be bound in Settings → Hotkeys.
+Folding a group, hiding a column, showing the hidden ones, the search, the panel, *Present, unmoved*, the gauge, gauging a column and setting its scale are commands, each named in the ⋯ menu, so a key of your own can be bound in Settings → Hotkeys.
 
 The line the grid writes is the line you would write:
 

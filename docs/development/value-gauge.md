@@ -1,6 +1,6 @@
 # Value gauge: design
 
-Status: **designed 2026-09-22, not built.** Explored in Claude Design (project *Creative Writer plugin redesign*, file `Value gauge.dc.html`, also the fourth page of `Plot grid.dc.html`): six boards, a rules strip and a fifteen-point critique (two points added on the revision). The author's decisions of the same day are folded in below and mark the open points closed. Increments in section 8.
+Status: **built 2026-09-22, all five increments, uncommitted for release (in the Unreleased changelog entry).** Departures: the manuscript's *Gauge marks* toggle is a setting like the page's other toggles rather than a per-project preference, because every manuscript toggle is global and one exception would surprise; the threads chart's toggle is per project as designed. Two stops in one scene that disagree count as *unread* and draw nothing (section 3), rather than the last one counting. The grid's rows are always in manuscript order, so the rule that hides the line when they are not is in the domain and its test but has no view yet. Originally: **designed 2026-09-22.** Explored in Claude Design (project *Creative Writer plugin redesign*, file `Value gauge.dc.html`, also the fourth page of `Plot grid.dc.html`): six boards, a rules strip and a fifteen-point critique (two points added on the revision). The author's decisions of the same day are folded in below and mark the open points closed. Increments in section 8.
 
 ## 1. Why
 

@@ -53,8 +53,8 @@ These commands are live only while their panel is the active tab, so they can be
 |---|---|
 | **Writer: next lane** / **previous lane** / **next group** / **previous group** / **new note in the focused group** / **add an existing note** / **new story** / **fit the board** / **show keyboard shortcuts** | The [writer board's keys](/guide/writer#the-keyboard) and its side column as commands. |
 | **Story map: add a node** / **fit the map** / **show all (leave the focus)** / **shake the layout** / **read project with model** / **reset filters** | The [story map's](/guide/story-map) head and side column as commands. |
-| **Story threads: zoom in** / **zoom out** / **fit the manuscript** / **open Story threads.md** / **read project for facts** | The [story threads'](/guide/story-threads) head and side column as commands. |
-| **Manuscript: toggle prose only** / **toggle the comments pane** / **toggle the ruler** / **toggle story marks** / **toggle echoes** / **toggle voices** | The [manuscript's](/guide/manuscript) toolbar switches as commands. |
+| **Story threads: zoom in** / **zoom out** / **fit the manuscript** / **open Story threads.md** / **read project for facts** / **show or hide the gauge** | The [story threads'](/guide/story-threads) head and side column as commands. |
+| **Manuscript: toggle prose only** / **toggle the comments pane** / **toggle the ruler** / **toggle story marks** / **toggle echoes** / **toggle voices** / **toggle gauge marks** | The [manuscript's](/guide/manuscript) toolbar switches as commands. |
 | **Plot grid: clear the search** / **find a column** | The search over the columns and the cast. |
 | **Plot grid: fold or expand the cast** | One column of dots, or one column per name. |
 | **Plot grid: fold or show the arcs** / **themes** / **subplots** / **free threads** | What the eyebrow's pills do. |
@@ -69,6 +69,9 @@ These commands are live only while their panel is the active tab, so they can be
 | **Plot grid: pick a sentence as the anchor** | With a cell selected: the scene's sentences, the near matches of a lost quote first. |
 | **Plot grid: snapshot the grid** | Writes `Plot grid · <date>.md` beside the project, never read back. |
 | **Plot grid: export the grid to a note** | Writes `Plot grid.md` beside the project, refreshed on every export. |
+| **Plot grid: show or hide the gauge** | The value gauge at the grid's right edge: pipes for each scene's charge on a graded column, the running total, where it flips. Remembered per project. |
+| **Plot grid: gauge the selected column** | Ticks or unticks the selected graded column as a lane of the gauge; three at most. |
+| **Plot grid: set the selected column's scale** | Opens Set scale… for the selected column: the words most negative first, the middle neutral, written as one comment line under its heading. |
 | **Plot grid: read every column with the model** / **read this column with the model** / **check this column against the draft** | The model leaves [readings](/guide/plot-grid#reading-with-the-model); you answer them. Ollama or Claude. |
 | **Plot grid: dismiss the reading** | With a cell that has a reading selected. |
 | **Plot grid: propose columns with the model** | One call over the events the map holds; the proposals wait in the side column for a tick. |
