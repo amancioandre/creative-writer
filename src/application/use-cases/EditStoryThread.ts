@@ -1,5 +1,5 @@
 import type { ProjectSpec } from "../../domain/progress/Project";
-import { addThread, appendThreadItems, removeThread, removeThreadItem, renameScaleWord, renameThread, setStopRole, setThreadScale, upsertThreadItem } from "../../domain/threads/StoryThreadsNote";
+import { addThread, appendThreadItems, removeThread, removeThreadItem, renameScaleWord, renameThread, setStopRole, setThreadScale, setThreadSummary, upsertThreadItem } from "../../domain/threads/StoryThreadsNote";
 import type { StopRole } from "../../domain/threads/Thread";
 
 /** A stop to write: where, what it is, the sentence it hangs on, a word about it. */
@@ -60,6 +60,11 @@ export class EditStoryThread {
   /** The thread's scale as one comment line under its heading; null takes the line out. */
   async setScale(project: ProjectSpec, thread: string, words: readonly string[] | null): Promise<void> {
     await this.repo.update(project, (md) => setThreadScale(md, thread, words));
+  }
+
+  /** The writer's line about a thread, a comment under its heading; null or "" takes it out. */
+  async setSummary(project: ProjectSpec, thread: string, text: string | null): Promise<void> {
+    await this.repo.update(project, (md) => setThreadSummary(md, thread, text));
   }
 
   /** One word of the scale renamed, in the scale line and in every stop that used it. Resolves to how many stops changed. */

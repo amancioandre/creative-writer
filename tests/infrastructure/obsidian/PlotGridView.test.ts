@@ -4,7 +4,7 @@ import { PLOT_GRID_VIEW_TYPE, PlotGridView, ROW_CHUNK, actOf, type PlotGridSourc
 import { buildStoryGraph, type ProjectNote } from "../../../src/domain/story/BuildGraph";
 import { buildPlotGrid } from "../../../src/domain/plot/PlotGrid";
 import { buildThreads } from "../../../src/domain/threads/BuildThreads";
-import { addThread, appendThreadItems, parseStoryThreads, removeThread, removeThreadItem, renameScaleWord, renameThread, setThreadScale } from "../../../src/domain/threads/StoryThreadsNote";
+import { addThread, appendThreadItems, parseStoryThreads, removeThread, removeThreadItem, renameScaleWord, renameThread, setThreadScale, setThreadSummary } from "../../../src/domain/threads/StoryThreadsNote";
 import { splitScenes } from "../../../src/domain/text/Scenes";
 import { EMPTY_STORY_MAP_FILE, putGridReading, putReading, type GridReading, type StoryMapFile } from "../../../src/domain/story/StoryMapFile";
 import { textHash } from "../../../src/domain/story/StoryGraph";
@@ -104,6 +104,7 @@ function open(overrides: Partial<PlotGridSource> = {}, threads = threadsNote, se
     readProject: async () => { calls.writes.push("readProject"); return 3; },
     renameThread: async (_p, from, to) => { calls.writes.push(`rename ${from} → ${to}`); md = renameThread(md, from, to); },
     setScale: async (_p, thread, words) => { calls.writes.push(`scale ${thread}: ${words ? words.join(", ") : "none"}`); md = setThreadScale(md, thread, words); },
+    setSummary: async (_p, thread, text) => { calls.writes.push(`summary ${thread}: ${text ?? "none"}`); md = setThreadSummary(md, thread, text); },
     renameScaleWord: async (_p, thread, from, to) => { calls.writes.push(`reword ${thread}: ${from} → ${to}`); const r = renameScaleWord(md, thread, from, to); md = r.markdown; return r.changed; },
     setProjectKey: async (_p, key, value) => { calls.writes.push(`${key}=${value ?? ""}`); if (key === "plot-order") { spec = { ...spec, plotOrder: value ? value.split(",").map((x) => x.trim()) : undefined }; return; } const k = key === "plot-pov" ? "plotPov" : key === "plot-time" ? "plotTime" : key === "plot-beats" ? "plotBeats" : "plotTheme"; spec = { ...spec, [k]: value ?? undefined }; },
     gridSettings: () => prefs,
@@ -369,7 +370,7 @@ describe("PlotGridView", () => {
     // The header's ⋯ opens the column menu; a job row writes the key and the rebuild reads it back.
     const eyes = [...el.querySelectorAll(".czm-pg-col-thread")].find((th) => th.querySelector(".czm-pg-col-title")?.textContent === "Eyes")!;
     (eyes.querySelector(".czm-pg-col-more") as HTMLElement).click();
-    expect(Menu.last!.items.map((i) => i.title.replace(/Plot grid:.*$/, ""))).toEqual(["Rename…", "Move the threads left", "Move the threads right", "Kind: arc", "Kind: theme", "Kind: subplot", "Kind: free thread", "Use as POV", "Use as Time", "Use as Plot point", "Use as Main theme", "Read this column with the model…", "Check this column against the draft…", "Dismiss all readings", "Set scale…", "Gauge this column", "Freeze up to here", "Hide column", "Delete column…"]);
+    expect(Menu.last!.items.map((i) => i.title.replace(/Plot grid:.*$/, ""))).toEqual(["Rename…", "Add a summary…", "Move the threads left", "Move the threads right", "Kind: arc", "Kind: theme", "Kind: subplot", "Kind: free thread", "Use as POV", "Use as Time", "Use as Plot point", "Use as Main theme", "Read this column with the model…", "Check this column against the draft…", "Dismiss all readings", "Set scale…", "Gauge this column", "Freeze up to here", "Hide column", "Delete column…"]);
     Menu.last!.items.find((i) => i.title === "Use as POV")!.cb();
     await new Promise((r) => setTimeout(r, 400));
     expect(calls.writes).toContain("plot-pov=Eyes");
@@ -1276,5 +1277,49 @@ describe("setting a scale and writing a keyword", () => {
     expect(note()).toContain("- [[One#Later]] — love: meh");
     v.run("next-issue");
     expect(el.querySelector(".czm-map-status")?.textContent).toContain("every turn of the gauge has its line");
+  });
+});
+
+describe("a column's summary", () => {
+  const withSummary = `## Arc: [[Ilse]]
+<!-- A self-sacrifice arc: she realises she has been vain and chose herself over the love of this life -->
+- [[One#Camp]] — want: "woke before Ilse" to be first
+
+## Subplot: The gate
+- [[One#Camp]] — plant: "gate of Lisbon" planted
+`;
+  const tick = () => new Promise((r) => setTimeout(r, 20));
+
+  it("shows the comment under the heading beneath the column's name, whole on hover, and writes one from the Column section with Undo", async () => {
+    const { v, note, calls } = open({}, withSummary);
+    await v.onOpen();
+    const el = v.contentEl;
+    const heads = [...el.querySelectorAll(".czm-pg-col-thread")];
+    expect(heads[0]!.querySelector(".czm-pg-col-summary")?.textContent).toBe("A self-sacrifice arc: she realises she has been vain and chose herself over the love of this life");
+    expect(heads[0]!.querySelector(".czm-pg-col-summary")?.getAttribute("title")).toContain("self-sacrifice");
+    expect(heads[0]!.querySelector(".czm-pg-col-title")?.textContent).toBe("Ilse");
+    expect(heads[1]!.querySelector(".czm-pg-col-summary")).toBeNull();
+    // The gate has none: its menu offers to add one, and the Column section writes it.
+    (heads[1]!.querySelector(".czm-pg-col-more") as HTMLElement).click();
+    const row = Menu.last!.items.find((i) => i.title.startsWith("Add a summary…"))!;
+    row.cb();
+    const field = el.querySelector(".czm-map-section-pg-column .czm-pg-summary-field") as HTMLTextAreaElement;
+    expect(field.value).toBe("");
+    field.value = "  The letter nobody collects,\n and who finally does  ";
+    (el.querySelector(".czm-pg-summary-save") as HTMLElement).click(); await tick();
+    expect(calls.writes.at(-1)).toBe("summary Subplot: The gate: The letter nobody collects, and who finally does");
+    expect(note()).toContain("## Subplot: The gate\n<!-- The letter nobody collects, and who finally does -->\n- [[One#Camp]]");
+    expect([...el.querySelectorAll(".czm-pg-col-thread .czm-pg-col-summary")].map((d) => d.textContent)).toHaveLength(2);
+    expect(el.querySelector(".czm-map-status")?.textContent).toContain("Summary written for “The gate”");
+    (el.querySelector(".czm-map-status button") as HTMLElement).click(); await tick();
+    expect(note()).toBe(withSummary);
+    // Emptying the field takes the line out.
+    v.select({ col: 0, row: 0 });
+    const f2 = el.querySelector(".czm-map-section-pg-column .czm-pg-summary-field") as HTMLTextAreaElement;
+    expect(f2.value).toContain("self-sacrifice");
+    f2.value = "";
+    (el.querySelector(".czm-pg-summary-save") as HTMLElement).click(); await tick();
+    expect(note()).not.toContain("<!--");
+    expect(el.querySelector(".czm-map-status")?.textContent).toContain("Summary removed from “Ilse”");
   });
 });

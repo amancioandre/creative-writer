@@ -48,6 +48,8 @@ export interface PlotGridSource {
   renameThread(project: ProjectSpec, from: string, to: string): Promise<void>;
   /** The thread's scale as one comment line under its heading; null takes the line out. */
   setScale(project: ProjectSpec, thread: string, words: readonly string[] | null): Promise<void>;
+  /** The writer's line about a thread, a comment under its heading; null takes it out. */
+  setSummary(project: ProjectSpec, thread: string, text: string | null): Promise<void>;
   /** One word of the scale renamed in the line and in every stop that used it; resolves to how many stops changed. */
   renameScaleWord(project: ProjectSpec, thread: string, from: string, to: string): Promise<number>;
   /** Writes or clears a text key in the project note's front matter: `plot-pov`, `plot-time`, `plot-theme`. */
@@ -749,6 +751,7 @@ export class PlotGridView extends ItemView {
       name.createSpan({ text: c.heading.name, cls: "czm-pg-col-title" });
       onActivate(name, () => this.pickColumn(col));
       name.addEventListener("dblclick", (ev) => { ev.preventDefault(); this.renameColumnInPlace(c); });
+      if (c.summary) { th.createDiv({ text: c.summary, cls: "czm-pg-col-summary", attr: { title: c.summary } }); th.title = c.summary; }
       const sub = th.createDiv({ cls: "czm-pg-col-sub" });
       const audit = this.audit ? ` · ${c.verified} ${STATE_GLYPH.verified}${c.broken ? ` · ${c.broken} ${STATE_GLYPH.broken}` : ""}` : "";
       sub.createSpan({ text: `${c.special ? `${SPECIAL_LABEL[c.special].toLowerCase()} · ` : ""}${c.filled} of ${rows.length}${audit}`, cls: "czm-pg-col-count" });
@@ -1354,6 +1357,7 @@ export class PlotGridView extends ItemView {
     const jobRows: MenuEntry[] = (["pov", "time", "beats", "main-theme"] as SpecialColumn[]).map((job) => ({ label: c.special === job ? `Stop using as ${SPECIAL_LABEL[job]}` : `Use as ${SPECIAL_LABEL[job]}`, checked: c.special === job, onClick: () => void this.setSpecial(c, job) }));
     return [
       { label: "Rename…", icon: "pencil", onClick: () => this.renameColumnInPlace(c) },
+      { label: c.summary ? "Summary…" : "Add a summary…", icon: "text", onClick: () => this.openSide("pg-column", ".czm-pg-summary-field") },
       { label: DERIVED.includes(c.special) ? "Move left" : `Move the ${KIND_GROUP[c.heading.kind].toLowerCase()} left`, icon: "arrow-left", onClick: () => void this.nudgeBlock(c, -1) },
       { label: DERIVED.includes(c.special) ? "Move right" : `Move the ${KIND_GROUP[c.heading.kind].toLowerCase()} right`, icon: "arrow-right", onClick: () => void this.nudgeBlock(c, 1) },
       "-",
@@ -1727,7 +1731,27 @@ export class PlotGridView extends ItemView {
       const b = jobRow.createEl("button", { text: SPECIAL_LABEL[job], cls: `czm-pg-job${c.special === job ? " is-on" : ""}`, attr: { "aria-pressed": String(c.special === job), title: c.special === job ? `Stop using as ${SPECIAL_LABEL[job]}` : `Use as ${SPECIAL_LABEL[job]}: writes ${SPECIAL_KEY[job]} to the project note` } });
       b.addEventListener("click", () => void this.setSpecial(c, job));
     }
+    const summary = section.createDiv({ cls: "czm-pg-field" });
+    summary.createDiv({ text: "Summary · what the column is", cls: "czm-pg-field-label" });
+    const field = summary.createEl("textarea", { cls: "czm-pg-summary-field", attr: { rows: "3", placeholder: c.heading.kind === "arc" ? "A self-sacrifice arc: he realises he has been vain and chose himself over the love of this life" : c.heading.kind === "theme" ? "What the story argues, and the answers it turns through" : "What this line of events is, from its plant to its payoff", "aria-label": "Summary" } });
+    field.value = c.summary ?? "";
+    field.addEventListener("keydown", (ev) => { ev.stopPropagation(); if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); void this.writeSummary(c, field.value); } });
+    const acts = summary.createDiv({ cls: "czm-map-panel-actions czm-pg-summary-actions" });
+    const save = acts.createEl("button", { text: "Save summary", cls: "czm-pg-summary-save mod-cta" });
+    save.addEventListener("click", () => { save.disabled = true; void this.writeSummary(c, field.value).finally(() => { save.disabled = false; }); });
+    summary.createDiv({ text: "Kept as a comment under the heading in Story threads.md; shown under the column's name, whole on hover.", cls: "czm-map-absent" });
     section.createDiv({ text: `${c.filled} of ${this.rows.length} scenes · ${c.verified} verified · ${c.broken} broken${c.entity ? ` · bound to ${c.entity.name}` : c.heading.kind === "arc" ? " · no character of that name on the map" : ""}`, cls: "czm-map-absent" });
+  }
+
+  /** Writes the column's summary as the comment under its heading, with Undo; an emptied field takes the line out. */
+  private async writeSummary(c: GridColumn, text: string): Promise<void> {
+    const project = this.project;
+    if (!project) return;
+    const before = c.summary, next = text.replace(/\s+/g, " ").trim() || null;
+    if ((before ?? null) === next) return;
+    try { await this.source.setSummary(project, c.heading.heading, next); } catch (e) { this.status?.fail(couldNot(`write the summary of “${c.heading.name}”`, e)); return; }
+    await this.show(project, true);
+    this.status?.undoable(next ? `Summary written for “${c.heading.name}”` : `Summary removed from “${c.heading.name}”`, async () => { await this.source.setSummary(project, c.heading.heading, before); await this.show(project, true); });
   }
 
   private renderCellSection(section: HTMLElement, column: GridColumn, row: GridRow, cell: GridCell): void {

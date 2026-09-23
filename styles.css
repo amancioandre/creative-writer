@@ -690,6 +690,10 @@ body.czm-zen .cm-layer.czm-rhythm-gutter-layer {
 /* A column header: the name, the count, and a ⋯ that appears when the header is hovered or holds the focus. */
 .czm-pg-col-sub { display: flex; align-items: flex-start; justify-content: space-between; gap: 4px; }
 .czm-pg-col-sub .czm-pg-col-count { white-space: normal; overflow-wrap: anywhere; }
+/* The writer's line about the column, under its name: three lines at most, the whole of it on hover. */
+.czm-pg-col-summary { font-size: 11px; line-height: 1.3; font-weight: normal; color: var(--text-muted); white-space: normal; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; margin: 2px 0 3px; }
+.czm-pg-summary-field { width: 100%; font-size: var(--font-ui-smaller); resize: vertical; }
+.czm-pg-summary-actions { grid-template-columns: 1fr; }
 .czm-pg-col-more { width: 18px; height: 18px; opacity: 0; color: var(--text-faint); }
 .czm-pg-col-thread:hover .czm-pg-col-more, .czm-pg-col-thread:focus-within .czm-pg-col-more, .czm-pg-col-thread.is-current .czm-pg-col-more { opacity: 1; }
 .czm-pg-col-thread.is-current .czm-pg-col-title { color: var(--text-accent); }

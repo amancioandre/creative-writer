@@ -83,6 +83,8 @@ export interface GridColumn {
   readonly rowIndex: ReadonlyMap<string, number>;
   /** The thread's scale, most negative first, when its heading carries a `<!-- scale: … -->` line; what the gauge reads. */
   readonly scale: readonly string[] | null;
+  /** The writer's line about the column, from the comment under its heading: what the arc is, what the theme argues. */
+  readonly summary: string | null;
 }
 
 /** Where an outline row sits in the plan: the chapter and act it was written under, by heading, since every outline row shares one note. */
@@ -260,7 +262,7 @@ function column(thread: Thread, heading: ColumnHeading, special: SpecialColumn |
     if (reading && !reading.stale) readings++;
     return { state, stop, more: stops.slice(1), presentUnmoved, reading };
   });
-  return { id: thread.id, special, heading, thread, entity, cells, filled, verified, broken, armed: verified > 0, unresolved, readings, rowIndex, scale: thread.scale ?? null };
+  return { id: thread.id, special, heading, thread, entity, cells, filled, verified, broken, armed: verified > 0, unresolved, readings, rowIndex, scale: thread.scale ?? null, summary: thread.summary ?? null };
 }
 
 /** What a stop's anchor says: no quote is a plan, a found quote is verified, a lost one is broken. */

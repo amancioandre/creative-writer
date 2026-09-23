@@ -81,6 +81,8 @@ export interface Thread {
   readonly refs: readonly ThreadRef[];
   /** A hand-drawn thread's scale, the words of its `<!-- scale: … -->` line, most negative first. */
   readonly scale?: readonly string[];
+  /** A hand-drawn thread's summary: the writer's comment line under its heading. */
+  readonly summary?: string;
   /** Some scene changed since the model read it. */
   readonly stale: boolean;
   /** A hand-drawn thread with at least one plant: its plant → payoff arcs carry a direction. */

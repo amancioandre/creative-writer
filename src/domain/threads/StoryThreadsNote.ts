@@ -1,6 +1,7 @@
 import { sameTarget } from "../story/Relations";
 import type { SceneRef } from "../story/StoryGraph";
 import { STOP_ROLES, THREAD_ROLES, type StopRole, type ThreadRef } from "./Thread";
+import { commentLine, htmlComment } from "../text/Comments";
 
 /**
  * Threads the writer draws by hand live in `Story threads.md` in the
@@ -57,6 +58,9 @@ export interface WriterThread {
   readonly scale: readonly string[] | null;
   /** 0-based line of that comment, so it can be rewritten in place. */
   readonly scaleLine: number | null;
+  /** The writer's line about the thread, the first comment under the heading that is not the scale: what the arc is, what the theme argues. */
+  readonly summary: string | null;
+  readonly summaryLine: number | null;
 }
 
 const THREAD_HEADING = /^##\s+(.+?)\s*#*\s*$/;
@@ -114,7 +118,7 @@ const QUOTE = /"([^"]+)"|“([^”]+)”/;
 
 export function parseStoryThreads(markdown: string): WriterThread[] {
   const lines = markdown.split("\n");
-  const sections: { name: string; line: number; scale: readonly string[] | null; scaleLine: number | null; raw: { text: string; line: number }[] }[] = [];
+  const sections: { name: string; line: number; scale: readonly string[] | null; scaleLine: number | null; summary: string | null; summaryLine: number | null; raw: { text: string; line: number }[] }[] = [];
   let current: (typeof sections)[number] | null = null;
   let inFence = false;
   for (let i = 0; i < lines.length; i++) {
@@ -122,12 +126,15 @@ export function parseStoryThreads(markdown: string): WriterThread[] {
     if (/^\s*(```|~~~)/.test(line)) { inFence = !inFence; continue; }
     if (inFence) continue;
     const h = THREAD_HEADING.exec(line);
-    if (h) { current = { name: h[1]!.trim(), line: i, scale: null, scaleLine: null, raw: [] }; sections.push(current); continue; }
+    if (h) { current = { name: h[1]!.trim(), line: i, scale: null, scaleLine: null, summary: null, summaryLine: null, raw: [] }; sections.push(current); continue; }
     if (ANY_HEADING.test(line)) { current = null; continue; }
     if (!current) continue;
     // The scale is read before the stops, wherever it sits in the section, because a stop's keyword is only a keyword on the scale.
     const sc = SCALE_LINE.exec(line);
     if (sc && current.scaleLine === null) { current.scale = parseScaleWords(sc[1]!); current.scaleLine = i; continue; }
+    // Any other comment line in the section is the writer's own line about the thread; the first one counts.
+    const said = commentLine(line);
+    if (said !== null) { if (current.summaryLine === null && said) { current.summary = said; current.summaryLine = i; } continue; }
     const item = ITEM.exec(line);
     if (item) current.raw.push({ text: item[1]!, line: i });
   }
@@ -137,7 +144,7 @@ export function parseStoryThreads(markdown: string): WriterThread[] {
       const parsed = parseItem(r.text);
       if (parsed) items.push({ ...parsed, ...parseStopText(parsed.note, rolesFor(sec.name), sec.scale ?? []), line: r.line });
     }
-    return { name: sec.name, line: sec.line, items, scale: sec.scale, scaleLine: sec.scaleLine };
+    return { name: sec.name, line: sec.line, items, scale: sec.scale, scaleLine: sec.scaleLine, summary: sec.summary, summaryLine: sec.summaryLine };
   });
 }
 
@@ -260,6 +267,20 @@ export function setThreadScale(markdown: string, thread: string, words: readonly
     if (words) lines[existing.scaleLine] = scaleComment(words); else lines.splice(existing.scaleLine, 1);
   } else if (words) {
     lines.splice(existing.line + 1, 0, scaleComment(words));
+  }
+  return lines.join("\n");
+}
+
+/** Writes, replaces or (with null or "") removes the writer's line about a thread, a comment right under its heading; nothing happens when the thread is not there. */
+export function setThreadSummary(markdown: string, thread: string, text: string | null): string {
+  const lines = markdown.split("\n");
+  const existing = parseStoryThreads(markdown).find((t) => sameName(t.name, thread));
+  if (!existing) return markdown;
+  const clean = text?.replace(/\s+/g, " ").trim() ?? "";
+  if (existing.summaryLine !== null) {
+    if (clean) lines[existing.summaryLine] = htmlComment(clean); else lines.splice(existing.summaryLine, 1);
+  } else if (clean) {
+    lines.splice(existing.line + 1, 0, htmlComment(clean));
   }
   return lines.join("\n");
 }

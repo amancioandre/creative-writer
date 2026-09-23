@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { addThread, removeThread, appendThreadItems, formatThreadItem, parseStopText, parseStoryThreads, relinkThreadItems, removeThreadItem, renameScaleWord, renameThread, resolveThreadRef, sameLink, scaleComment, serializeStoryThreadsNote, setThreadScale, upsertThreadItem } from "../../../src/domain/threads/StoryThreadsNote";
+import { addThread, removeThread, appendThreadItems, formatThreadItem, parseStopText, parseStoryThreads, relinkThreadItems, removeThreadItem, renameScaleWord, renameThread, resolveThreadRef, sameLink, scaleComment, serializeStoryThreadsNote, setThreadScale, setThreadSummary, upsertThreadItem } from "../../../src/domain/threads/StoryThreadsNote";
 
 const note = `---
 creative-writer: false
@@ -206,5 +206,37 @@ describe("a thread's scale and a stop's keyword", () => {
     expect(r.markdown).toBe(`## T\n<!-- scale: loathing, calm, love -->\n- [[One#Quay]] — loathing: cold\n- [[One#Creek]] — plant: loathing: "salt" colder\n- [[Two#Return]] — love: warm\n`);
     expect(renameScaleWord(md, "T", "hate", "hate")).toEqual({ markdown: md, changed: 0 });
     expect(renameScaleWord(md, "U", "hate", "x")).toEqual({ markdown: md, changed: 0 });
+  });
+});
+
+describe("a thread's summary", () => {
+  it("reads the first comment under the heading that is not the scale, in either comment syntax, and leaves stops alone", () => {
+    const md = `## Arc: [[Anna]]
+<!-- scale: fear, calm, peace -->
+<!-- A self-sacrifice arc -->
+<!-- a second comment is not it -->
+- [[One#Quay]] — fear: cold
+
+## The letter
+%% the letter nobody collects %%
+- [[One#Quay]] — planted
+`;
+    const [arc, letter] = parseStoryThreads(md);
+    expect(arc!.summary).toBe("A self-sacrifice arc");
+    expect(arc!.summaryLine).toBe(2);
+    expect(arc!.scale).toEqual(["fear", "calm", "peace"]);
+    expect(arc!.items).toHaveLength(1);
+    expect(letter!.summary).toBe("the letter nobody collects");
+    expect(parseStoryThreads("## T\n- [[One#Quay]]\n")[0]!.summary).toBeNull();
+  });
+
+  it("writes the summary right under the heading, replaces it in place, and removes it on null or blank", () => {
+    const md = `## T\n<!-- scale: a, b, c -->\n- [[One#Quay]] — warm\n`;
+    const written = setThreadSummary(md, "T", "  what it   is -- really ");
+    expect(written).toBe(`## T\n<!-- what it is – really -->\n<!-- scale: a, b, c -->\n- [[One#Quay]] — warm\n`);
+    expect(setThreadSummary(written, "T", "shorter")).toBe(`## T\n<!-- shorter -->\n<!-- scale: a, b, c -->\n- [[One#Quay]] — warm\n`);
+    expect(setThreadSummary(written, "T", null)).toBe(md);
+    expect(setThreadSummary(written, "T", "   ")).toBe(md);
+    expect(setThreadSummary(md, "Nope", "x")).toBe(md);
   });
 });

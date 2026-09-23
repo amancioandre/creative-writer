@@ -57,7 +57,7 @@ export function buildThreads(graph: StoryGraph, file: StoryMapFile, writer: read
   const nextLine = sceneEnds(graph);
   for (const t of writer) {
     const refs = t.items.map((item) => anchored(resolveThreadRef(item, places), textOf, nextLine)).sort((a, b) => (a.index < 0 ? 1 : b.index < 0 ? -1 : a.index - b.index) || (a.line ?? 0) - (b.line ?? 0));
-    threads.push({ id: `writer:${t.name.trim().toLowerCase()}`, kind: "writer", source: "writer", label: t.name, refs, stale: false, directed: refs.some((r) => r.role === "plant"), dangling: danglingPlants(refs), ...(t.scale ? { scale: t.scale } : {}) });
+    threads.push({ id: `writer:${t.name.trim().toLowerCase()}`, kind: "writer", source: "writer", label: t.name, refs, stale: false, directed: refs.some((r) => r.role === "plant"), dangling: danglingPlants(refs), ...(t.scale ? { scale: t.scale } : {}), ...(t.summary ? { summary: t.summary } : {}) });
   }
 
   const intents = new Map(file.intents.map((r) => [r.key, r]));

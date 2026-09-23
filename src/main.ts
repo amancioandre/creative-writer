@@ -573,6 +573,7 @@ export default class CreativeZenModePlugin extends Plugin {
       removeThread: (project, name) => editThread.removeThread(project, name),
       renameThread: (project, from, to) => editThread.rename(project, from, to),
       setScale: (project, thread, words) => editThread.setScale(project, thread, words),
+      setSummary: (project, thread, text) => editThread.setSummary(project, thread, text),
       renameScaleWord: (project, thread, from, to) => editThread.renameScaleWord(project, thread, from, to),
       setProjectKey: (project, key, value) => this.setTextKey(project.notePath, key, value),
       gridSettings: () => this.current.plotGrid,

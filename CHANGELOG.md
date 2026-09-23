@@ -2,6 +2,10 @@
 
 Release notes for every version are on the [releases page](https://github.com/amancioandre/creative-writer/releases). This file carries the same text for the versions since it was started.
 
+## Unreleased
+
+- **A summary under the column's name.** A comment line under a heading in `Story threads.md` is the column's summary, what the arc is or what the theme argues, shown under the name in three lines at most and whole on hover; **Summary…** in the column's menu and the Column section write it, with Undo.
+
 ## 0.14.1 — Headers that wrap
 
 - **Column names wrap.** A column's name and the line under it wrap in the header and take the height they need, instead of cutting off with an ellipsis; a theme asked as a question now reads whole.
